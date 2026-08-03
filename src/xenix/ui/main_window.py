@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-import logging
 import threading
-from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING
 from uuid import uuid4
 
 from PySide6.QtCore import QEvent, QPoint, QSize, Qt, QTimer, QUrl, Signal
@@ -51,8 +49,6 @@ from .settings_dialog import SettingsDialog, SettingsTab
 from .software_update import SoftwareUpdateController
 from .tool_call_detail_view import ToolCallDetailView
 
-LOGGER = logging.getLogger(__name__)
-
 if TYPE_CHECKING:
     from ..services.knowledge_derivation_service import KnowledgeDerivationService
     from ..services.knowledge_document_lifecycle_service import (
@@ -95,24 +91,6 @@ class _PendingComposerSubmission:
     append_acknowledged: bool = False
 
 
-class MainWindowActionHandle(Protocol):
-    """Lifecycle handle returned by an optional main-window action."""
-
-    def retranslate_ui(self) -> None: ...
-
-    def shutdown(self) -> None: ...
-
-
-class MainWindowActionContribution(Protocol):
-    """Optional app-composed action that attaches to the main-window header."""
-
-    def attach(
-        self,
-        window: MainWindow,
-        header_layout: QHBoxLayout,
-    ) -> MainWindowActionHandle: ...
-
-
 class MainWindow(QMainWindow):
     closing = Signal()
     _harness_failed = Signal(object)
@@ -147,7 +125,6 @@ class MainWindow(QMainWindow):
         knowledge_workspace_service: KnowledgeWorkspaceService | None = None,
         knowledge_document_lifecycle_service: KnowledgeDocumentLifecycleService
         | None = None,
-        action_contributions: Sequence[MainWindowActionContribution] = (),
     ) -> None:
         super().__init__()
         self._paths = paths
@@ -179,8 +156,6 @@ class MainWindow(QMainWindow):
         self._knowledge_document_lifecycle_service = (
             knowledge_document_lifecycle_service
         )
-        self._action_contributions = tuple(action_contributions)
-        self._action_contribution_handles: list[MainWindowActionHandle] = []
         self._agent_thread_id: str | None = None
         self._active_pending_message_id: str | None = None
         self._active_submission_id: str | None = None
@@ -294,7 +269,6 @@ class MainWindow(QMainWindow):
         layout.addLayout(content_layout, 1)
 
         self.setCentralWidget(root)
-        self._attach_action_contributions(header_layout)
         self._refresh_history_sidebar()
         current_item = self._history_list.currentItem()
         if current_item is not None:
@@ -304,7 +278,6 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event) -> None:  # type: ignore[override]
         super().closeEvent(event)
         if event.isAccepted():
-            self._shutdown_action_contributions()
             if self._software_update_controller is not None:
                 self._software_update_controller.shutdown()
             if self._knowledge_workspace is not None:
@@ -330,34 +303,6 @@ class MainWindow(QMainWindow):
         if self._software_update_controller is not None:
             self._software_update_controller.retranslate_ui()
         self._sync_model_picker_options()
-        self._retranslate_action_contributions()
-
-    def _attach_action_contributions(self, header_layout: QHBoxLayout) -> None:
-        for contribution in self._action_contributions:
-            try:
-                handle = contribution.attach(self, header_layout)
-                if handle is None:
-                    raise TypeError("Main-window action contribution returned no lifecycle handle.")
-            except Exception:
-                LOGGER.exception("Main-window action contribution failed to attach.")
-                continue
-            self._action_contribution_handles.append(handle)
-
-    def _retranslate_action_contributions(self) -> None:
-        for handle in tuple(self._action_contribution_handles):
-            try:
-                handle.retranslate_ui()
-            except Exception:
-                LOGGER.exception("Main-window action contribution failed to retranslate.")
-
-    def _shutdown_action_contributions(self) -> None:
-        handles = self._action_contribution_handles
-        self._action_contribution_handles = []
-        for handle in handles:
-            try:
-                handle.shutdown()
-            except Exception:
-                LOGGER.exception("Main-window action contribution failed to shut down.")
 
     def changeEvent(self, event: QEvent) -> None:
         if event.type() == QEvent.LanguageChange:

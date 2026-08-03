@@ -15,7 +15,6 @@ from xenix.services.embedding_service import EmbeddingSettingsService
 from xenix.services.knowledge_index_service import KnowledgeIndexOverview
 from xenix.services.llm import LLMService, LLMSettingsService
 from xenix.services.ml.worker_settings import MLWorkerSettingsService
-from xenix.services.settings_store import SettingsStore
 from xenix.ui.settings_dialog import SettingsDialog
 
 
@@ -60,11 +59,10 @@ def _build_dialog(
     monkeypatch,
     tmp_path: Path,
     index_service,
-) -> tuple[SettingsDialog, SettingsStore]:
+) -> SettingsDialog:
     monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
     paths = ensure_app_dirs(get_app_paths())
-    settings_store = SettingsStore(paths.config)
-    llm_settings = LLMSettingsService(settings_store=settings_store)
+    llm_settings = LLMSettingsService(paths)
     dialog = SettingsDialog(
         paths,
         paths.logs / "xenix.log",
@@ -73,10 +71,10 @@ def _build_dialog(
         LLMService(llm_settings),
         llm_settings,
         MLWorkerSettingsService(paths),
-        EmbeddingSettingsService(settings_store=settings_store),
+        EmbeddingSettingsService(paths),
         knowledge_index_service=index_service,
     )
-    return dialog, settings_store
+    return dialog
 
 
 def test_settings_dialog_opens_before_index_status_finishes(
@@ -112,7 +110,7 @@ def test_settings_dialog_opens_before_index_status_finishes(
 
     indexes = BlockingIndexes()
     main_thread_id = threading.get_ident()
-    dialog, settings_store = _build_dialog(
+    dialog = _build_dialog(
         app=app,
         monkeypatch=monkeypatch,
         tmp_path=tmp_path,
@@ -139,7 +137,6 @@ def test_settings_dialog_opens_before_index_status_finishes(
         indexes.release.set()
         dialog.close()
         dialog.shutdown()
-        settings_store.close()
 
 
 def test_settings_dialog_discards_status_from_previous_activation(
@@ -188,7 +185,7 @@ def test_settings_dialog_discards_status_from_previous_activation(
             return future
 
     indexes = SequencedIndexes()
-    dialog, settings_store = _build_dialog(
+    dialog = _build_dialog(
         app=app,
         monkeypatch=monkeypatch,
         tmp_path=tmp_path,
@@ -219,7 +216,6 @@ def test_settings_dialog_discards_status_from_previous_activation(
             release.set()
         dialog.close()
         dialog.shutdown()
-        settings_store.close()
 
 
 def test_settings_dialog_shutdown_does_not_wait_for_running_index_status(
@@ -247,7 +243,7 @@ def test_settings_dialog_shutdown_does_not_wait_for_running_index_status(
             return self.future
 
     indexes = RunningIndexes()
-    dialog, settings_store = _build_dialog(
+    dialog = _build_dialog(
         app=app,
         monkeypatch=monkeypatch,
         tmp_path=tmp_path,
@@ -276,4 +272,3 @@ def test_settings_dialog_shutdown_does_not_wait_for_running_index_status(
             indexes.future.set_result(_overview("ready", unit_count=67))
         dialog.close()
         dialog.shutdown()
-        settings_store.close()

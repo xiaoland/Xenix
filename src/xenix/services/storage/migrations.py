@@ -9,7 +9,7 @@ from sqlmodel import SQLModel
 from ...exceptions import ValidationError
 from . import models  # noqa: F401
 
-CURRENT_SCHEMA_VERSION = 24
+CURRENT_SCHEMA_VERSION = 23
 
 
 def get_user_version(engine: Engine) -> int:
@@ -1669,83 +1669,6 @@ def migrate_v22_to_v23(engine: Engine) -> int:
     return 23
 
 
-def migrate_v23_to_v24(engine: Engine) -> int:
-    """Add inert managed-installation records without coupling storage to AMD code."""
-
-    with engine.begin() as connection:
-        connection.exec_driver_sql(
-            """
-            CREATE TABLE IF NOT EXISTS amd_target_enrollment (
-                id VARCHAR NOT NULL PRIMARY KEY,
-                host VARCHAR NOT NULL,
-                user VARCHAR NOT NULL,
-                port INTEGER NOT NULL,
-                pinned_host_key VARCHAR NOT NULL,
-                identity_file_reference VARCHAR NOT NULL,
-                created_at DATETIME NOT NULL
-            )
-            """
-        )
-        connection.exec_driver_sql(
-            """
-            CREATE TABLE IF NOT EXISTS amd_installation (
-                id VARCHAR NOT NULL PRIMARY KEY,
-                placement VARCHAR NOT NULL,
-                target_id VARCHAR,
-                profile_id VARCHAR NOT NULL,
-                profile_digest VARCHAR NOT NULL,
-                desired_presence BOOLEAN NOT NULL,
-                lifecycle_state VARCHAR NOT NULL,
-                revision INTEGER NOT NULL,
-                created_at DATETIME NOT NULL,
-                updated_at DATETIME NOT NULL,
-                CONSTRAINT uq_amd_installation_id_placement UNIQUE (id, placement),
-                FOREIGN KEY(target_id) REFERENCES amd_target_enrollment (id)
-            )
-            """
-        )
-        connection.exec_driver_sql(
-            """
-            CREATE TABLE IF NOT EXISTS amd_component_generation (
-                id VARCHAR NOT NULL PRIMARY KEY,
-                installation_id VARCHAR NOT NULL,
-                capability VARCHAR NOT NULL,
-                manifest_digest VARCHAR NOT NULL,
-                lifecycle_state VARCHAR NOT NULL,
-                phase VARCHAR NOT NULL,
-                error_code VARCHAR,
-                attestation_reference VARCHAR,
-                revision INTEGER NOT NULL,
-                created_at DATETIME NOT NULL,
-                updated_at DATETIME NOT NULL,
-                CONSTRAINT uq_amd_component_generation_identity
-                    UNIQUE (installation_id, capability, manifest_digest),
-                FOREIGN KEY(installation_id) REFERENCES amd_installation (id)
-            )
-            """
-        )
-        for name, table, column in (
-            ("ix_amd_target_enrollment_host", "amd_target_enrollment", "host"),
-            ("ix_amd_installation_placement", "amd_installation", "placement"),
-            ("ix_amd_installation_target_id", "amd_installation", "target_id"),
-            ("ix_amd_installation_profile_id", "amd_installation", "profile_id"),
-            ("ix_amd_installation_profile_digest", "amd_installation", "profile_digest"),
-            ("ix_amd_installation_desired_presence", "amd_installation", "desired_presence"),
-            ("ix_amd_installation_lifecycle_state", "amd_installation", "lifecycle_state"),
-            ("ix_amd_component_generation_installation_id", "amd_component_generation", "installation_id"),
-            ("ix_amd_component_generation_capability", "amd_component_generation", "capability"),
-            ("ix_amd_component_generation_manifest_digest", "amd_component_generation", "manifest_digest"),
-            ("ix_amd_component_generation_lifecycle_state", "amd_component_generation", "lifecycle_state"),
-            ("ix_amd_component_generation_phase", "amd_component_generation", "phase"),
-            ("ix_amd_component_generation_error_code", "amd_component_generation", "error_code"),
-        ):
-            connection.exec_driver_sql(
-                f"CREATE INDEX IF NOT EXISTS {name} ON {table} ({column})"
-            )
-        connection.exec_driver_sql("PRAGMA user_version=24")
-    return 24
-
-
 def _create_v16_knowledge_schema(connection) -> None:
     """Create the fixed historical v16 Knowledge shape without current metadata."""
 
@@ -1878,8 +1801,6 @@ def run_migrations(engine: Engine) -> int:
         current_version = migrate_v21_to_v22(engine)
     if current_version == 22:
         current_version = migrate_v22_to_v23(engine)
-    if current_version == 23:
-        current_version = migrate_v23_to_v24(engine)
     if current_version == CURRENT_SCHEMA_VERSION:
         return current_version
     raise ValidationError(

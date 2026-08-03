@@ -30,26 +30,6 @@ class ConversationRepository:
         statement = select(ConversationThreadRow).order_by(ConversationThreadRow.updated_at.desc())
         return list(session.exec(statement))
 
-    def list_thread_ids_referencing_model(
-        self,
-        session: Session,
-        fq_model_key: str,
-    ) -> tuple[str, ...]:
-        """Return exact historical Thread references without making them blockers.
-
-        The LLM settings owner uses this narrow query only to classify a removed
-        generation's retained history.  A persisted Thread reference is stale
-        after removal rather than authority to retain remote compute.
-        """
-
-        normalized = fq_model_key.strip()
-        if not normalized:
-            raise ValidationError("LLM model key cannot be blank.")
-        statement = select(ConversationThreadRow.id).where(
-            ConversationThreadRow.selected_fq_model_key == normalized
-        )
-        return tuple(str(thread_id) for thread_id in session.exec(statement))
-
     def rename_thread(
         self,
         session: Session,

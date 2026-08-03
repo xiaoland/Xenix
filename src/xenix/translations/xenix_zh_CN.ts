@@ -4,52 +4,52 @@
 <context>
     <name>AboutDialog</name>
     <message>
-        <location filename="../ui/settings_dialog.py" line="154"/>
+        <location filename="../ui/settings_dialog.py" line="150"/>
         <source>About</source>
         <translation>关于</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="155"/>
+        <location filename="../ui/settings_dialog.py" line="151"/>
         <source>App home</source>
         <translation>应用目录</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="156"/>
+        <location filename="../ui/settings_dialog.py" line="152"/>
         <source>State</source>
         <translation>状态目录</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="157"/>
+        <location filename="../ui/settings_dialog.py" line="153"/>
         <source>Artifacts</source>
         <translation>制品目录</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="158"/>
+        <location filename="../ui/settings_dialog.py" line="154"/>
         <source>Database</source>
         <translation>数据库</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="159"/>
+        <location filename="../ui/settings_dialog.py" line="155"/>
         <source>Current log file</source>
         <translation>当前日志文件</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="160"/>
+        <location filename="../ui/settings_dialog.py" line="156"/>
         <source>App version</source>
         <translation>应用版本</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="161"/>
+        <location filename="../ui/settings_dialog.py" line="157"/>
         <source>Build commit</source>
         <translation>构建提交</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="162"/>
+        <location filename="../ui/settings_dialog.py" line="158"/>
         <source>Open log directory</source>
         <translation>打开日志目录</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="163"/>
+        <location filename="../ui/settings_dialog.py" line="159"/>
         <source>Check for updates</source>
         <translation>检查更新</translation>
     </message>
@@ -80,134 +80,6 @@
     <message>
         <source>Restart Xenix now to apply version {version}?</source>
         <translation type="vanished">现在重启 Xenix 并应用版本 {version} 吗？</translation>
-    </message>
-</context>
-<context>
-    <name>AmdGuidedSetupDialog</name>
-    <message>
-        <location filename="../ui/amd_setup.py" line="171"/>
-        <source>AMD Radeon setup</source>
-        <translation>AMD Radeon 设置</translation>
-    </message>
-    <message>
-        <location filename="../ui/amd_setup.py" line="172"/>
-        <source>Local Linux Radeon</source>
-        <translation>本地 Linux Radeon</translation>
-    </message>
-    <message>
-        <location filename="../ui/amd_setup.py" line="173"/>
-        <source>Private SSH Radeon</source>
-        <translation>私有 SSH Radeon</translation>
-    </message>
-    <message>
-        <location filename="../ui/amd_setup.py" line="174"/>
-        <source>Installation ID</source>
-        <translation>安装 ID</translation>
-    </message>
-    <message>
-        <location filename="../ui/amd_setup.py" line="175"/>
-        <source>Target ID</source>
-        <translation>目标 ID</translation>
-    </message>
-    <message>
-        <location filename="../ui/amd_setup.py" line="176"/>
-        <source>Host</source>
-        <translation>主机</translation>
-    </message>
-    <message>
-        <location filename="../ui/amd_setup.py" line="177"/>
-        <source>User</source>
-        <translation>用户</translation>
-    </message>
-    <message>
-        <location filename="../ui/amd_setup.py" line="178"/>
-        <source>Port</source>
-        <translation>端口</translation>
-    </message>
-    <message>
-        <location filename="../ui/amd_setup.py" line="179"/>
-        <source>Identity file</source>
-        <translation>身份文件</translation>
-    </message>
-    <message>
-        <location filename="../ui/amd_setup.py" line="180"/>
-        <source>Browse…</source>
-        <translation>浏览…</translation>
-    </message>
-    <message>
-        <location filename="../ui/amd_setup.py" line="181"/>
-        <source>Pinned public host key</source>
-        <translation>已固定的主机公钥</translation>
-    </message>
-    <message>
-        <location filename="../ui/amd_setup.py" line="183"/>
-        <source>OpenSSH public key</source>
-        <translation>OpenSSH 公钥</translation>
-    </message>
-    <message>
-        <location filename="../ui/amd_setup.py" line="185"/>
-        <source>Condition</source>
-        <translation>状态</translation>
-    </message>
-    <message>
-        <location filename="../ui/amd_setup.py" line="186"/>
-        <source>Phase</source>
-        <translation>阶段</translation>
-    </message>
-    <message>
-        <location filename="../ui/amd_setup.py" line="187"/>
-        <source>Error code</source>
-        <translation>错误代码</translation>
-    </message>
-    <message>
-        <location filename="../ui/amd_setup.py" line="188"/>
-        <source>Install</source>
-        <translation>安装</translation>
-    </message>
-    <message>
-        <location filename="../ui/amd_setup.py" line="189"/>
-        <source>Repair</source>
-        <translation>修复</translation>
-    </message>
-    <message>
-        <location filename="../ui/amd_setup.py" line="191"/>
-        <source>Retry removal</source>
-        <translation>重试移除</translation>
-    </message>
-    <message>
-        <location filename="../ui/amd_setup.py" line="191"/>
-        <source>Remove</source>
-        <translation>移除</translation>
-    </message>
-    <message>
-        <location filename="../ui/amd_setup.py" line="193"/>
-        <source>Close</source>
-        <translation>关闭</translation>
-    </message>
-    <message>
-        <location filename="../ui/amd_setup.py" line="291"/>
-        <source>Choose an identity file</source>
-        <translation>选择身份文件</translation>
-    </message>
-    <message>
-        <location filename="../ui/amd_setup.py" line="293"/>
-        <source>All files (*)</source>
-        <translation>所有文件 (*)</translation>
-    </message>
-    <message>
-        <location filename="../ui/amd_setup.py" line="464"/>
-        <source>Requesting safe retirement</source>
-        <translation>正在请求安全退役</translation>
-    </message>
-    <message>
-        <location filename="../ui/amd_setup.py" line="466"/>
-        <source>Removal requested; retiring safely</source>
-        <translation>已请求移除；正在安全退役</translation>
-    </message>
-    <message>
-        <location filename="../ui/amd_setup.py" line="467"/>
-        <source>Not available</source>
-        <translation>不可用</translation>
     </message>
 </context>
 <context>
@@ -1462,32 +1334,32 @@ Trigger: %2</source>
 <context>
     <name>MainWindow</name>
     <message>
-        <location filename="../ui/main_window.py" line="317"/>
+        <location filename="../ui/main_window.py" line="290"/>
         <source>Xenix Native</source>
         <translation>Xenix 原生版</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="318"/>
+        <location filename="../ui/main_window.py" line="291"/>
         <source>Xenix</source>
         <translation>Xenix</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="319"/>
+        <location filename="../ui/main_window.py" line="292"/>
         <source>Settings</source>
         <translation>设置</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="320"/>
+        <location filename="../ui/main_window.py" line="293"/>
         <source>Knowledge</source>
         <translation>知识库</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="321"/>
+        <location filename="../ui/main_window.py" line="294"/>
         <source>History</source>
         <translation>历史</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="323"/>
+        <location filename="../ui/main_window.py" line="296"/>
         <source>New thread</source>
         <translation>新建线程</translation>
     </message>
@@ -1508,18 +1380,18 @@ Trigger: %2</source>
         <translation type="vanished">无法打开产物：{path}</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="754"/>
-        <location filename="../ui/main_window.py" line="771"/>
+        <location filename="../ui/main_window.py" line="699"/>
+        <location filename="../ui/main_window.py" line="716"/>
         <source>Opening link...</source>
         <translation>正在打开链接...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="772"/>
+        <location filename="../ui/main_window.py" line="717"/>
         <source>Open Link</source>
         <translation>打开链接</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="826"/>
+        <location filename="../ui/main_window.py" line="771"/>
         <source>The submitted message is being prepared and cannot be stopped.</source>
         <translation>已提交的消息正在准备中，无法停止。</translation>
     </message>
@@ -1564,92 +1436,92 @@ Trigger: %2</source>
         <translation type="vanished">正在下载 Xenix {version}...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="440"/>
+        <location filename="../ui/main_window.py" line="385"/>
         <source>Knowledge Workspace</source>
         <translation>知识工作区</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="441"/>
+        <location filename="../ui/main_window.py" line="386"/>
         <source>Knowledge services are not available.</source>
         <translation>知识库服务当前不可用。</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="570"/>
+        <location filename="../ui/main_window.py" line="515"/>
         <source>The selected source path is not a file.</source>
         <translation>所选源路径不是文件。</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="839"/>
+        <location filename="../ui/main_window.py" line="784"/>
         <source>Stopped.</source>
         <translation>已停止。</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="895"/>
+        <location filename="../ui/main_window.py" line="840"/>
         <source>Rename</source>
         <translation>重命名</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="896"/>
+        <location filename="../ui/main_window.py" line="841"/>
         <source>Generate title...</source>
         <translation>生成标题...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="897"/>
+        <location filename="../ui/main_window.py" line="842"/>
         <source>Copy thread ID</source>
         <translation>复制线程 ID</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="898"/>
+        <location filename="../ui/main_window.py" line="843"/>
         <source>Delete</source>
         <translation>删除</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="923"/>
+        <location filename="../ui/main_window.py" line="868"/>
         <source>Rename Thread</source>
         <translation>重命名线程</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="924"/>
-        <location filename="../ui/main_window.py" line="991"/>
+        <location filename="../ui/main_window.py" line="869"/>
+        <location filename="../ui/main_window.py" line="936"/>
         <source>Thread name</source>
         <translation>线程名称</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="940"/>
-        <location filename="../ui/main_window.py" line="971"/>
-        <location filename="../ui/main_window.py" line="1001"/>
-        <location filename="../ui/main_window.py" line="1011"/>
+        <location filename="../ui/main_window.py" line="885"/>
+        <location filename="../ui/main_window.py" line="916"/>
+        <location filename="../ui/main_window.py" line="946"/>
+        <location filename="../ui/main_window.py" line="956"/>
         <source>Generate Thread Title</source>
         <translation>生成线程标题</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="941"/>
+        <location filename="../ui/main_window.py" line="886"/>
         <source>Thread title model is not configured.</source>
         <translation>未配置线程标题模型。</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="964"/>
+        <location filename="../ui/main_window.py" line="909"/>
         <source>Generating thread title...</source>
         <translation>正在生成线程标题...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="990"/>
+        <location filename="../ui/main_window.py" line="935"/>
         <source>Apply Generated Title</source>
         <translation>应用生成的标题</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="1026"/>
-        <location filename="../ui/main_window.py" line="1034"/>
+        <location filename="../ui/main_window.py" line="971"/>
+        <location filename="../ui/main_window.py" line="979"/>
         <source>Delete Thread</source>
         <translation>删除线程</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="1027"/>
+        <location filename="../ui/main_window.py" line="972"/>
         <source>Stop the current run before deleting this thread.</source>
         <translation>删除此线程前请先停止当前运行。</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="1035"/>
+        <location filename="../ui/main_window.py" line="980"/>
         <source>Delete &quot;{title}&quot;? This action cannot be undone.</source>
         <translation>删除“{title}”？此操作无法撤销。</translation>
     </message>
@@ -1657,16 +1529,15 @@ Trigger: %2</source>
 <context>
     <name>SettingsDialog</name>
     <message>
-        <location filename="../ui/settings_dialog.py" line="485"/>
-        <location filename="../ui/settings_dialog.py" line="896"/>
-        <location filename="../ui/settings_dialog.py" line="962"/>
-        <location filename="../ui/settings_dialog.py" line="1172"/>
-        <location filename="../ui/settings_dialog.py" line="1198"/>
+        <location filename="../ui/settings_dialog.py" line="474"/>
+        <location filename="../ui/settings_dialog.py" line="800"/>
+        <location filename="../ui/settings_dialog.py" line="825"/>
+        <location filename="../ui/settings_dialog.py" line="1050"/>
         <source>Settings</source>
         <translation>设置</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="486"/>
+        <location filename="../ui/settings_dialog.py" line="475"/>
         <source>Language</source>
         <translation>语言</translation>
     </message>
@@ -1675,162 +1546,161 @@ Trigger: %2</source>
         <translation type="vanished">LLM 提供商</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.py" line="491"/>
         <location filename="../ui/settings_dialog.py" line="502"/>
-        <location filename="../ui/settings_dialog.py" line="514"/>
         <source>Base URL</source>
         <translation>基础 URL</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.py" line="492"/>
         <location filename="../ui/settings_dialog.py" line="503"/>
-        <location filename="../ui/settings_dialog.py" line="515"/>
         <source>API key</source>
         <translation>API 密钥</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="516"/>
+        <location filename="../ui/settings_dialog.py" line="504"/>
         <source>Model</source>
         <translation>模型</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="508"/>
+        <location filename="../ui/settings_dialog.py" line="497"/>
         <source>Turn guard model</source>
         <translation>轮次守卫模型</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="509"/>
+        <location filename="../ui/settings_dialog.py" line="498"/>
         <source>Thread title model</source>
         <translation>线程标题模型</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="505"/>
-        <location filename="../ui/settings_dialog.py" line="520"/>
+        <location filename="../ui/settings_dialog.py" line="494"/>
+        <location filename="../ui/settings_dialog.py" line="508"/>
         <source>Timeout</source>
         <translation>超时</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="487"/>
+        <location filename="../ui/settings_dialog.py" line="476"/>
         <source>AI</source>
         <translation>AI</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="490"/>
+        <location filename="../ui/settings_dialog.py" line="479"/>
         <source>Knowledge Base</source>
         <translation>知识库</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="494"/>
+        <location filename="../ui/settings_dialog.py" line="483"/>
         <source>ML Workers</source>
         <translation>ML 工作器</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="496"/>
+        <location filename="../ui/settings_dialog.py" line="485"/>
         <source>Global models</source>
         <translation>全局模型</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="497"/>
+        <location filename="../ui/settings_dialog.py" line="486"/>
         <source>LLM providers</source>
         <translation>LLM 提供商</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="498"/>
-        <location filename="../ui/settings_dialog.py" line="512"/>
+        <location filename="../ui/settings_dialog.py" line="487"/>
         <source>Provider</source>
         <translation>提供商</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="499"/>
+        <location filename="../ui/settings_dialog.py" line="488"/>
         <source>Provider key</source>
         <translation>提供商键</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="500"/>
+        <location filename="../ui/settings_dialog.py" line="489"/>
         <source>Provider name</source>
         <translation>提供商名称</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="501"/>
+        <location filename="../ui/settings_dialog.py" line="490"/>
         <source>Dialect</source>
         <translation>方言</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="504"/>
+        <location filename="../ui/settings_dialog.py" line="493"/>
         <source>Models</source>
         <translation>模型</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="506"/>
+        <location filename="../ui/settings_dialog.py" line="495"/>
         <source>Streaming</source>
         <translation>流式输出</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="507"/>
+        <location filename="../ui/settings_dialog.py" line="496"/>
         <source>Default model</source>
         <translation>默认模型</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="510"/>
+        <location filename="../ui/settings_dialog.py" line="499"/>
         <source>LLM retry attempts</source>
         <translation>LLM 重试次数</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="511"/>
+        <location filename="../ui/settings_dialog.py" line="500"/>
         <source>Embedding provider</source>
         <translation>嵌入模型提供商</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="513"/>
+        <location filename="../ui/settings_dialog.py" line="501"/>
         <source>Enabled</source>
         <translation>启用</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="517"/>
+        <location filename="../ui/settings_dialog.py" line="505"/>
         <source>Dimensions</source>
         <translation>向量维度</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="518"/>
+        <location filename="../ui/settings_dialog.py" line="506"/>
         <source>Provider default (0)</source>
         <translation>使用提供商默认值（0）</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="519"/>
+        <location filename="../ui/settings_dialog.py" line="507"/>
         <source>Batch size</source>
         <translation>批次大小</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="521"/>
+        <location filename="../ui/settings_dialog.py" line="509"/>
         <source>OCR</source>
         <translation>OCR</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="522"/>
-        <location filename="../ui/settings_dialog.py" line="670"/>
+        <location filename="../ui/settings_dialog.py" line="510"/>
+        <location filename="../ui/settings_dialog.py" line="664"/>
         <source>Set up local PaddleOCR</source>
         <translation>部署本地 PaddleOCR</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="523"/>
+        <location filename="../ui/settings_dialog.py" line="511"/>
         <source>Indexes</source>
         <translation>索引</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="524"/>
+        <location filename="../ui/settings_dialog.py" line="512"/>
         <source>Rebuild indexes...</source>
         <translation>重建索引...</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="525"/>
+        <location filename="../ui/settings_dialog.py" line="513"/>
         <source>Add</source>
         <translation>添加</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="526"/>
+        <location filename="../ui/settings_dialog.py" line="514"/>
         <source>Remove</source>
         <translation>移除</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="527"/>
+        <location filename="../ui/settings_dialog.py" line="515"/>
         <source>OpenAI-compatible</source>
         <translation>OpenAI 兼容</translation>
     </message>
@@ -1851,17 +1721,17 @@ Trigger: %2</source>
         <translation type="vanished">AIMock API 密钥</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="529"/>
+        <location filename="../ui/settings_dialog.py" line="517"/>
         <source>ML workers</source>
         <translation>ML 工作器</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="530"/>
+        <location filename="../ui/settings_dialog.py" line="518"/>
         <source>Add SSH worker...</source>
         <translation>添加 SSH 工作器...</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="531"/>
+        <location filename="../ui/settings_dialog.py" line="519"/>
         <source>About</source>
         <translation>关于</translation>
     </message>
@@ -1894,7 +1764,7 @@ Trigger: %2</source>
         <translation type="vanished">打开日志目录</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="532"/>
+        <location filename="../ui/settings_dialog.py" line="520"/>
         <source>Save</source>
         <translation>保存</translation>
     </message>
@@ -1915,43 +1785,43 @@ Trigger: %2</source>
         <translation type="vanished">正在准备 OCR 模型</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="571"/>
-        <location filename="../ui/settings_dialog.py" line="1120"/>
+        <location filename="../ui/settings_dialog.py" line="563"/>
+        <location filename="../ui/settings_dialog.py" line="998"/>
         <source>Ready</source>
         <translation>就绪</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="573"/>
+        <location filename="../ui/settings_dialog.py" line="565"/>
         <source>Preparing local OCR</source>
         <translation>正在准备本地 OCR</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="574"/>
+        <location filename="../ui/settings_dialog.py" line="567"/>
         <source>Local OCR setup: %1</source>
         <translation>本地 OCR 部署：%1</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="592"/>
+        <location filename="../ui/settings_dialog.py" line="586"/>
         <source>Local OCR Setup Failed</source>
         <translation>本地 OCR 部署失败</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="617"/>
+        <location filename="../ui/settings_dialog.py" line="611"/>
         <source>Local OCR setup could not be completed.</source>
         <translation>无法完成本地 OCR 部署。</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="646"/>
+        <location filename="../ui/settings_dialog.py" line="640"/>
         <source>Local PaddleOCR service is unavailable</source>
         <translation>本地 PaddleOCR 服务不可用</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="649"/>
+        <location filename="../ui/settings_dialog.py" line="643"/>
         <source>Checking local PaddleOCR status</source>
         <translation>正在检查本地 PaddleOCR 状态</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="652"/>
+        <location filename="../ui/settings_dialog.py" line="646"/>
         <source>Local PaddleOCR is ready</source>
         <translation>本地 PaddleOCR 已就绪</translation>
     </message>
@@ -1960,27 +1830,27 @@ Trigger: %2</source>
         <translation type="vanished">本地 PaddleOCR 运行时已安装，模型尚未就绪</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="668"/>
+        <location filename="../ui/settings_dialog.py" line="662"/>
         <source>Local PaddleOCR is not installed</source>
         <translation>本地 PaddleOCR 尚未安装</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="717"/>
+        <location filename="../ui/settings_dialog.py" line="711"/>
         <source>English</source>
         <translation>English</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="718"/>
+        <location filename="../ui/settings_dialog.py" line="712"/>
         <source>Simplified Chinese</source>
         <translation>简体中文</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="742"/>
+        <location filename="../ui/settings_dialog.py" line="736"/>
         <source>Language Switch Failed</source>
         <translation>语言切换失败</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="743"/>
+        <location filename="../ui/settings_dialog.py" line="737"/>
         <source>Unable to switch the application language.
 
 {details}</source>
@@ -1989,205 +1859,198 @@ Trigger: %2</source>
 {details}</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="909"/>
-        <location filename="../ui/settings_dialog.py" line="972"/>
+        <location filename="../ui/settings_dialog.py" line="813"/>
+        <location filename="../ui/settings_dialog.py" line="839"/>
         <source>Knowledge Indexes</source>
         <translation>知识库索引</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="973"/>
+        <location filename="../ui/settings_dialog.py" line="841"/>
         <source>Embedding settings were saved, but the vector rebuild could not be queued.</source>
         <translation>Embedding 设置已保存，但无法将文本向量重建加入队列。</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="981"/>
+        <location filename="../ui/settings_dialog.py" line="851"/>
         <source>Rebuild text vectors?</source>
         <translation>重建文本向量？</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="984"/>
+        <location filename="../ui/settings_dialog.py" line="854"/>
         <source>This change uses a different embedding space. Existing text vectors cannot be reused for current Knowledge content.</source>
         <translation>此更改将使用不同的 Embedding 空间。现有文本向量无法用于当前知识库内容。</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="989"/>
+        <location filename="../ui/settings_dialog.py" line="859"/>
         <source>Save and rebuild now</source>
         <translation>保存并立即重建</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="993"/>
+        <location filename="../ui/settings_dialog.py" line="863"/>
         <source>Save; rebuild later</source>
         <translation>保存；稍后重建</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="1098"/>
+        <location filename="../ui/settings_dialog.py" line="973"/>
         <source>Knowledge index service is unavailable</source>
         <translation>知识库索引服务不可用</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="910"/>
-        <location filename="../ui/settings_dialog.py" line="1104"/>
+        <location filename="../ui/settings_dialog.py" line="814"/>
+        <location filename="../ui/settings_dialog.py" line="980"/>
         <source>Knowledge index status is unavailable</source>
         <translation>无法获取知识库索引状态</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="566"/>
+        <location filename="../ui/settings_dialog.py" line="558"/>
         <source>Downloading OCR component</source>
         <translation>正在下载 OCR 组件</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="567"/>
+        <location filename="../ui/settings_dialog.py" line="559"/>
         <source>Unpacking OCR component</source>
         <translation>正在解压 OCR 组件</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="568"/>
+        <location filename="../ui/settings_dialog.py" line="560"/>
         <source>Verifying OCR component</source>
         <translation>正在校验 OCR 组件</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="569"/>
+        <location filename="../ui/settings_dialog.py" line="561"/>
         <source>Testing OCR component</source>
         <translation>正在测试 OCR 组件</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="570"/>
+        <location filename="../ui/settings_dialog.py" line="562"/>
         <source>Activating OCR component</source>
         <translation>正在激活 OCR 组件</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="598"/>
+        <location filename="../ui/settings_dialog.py" line="592"/>
         <source>Local OCR is unavailable in this build.</source>
         <translation>当前构建不提供本地 OCR。</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="600"/>
+        <location filename="../ui/settings_dialog.py" line="594"/>
         <source>Local OCR download source is unavailable.</source>
         <translation>本地 OCR 下载源不可用。</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="602"/>
+        <location filename="../ui/settings_dialog.py" line="596"/>
         <source>Local OCR component could not be downloaded.</source>
         <translation>无法下载本地 OCR 组件。</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="604"/>
+        <location filename="../ui/settings_dialog.py" line="598"/>
         <source>Local OCR bundle source is unavailable.</source>
         <translation>本地 OCR 组件源不可用。</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="610"/>
+        <location filename="../ui/settings_dialog.py" line="604"/>
         <source>Local OCR component failed integrity verification.</source>
         <translation>本地 OCR 组件未通过完整性校验。</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="616"/>
+        <location filename="../ui/settings_dialog.py" line="610"/>
         <source>Local OCR component failed its self-test.</source>
         <translation>本地 OCR 组件未通过自检。</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="654"/>
+        <location filename="../ui/settings_dialog.py" line="648"/>
         <source>Reinstall local PaddleOCR</source>
         <translation>重新安装本地 PaddleOCR</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="656"/>
+        <location filename="../ui/settings_dialog.py" line="650"/>
         <source>Local PaddleOCR requires repair</source>
         <translation>本地 PaddleOCR 需要修复</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="658"/>
+        <location filename="../ui/settings_dialog.py" line="652"/>
         <source>Repair local PaddleOCR</source>
         <translation>修复本地 PaddleOCR</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="660"/>
-        <location filename="../ui/settings_dialog.py" line="662"/>
+        <location filename="../ui/settings_dialog.py" line="654"/>
+        <location filename="../ui/settings_dialog.py" line="656"/>
         <source>Preparing local PaddleOCR</source>
         <translation>正在准备本地 PaddleOCR</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="664"/>
+        <location filename="../ui/settings_dialog.py" line="658"/>
         <source>Local PaddleOCR setup needs attention</source>
         <translation>本地 PaddleOCR 设置需要处理</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="666"/>
+        <location filename="../ui/settings_dialog.py" line="660"/>
         <source>Try local PaddleOCR setup again</source>
         <translation>重试设置本地 PaddleOCR</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="876"/>
-        <location filename="../ui/settings_dialog.py" line="877"/>
-        <location filename="../ui/settings_dialog.py" line="1294"/>
-        <location filename="../ui/settings_dialog.py" line="1295"/>
         <source>Managed by deployment</source>
-        <translation>由部署管理</translation>
+        <translation type="vanished">由部署管理</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="928"/>
         <source>LLM settings changed elsewhere. Your edits are still shown; save again to reapply them.</source>
-        <translation>LLM 设置已在其他位置更改。您的编辑仍显示在此处；请再次保存以重新应用。</translation>
+        <translation type="vanished">LLM 设置已在其他位置更改。您的编辑仍显示在此处；请再次保存以重新应用。</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="944"/>
         <source>Embedding settings changed elsewhere. Your edits are still shown; save again to reapply them.</source>
-        <translation>Embedding 设置已在其他位置更改。您的编辑仍显示在此处；请再次保存以重新应用。</translation>
+        <translation type="vanished">Embedding 设置已在其他位置更改。您的编辑仍显示在此处；请再次保存以重新应用。</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="1106"/>
+        <location filename="../ui/settings_dialog.py" line="982"/>
         <source>Checking Knowledge index status</source>
         <translation>正在检查知识索引状态</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="1112"/>
+        <location filename="../ui/settings_dialog.py" line="988"/>
         <source>Keyword: %1
 Text vectors: %2</source>
         <translation>关键词：%1
 文本向量：%2</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="1121"/>
+        <location filename="../ui/settings_dialog.py" line="999"/>
         <source>Building</source>
         <translation>正在构建</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="1122"/>
+        <location filename="../ui/settings_dialog.py" line="1000"/>
         <source>Needs rebuild</source>
         <translation>需要重建</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="1123"/>
+        <location filename="../ui/settings_dialog.py" line="1001"/>
         <source>Unavailable</source>
         <translation>不可用</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="1124"/>
+        <location filename="../ui/settings_dialog.py" line="1002"/>
         <source>Needs attention</source>
         <translation>需要处理</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="1126"/>
+        <location filename="../ui/settings_dialog.py" line="1004"/>
         <source>Unknown status</source>
         <translation>未知状态</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="1135"/>
+        <location filename="../ui/settings_dialog.py" line="1013"/>
         <source>{local_count} local, {ssh_count} SSH, {slots} execution slot(s).</source>
         <translation>{local_count} 个本地，{ssh_count} 个 SSH，{slots} 个执行槽。</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="1199"/>
         <source>This provider is managed by a deployment and cannot be removed here.</source>
-        <translation>此提供商由部署管理，无法在此处移除。</translation>
+        <translation type="vanished">此提供商由部署管理，无法在此处移除。</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="1297"/>
+        <location filename="../ui/settings_dialog.py" line="1149"/>
         <source>Built into packaged app</source>
         <translation>已内置于打包应用</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="1349"/>
+        <location filename="../ui/settings_dialog.py" line="1200"/>
         <source>None</source>
         <translation>无</translation>
     </message>
@@ -2934,22 +2797,22 @@ Text vectors: %2</source>
 <context>
     <name>XenixStartup</name>
     <message>
-        <location filename="../app.py" line="180"/>
+        <location filename="../app.py" line="146"/>
         <source>Local database recovery</source>
         <translation>本地数据库恢复</translation>
     </message>
     <message>
-        <location filename="../app.py" line="183"/>
+        <location filename="../app.py" line="149"/>
         <source>Xenix could not initialize the local database.</source>
         <translation>Xenix 无法初始化本地数据库。</translation>
     </message>
     <message>
-        <location filename="../app.py" line="189"/>
+        <location filename="../app.py" line="155"/>
         <source>The database may belong to an unsupported development build or may be damaged. You can back it up and rebuild a fresh database now.</source>
         <translation>该数据库可能来自不受支持的开发版本，或已经损坏。你可以现在备份它并重建一个新的数据库。</translation>
     </message>
     <message>
-        <location filename="../app.py" line="196"/>
+        <location filename="../app.py" line="162"/>
         <source>Database: {path}
 
 Reason: {reason}</source>
@@ -2958,33 +2821,33 @@ Reason: {reason}</source>
 原因：{reason}</translation>
     </message>
     <message>
-        <location filename="../app.py" line="202"/>
+        <location filename="../app.py" line="168"/>
         <source>Back up and rebuild</source>
         <translation>备份并重建</translation>
     </message>
     <message>
-        <location filename="../app.py" line="206"/>
+        <location filename="../app.py" line="172"/>
         <source>Open data folder</source>
         <translation>打开数据目录</translation>
     </message>
     <message>
-        <location filename="../app.py" line="210"/>
-        <location filename="../app.py" line="261"/>
+        <location filename="../app.py" line="176"/>
+        <location filename="../app.py" line="227"/>
         <source>Exit</source>
         <translation>退出</translation>
     </message>
     <message>
-        <location filename="../app.py" line="231"/>
+        <location filename="../app.py" line="197"/>
         <source>Xenix test build locked</source>
         <translation>Xenix 测试版已锁定</translation>
     </message>
     <message>
-        <location filename="../app.py" line="234"/>
+        <location filename="../app.py" line="200"/>
         <source>This Xenix test build is locked.</source>
         <translation>此 Xenix 测试版本已锁定。</translation>
     </message>
     <message>
-        <location filename="../app.py" line="247"/>
+        <location filename="../app.py" line="213"/>
         <source>Reason: {reason}
 Trial expired at: {expires_at}
 State file: {state_path}</source>
@@ -3001,7 +2864,7 @@ State file: {state_path}</source>
         <translation type="vanished">此 Xenix 测试版本已到期。</translation>
     </message>
     <message>
-        <location filename="../app.py" line="240"/>
+        <location filename="../app.py" line="206"/>
         <source>Please purchase a license or download a licensed Xenix build from {url}.</source>
         <translation>请前往 {url} 购买许可证或下载包含许可证激活的新版本。</translation>
     </message>
@@ -3012,36 +2875,23 @@ Reason: {reason}</source>
 原因：{reason}</translation>
     </message>
     <message>
-        <location filename="../app.py" line="257"/>
+        <location filename="../app.py" line="223"/>
         <source>Buy license</source>
         <translation>前往购买</translation>
     </message>
     <message>
-        <location filename="../app.py" line="913"/>
+        <location filename="../app.py" line="802"/>
         <source>Unable to start Xenix</source>
         <translation>无法启动 Xenix</translation>
     </message>
     <message>
-        <location filename="../app.py" line="914"/>
+        <location filename="../app.py" line="803"/>
         <source>Xenix could not finish startup.
 
 {error}</source>
         <translation>Xenix 未能完成启动。
 
 {error}</translation>
-    </message>
-</context>
-<context>
-    <name>_AmdGuidedSetupHandle</name>
-    <message>
-        <location filename="../ui/amd_setup.py" line="77"/>
-        <source>AMD setup</source>
-        <translation>AMD 设置</translation>
-    </message>
-    <message>
-        <location filename="../ui/amd_setup.py" line="78"/>
-        <source>Set up the fixed Radeon profile</source>
-        <translation>设置固定的 Radeon 配置</translation>
     </message>
 </context>
 </TS>

@@ -1,6 +1,5 @@
 # -*- mode: python ; coding: utf-8 -*-
 
-import os
 from pathlib import Path
 
 from PyInstaller.utils.hooks import collect_all, collect_data_files, collect_dynamic_libs
@@ -9,12 +8,6 @@ from PyInstaller.utils.hooks import collect_all, collect_data_files, collect_dyn
 project_root = Path.cwd()
 src_root = project_root / "src"
 scripts_root = project_root / "scripts"
-amd_slice_enabled = os.environ.get("XENIX_BUILD_AMD_ONE_CLICK", "1").strip().lower() not in {
-    "0",
-    "false",
-    "no",
-    "off",
-}
 xgboost_binaries = collect_dynamic_libs("xgboost")
 xgboost_datas = collect_data_files("xgboost", includes=["VERSION", "py.typed"])
 polars_binaries = collect_dynamic_libs("_polars_runtime_compat") + collect_dynamic_libs("_polars_runtime_32")
@@ -54,70 +47,20 @@ def collect_xenix_worker_source():
         relative_path = path.relative_to(source_root)
         if relative_path.parts[:3] == ("services", "agent", "skills"):
             continue
-        if relative_path.parts[:2] in {("services", "amd"), ("resources", "amd")}:
-            continue
-        if relative_path in {
-            Path("ui/amd_setup.py"),
-            Path("ui/amd_deployment_tasks.py"),
-        }:
-            continue
         if "__pycache__" in relative_path.parts or path.suffix == ".pyc":
             continue
         entries.append((str(path), str(Path("xenix_worker_source") / "xenix" / relative_path.parent)))
     return entries
-
-
-def collect_generic_xenix_resources():
-    resource_root = src_root / "xenix" / "resources"
-    entries = []
-    for path in sorted(resource_root.rglob("*")):
-        if not path.is_file():
-            continue
-        relative_path = path.relative_to(resource_root)
-        if relative_path.parts[:1] == ("amd",):
-            continue
-        entries.append((str(path), str(Path("xenix/resources") / relative_path.parent)))
-    return entries
-
-
-def collect_amd_slice():
-    if not amd_slice_enabled:
-        return [], [], []
-    amd_resources = src_root / "xenix" / "resources" / "amd"
-    amd_services = src_root / "xenix" / "services" / "amd"
-    amd_ui = src_root / "xenix" / "ui" / "amd_setup.py"
-    amd_tasks = src_root / "xenix" / "ui" / "amd_deployment_tasks.py"
-    required_paths = (amd_resources, amd_services, amd_ui, amd_tasks)
-    if any(not path.exists() for path in required_paths):
-        raise SystemExit("AMD one-click build requested, but the AMD slice is incomplete.")
-
-    runtime_hook = project_root / "build" / "amd_one_click_runtime_hook.py"
-    runtime_hook.parent.mkdir(parents=True, exist_ok=True)
-    runtime_hook.write_text(
-        "import os\n"
-        "os.environ.setdefault('XENIX_ENABLE_AMD_ONE_CLICK', '1')\n",
-        encoding="utf-8",
-    )
-    return [
-        (str(amd_resources), "xenix/resources/amd"),
-    ], [
-        "xenix.services.amd.composition",
-        "xenix.ui.amd_setup",
-    ], [str(runtime_hook)]
-
-
-amd_datas, amd_hiddenimports, amd_runtime_hooks = collect_amd_slice()
 
 a = Analysis(
     [str(scripts_root / "run_packaged.py")],
     pathex=[str(src_root)],
     binaries=xgboost_binaries + polars_binaries + knowledge_binaries,
     datas=[
+        (str(src_root / "xenix" / "resources"), "xenix/resources"),
         (str(src_root / "xenix" / "translations"), "xenix/translations"),
         (str(skill_catalog), "xenix/services/agent/skills"),
     ]
-    + collect_generic_xenix_resources()
-    + amd_datas
     + collect_xenix_worker_source()
     + xgboost_datas
     + polars_datas
@@ -134,15 +77,11 @@ a = Analysis(
         "xenix.services.agent.tool_presentations",
         "xenix.services.agent.tools",
         "xenix.services.artifact_service",
-        "xenix.services.agent.composition",
         "xenix.services.data_cleaning",
         "xenix.services.data_transform",
         "xenix.services.dataset_service",
-        "xenix.services.dataset_export_service",
-        "xenix.services.embedding_provider_factory",
         "xenix.services.lazy_ml_service",
         "xenix.services.lazy_services",
-        "xenix.services.link_router",
         "xenix.services.llm",
         "xenix.services.ml.worker_settings",
         "xenix.services.ml_service",
@@ -165,8 +104,6 @@ a = Analysis(
         "xenix.services.knowledge_task_logs",
         "xenix.services.knowledge_vector_store",
         "xenix.services.paddle_ocr_service",
-        "xenix.services.ocr.settings",
-        "xenix.services.settings_store",
         "xenix.services.storage",
         "xenix.services.storage.layout",
         "fastexcel",
@@ -181,10 +118,10 @@ a = Analysis(
         "_polars_runtime_compat._polars_runtime",
         "_polars_runtime_32",
         "_polars_runtime_32._polars_runtime",
-    ] + knowledge_hiddenimports + amd_hiddenimports,
+    ] + knowledge_hiddenimports,
     hookspath=[],
     hooksconfig={},
-    runtime_hooks=amd_runtime_hooks,
+    runtime_hooks=[],
     excludes=[],
     noarchive=False,
     optimize=0,

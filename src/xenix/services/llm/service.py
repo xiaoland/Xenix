@@ -1,109 +1,248 @@
-"""LLM inference facade over read-only settings and explicit provider scopes."""
-
 from __future__ import annotations
 
-from collections.abc import Callable, Iterator
-from contextlib import contextmanager
+import json
+from enum import StrEnum
+from pathlib import Path
+from typing import Any, Callable, Iterator, Protocol
 
+from pydantic import BaseModel, Field, field_validator, model_validator
+
+from ...config import AppPaths
 from ...exceptions import NotFoundError, ValidationError
-from .provider_factory import (
-    LLMProviderFactoryRegistry,
-    ProviderImplementationUnavailableError,
-    ProviderOperationScope,
-    create_builtin_llm_provider_factory_registry,
-)
+from ...release_config import load_release_config
 from .providers import (
-    AgentProvider,
     LLMRequestMetadata,
     LLMRetryEvent,
+    OpenAICompatibleChatProvider,
     ProviderMessage,
     ProviderResponse,
     ProviderStreamEvent,
-    redact_provider_error_text,
-)
-from .settings import (
-    DEFAULT_FQ_MODEL_KEY,
-    DEFAULT_MODEL_KEY,
-    DEFAULT_PROVIDER_KEY,
-    PACKAGED_TRIAL_SECRET_SOURCE,
-    SETTINGS_FILE_NAME,
-    TRIAL_PROVIDER_DISPLAY_NAME,
-    TRIAL_PROVIDER_KEY,
-    TRIAL_LLM_BASE_URL_FALLBACK,
-    TRIAL_LLM_MODEL_FALLBACK,
-    FrozenLLMSettingsSource,
-    LLMDialect,
-    LLMModelOption,
-    LLMModelRef,
-    LLMProviderConfig,
-    LLMSettings,
-    LLMSettingsSource,
-    LLMSettingsService,
-    PackagedTrialLLMConfig,
-    StaticLlmTarget,
-    default_llm_settings,
-    fq_model_key,
-    is_managed_llm_provider_instance_id,
-    load_packaged_trial_llm_config,
-    model_options_from_settings,
-    parse_fq_model_key,
-    sanitize_settings_for_save,
 )
 from .tooling import AgentToolSpec
 
+SETTINGS_FILE_NAME = "agent_settings.json"
+DEFAULT_PROVIDER_KEY = "openai"
+DEFAULT_MODEL_KEY = "gpt-4o-mini"
+DEFAULT_FQ_MODEL_KEY = f"{DEFAULT_PROVIDER_KEY}/{DEFAULT_MODEL_KEY}"
+TRIAL_PROVIDER_KEY = "trial"
+TRIAL_PROVIDER_DISPLAY_NAME = "Trial"
+PACKAGED_TRIAL_SECRET_SOURCE = "packaged_trial"
+TRIAL_LLM_BASE_URL_FALLBACK = "https://api.openai.com"
+TRIAL_LLM_MODEL_FALLBACK = DEFAULT_MODEL_KEY
+
+
+class LLMDialect(StrEnum):
+    OPENAI_COMPATIBLE = "openai_compatible"
+
+
+class LLMProviderConfig(BaseModel):
+    key: str = DEFAULT_PROVIDER_KEY
+    display_name: str = "OpenAI"
+    dialect: LLMDialect = LLMDialect.OPENAI_COMPATIBLE
+    base_url: str = "https://api.openai.com"
+    api_key: str = ""
+    models: list[str] = Field(default_factory=lambda: [DEFAULT_MODEL_KEY])
+    timeout_seconds: int = Field(default=120, ge=1, le=3600)
+    streaming_enabled: bool = True
+    dialect_config: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("key")
+    @classmethod
+    def _validate_provider_key(cls, value: str) -> str:
+        provider_key = value.strip()
+        if not provider_key:
+            raise ValueError("Provider key cannot be empty.")
+        if "/" in provider_key:
+            raise ValueError("Provider key cannot contain '/'.")
+        return provider_key
+
+    @field_validator("display_name")
+    @classmethod
+    def _normalize_display_name(cls, value: str) -> str:
+        return value.strip()
+
+    @field_validator("models")
+    @classmethod
+    def _validate_models(cls, value: list[str]) -> list[str]:
+        models: list[str] = []
+        seen: set[str] = set()
+        for raw_model in value:
+            model_key = str(raw_model).strip()
+            if not model_key:
+                continue
+            if "/" in model_key:
+                raise ValueError("Model key cannot contain '/'.")
+            if model_key not in seen:
+                models.append(model_key)
+                seen.add(model_key)
+        if not models:
+            raise ValueError("Provider must define at least one model.")
+        return models
+
+
+class PackagedTrialLLMConfig(BaseModel):
+    base_url: str
+    api_key: str
+    model: str
+
+    @property
+    def enabled(self) -> bool:
+        return bool(self.api_key.strip())
+
+
+class LLMModelRef(BaseModel):
+    provider_key: str
+    model_key: str
+
+
+class LLMModelOption(BaseModel):
+    fq_model_key: str
+    provider_key: str
+    model_key: str
+    label: str
+
+
+def default_llm_settings() -> "LLMSettings":
+    trial_config = load_packaged_trial_llm_config()
+    if trial_config.enabled:
+        return LLMSettings(
+            providers=[
+                LLMProviderConfig(
+                    key=TRIAL_PROVIDER_KEY,
+                    display_name=TRIAL_PROVIDER_DISPLAY_NAME,
+                    dialect=LLMDialect.OPENAI_COMPATIBLE,
+                    base_url=trial_config.base_url,
+                    api_key="",
+                    models=[trial_config.model],
+                    dialect_config={"secret_source": PACKAGED_TRIAL_SECRET_SOURCE},
+                )
+            ],
+            default_fq_model_key=LLMService.fq_model_key(TRIAL_PROVIDER_KEY, trial_config.model),
+        )
+    return LLMSettings(
+        providers=[LLMProviderConfig()],
+        default_fq_model_key=DEFAULT_FQ_MODEL_KEY,
+    )
+
+
+class LLMSettings(BaseModel):
+    providers: list[LLMProviderConfig] = Field(
+        default_factory=lambda: [LLMProviderConfig()]
+    )
+    default_fq_model_key: str = DEFAULT_FQ_MODEL_KEY
+    turn_completion_guard_fq_model_key: str = ""
+    thread_title_fq_model_key: str = ""
+    retry_attempts: int = Field(default=5, ge=1, le=20)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _migrate_legacy_payload(cls, value: Any) -> Any:
+        if not isinstance(value, dict):
+            return value
+        if "providers" in value:
+            return value
+        return _legacy_payload_to_settings(value)
+
+    @model_validator(mode="after")
+    def _validate_model_references(self) -> LLMSettings:
+        if not self.providers:
+            self.providers = [LLMProviderConfig()]
+
+        provider_keys: set[str] = set()
+        available: set[str] = set()
+        for provider in self.providers:
+            if provider.key in provider_keys:
+                raise ValueError(f"Provider key '{provider.key}' is duplicated.")
+            provider_keys.add(provider.key)
+            for model_key in provider.models:
+                available.add(LLMService.fq_model_key(provider.key, model_key))
+
+        if self.default_fq_model_key not in available:
+            first_provider = self.providers[0]
+            self.default_fq_model_key = LLMService.fq_model_key(
+                first_provider.key,
+                first_provider.models[0],
+            )
+
+        for field_name in (
+            "turn_completion_guard_fq_model_key",
+            "thread_title_fq_model_key",
+        ):
+            fq_model_key = getattr(self, field_name)
+            if fq_model_key and fq_model_key not in available:
+                raise ValueError(f"{field_name} does not match a configured provider model.")
+        return self
+
+
+class LLMSettingsSource(Protocol):
+    """Supplies the settings used by an ``LLMService`` instance."""
+
+    def load(self) -> LLMSettings: ...
+
+    def save(self, settings: LLMSettings) -> None: ...
+
+
+class FrozenLLMSettingsSource:
+    """Read-only, in-memory settings source for an isolated LLM service."""
+
+    def __init__(self, settings: LLMSettings) -> None:
+        self._settings = settings.model_copy(deep=True)
+
+    def __repr__(self) -> str:
+        return f"{type(self).__name__}()"
+
+    def load(self) -> LLMSettings:
+        return self._settings.model_copy(deep=True)
+
+    def save(self, settings: LLMSettings) -> None:
+        raise ValidationError(
+            "LLM settings are read-only for this run.",
+            error_code="llm_settings_read_only",
+        )
+
+
+class LLMSettingsService:
+    def __init__(self, paths: AppPaths) -> None:
+        self._settings_path = paths.config / SETTINGS_FILE_NAME
+
+    @property
+    def settings_path(self) -> Path:
+        return self._settings_path
+
+    def load(self) -> LLMSettings:
+        if not self._settings_path.exists():
+            return default_llm_settings()
+        payload = json.loads(self._settings_path.read_text(encoding="utf-8"))
+        return LLMSettings.model_validate(payload)
+
+    def save(self, settings: LLMSettings) -> None:
+        self._settings_path.parent.mkdir(parents=True, exist_ok=True)
+        sanitized = sanitize_settings_for_save(settings)
+        self._settings_path.write_text(
+            sanitized.model_dump_json(indent=2),
+            encoding="utf-8",
+        )
+
 
 class LLMService:
-    """Inference-only LLM facade.
-
-    The service has no full-document settings write API.  It receives a narrow
-    settings reader and one app-scoped factory registry; construction, retries,
-    and streaming then share one exact operation scope.
-    """
-
-    def __init__(
-        self,
-        settings_service: LLMSettingsSource,
-        *,
-        provider_factory_registry: LLMProviderFactoryRegistry | None = None,
-    ) -> None:
+    def __init__(self, settings_service: LLMSettingsSource) -> None:
         self._settings_service = settings_service
-        # The compatibility default is a fresh explicit registry, not a module
-        # global.  Optional managers must be contributed by app composition.
-        self._provider_factory_registry = (
-            provider_factory_registry or create_builtin_llm_provider_factory_registry()
-        )
 
     @property
     def settings_service(self) -> LLMSettingsSource:
         return self._settings_service
 
-    @property
-    def provider_factory_registry(self) -> LLMProviderFactoryRegistry:
-        return self._provider_factory_registry
-
     def load_settings(self) -> LLMSettings:
         return self._settings_service.load()
+
+    def save_settings(self, settings: LLMSettings) -> None:
+        self._settings_service.save(settings)
 
     def default_fq_model_key(self) -> str:
         return self.load_settings().default_fq_model_key
 
     def model_options(self) -> list[LLMModelOption]:
         return self.model_options_from_settings(self.load_settings())
-
-    @contextmanager
-    def provider_scope(self, fq_model_key: str | None = None) -> Iterator[ProviderOperationScope]:
-        """Enter one provider operation scope for an exact selected model.
-
-        Callers that dispatch directly should keep this context around their
-        complete semantic operation.  ``complete`` and ``stream`` do this
-        internally and additionally keep it around their full retry lifetime.
-        """
-
-        settings = self.load_settings()
-        provider, model_key = self._resolve_provider_from_settings(settings, fq_model_key)
-        scope = self._provider_factory_registry.provider_scope(provider, model_key=model_key)
-        with scope:
-            yield scope
 
     def complete(
         self,
@@ -115,18 +254,15 @@ class LLMService:
         before_provider_request: Callable[[], None] | None = None,
     ) -> ProviderResponse:
         settings = self.load_settings()
-        provider, model_key = self._resolve_provider_from_settings(settings, fq_model_key)
-        scope = self._provider_factory_registry.provider_scope(provider, model_key=model_key)
-        with scope:
-            return self._complete_with_retry(
-                provider=scope.provider,
-                operation_scope=scope,
-                messages=messages,
-                tools=tools,
-                max_attempts=settings.retry_attempts,
-                retry_callback=retry_callback,
-                before_provider_request=before_provider_request,
-            )
+        provider = self._build_provider_from_settings(settings, fq_model_key)
+        return self._complete_with_retry(
+            provider=provider,
+            messages=messages,
+            tools=tools,
+            max_attempts=settings.retry_attempts,
+            retry_callback=retry_callback,
+            before_provider_request=before_provider_request,
+        )
 
     def stream(
         self,
@@ -136,59 +272,50 @@ class LLMService:
         tools: list[AgentToolSpec],
         before_provider_request: Callable[[], None] | None = None,
     ) -> Iterator[ProviderStreamEvent | LLMRetryEvent]:
-        """Stream one operation, releasing its exact scope on close/abandonment."""
-
         settings = self.load_settings()
-        provider, model_key = self._resolve_provider_from_settings(settings, fq_model_key)
+        provider = self._build_provider_from_settings(settings, fq_model_key)
         max_attempts = self._max_attempts(settings.retry_attempts)
         previous_error: Exception | None = None
-        scope = self._provider_factory_registry.provider_scope(provider, model_key=model_key)
-        # This ``with`` remains active across every yield.  Python unwinds it in
-        # generator.close()/abandonment as well as normal completion.
-        with scope:
-            for attempt_number in range(1, max_attempts + 1):
-                if previous_error is not None:
-                    yield self._retry_event(
-                        attempt_number=attempt_number,
-                        max_attempts=max_attempts,
-                        exc=previous_error,
-                    )
-                if before_provider_request is not None:
-                    before_provider_request()
-                try:
-                    stream_method = getattr(scope.provider, "stream", None)
-                    if callable(stream_method):
-                        buffered_events: list[ProviderStreamEvent] = []
-                        for event in stream_method(messages, tools):
-                            # A received provider event proves this attempt has
-                            # crossed dispatch.  A later loss must not replay it.
-                            scope.mark_dispatch_may_have_happened()
-                            if self._is_live_tool_call_progress(event):
-                                yield event
-                                continue
-                            buffered_events.append(event)
-                    else:
-                        response = scope.provider.complete(messages, tools)
-                        buffered_events = [ProviderStreamEvent(response=response)]
-                    yield from buffered_events
-                    return
-                except Exception as exc:
-                    if not self._should_retry(
-                        exc,
-                        attempt_number=attempt_number,
-                        max_attempts=max_attempts,
-                        operation_scope=scope,
-                    ):
-                        redacted = self._redacted_exception(exc)
-                        if redacted is exc:
-                            raise
-                        raise redacted from None
-                    previous_error = exc
+        for attempt_number in range(1, max_attempts + 1):
+            if previous_error is not None:
+                yield self._retry_event(
+                    attempt_number=attempt_number,
+                    max_attempts=max_attempts,
+                    exc=previous_error,
+                )
+            if before_provider_request is not None:
+                before_provider_request()
+            try:
+                stream = getattr(provider, "stream", None)
+                if callable(stream):
+                    buffered_events = []
+                    events = stream(messages, tools)
+                    for event in events:
+                        if self._is_live_tool_call_progress(event):
+                            yield event
+                            continue
+                        buffered_events.append(event)
+                else:
+                    response = provider.complete(messages, tools)
+                    buffered_events = [ProviderStreamEvent(response=response)]
+                yield from buffered_events
+                return
+            except Exception as exc:
+                if not self._should_retry(exc, attempt_number=attempt_number, max_attempts=max_attempts):
+                    raise
+                previous_error = exc
+
+    def _is_live_tool_call_progress(self, event: ProviderStreamEvent) -> bool:
+        return event.is_tool_call_delta and not event.delta_text and event.response is None
 
     def request_metadata(self, fq_model_key: str | None = None) -> LLMRequestMetadata:
         settings = self.load_settings()
-        provider, model_key = self._resolve_provider_from_settings(settings, fq_model_key)
-        return LLMRequestMetadata(provider_name=provider.provider_id, model=model_key)
+        selected_key = fq_model_key or settings.default_fq_model_key
+        ref = self.parse_fq_model_key(selected_key)
+        provider_config = self._provider_for_key(settings, ref.provider_key)
+        if ref.model_key not in provider_config.models:
+            raise NotFoundError(f"LLM model '{selected_key}' was not found.")
+        return LLMRequestMetadata(provider_name=provider_config.key, model=ref.model_key)
 
     def turn_completion_guard_fq_model_key(self) -> str | None:
         value = self.load_settings().turn_completion_guard_fq_model_key.strip()
@@ -198,98 +325,48 @@ class LLMService:
         value = self.load_settings().thread_title_fq_model_key.strip()
         return value or None
 
-    def build_provider(self, fq_model_key: str | None = None) -> AgentProvider:
-        """Compatibility construction helper for ordinary static callers.
+    def build_provider(self, fq_model_key: str | None = None) -> OpenAICompatibleChatProvider:
+        return self._build_provider_from_settings(self.load_settings(), fq_model_key)
 
-        New inference code should call ``complete``/``stream`` or retain
-        ``provider_scope`` itself.  A managed target gets a small operation-backed
-        adapter so a permit is never detached from a semantic request.
-        """
-
-        settings = self.load_settings()
-        provider, model_key = self._resolve_provider_from_settings(settings, fq_model_key)
-        selected_key = fq_model_key or settings.default_fq_model_key
-        if not isinstance(provider.target, StaticLlmTarget):
-            return _OperationBackedProvider(self, selected_key)
-        scope = self._provider_factory_registry.provider_scope(provider, model_key=model_key)
-        try:
-            return scope.provider
-        finally:
-            scope.close()
-
-    def build_turn_completion_guard_provider(self) -> AgentProvider | None:
-        fq_model_key = self.turn_completion_guard_fq_model_key()
-        if fq_model_key is None:
-            return None
-        return self.build_provider(fq_model_key)
-
-    def build_thread_title_provider(self) -> AgentProvider | None:
-        fq_model_key = self.thread_title_fq_model_key()
-        if fq_model_key is None:
-            return None
-        return self.build_provider(fq_model_key)
-
-    def validate_fq_model_key(self, fq_model_key: str) -> str:
-        normalized = fq_model_key.strip()
-        provider, _ = self._resolve_provider_from_settings(self.load_settings(), normalized)
-        if not self._provider_factory_registry.has_factory_for(provider):
-            raise ProviderImplementationUnavailableError()
-        return normalized
-
-    @staticmethod
-    def fq_model_key(provider_key: str, model_key: str) -> str:
-        return fq_model_key(provider_key, model_key)
-
-    @staticmethod
-    def parse_fq_model_key(fq_model_key: str) -> LLMModelRef:
-        return parse_fq_model_key(fq_model_key)
-
-    @staticmethod
-    def model_options_from_settings(settings: LLMSettings) -> list[LLMModelOption]:
-        return model_options_from_settings(settings)
-
-    def _resolve_provider_from_settings(
+    def _build_provider_from_settings(
         self,
         settings: LLMSettings,
-        requested_key: str | None,
-    ) -> tuple[LLMProviderConfig, str]:
-        selected_key = (requested_key or settings.default_fq_model_key).strip()
-        reference = parse_fq_model_key(selected_key)
-        provider = self._provider_for_key(settings, reference.provider_key)
-        if provider is None:
-            self._raise_missing_reference(selected_key, reference.provider_key)
-        if reference.model_key not in provider.models:
-            if provider.is_managed:
-                raise ValidationError(
-                    "The exact managed LLM model reference is stale.",
-                    error_code="llm_model_reference_stale",
-                )
+        fq_model_key: str | None = None,
+    ) -> OpenAICompatibleChatProvider:
+        selected_key = fq_model_key or settings.default_fq_model_key
+        ref = self.parse_fq_model_key(selected_key)
+        provider_config = self._provider_for_key(settings, ref.provider_key)
+        if ref.model_key not in provider_config.models:
             raise NotFoundError(f"LLM model '{selected_key}' was not found.")
-        if provider.retiring:
+        if provider_config.dialect is not LLMDialect.OPENAI_COMPATIBLE:
             raise ValidationError(
-                "The exact managed LLM model reference is stale.",
-                error_code="llm_model_reference_stale",
+                f"LLM dialect '{provider_config.dialect.value}' is not supported yet."
             )
-        return provider, reference.model_key
-
-    @staticmethod
-    def _raise_missing_reference(selected_key: str, provider_key: str) -> None:
-        if is_managed_llm_provider_instance_id(provider_key):
-            raise ValidationError(
-                "The exact managed LLM model reference is stale.",
-                error_code="llm_model_reference_stale",
+        trial_config = load_packaged_trial_llm_config()
+        if provider_config.dialect_config.get("secret_source") == PACKAGED_TRIAL_SECRET_SOURCE:
+            if not trial_config.enabled:
+                raise ValidationError("Packaged trial LLM provider is not available in this build.")
+            return OpenAICompatibleChatProvider(
+                provider_key=provider_config.key,
+                base_url=trial_config.base_url,
+                api_key=trial_config.api_key,
+                model=ref.model_key,
+                timeout_seconds=provider_config.timeout_seconds,
+                streaming_enabled=provider_config.streaming_enabled,
             )
-        raise NotFoundError(f"LLM model '{selected_key}' was not found.")
-
-    @staticmethod
-    def _provider_for_key(settings: LLMSettings, provider_key: str) -> LLMProviderConfig | None:
-        return settings.provider_for_id(provider_key)
+        return OpenAICompatibleChatProvider(
+            provider_key=provider_config.key,
+            base_url=provider_config.base_url,
+            api_key=provider_config.api_key,
+            model=ref.model_key,
+            timeout_seconds=provider_config.timeout_seconds,
+            streaming_enabled=provider_config.streaming_enabled,
+        )
 
     def _complete_with_retry(
         self,
         *,
-        provider: AgentProvider,
-        operation_scope: ProviderOperationScope | None = None,
+        provider,
         messages: list[ProviderMessage],
         tools: list[AgentToolSpec],
         max_attempts: int,
@@ -297,7 +374,6 @@ class LLMService:
         before_provider_request: Callable[[], None] | None,
     ) -> ProviderResponse:
         attempts = self._max_attempts(max_attempts)
-        retry_scope = operation_scope or ProviderOperationScope(provider)
         previous_error: Exception | None = None
         for attempt_number in range(1, attempts + 1):
             if previous_error is not None and retry_callback is not None:
@@ -313,117 +389,154 @@ class LLMService:
             try:
                 return provider.complete(messages, tools)
             except Exception as exc:
-                if not self._should_retry(
-                    exc,
-                    attempt_number=attempt_number,
-                    max_attempts=attempts,
-                    operation_scope=retry_scope,
-                ):
-                    redacted = self._redacted_exception(exc)
-                    if redacted is exc:
-                        raise
-                    raise redacted from None
+                if not self._should_retry(exc, attempt_number=attempt_number, max_attempts=attempts):
+                    raise
                 previous_error = exc
         raise AssertionError("LLM retry loop exited without a response or exception.")
 
-    def _should_retry(
-        self,
-        exc: Exception,
-        *,
-        attempt_number: int,
-        max_attempts: int,
-        operation_scope: ProviderOperationScope | None = None,
-    ) -> bool:
-        if attempt_number >= max_attempts or getattr(exc, "retryable", None) is not True:
+    def _should_retry(self, exc: Exception, *, attempt_number: int, max_attempts: int) -> bool:
+        if attempt_number >= max_attempts:
             return False
-        if operation_scope is not None and not operation_scope.retry_allowed_after(exc):
-            return False
-        return True
+        return getattr(exc, "retryable", None) is True
 
-    @staticmethod
-    def _is_live_tool_call_progress(event: ProviderStreamEvent) -> bool:
-        return event.is_tool_call_delta and not event.delta_text and event.response is None
-
-    @staticmethod
-    def _retry_event(*, attempt_number: int, max_attempts: int, exc: Exception) -> LLMRetryEvent:
+    def _retry_event(self, *, attempt_number: int, max_attempts: int, exc: Exception) -> LLMRetryEvent:
         error_code = getattr(exc, "error_code", None)
         return LLMRetryEvent(
             attempt_number=attempt_number,
             max_attempts=max_attempts,
             reason="retryable_error",
-            error_summary=redact_provider_error_text(exc),
+            error_summary=str(exc),
             error_code=error_code if isinstance(error_code, str) else None,
         )
 
-    @staticmethod
-    def _redacted_exception(exc: Exception) -> Exception:
-        redacted = redact_provider_error_text(exc)
-        if redacted == str(exc):
-            return exc
-        return ValidationError(
-            redacted,
-            error_code=getattr(exc, "error_code", None),
-            retryable=getattr(exc, "retryable", None),
-        )
-
-    @staticmethod
-    def _max_attempts(value: int) -> int:
+    def _max_attempts(self, value: int) -> int:
         if isinstance(value, bool):
             return 1
         return max(1, min(int(value), 20))
 
+    def build_turn_completion_guard_provider(self) -> "OpenAICompatibleChatProvider | None":
+        fq_model_key = self.load_settings().turn_completion_guard_fq_model_key
+        if not fq_model_key:
+            return None
+        return self.build_provider(fq_model_key)
 
-class _OperationBackedProvider:
-    """Legacy ``AgentProvider`` projection that preserves managed scope lifetime."""
+    def build_thread_title_provider(self) -> "OpenAICompatibleChatProvider | None":
+        fq_model_key = self.load_settings().thread_title_fq_model_key
+        if not fq_model_key:
+            return None
+        return self.build_provider(fq_model_key)
 
-    def __init__(self, service: LLMService, fq_model_key: str) -> None:
-        self._service = service
-        self._fq_model_key = fq_model_key
+    def validate_fq_model_key(self, fq_model_key: str) -> str:
+        normalized = fq_model_key.strip()
+        ref = self.parse_fq_model_key(normalized)
+        settings = self.load_settings()
+        provider = self._provider_for_key(settings, ref.provider_key)
+        if ref.model_key not in provider.models:
+            raise NotFoundError(f"LLM model '{normalized}' was not found.")
+        return normalized
 
-    def complete(
-        self,
-        messages: list[ProviderMessage],
-        tools: list[AgentToolSpec],
-    ) -> ProviderResponse:
-        return self._service.complete(
-            fq_model_key=self._fq_model_key,
-            messages=messages,
-            tools=tools,
-        )
+    @staticmethod
+    def fq_model_key(provider_key: str, model_key: str) -> str:
+        provider = provider_key.strip()
+        model = model_key.strip()
+        if not provider:
+            raise ValidationError("Provider key cannot be empty.")
+        if not model:
+            raise ValidationError("Model key cannot be empty.")
+        if "/" in provider:
+            raise ValidationError("Provider key cannot contain '/'.")
+        if "/" in model:
+            raise ValidationError("Model key cannot contain '/'.")
+        return f"{provider}/{model}"
 
-    def stream(
-        self,
-        messages: list[ProviderMessage],
-        tools: list[AgentToolSpec],
-    ) -> Iterator[ProviderStreamEvent | LLMRetryEvent]:
-        yield from self._service.stream(
-            fq_model_key=self._fq_model_key,
-            messages=messages,
-            tools=tools,
-        )
+    @staticmethod
+    def parse_fq_model_key(fq_model_key: str) -> LLMModelRef:
+        normalized = fq_model_key.strip()
+        parts = normalized.split("/")
+        if len(parts) != 2 or not parts[0].strip() or not parts[1].strip():
+            raise ValidationError("Model key must use 'provider/model' format.")
+        provider_key, model_key = parts[0].strip(), parts[1].strip()
+        if "/" in model_key:
+            raise ValidationError("Model key cannot contain '/'.")
+        return LLMModelRef(provider_key=provider_key, model_key=model_key)
+
+    @staticmethod
+    def model_options_from_settings(settings: LLMSettings) -> list[LLMModelOption]:
+        options: list[LLMModelOption] = []
+        for provider in settings.providers:
+            provider_label = provider.display_name or provider.key
+            for model_key in provider.models:
+                fq_model_key = LLMService.fq_model_key(provider.key, model_key)
+                options.append(
+                    LLMModelOption(
+                        fq_model_key=fq_model_key,
+                        provider_key=provider.key,
+                        model_key=model_key,
+                        label=f"{provider_label} / {model_key}",
+                    )
+                )
+        return options
+
+    def _provider_for_key(self, settings: LLMSettings, provider_key: str) -> LLMProviderConfig:
+        for provider in settings.providers:
+            if provider.key == provider_key:
+                return provider
+        raise NotFoundError(f"LLM provider '{provider_key}' was not found.")
 
 
-__all__ = [
-    "DEFAULT_FQ_MODEL_KEY",
-    "DEFAULT_MODEL_KEY",
-    "DEFAULT_PROVIDER_KEY",
-    "FrozenLLMSettingsSource",
-    "LLMDialect",
-    "LLMModelOption",
-    "LLMModelRef",
-    "LLMProviderConfig",
-    "LLMService",
-    "LLMSettings",
-    "LLMSettingsService",
-    "LLMSettingsSource",
-    "PACKAGED_TRIAL_SECRET_SOURCE",
-    "PackagedTrialLLMConfig",
-    "SETTINGS_FILE_NAME",
-    "TRIAL_LLM_BASE_URL_FALLBACK",
-    "TRIAL_LLM_MODEL_FALLBACK",
-    "TRIAL_PROVIDER_DISPLAY_NAME",
-    "TRIAL_PROVIDER_KEY",
-    "default_llm_settings",
-    "load_packaged_trial_llm_config",
-    "sanitize_settings_for_save",
-]
+def load_packaged_trial_llm_config() -> PackagedTrialLLMConfig:
+    release_config = load_release_config()
+    return PackagedTrialLLMConfig(
+        base_url=release_config.trial_llm_base_url or TRIAL_LLM_BASE_URL_FALLBACK,
+        api_key=release_config.trial_llm_api_key,
+        model=release_config.trial_llm_model or TRIAL_LLM_MODEL_FALLBACK,
+    )
+
+
+def sanitize_settings_for_save(settings: LLMSettings) -> LLMSettings:
+    providers: list[LLMProviderConfig] = []
+    for provider in settings.providers:
+        if provider.dialect_config.get("secret_source") == PACKAGED_TRIAL_SECRET_SOURCE:
+            providers.append(provider.model_copy(update={"api_key": ""}))
+            continue
+        providers.append(provider)
+    return settings.model_copy(update={"providers": providers}, deep=True)
+
+
+def _legacy_payload_to_settings(payload: dict[str, Any]) -> dict[str, Any]:
+    model = str(payload.get("model") or DEFAULT_MODEL_KEY).strip() or DEFAULT_MODEL_KEY
+    guard_model = str(payload.get("turn_completion_guard_model") or "").strip()
+    title_model = str(payload.get("thread_title_model") or "").strip()
+    models = _unique_non_empty([model, guard_model, title_model])
+    provider = {
+        "key": DEFAULT_PROVIDER_KEY,
+        "display_name": "OpenAI-compatible",
+        "dialect": LLMDialect.OPENAI_COMPATIBLE.value,
+        "base_url": str(payload.get("base_url") or "https://api.openai.com").strip(),
+        "api_key": str(payload.get("api_key") or ""),
+        "models": models or [DEFAULT_MODEL_KEY],
+        "timeout_seconds": payload.get("timeout_seconds", 120),
+        "streaming_enabled": payload.get("streaming_enabled", True),
+    }
+    settings = {
+        "providers": [provider],
+        "default_fq_model_key": LLMService.fq_model_key(DEFAULT_PROVIDER_KEY, model),
+        "turn_completion_guard_fq_model_key": (
+            LLMService.fq_model_key(DEFAULT_PROVIDER_KEY, guard_model) if guard_model else ""
+        ),
+        "thread_title_fq_model_key": (
+            LLMService.fq_model_key(DEFAULT_PROVIDER_KEY, title_model) if title_model else ""
+        ),
+    }
+    return settings
+
+
+def _unique_non_empty(values: list[str]) -> list[str]:
+    result: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        item = value.strip()
+        if item and item not in seen:
+            result.append(item)
+            seen.add(item)
+    return result

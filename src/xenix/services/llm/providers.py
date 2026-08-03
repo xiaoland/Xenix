@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import re
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 from urllib import error, request
@@ -151,70 +150,6 @@ class LLMRequestMetadata:
     model: str
 
 
-_PROVIDER_URL_PATTERN = re.compile(r"(?i)\b(?:https?|wss?)://[^\s'\"<>]+")
-_PROVIDER_SECRET_PATTERN = re.compile(
-    r"(?i)(\b(?:api[_-]?key|authorization|bearer(?:[_-]?token)?|password|secret|token)\b\s*(?:[:=]|\s)\s*)([^\s,;]+)"
-)
-
-
-def redact_provider_error_text(value: object, *, fallback: str = "LLM provider request failed.") -> str:
-    """Return bounded diagnostics without a dynamic endpoint or credential.
-
-    Provider failures can cross retry events into the Harness/UI.  Treat them as
-    an external boundary even when the immediate adapter is a local loopback.
-    """
-
-    text = str(value).strip()
-    if not text:
-        return fallback
-    text = _PROVIDER_URL_PATTERN.sub("<endpoint>", text)
-    text = _PROVIDER_SECRET_PATTERN.sub(r"\1<redacted>", text)
-    return text[:512]
-
-
-class ProviderOperationError(ValidationError):
-    """A provider failure carrying the operation's dispatch witness.
-
-    Managed adapters set ``dispatch_may_have_happened`` when a binding loss can
-    no longer prove that the server did not receive the request.  The outer LLM
-    retry loop then fails the semantic operation instead of replaying it.
-    """
-
-    def __init__(
-        self,
-        message: str,
-        *,
-        error_code: str | None = None,
-        retryable: bool | None = None,
-        dispatch_may_have_happened: bool = False,
-    ) -> None:
-        self.dispatch_may_have_happened = bool(dispatch_may_have_happened)
-        super().__init__(
-            redact_provider_error_text(message),
-            error_code=error_code,
-            retryable=retryable,
-        )
-
-
-class ProviderBindingError(ProviderOperationError):
-    """A manager-provided dynamic binding failed without leaking its details."""
-
-    def __init__(
-        self,
-        message: str = "LLM provider binding failed.",
-        *,
-        error_code: str = "llm_provider_binding_error",
-        retryable: bool = True,
-        dispatch_may_have_happened: bool = False,
-    ) -> None:
-        super().__init__(
-            message,
-            error_code=error_code,
-            retryable=retryable,
-            dispatch_may_have_happened=dispatch_may_have_happened,
-        )
-
-
 class AgentProvider(Protocol):
     def complete(
         self,
@@ -255,13 +190,6 @@ class OpenAICompatibleChatProvider:
         self._model = model or "gpt-4o-mini"
         self._timeout_seconds = timeout_seconds
         self._streaming_enabled = streaming_enabled
-
-    def __repr__(self) -> str:
-        return (
-            f"{type(self).__name__}(provider_key={self._provider_key!r}, "
-            f"model={self._model!r}, timeout_seconds={self._timeout_seconds!r}, "
-            f"streaming_enabled={self._streaming_enabled!r})"
-        )
 
     @property
     def provider_key(self) -> str:
@@ -438,28 +366,19 @@ class OpenAICompatibleChatProvider:
                 try:
                     return json.loads(response.read().decode("utf-8"))
                 except json.JSONDecodeError as exc:
-                    raise ProviderOperationError(
+                    raise ValidationError(
                         "LLM provider returned invalid JSON.",
                         error_code="llm_response_invalid_json",
                         retryable=True,
-                        # A response body proves the server accepted and
-                        # processed this semantic request.  Retrying could
-                        # duplicate a Tool Call or user-visible completion.
-                        dispatch_may_have_happened=True,
                     ) from exc
         except error.HTTPError as exc:
-            raise self._http_error(endpoint, exc) from None
-        except (error.URLError, TimeoutError, OSError):
-            # ``urllib`` cannot prove that a transport failure occurred before
-            # bytes crossed the socket boundary.  Preserve the conservative
-            # possible-dispatch witness; manager adapters may still raise an
-            # explicit pre-dispatch binding error when they can prove otherwise.
-            raise ProviderOperationError(
-                "LLM provider request could not be completed.",
+            raise self._http_error(endpoint, exc) from exc
+        except (error.URLError, TimeoutError, OSError) as exc:
+            raise ValidationError(
+                f"LLM provider request failed at {endpoint}: {exc}.",
                 error_code="llm_provider_network_error",
                 retryable=True,
-                dispatch_may_have_happened=True,
-            ) from None
+            ) from exc
 
     def _post_stream(self, payload: dict[str, Any]):
         endpoint = f"{self._base_url}/v1/chat/completions"
@@ -485,52 +404,48 @@ class OpenAICompatibleChatProvider:
                     try:
                         yield json.loads(data)
                     except json.JSONDecodeError as exc:
-                        raise ProviderOperationError(
+                        raise ValidationError(
                             "LLM provider stream returned invalid JSON.",
                             error_code="llm_stream_invalid_json",
                             retryable=True,
-                            dispatch_may_have_happened=True,
                         ) from exc
         except error.HTTPError as exc:
-            raise self._http_error(endpoint, exc) from None
-        except (error.URLError, TimeoutError, OSError):
-            raise ProviderOperationError(
-                "LLM provider stream could not be completed.",
+            raise self._http_error(endpoint, exc) from exc
+        except (error.URLError, TimeoutError, OSError) as exc:
+            raise ValidationError(
+                f"LLM provider stream failed at {endpoint}: {exc}.",
                 error_code="llm_provider_network_error",
                 retryable=True,
-                dispatch_may_have_happened=True,
-            ) from None
+            ) from exc
 
-    def _http_error(self, endpoint: str, exc: error.HTTPError) -> ProviderOperationError:
+    def _http_error(self, endpoint: str, exc: error.HTTPError) -> ValidationError:
         retryable = exc.code in {408, 409, 425, 429, 500, 502, 503, 504}
-        return ProviderOperationError(
+        return ValidationError(
             self._format_http_error(endpoint, exc),
             error_code=f"llm_provider_http_{exc.code}",
             retryable=retryable,
-            dispatch_may_have_happened=True,
         )
 
     def _format_http_error(self, endpoint: str, exc: error.HTTPError) -> str:
-        # Do not echo a server body here: it can contain an endpoint, a bearer
-        # token, or provider-private request details that later surface through
-        # a retry event.  The typed status code is sufficient for this boundary.
-        del endpoint
-        return f"LLM provider request failed with HTTP {exc.code}."
+        body = exc.read().decode("utf-8", errors="replace")
+        provider_message = self._extract_provider_error_message(body)
+        detail = f": {provider_message}" if provider_message else ""
+        return f"LLM provider request failed with HTTP {exc.code} at {endpoint}{detail}."
 
     def _extract_provider_error_message(self, body: str) -> str:
         try:
             payload = json.loads(body)
         except json.JSONDecodeError:
-            return redact_provider_error_text(body, fallback="")
+            return body.strip()
         provider_error = payload.get("error")
         if isinstance(provider_error, dict):
             message = provider_error.get("message")
             code = provider_error.get("code")
             if message and code:
-                return redact_provider_error_text(f"{message} ({code})", fallback="")
+                return f"{message} ({code})"
             if message:
-                return redact_provider_error_text(message, fallback="")
-        return redact_provider_error_text(body, fallback="")
+                return str(message)
+        return body.strip()
 
     def _parse_chat_completion(self, raw: dict[str, Any], tools: list[_ToolDefinition]) -> ProviderResponse:
         if not isinstance(raw, dict):

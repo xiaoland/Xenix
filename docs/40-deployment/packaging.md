@@ -22,45 +22,6 @@ Packaging success proves assembly, not usability. The smoke gate proves only the
 
 Record the build commit, build environment, commands, smoke result, and archive checksum as release evidence. Re-run the whole chain after dependency, spec, resource, translation, build-input, or packaging-script changes.
 
-## Optional AMD One-click Slice
-
-AMD one-click is a build-owned optional composition slice. It has two supported
-package modes:
-
-- Default (`XENIX_BUILD_AMD_ONE_CLICK` unset or truthy): includes the AMD
-  resources, hidden imports, UI contribution, and runtime hook. The hook enables
-  the optional composition for that package unless an operator explicitly sets
-  `XENIX_ENABLE_AMD_ONE_CLICK` to a false value.
-- Cut-off (`XENIX_BUILD_AMD_ONE_CLICK=0`): excludes those AMD paths. The generic
-  application must still start even if its environment sets
-  `XENIX_ENABLE_AMD_ONE_CLICK=1`; the application treats a missing slice as
-  disabled rather than failing startup.
-
-For an AMD-containing release that is being decommissioned, set
-`XENIX_AMD_RETIRE_ONLY=1`. It retains the owner only to retire existing managed
-installations and rejects new install, upgrade, repair, and resume operations.
-It is not a substitute for target inventory and exact cleanup.
-
-Verify both package modes whenever the slice, its app/spec anchors, or packaging
-changes:
-
-```powershell
-$env:XENIX_BUILD_AMD_ONE_CLICK = "0"
-pdm run package
-$env:XENIX_ENABLE_AMD_ONE_CLICK = "1"
-pdm run smoke-package
-Remove-Item Env:XENIX_BUILD_AMD_ONE_CLICK
-Remove-Item Env:XENIX_ENABLE_AMD_ONE_CLICK
-
-pdm run package
-pdm run smoke-package
-```
-
-The cut-off package must contain no AMD service, resource, UI, or runtime-hook
-path. Do not use removal of source or a build switch as authority to terminate an
-unknown remote process; follow [Managed AMD Runtime](managed-amd-runtime.md) for
-the staged retirement sequence.
-
 ## Packaged-Only Failures
 
 Start with the smoke gate and its failing boundary. Inspect PyInstaller analysis/collection evidence and the built `_internal` tree for missing native libraries, metadata, or data files; a successful analysis-time import does not prove delayed runtime loading.

@@ -56,16 +56,6 @@ canonical-ready generation
   generation, model pack, engine, protocol, and manifest identity actually used. It
   installs no Python packages and uses no global Paddle model cache. OCR runtime
   ownership is separate from LLM configuration and from import orchestration.
-- OCR is an engine-neutral capability boundary. A managed Radeon realization may
-  use KServe V2 with PAGE 2024-07-15 while preserving the same parent-owned
-  import/canonical-publication authority. PAGE requests are PNG-only and carry
-  one decoded logical image; responses contain one `PcGts/Page`. Text lines use
-  preferred `TextEquiv index=1`; Xenix applies inverse transform, round-half-up,
-  and bounds clamping. Legal no-text is an empty success, while transport,
-  authentication, deadline, binding, XML, schema, and generation failures fail
-  the whole import attempt without a partial canonical publication. The managed
-  parent holds admission until its spawned child settles; the child receives only
-  an ordinary memory-only OCR specification and imports no deployment manager.
 - The selected user file is never modified. The parent snapshots source bytes into
   app-owned CAS. A worker may write canonical bytes only to its exact private
   attempt directory and returns one strict typed result manifest; the parent
