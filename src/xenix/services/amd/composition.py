@@ -17,7 +17,6 @@ from ..ocr.contracts import OcrRuntimeDescriptor
 from ..ocr.settings import ManagedOcrProviderRef, OcrProviderProjection
 from .adapters import AmdEmbeddingAdapter, AmdLlmAdapter, AmdOcrAdapter, AmdOcrDescriptorMismatchError
 from .deployment import AmdAiDeploymentService
-from .guided import AmdGuidedDeploymentService
 from .manifests import ComponentManifest, ManifestCapability, ManifestCatalog
 from .participants import AMD_MANAGER_ID, AmdEmbeddingParticipant, AmdLlmParticipant, AmdOcrParticipant
 from .placements.local import LocalAmdPlacement
@@ -60,7 +59,6 @@ class AmdComposition:
 
     catalog: ManifestCatalog
     deployment: AmdAiDeploymentService
-    guided: AmdGuidedDeploymentService
     ssh_security: AmdSshSecurityStore
     ssh_target_resolver: AmdSqliteSshTargetResolver
     retirement_only: bool = False
@@ -132,16 +130,14 @@ def build_amd_composition(
             temporary_parent=temporary_parent,
         )
         private_ssh_recipes = PrivateSshRecipePlacement(private_ssh)
-        historical_local = LocalAmdPlacement(product_root=local_root)
+        local = LocalAmdPlacement(product_root=local_root)
 
         deployment = AmdAiDeploymentService(
             session_factory=session_factory,
             catalog=catalog,
             placements={
                 private_ssh_recipes.placement_kind: private_ssh_recipes,
-                # No Local install route is exposed.  The controller remains
-                # solely as the exact cleanup owner for historical generations.
-                historical_local.placement_kind: historical_local,
+                local.placement_kind: local,
             },
             participants={
                 ManifestCapability.CHAT: AmdLlmParticipant(llm_settings_service),
@@ -151,12 +147,6 @@ def build_amd_composition(
             runtime_directory=runtime_directory,
             repository=repository,
             allow_new_installations=not retirement_only,
-            new_installation_placements=frozenset({"private_ssh"}),
-        )
-        guided = AmdGuidedDeploymentService(
-            catalog=catalog,
-            deployment=deployment,
-            ssh_security=ssh_security,
         )
 
         llm_provider_factory_registry.register_managed_factory(
@@ -186,7 +176,6 @@ def build_amd_composition(
     return AmdComposition(
         catalog=catalog,
         deployment=deployment,
-        guided=guided,
         ssh_security=ssh_security,
         ssh_target_resolver=ssh_target_resolver,
         retirement_only=retirement_only,

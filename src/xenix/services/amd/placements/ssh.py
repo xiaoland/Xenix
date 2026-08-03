@@ -46,49 +46,33 @@ _MAX_SSH_OUTPUT = 64 * 1_024
 class SshPlacementError(AmdPlacementError):
     """OpenSSH placement failed without exposing target or credential material."""
 
-    error_code = "amd_ssh_operation_failed"
-
 
 class SshTargetResolutionError(SshPlacementError):
     """An immutable target or one of its local security handles was unavailable."""
-
-    error_code = "amd_ssh_target_unavailable"
 
 
 class SshClientUnavailableError(SshPlacementError):
     """The supported OpenSSH client is absent or cannot be started."""
 
-    error_code = "amd_ssh_client_unavailable"
-
 
 class SshHostTrustError(SshPlacementError):
     """Pinned host trust did not match exactly."""
-
-    error_code = "amd_ssh_host_trust_failed"
 
 
 class SshAuthenticationError(SshPlacementError):
     """Public-key authentication failed without an allowed fallback."""
 
-    error_code = "amd_ssh_authentication_failed"
-
 
 class SshConnectionError(SshPlacementError):
     """The enrolled target could not sustain an SSH connection."""
-
-    error_code = "amd_ssh_connection_failed"
 
 
 class SshCommandTimeoutError(SshConnectionError):
     """A bounded SSH operation exceeded its deadline."""
 
-    error_code = "amd_ssh_connection_timeout"
-
 
 class SshForwardError(SshConnectionError):
     """A loopback forward could not be established or was lost."""
-
-    error_code = "amd_ssh_forward_failed"
 
 
 @dataclass(frozen=True, slots=True)
@@ -106,19 +90,13 @@ class SshTargetEnrollment:
         _require_target_id(self.target_id)
         _require_host(self.host)
         if not isinstance(self.user, str) or not _SSH_USER.fullmatch(self.user):
-            raise SshTargetResolutionError(
-                "SSH target user is invalid.",
-                error_code="amd_ssh_user_invalid",
-            )
+            raise SshTargetResolutionError("SSH target user is invalid.")
         if (
             not isinstance(self.port, int)
             or isinstance(self.port, bool)
             or not 1 <= self.port <= 65_535
         ):
-            raise SshTargetResolutionError(
-                "SSH target port is invalid.",
-                error_code="amd_ssh_port_invalid",
-            )
+            raise SshTargetResolutionError("SSH target port is invalid.")
         _require_opaque_reference(self.pinned_host_key_reference, "Pinned host-key reference")
         _require_opaque_reference(self.identity_file_reference, "Identity-file reference")
 
@@ -132,10 +110,7 @@ class ResolvedSshIdentity:
     def __post_init__(self) -> None:
         path = Path(self.identity_file)
         if not path.is_absolute():
-            raise SshTargetResolutionError(
-                "Resolved SSH identity is invalid.",
-                error_code="amd_ssh_identity_invalid",
-            )
+            raise SshTargetResolutionError("Resolved SSH identity is invalid.")
         object.__setattr__(self, "identity_file", path)
 
 
@@ -281,10 +256,7 @@ class _IsolatedOpenSshMaterial:
         keepalive_failures: int,
     ) -> None:
         if not identity.identity_file.is_file():
-            raise SshTargetResolutionError(
-                "Resolved SSH identity is unavailable.",
-                error_code="amd_ssh_identity_unavailable",
-            )
+            raise SshTargetResolutionError("Resolved SSH identity is unavailable.")
         try:
             self._temporary = tempfile.TemporaryDirectory(
                 prefix="xenix-amd-ssh-",
@@ -906,10 +878,7 @@ class PrivateSshAmdPlacement:
 
 def _require_target_id(value: str) -> None:
     if not isinstance(value, str) or not _TARGET_ID.fullmatch(value):
-        raise SshTargetResolutionError(
-            "SSH target ID is invalid.",
-            error_code="amd_ssh_target_id_invalid",
-        )
+        raise SshTargetResolutionError("SSH target ID is invalid.")
 
 
 def _require_host(value: str) -> None:
@@ -921,19 +890,13 @@ def _require_host(value: str) -> None:
         or value.startswith("-")
         or any(character.isspace() or ord(character) < 0x21 or ord(character) == 0x7F for character in value)
     ):
-        raise SshTargetResolutionError(
-            "SSH target host is invalid.",
-            error_code="amd_ssh_host_invalid",
-        )
+        raise SshTargetResolutionError("SSH target host is invalid.")
     try:
         ipaddress.ip_address(value)
     except ValueError:
         dns_name = value[:-1] if value.endswith(".") else value
         if not dns_name or any(not _DNS_LABEL.fullmatch(label) for label in dns_name.split(".")):
-            raise SshTargetResolutionError(
-                "SSH target host is invalid.",
-                error_code="amd_ssh_host_invalid",
-            ) from None
+            raise SshTargetResolutionError("SSH target host is invalid.") from None
 
 
 def _require_opaque_reference(value: str, label: str) -> None:

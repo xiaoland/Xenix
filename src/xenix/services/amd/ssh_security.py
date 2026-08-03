@@ -9,8 +9,6 @@ persists a password, token, or endpoint binding.
 
 from __future__ import annotations
 
-import base64
-import binascii
 import threading
 from collections.abc import Callable, Mapping
 from pathlib import Path
@@ -40,15 +38,6 @@ _MAX_TARGETS = 128
 class AmdSshSecurityError(RuntimeError):
     """A local Private SSH enrollment handle could not be used safely."""
 
-    def __init__(
-        self,
-        message: str,
-        *,
-        error_code: str = "amd_ssh_security_invalid",
-    ) -> None:
-        super().__init__(message)
-        self.error_code = error_code
-
 
 class AmdSshSecurityStore:
     """One app-scoped store for opaque Private SSH enrollment material."""
@@ -66,24 +55,6 @@ class AmdSshSecurityStore:
         with self._lock:
             self._closed = True
 
-    def references_for_target(self, target_id: str) -> tuple[str, str]:
-        """Return deterministic opaque references without reading or writing a key."""
-
-        normalized_target_id = _require_target_id(target_id)
-        with self._lock:
-            self._require_open()
-        reference = _reference_for_target(normalized_target_id)
-        return reference, reference
-
-    def contains_target(self, target_id: str) -> bool:
-        """Return whether the exact local security checkpoint exists."""
-
-        normalized_target_id = _require_target_id(target_id)
-        with self._lock:
-            self._require_open()
-            payload = _payload_from_snapshot(self._load())
-        return normalized_target_id in payload["targets"]
-
     def record(
         self,
         *,
@@ -96,10 +67,7 @@ class AmdSshSecurityStore:
         normalized_target_id = _require_target_id(target_id)
         path = _require_identity_path(identity_file)
         if not isinstance(host_key, PinnedHostKey):
-            raise AmdSshSecurityError(
-                "Pinned SSH host key is invalid.",
-                error_code="amd_ssh_host_key_invalid",
-            )
+            raise AmdSshSecurityError("Pinned SSH host key is invalid.")
         reference = _reference_for_target(normalized_target_id)
         record = {
             "identity_file": str(path),
@@ -114,17 +82,11 @@ class AmdSshSecurityStore:
                 targets = dict(current["targets"])
                 existing = targets.get(normalized_target_id)
                 if existing is not None and existing != record:
-                    raise AmdSshSecurityError(
-                        "Private SSH target security material is already enrolled.",
-                        error_code="amd_ssh_security_conflict",
-                    )
+                    raise AmdSshSecurityError("Private SSH target security material is already enrolled.")
                 if existing == record:
                     return reference, reference
                 if len(targets) >= _MAX_TARGETS:
-                    raise AmdSshSecurityError(
-                        "Too many Private SSH targets are enrolled.",
-                        error_code="amd_ssh_security_capacity_reached",
-                    )
+                    raise AmdSshSecurityError("Too many Private SSH targets are enrolled.")
                 targets[normalized_target_id] = record
                 next_payload = {"schema_version": _SCHEMA_VERSION, "targets": targets}
                 try:
@@ -137,24 +99,15 @@ class AmdSshSecurityStore:
                 except SettingsConflictError:
                     continue
                 except SettingsStoreError as exc:
-                    raise AmdSshSecurityError(
-                        "Private SSH security material could not be saved.",
-                        error_code="amd_ssh_security_unavailable",
-                    ) from exc
-        raise AmdSshSecurityError(
-            "Private SSH security material changed repeatedly; retry enrollment.",
-            error_code="amd_ssh_security_conflict",
-        )
+                    raise AmdSshSecurityError("Private SSH security material could not be saved.") from exc
+        raise AmdSshSecurityError("Private SSH security material changed repeatedly; retry enrollment.")
 
     def resolve_identity(self, reference: str) -> ResolvedSshIdentity:
         record = self._record(reference)
         try:
             return ResolvedSshIdentity(identity_file=Path(record["identity_file"]))
         except (KeyError, TypeError, ValueError, SshTargetResolutionError) as exc:
-            raise AmdSshSecurityError(
-                "Private SSH identity handle is invalid.",
-                error_code="amd_ssh_identity_invalid",
-            ) from exc
+            raise AmdSshSecurityError("Private SSH identity handle is invalid.") from exc
 
     def resolve_host_key(self, reference: str) -> PinnedHostKey:
         record = self._record(reference)
@@ -164,10 +117,7 @@ class AmdSshSecurityStore:
                 key_data=record["host_key_data"],
             )
         except (KeyError, TypeError, ValueError, SshTargetResolutionError) as exc:
-            raise AmdSshSecurityError(
-                "Pinned SSH host key is invalid.",
-                error_code="amd_ssh_host_key_invalid",
-            ) from exc
+            raise AmdSshSecurityError("Pinned SSH host key is invalid.") from exc
 
     def _record(self, reference: str) -> Mapping[str, str]:
         target_id = _target_id_from_reference(reference)
@@ -176,10 +126,7 @@ class AmdSshSecurityStore:
             payload = _payload_from_snapshot(self._load())
         record = payload["targets"].get(target_id)
         if not isinstance(record, Mapping):
-            raise AmdSshSecurityError(
-                "Private SSH target security material is unavailable.",
-                error_code="amd_ssh_security_unavailable",
-            )
+            raise AmdSshSecurityError("Private SSH target security material is unavailable.")
         expected_fields = {"identity_file", "host_key_type", "host_key_data"}
         if set(record) != expected_fields or not all(isinstance(record[field], str) for field in expected_fields):
             raise AmdSshSecurityError("Private SSH target security material is invalid.")
@@ -189,17 +136,11 @@ class AmdSshSecurityStore:
         try:
             return self._store.load(_DOCUMENT_ID)
         except SettingsStoreError as exc:
-            raise AmdSshSecurityError(
-                "Private SSH security material could not be read.",
-                error_code="amd_ssh_security_unavailable",
-            ) from exc
+            raise AmdSshSecurityError("Private SSH security material could not be read.") from exc
 
     def _require_open(self) -> None:
         if self._closed:
-            raise AmdSshSecurityError(
-                "Private SSH security store is closed.",
-                error_code="amd_ssh_security_unavailable",
-            )
+            raise AmdSshSecurityError("Private SSH security store is closed.")
 
 
 class AmdSqliteSshTargetResolver(SshTargetResolver):
@@ -274,46 +215,18 @@ class AmdSettingsSshTrustResolver(SshTrustResolver):
             raise SshTargetResolutionError("Pinned SSH host key is unavailable.") from exc
 
 
-def parse_pinned_host_key(
-    value: str,
-    *,
-    expected_host: str | None = None,
-    expected_port: int | None = None,
-) -> PinnedHostKey:
-    """Parse one verified OpenSSH server host key.
-
-    The accepted forms are ``key-type base64 [comment...]`` and, when the
-    expected endpoint is supplied, the exact un-hashed ``known_hosts`` form
-    ``host-pattern key-type base64 [comment...]``.  Fingerprints, multi-line
-    scans, wildcard/hashed host patterns, and mismatched endpoint prefixes are
-    rejected.  The binary key blob must name the same algorithm as the text
-    prefix.
-    """
+def parse_pinned_host_key(value: str) -> PinnedHostKey:
+    """Parse a copied OpenSSH public key, discarding an optional comment."""
 
     if not isinstance(value, str) or "\x00" in value or "\r" in value or "\n" in value:
-        raise _invalid_host_key()
+        raise AmdSshSecurityError("Pinned SSH host key is invalid.")
     fields = value.strip().split()
-    candidates: list[tuple[str, str]] = []
-    if len(fields) >= 2:
-        candidates.append((fields[0], fields[1]))
-    if expected_host is not None and expected_port is not None and len(fields) >= 3:
-        expected_pattern = (
-            f"[{expected_host}]:{expected_port}"
-            if expected_port != 22 or ":" in expected_host
-            else expected_host
-        )
-        if fields[0] == expected_pattern:
-            candidates.insert(0, (fields[1], fields[2]))
-
-    for key_type, key_data in candidates:
-        try:
-            host_key = PinnedHostKey(key_type=key_type, key_data=key_data)
-            if _embedded_key_type(key_data) != key_type:
-                continue
-            return host_key
-        except (ValueError, SshTargetResolutionError):
-            continue
-    raise _invalid_host_key()
+    if len(fields) not in {2, 3}:
+        raise AmdSshSecurityError("Pinned SSH host key is invalid.")
+    try:
+        return PinnedHostKey(key_type=fields[0], key_data=fields[1])
+    except SshTargetResolutionError as exc:
+        raise AmdSshSecurityError("Pinned SSH host key is invalid.") from exc
 
 
 def _payload_from_snapshot(snapshot: SettingsSnapshot) -> dict[str, object]:
@@ -343,20 +256,11 @@ def _require_target_id(value: str) -> str:
             identity_file_reference="validation",
         ).target_id
     except SshTargetResolutionError as exc:
-        raise AmdSshSecurityError(
-            "Private SSH target ID is invalid.",
-            error_code="amd_ssh_target_id_invalid",
-        ) from exc
+        raise AmdSshSecurityError("Private SSH target ID is invalid.") from exc
 
 
 def _require_identity_path(value: Path) -> Path:
-    try:
-        path = Path(value)
-    except (OSError, TypeError, ValueError):
-        raise AmdSshSecurityError(
-            "Private SSH identity path is invalid.",
-            error_code="amd_ssh_identity_invalid",
-        ) from None
+    path = Path(value)
     rendered = str(path)
     if (
         not path.is_absolute()
@@ -365,33 +269,8 @@ def _require_identity_path(value: Path) -> Path:
         or "\n" in rendered
         or len(rendered) > 2_048
     ):
-        raise AmdSshSecurityError(
-            "Private SSH identity path is invalid.",
-            error_code="amd_ssh_identity_invalid",
-        )
+        raise AmdSshSecurityError("Private SSH identity path is invalid.")
     return path
-
-
-def _embedded_key_type(key_data: str) -> str:
-    try:
-        padding = "=" * ((4 - len(key_data) % 4) % 4)
-        payload = base64.b64decode(key_data + padding, validate=True)
-        if len(payload) < 5:
-            raise ValueError
-        name_length = int.from_bytes(payload[:4], byteorder="big", signed=False)
-        name_end = 4 + name_length
-        if not 1 <= name_length <= 256 or name_end >= len(payload):
-            raise ValueError
-        return payload[4:name_end].decode("ascii", errors="strict")
-    except (UnicodeDecodeError, ValueError, binascii.Error):
-        raise ValueError("Invalid OpenSSH public key blob.") from None
-
-
-def _invalid_host_key() -> AmdSshSecurityError:
-    return AmdSshSecurityError(
-        "Pinned SSH host key is invalid.",
-        error_code="amd_ssh_host_key_invalid",
-    )
 
 
 def _reference_for_target(target_id: str) -> str:

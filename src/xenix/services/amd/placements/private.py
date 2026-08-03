@@ -30,8 +30,6 @@ from .ssh import PrivateSshAmdPlacement, SshAmdExecutionSession, SshPlacementErr
 class PrivateRecipePlacementError(AmdPlacementError):
     """A bundled Private recipe could not be completed safely."""
 
-    error_code = "amd_private_recipe_failed"
-
 
 _PROVISION_TIMEOUT_SECONDS = 7_200.0
 _STARTUP_TIMEOUT_SECONDS = 180.0
@@ -287,10 +285,7 @@ class PrivateSshRecipePlacement:
         try:
             raw = self._placement.open_session(target_id, incarnation)
         except SshPlacementError as exc:
-            raise PrivateRecipePlacementError(
-                "Private AMD target is unavailable.",
-                error_code=exc.error_code,
-            ) from exc
+            raise PrivateRecipePlacementError("Private AMD target is unavailable.") from exc
         return _PrivateRecipeSession(raw=raw, recipes={})
 
 
