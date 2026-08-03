@@ -1,8 +1,8 @@
 # Verification Record
 
 This file records completed evidence rather than treating the earlier plan as a
-future gate. The original guided UI claim was reopened after a real click exposed
-a silent pre-enrollment failure. TP-20A now owns the corrective evidence.
+future gate. It separates implementation proof from the two remaining physical
+manual acceptance cells.
 
 ## Completed Evidence
 
@@ -17,8 +17,7 @@ a silent pre-enrollment failure. TP-20A now owns the corrective evidence.
 | Retirement is forward-only | Durable desired absence is committed before cancellation/cleanup; exact generation gates, projection commands, and target cleanup only advance toward removal. | Passed |
 | Default distributable carries the optional slice | Default `pdm run package` and `pdm run smoke-package` passed after validating the AMD runtime hook. | Passed |
 | Hard cut-off is executable | `XENIX_BUILD_AMD_ONE_CLICK=0` produced a package with no AMD slice paths. Its packaged smoke passed even when `XENIX_ENABLE_AMD_ONE_CLICK=1`. | Passed |
-| Guided UI failures are truthful and observable | The production Qt dialog proved read-only field validation/focus, no Save/Local action, one exact command, a real typed SSH failure, Repair/Remove availability, and fully redacted logs. | Passed |
-| Generic product remains AMD-free | Static source regression rejects direct generic-to-AMD imports; `pdm run test` (104), `pdm run check`, and `pdm run smoke` passed. | Passed |
+| Generic product remains AMD-free | Static source regression rejects direct generic-to-AMD imports; `pdm run test` (44), `pdm run check`, and `pdm run smoke` passed. | Passed |
 
 ## Validation Commands
 
@@ -33,15 +32,6 @@ XENIX_BUILD_AMD_ONE_CLICK=0 pdm run package
 XENIX_ENABLE_AMD_ONE_CLICK=1 pdm run smoke-package
 pdm run package
 pdm run smoke-package
-```
-
-The final repair verification additionally ran:
-
-```text
-pdm run pytest --direct tests/test_amd_guided_setup.py tests/test_amd_one_click.py -q
-pdm run i18n-extract
-pdm run i18n-compile
-tasks/.../validate_guided_ui_headed.py (isolated XENIX_APP_HOME)
 ```
 
 The AMD-enabled build initially exposed a malformed generated runtime hook. The
@@ -66,10 +56,8 @@ release-proof, not a first-pass claim.
 
 | Cell | Why it remains manual | Required outcome |
 | --- | --- | --- |
-| Fresh Private SSH Radeon target | The visible validation, typed SSH failure, and redacted status/log presentation now pass. The assigned endpoint currently resets SSH key exchange. | After endpoint restoration/replacement: operational install, all three capability paths, and Remove with no manual endpoint/tunnel entry or fallback. |
-
-There is no remaining Local Linux desktop cell. Xenix has no Linux distribution;
-same-host controller experiments are historical engineering evidence only.
+| Fresh Private SSH Radeon target | Verify the user-facing guided setup/removal flow and redacted status presentation, not just headless composition. | One visible install, operation, and removal with no manual endpoint entry or fallback. |
+| Fresh Local Linux Radeon host | No physical compatible local Radeon host was available during implementation. | One local install, all three services, restart/cleanup, and removal without SSH. |
 
 The original feasibility probes and detailed cell records remain under
 [evidence](evidence/) and [spikes](spikes/). They are historical evidence, not
