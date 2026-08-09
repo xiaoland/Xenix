@@ -5,13 +5,16 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from hashlib import sha256
+import inspect
 import json
 import os
 from pathlib import Path
+import platform
 import subprocess
+import sys
 import tempfile
 import time
-from typing import Any, Iterable
+from typing import Any, Callable, Iterator
 from uuid import uuid4
 
 from xenix.config import AppPaths, ensure_app_dirs, package_root
@@ -42,6 +45,15 @@ from .contracts import (
     SemanticVerdict,
     TokenUsage,
 )
+from .budgets import (
+    BenchmarkBudgetController,
+    BenchmarkBudgetError,
+    BenchmarkBudgetPolicy,
+    BenchmarkBudgetSnapshot,
+    BenchmarkBudgetStatus,
+    IsolatedCallStatus,
+    run_isolated_call,
+)
 from .judge import judge_independence, run_judge
 
 
@@ -49,6 +61,7 @@ LLM_SETTINGS_PATH_ENV = "XENIX_AGENT_BENCHMARK_LLM_SETTINGS_PATH"
 EMBEDDING_SETTINGS_PATH_ENV = "XENIX_AGENT_BENCHMARK_EMBEDDING_SETTINGS_PATH"
 JUDGE_LLM_SETTINGS_PATH_ENV = "XENIX_AGENT_BENCHMARK_JUDGE_LLM_SETTINGS_PATH"
 DEFAULT_OUTPUT_DIRECTORY = Path("build") / "agent-harness-benchmarks"
+DEFAULT_BUDGET_POLICY = BenchmarkBudgetPolicy()
 
 
 class BenchmarkSettingsError(ValueError):
@@ -111,6 +124,75 @@ class _StreamMeasurements:
                 self.source_state_captured = True
 
 
+class _BoundedLLMService(LLMService):
+    """Real provider gateway with benchmark-only request admission guards."""
+
+    def __init__(
+        self,
+        settings_source: FrozenLLMSettingsSource,
+        budget: BenchmarkBudgetController,
+    ) -> None:
+        super().__init__(settings_source)
+        self._budget = budget
+
+    def complete(
+        self,
+        *,
+        fq_model_key: str | None = None,
+        messages: list[Any],
+        tools: list[Any],
+        retry_callback: Callable[[Any], None] | None = None,
+        before_provider_request: Callable[[], None] | None = None,
+    ) -> Any:
+        self._budget.begin_sampling_round()
+        response = super().complete(
+            fq_model_key=fq_model_key,
+            messages=messages,
+            tools=tools,
+            retry_callback=retry_callback,
+            before_provider_request=self._admission(before_provider_request),
+        )
+        self._observe_response(response)
+        return response
+
+    def stream(
+        self,
+        *,
+        fq_model_key: str | None = None,
+        messages: list[Any],
+        tools: list[Any],
+        before_provider_request: Callable[[], None] | None = None,
+    ) -> Iterator[Any]:
+        self._budget.begin_sampling_round()
+        for event in super().stream(
+            fq_model_key=fq_model_key,
+            messages=messages,
+            tools=tools,
+            before_provider_request=self._admission(before_provider_request),
+        ):
+            response = getattr(event, "response", None)
+            if response is not None:
+                self._observe_response(response)
+            yield event
+
+    def _admission(
+        self,
+        original: Callable[[], None] | None,
+    ) -> Callable[[], None]:
+        def admit() -> None:
+            if original is not None:
+                original()
+            self._budget.admit_provider_attempt()
+
+        return admit
+
+    def _observe_response(self, response: Any) -> None:
+        usage = LLMTokenUsage.from_payload(getattr(response, "usage_payload", None))
+        self._budget.observe_subject_response(
+            usage.total_tokens if usage is not None else None
+        )
+
+
 class _HeadlessBenchmarkCell:
     """One isolated production-service composition behind the runner contract."""
 
@@ -120,6 +202,7 @@ class _HeadlessBenchmarkCell:
         paths: AppPaths,
         settings: LLMSettings,
         embedding_settings: EmbeddingSettings | None,
+        budget: BenchmarkBudgetController,
     ) -> None:
         self.paths = paths
         self._closed = False
@@ -129,7 +212,7 @@ class _HeadlessBenchmarkCell:
         self._knowledge_index = None
         try:
             self._storage = StorageBootstrapService().initialize(paths)
-            llm = LLMService(FrozenLLMSettingsSource(settings))
+            llm = _BoundedLLMService(FrozenLLMSettingsSource(settings), budget)
             worker_settings = MLWorkerSettingsService(paths)
             embedding_settings_service = EmbeddingSettingsService(paths)
             if embedding_settings is not None:
@@ -277,46 +360,36 @@ def _load_judge_configuration(
             model_key=selected_model or None,
             setup_error=f"judge_{setup_error}",
         )
+    effective_settings = settings.model_copy(
+        deep=True,
+        update={"retry_attempts": DEFAULT_BUDGET_POLICY.max_provider_attempts},
+    )
     return _JudgeConfiguration(
-        settings=settings,
+        settings=effective_settings,
         settings_sha256=settings_sha256,
         model_key=selected_model,
     )
 
 
-def configured_model_keys(settings: LLMSettings) -> tuple[str, ...]:
-    return tuple(
-        f"{provider.key}/{model_key}"
-        for provider in settings.providers
-        for model_key in provider.models
-    )
-
-
-def filtered_model_keys(
+def selected_model_key(
     settings: LLMSettings,
-    requested_models: Iterable[str] | None = None,
-) -> tuple[str, ...]:
-    configured = configured_model_keys(settings)
-    requested = tuple(
-        dict.fromkeys(
-            model.strip()
-            for model in (requested_models or ())
-            if isinstance(model, str) and model.strip()
-        )
-    )
-    if not requested:
-        return configured
-    return requested
+    requested_model: str | None = None,
+) -> str:
+    requested = requested_model.strip() if isinstance(requested_model, str) else ""
+    selected = requested or settings.default_fq_model_key.strip()
+    if not selected:
+        raise BenchmarkSettingsError("missing_default_model")
+    return selected
 
 
-def dry_run_models(
+def dry_run_model(
     *,
     settings_path: Path | None = None,
-    requested_models: Iterable[str] | None = None,
-) -> tuple[str, ...]:
+    requested_model: str | None = None,
+) -> str:
     resolved_path = resolve_llm_settings_path(settings_path)
     settings, _settings_sha256 = load_settings_snapshot(resolved_path)
-    return filtered_model_keys(settings, requested_models)
+    return selected_model_key(settings, requested_model)
 
 
 def run_benchmark(
@@ -326,35 +399,62 @@ def run_benchmark(
     case: BenchmarkCase,
     execution_mode: BenchmarkExecutionMode = BenchmarkExecutionMode.HEADLESS,
     output_directory: Path = DEFAULT_OUTPUT_DIRECTORY,
-    requested_models: Iterable[str] | None = None,
+    requested_model: str | None = None,
     judge_settings_path: Path | None = None,
     judge_model_key: str | None = None,
-) -> tuple[BenchmarkRun, ...]:
+    budget_policy: BenchmarkBudgetPolicy = DEFAULT_BUDGET_POLICY,
+    harness_variant: str = "baseline",
+    invocation_reported_subject_tokens: int = 0,
+    invocation_id: str | None = None,
+) -> BenchmarkRun:
     identity = _repository_identity()
+    preserved_invocation_tokens = (
+        invocation_reported_subject_tokens
+        if isinstance(invocation_reported_subject_tokens, int)
+        and not isinstance(invocation_reported_subject_tokens, bool)
+        and invocation_reported_subject_tokens >= 0
+        else 0
+    )
     try:
+        normalized_variant = _normalized_harness_variant(harness_variant)
+        normalized_invocation_id = _normalized_invocation_id(invocation_id)
         resolved_settings_path = resolve_llm_settings_path(settings_path)
         settings, settings_sha256 = load_settings_snapshot(resolved_settings_path)
+        model_key = selected_model_key(settings, requested_model)
+        effective_settings = _effective_subject_settings(settings, budget_policy)
+        effective_settings_sha256 = _sha256_text(
+            effective_settings.model_dump_json()
+        )
         identity = BenchmarkIdentity(
             fixture_sha256=None,
             settings_sha256=settings_sha256,
             repository_commit=identity.repository_commit,
             repository_dirty=identity.repository_dirty,
+            effective_settings_sha256=effective_settings_sha256,
+            harness_variant=normalized_variant,
+            invocation_id=normalized_invocation_id,
+            case_definition_sha256=_case_definition_sha256(case),
+            runtime_sha256=_runtime_sha256(),
         )
     except BenchmarkSettingsError as exc:
-        return _persist_all(
+        fallback_variant = (
+            harness_variant.strip()
+            if isinstance(harness_variant, str) and harness_variant.strip()
+            else "unresolved"
+        )[:96]
+        return _persist_result(
             output_directory,
-            (
-                _invalid_result(
-                    case_id=case.case_id,
-                    provider_model="unresolved",
-                    execution_mode=execution_mode,
-                    identity=identity,
-                    failure_kind=exc.code,
-                ),
+            _invalid_result(
+                case_id=case.case_id,
+                provider_model="unresolved",
+                execution_mode=execution_mode,
+                identity=replace(identity, harness_variant=fallback_variant),
+                failure_kind=exc.code,
+                budget_policy=budget_policy,
+                invocation_reported_subject_tokens=preserved_invocation_tokens,
             ),
         )
 
-    model_keys = filtered_model_keys(settings, requested_models)
     resolved_embedding_settings_path = resolve_embedding_settings_path(
         embedding_settings_path
     )
@@ -370,18 +470,22 @@ def run_benchmark(
                 settings_sha256=settings_sha256,
                 repository_commit=identity.repository_commit,
                 repository_dirty=identity.repository_dirty,
+                effective_settings_sha256=effective_settings_sha256,
+                harness_variant=normalized_variant,
+                invocation_id=normalized_invocation_id,
+                case_definition_sha256=_case_definition_sha256(case),
+                runtime_sha256=_runtime_sha256(),
             )
-            return _persist_all(
+            return _persist_result(
                 output_directory,
-                tuple(
-                    _invalid_result(
-                        case_id=case.case_id,
-                        provider_model=model_key,
-                        execution_mode=execution_mode,
-                        identity=invalid_identity,
-                        failure_kind=exc.code,
-                    )
-                    for model_key in model_keys
+                _invalid_result(
+                    case_id=case.case_id,
+                    provider_model=model_key,
+                    execution_mode=execution_mode,
+                    identity=invalid_identity,
+                    failure_kind=exc.code,
+                    budget_policy=budget_policy,
+                    invocation_reported_subject_tokens=preserved_invocation_tokens,
                 ),
             )
     judge_configuration = _load_judge_configuration(
@@ -398,18 +502,22 @@ def run_benchmark(
             judge_settings_sha256=judge_configuration.settings_sha256,
             repository_commit=identity.repository_commit,
             repository_dirty=identity.repository_dirty,
+            effective_settings_sha256=effective_settings_sha256,
+            harness_variant=normalized_variant,
+            invocation_id=normalized_invocation_id,
+            case_definition_sha256=_case_definition_sha256(case),
+            runtime_sha256=_runtime_sha256(),
         )
-        return _persist_all(
+        return _persist_result(
             output_directory,
-            tuple(
-                _invalid_result(
-                    case_id=case.case_id,
-                    provider_model=model_key,
-                    execution_mode=execution_mode,
-                    identity=invalid_identity,
-                    failure_kind=exc.code,
-                )
-                for model_key in model_keys
+            _invalid_result(
+                case_id=case.case_id,
+                provider_model=model_key,
+                execution_mode=execution_mode,
+                identity=invalid_identity,
+                failure_kind=exc.code,
+                budget_policy=budget_policy,
+                invocation_reported_subject_tokens=preserved_invocation_tokens,
             ),
         )
 
@@ -420,30 +528,148 @@ def run_benchmark(
         judge_settings_sha256=judge_configuration.settings_sha256,
         repository_commit=identity.repository_commit,
         repository_dirty=identity.repository_dirty,
+        effective_settings_sha256=effective_settings_sha256,
+        harness_variant=normalized_variant,
+        invocation_id=normalized_invocation_id,
+        case_definition_sha256=_case_definition_sha256(case),
+        runtime_sha256=_runtime_sha256(),
     )
-    return _persist_all(
-        output_directory,
-        tuple(
-            _run_model_cell(
-                case=case,
+    run_id = uuid4().hex
+    if (
+        isinstance(invocation_reported_subject_tokens, bool)
+        or not isinstance(invocation_reported_subject_tokens, int)
+        or invocation_reported_subject_tokens < 0
+    ):
+        return _persist_result(
+            output_directory,
+            _invalid_result(
+                case_id=case.case_id,
+                provider_model=model_key,
                 execution_mode=execution_mode,
-                settings=settings,
-                settings_path=resolved_settings_path,
-                settings_sha256=settings_sha256,
-                embedding_settings=embedding_settings,
-                embedding_settings_path=resolved_embedding_settings_path,
-                embedding_settings_sha256=embedding_settings_sha256,
-                model_key=model_key,
                 identity=cell_identity,
-                judge_configuration=judge_configuration,
-            )
-            for model_key in model_keys
-        ),
+                failure_kind="invalid_invocation_token_state",
+                budget_policy=budget_policy,
+                run_id=run_id,
+            ),
+        )
+    if (
+        invocation_reported_subject_tokens
+        >= budget_policy.max_reported_invocation_subject_tokens
+    ):
+        return _persist_result(
+            output_directory,
+            AgentHarnessBenchmarkResult(
+                case_id=case.case_id,
+                run_id=run_id,
+                provider_model=model_key,
+                execution_mode=execution_mode,
+                run_status=BenchmarkRunStatus.BUDGET_EXCEEDED,
+                subject_metrics=BenchmarkMetrics(),
+                budget=BenchmarkBudgetSnapshot(
+                    status=BenchmarkBudgetStatus.EXCEEDED,
+                    policy=budget_policy,
+                    invocation_reported_subject_tokens=(
+                        invocation_reported_subject_tokens
+                    ),
+                    exhaustion_reason="invocation_token_limit_reached",
+                ),
+                identity=cell_identity,
+                failure_kind="invocation_token_limit_reached",
+            ),
+        )
+    with tempfile.TemporaryDirectory(
+        prefix="xenix-agent-benchmark-parent-",
+        ignore_cleanup_errors=True,
+    ) as temporary_parent:
+        outcome = run_isolated_call(
+            _run_model_cell,
+            {
+                "run_id": run_id,
+                "case": case,
+                "execution_mode": execution_mode,
+                "settings": effective_settings,
+                "settings_path": resolved_settings_path,
+                "settings_sha256": settings_sha256,
+                "embedding_settings": embedding_settings,
+                "embedding_settings_path": resolved_embedding_settings_path,
+                "embedding_settings_sha256": embedding_settings_sha256,
+                "model_key": model_key,
+                "identity": cell_identity,
+                "judge_configuration": judge_configuration,
+                "budget_policy": budget_policy,
+                "temporary_parent": Path(temporary_parent),
+            },
+            timeout_seconds=budget_policy.max_wall_seconds,
+        )
+    if outcome.status is IsolatedCallStatus.COMPLETED and isinstance(
+        outcome.value,
+        AgentHarnessBenchmarkResult,
+    ):
+        result = outcome.value
+    elif outcome.status is IsolatedCallStatus.TIMED_OUT:
+        result = AgentHarnessBenchmarkResult(
+            case_id=case.case_id,
+            run_id=run_id,
+            provider_model=model_key,
+            execution_mode=execution_mode,
+            run_status=BenchmarkRunStatus.BUDGET_EXCEEDED,
+            subject_metrics=BenchmarkMetrics(),
+            budget=BenchmarkBudgetSnapshot(
+                status=BenchmarkBudgetStatus.EXCEEDED,
+                policy=budget_policy,
+                exhaustion_reason="process_wall_time_exceeded",
+            ),
+            identity=cell_identity,
+            failure_kind="process_wall_time_exceeded",
+        )
+    else:
+        result = AgentHarnessBenchmarkResult(
+            case_id=case.case_id,
+            run_id=run_id,
+            provider_model=model_key,
+            execution_mode=execution_mode,
+            run_status=BenchmarkRunStatus.RUNTIME_ERROR,
+            subject_metrics=BenchmarkMetrics(),
+            budget=BenchmarkBudgetSnapshot(
+                status=BenchmarkBudgetStatus.NOT_EVALUATED,
+                policy=budget_policy,
+            ),
+            identity=cell_identity,
+            failure_kind=outcome.failure_kind or "child_process_failed",
+        )
+    invocation_total = (
+        invocation_reported_subject_tokens
+        + result.budget.reported_subject_tokens
     )
+    result_budget = replace(
+        result.budget,
+        invocation_reported_subject_tokens=invocation_total,
+    )
+    if (
+        result.run_status is BenchmarkRunStatus.COMPLETED
+        and invocation_total
+        > budget_policy.max_reported_invocation_subject_tokens
+    ):
+        result_budget = replace(
+            result_budget,
+            status=BenchmarkBudgetStatus.EXCEEDED,
+            exhaustion_reason="invocation_token_limit_exceeded",
+        )
+        result = replace(
+            result,
+            run_status=BenchmarkRunStatus.BUDGET_EXCEEDED,
+            semantic_verdict=SemanticVerdict.NOT_EVALUATED,
+            budget=result_budget,
+            failure_kind="invocation_token_limit_exceeded",
+        )
+    else:
+        result = replace(result, budget=result_budget)
+    return _persist_result(output_directory, result)
 
 
 def _run_model_cell(
     *,
+    run_id: str,
     case: BenchmarkCase,
     execution_mode: BenchmarkExecutionMode,
     settings: LLMSettings,
@@ -455,8 +681,9 @@ def _run_model_cell(
     model_key: str,
     identity: BenchmarkIdentity,
     judge_configuration: _JudgeConfiguration,
+    budget_policy: BenchmarkBudgetPolicy,
+    temporary_parent: Path,
 ) -> AgentHarnessBenchmarkResult:
-    run_id = uuid4().hex
     setup_error = _model_setup_error(settings, model_key)
     if setup_error is not None:
         return _invalid_result(
@@ -466,15 +693,21 @@ def _run_model_cell(
             identity=identity,
             failure_kind=setup_error,
             run_id=run_id,
+            budget_policy=budget_policy,
         )
 
+    budget = BenchmarkBudgetController(budget_policy)
     measurements = _StreamMeasurements()
     subject_metrics = BenchmarkMetrics()
     run_status = BenchmarkRunStatus.COMPLETED
     failure_kind: str | None = None
     assessment: BenchmarkCaseAssessment | None = None
     judge_result = JudgeResult()
-    with tempfile.TemporaryDirectory(prefix="xenix-agent-benchmark-") as temporary_root:
+    with tempfile.TemporaryDirectory(
+        prefix="cell-",
+        dir=temporary_parent,
+        ignore_cleanup_errors=True,
+    ) as temporary_root:
         paths = _benchmark_paths(Path(temporary_root) / "runtime")
         cell: Any | None = None
         case_services: BenchmarkCaseServices | None = None
@@ -486,6 +719,7 @@ def _run_model_cell(
                 paths=paths,
                 settings=settings,
                 embedding_settings=embedding_settings,
+                budget=budget,
             )
             case_services = BenchmarkCaseServices(
                 datasets=cell.datasets,
@@ -511,6 +745,9 @@ def _run_model_cell(
                     case=case,
                     services=case_services,
                 )
+            except BenchmarkBudgetError as exc:
+                run_status = BenchmarkRunStatus.BUDGET_EXCEEDED
+                failure_kind = exc.code
             except Exception as exc:
                 run_status = BenchmarkRunStatus.RUNTIME_ERROR
                 failure_kind = _exception_kind(exc)
@@ -561,6 +798,7 @@ def _run_model_cell(
                     pending_message_ids=measurements.pending_message_ids,
                     provider_retry_count=measurements.provider_retry_count,
                     terminal_shape=assessment.terminal_shape,
+                    budget=budget,
                 )
             except Exception as exc:
                 if run_status is BenchmarkRunStatus.COMPLETED:
@@ -576,11 +814,12 @@ def _run_model_cell(
                         pending_message_ids=measurements.pending_message_ids,
                         provider_retry_count=measurements.provider_retry_count,
                         terminal_shape=None,
+                        budget=budget,
                     )
                 except Exception:
                     subject_metrics = BenchmarkMetrics(
                         turn_seconds=turn_seconds,
-                        sampling_round_count=len(measurements.pending_message_ids),
+                        sampling_round_count=budget.snapshot().sampling_rounds_admitted,
                         provider_retry_count=measurements.provider_retry_count,
                     )
         except Exception as exc:
@@ -603,6 +842,17 @@ def _run_model_cell(
                             *cell.integrity_checks(),
                         ),
                     )
+        budget_snapshot = budget.snapshot()
+        if run_status is BenchmarkRunStatus.COMPLETED:
+            if budget_snapshot.status is BenchmarkBudgetStatus.EXCEEDED:
+                run_status = BenchmarkRunStatus.BUDGET_EXCEEDED
+                failure_kind = budget_snapshot.exhaustion_reason
+            elif budget_snapshot.status is BenchmarkBudgetStatus.UNVERIFIABLE:
+                run_status = BenchmarkRunStatus.MEASUREMENT_ERROR
+                failure_kind = budget_snapshot.exhaustion_reason
+            elif not _usage_projection_matches(subject_metrics, budget_snapshot):
+                run_status = BenchmarkRunStatus.MEASUREMENT_ERROR
+                failure_kind = "subject_usage_projection_mismatch"
         try:
             judge_result = _evaluate_judge(
                 assessment=assessment,
@@ -612,6 +862,7 @@ def _run_model_cell(
             )
         except Exception:
             judge_result = JudgeResult(
+                required=bool(assessment and assessment.judge_required),
                 status=JudgeStatus.PROVIDER_ERROR,
                 provider_model=judge_configuration.model_key,
                 independence=judge_independence(
@@ -621,6 +872,7 @@ def _run_model_cell(
                 summary="judge_dispatch_error",
             )
 
+    budget_snapshot = budget.snapshot()
     return AgentHarnessBenchmarkResult(
         case_id=case.case_id,
         run_id=run_id,
@@ -628,6 +880,7 @@ def _run_model_cell(
         execution_mode=execution_mode,
         run_status=run_status,
         subject_metrics=subject_metrics,
+        budget=budget_snapshot,
         semantic_verdict=_semantic_verdict(assessment=assessment, run_status=run_status, judge_result=judge_result),
         semantic_checks=assessment.semantic_checks if assessment is not None else (),
         integrity_checks=assessment.integrity_checks if assessment is not None else (),
@@ -643,12 +896,14 @@ def _open_benchmark_cell(
     paths: AppPaths,
     settings: LLMSettings,
     embedding_settings: EmbeddingSettings | None,
+    budget: BenchmarkBudgetController,
 ) -> Any:
     if execution_mode is BenchmarkExecutionMode.HEADLESS:
         return _HeadlessBenchmarkCell(
             paths=paths,
             settings=settings,
             embedding_settings=embedding_settings,
+            budget=budget,
         )
     if execution_mode is BenchmarkExecutionMode.HEADED:
         from .headed import HeadedBenchmarkCell
@@ -657,6 +912,10 @@ def _open_benchmark_cell(
             paths=paths,
             settings=settings,
             embedding_settings=embedding_settings,
+            bounded_llm=_BoundedLLMService(
+                FrozenLLMSettingsSource(settings),
+                budget,
+            ),
         )
     raise BenchmarkInputError("unsupported_execution_mode")
 
@@ -682,6 +941,7 @@ def _collect_metrics(
     pending_message_ids: set[str],
     provider_retry_count: int,
     terminal_shape: tuple[int, int] | None,
+    budget: BenchmarkBudgetController,
 ) -> BenchmarkMetrics:
     messages = list(getattr(snapshot, "messages", [])) if snapshot is not None else []
     message_counts: dict[str, int] = {}
@@ -700,7 +960,7 @@ def _collect_metrics(
     return BenchmarkMetrics(
         turn_seconds=turn_seconds,
         assessment_seconds=assessment_seconds,
-        sampling_round_count=len(pending_message_ids),
+        sampling_round_count=budget.snapshot().sampling_rounds_admitted,
         usage_reported_primary_response_count=usage_count,
         token_usage=token_usage,
         message_counts=message_counts,
@@ -756,23 +1016,30 @@ def _evaluate_judge(
         return JudgeResult(status=JudgeStatus.BLOCKED, summary="subject_assessment_unavailable")
     if not assessment.judge_required:
         return JudgeResult()
+    rubric_id, rubric_sha256 = _judge_rubric_identity(assessment)
     if run_status is not BenchmarkRunStatus.COMPLETED:
         return _blocked_judge_result(
             configuration=configuration,
             subject_model_key=subject_model_key,
             summary="subject_run_not_completed",
+            rubric_id=rubric_id,
+            rubric_sha256=rubric_sha256,
         )
     if not assessment.integrity_passed:
         return _blocked_judge_result(
             configuration=configuration,
             subject_model_key=subject_model_key,
             summary="benchmark_integrity_invalid",
+            rubric_id=rubric_id,
+            rubric_sha256=rubric_sha256,
         )
     if not assessment.semantic_checks_passed:
         return _blocked_judge_result(
             configuration=configuration,
             subject_model_key=subject_model_key,
             summary="semantic_prerequisite_failed",
+            rubric_id=rubric_id,
+            rubric_sha256=rubric_sha256,
         )
     if assessment.judge_input is None:
         return _blocked_judge_result(
@@ -780,9 +1047,14 @@ def _evaluate_judge(
             subject_model_key=subject_model_key,
             summary="insufficient_semantic_evidence",
             verdict=SemanticVerdict.INCONCLUSIVE,
+            rubric_id=rubric_id,
+            rubric_sha256=rubric_sha256,
         )
     if configuration.setup_error is not None:
         return JudgeResult(
+            required=True,
+            rubric_id=rubric_id,
+            rubric_sha256=rubric_sha256,
             status=JudgeStatus.INVALID_SETUP,
             provider_model=configuration.model_key,
             independence=judge_independence(
@@ -793,6 +1065,9 @@ def _evaluate_judge(
         )
     if not configuration.enabled:
         return JudgeResult(
+            required=True,
+            rubric_id=rubric_id,
+            rubric_sha256=rubric_sha256,
             status=JudgeStatus.NOT_CONFIGURED,
             provider_model=configuration.model_key,
             independence=judge_independence(
@@ -802,11 +1077,16 @@ def _evaluate_judge(
             summary="judge_not_configured",
         )
     judge_llm = LLMService(FrozenLLMSettingsSource(configuration.settings))
-    return run_judge(
-        llm=judge_llm,
-        judge_input=assessment.judge_input,
-        judge_model_key=configuration.model_key,
-        subject_model_key=subject_model_key,
+    return replace(
+        run_judge(
+            llm=judge_llm,
+            judge_input=assessment.judge_input,
+            judge_model_key=configuration.model_key,
+            subject_model_key=subject_model_key,
+        ),
+        required=True,
+        rubric_id=rubric_id,
+        rubric_sha256=rubric_sha256,
     )
 
 
@@ -816,8 +1096,13 @@ def _blocked_judge_result(
     subject_model_key: str,
     summary: str,
     verdict: SemanticVerdict = SemanticVerdict.NOT_EVALUATED,
+    rubric_id: str | None = None,
+    rubric_sha256: str | None = None,
 ) -> JudgeResult:
     return JudgeResult(
+        required=True,
+        rubric_id=rubric_id,
+        rubric_sha256=rubric_sha256,
         status=JudgeStatus.BLOCKED,
         verdict=verdict,
         provider_model=configuration.model_key,
@@ -827,6 +1112,26 @@ def _blocked_judge_result(
         ),
         summary=summary,
     )
+
+
+def _judge_rubric_identity(
+    assessment: BenchmarkCaseAssessment,
+) -> tuple[str | None, str | None]:
+    judge_input = assessment.judge_input
+    if judge_input is None:
+        return None, None
+    rubric = judge_input.rubric
+    payload = json.dumps(
+        {
+            "rubric_id": rubric.rubric_id,
+            "score_dimensions": list(rubric.score_dimensions),
+            "allowed_reason_codes": list(rubric.allowed_reason_codes),
+        },
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    )
+    return rubric.rubric_id, _sha256_text(payload)
 
 
 def _semantic_verdict(
@@ -848,16 +1153,15 @@ def _semantic_verdict(
     return SemanticVerdict.PASS
 
 
-def _persist_all(output_directory: Path, results: Iterable[AgentHarnessBenchmarkResult]) -> tuple[BenchmarkRun, ...]:
-    runs: list[BenchmarkRun] = []
-    for result in results:
-        try:
-            _write_result(output_directory, result)
-        except OSError:
-            runs.append(BenchmarkRun(result=result, persisted=False))
-        else:
-            runs.append(BenchmarkRun(result=result, persisted=True))
-    return tuple(runs)
+def _persist_result(
+    output_directory: Path,
+    result: AgentHarnessBenchmarkResult,
+) -> BenchmarkRun:
+    try:
+        _write_result(output_directory, result)
+    except OSError:
+        return BenchmarkRun(result=result, persisted=False)
+    return BenchmarkRun(result=result, persisted=True)
 
 
 def _write_result(output_directory: Path, result: AgentHarnessBenchmarkResult) -> None:
@@ -885,7 +1189,9 @@ def _invalid_result(
     execution_mode: BenchmarkExecutionMode,
     identity: BenchmarkIdentity,
     failure_kind: str,
+    budget_policy: BenchmarkBudgetPolicy,
     run_id: str | None = None,
+    invocation_reported_subject_tokens: int = 0,
 ) -> AgentHarnessBenchmarkResult:
     return AgentHarnessBenchmarkResult(
         case_id=case_id,
@@ -894,6 +1200,11 @@ def _invalid_result(
         execution_mode=execution_mode,
         run_status=BenchmarkRunStatus.INVALID_SETUP,
         subject_metrics=BenchmarkMetrics(),
+        budget=BenchmarkBudgetSnapshot(
+            status=BenchmarkBudgetStatus.NOT_EVALUATED,
+            policy=budget_policy,
+            invocation_reported_subject_tokens=invocation_reported_subject_tokens,
+        ),
         identity=identity,
         failure_kind=failure_kind,
     )
@@ -913,6 +1224,87 @@ def _model_setup_error(settings: LLMSettings, model_key: str) -> str | None:
             return "missing_credentials"
         return None
     return "invalid_model"
+
+
+def _effective_subject_settings(
+    settings: LLMSettings,
+    policy: BenchmarkBudgetPolicy,
+) -> LLMSettings:
+    return settings.model_copy(
+        deep=True,
+        update={
+            "retry_attempts": policy.max_provider_attempts,
+            "thread_title_fq_model_key": "",
+            "turn_completion_guard_fq_model_key": "",
+        },
+    )
+
+
+def _normalized_harness_variant(value: object) -> str:
+    variant = value.strip() if isinstance(value, str) else ""
+    if (
+        not variant
+        or len(variant) > 96
+        or any(not (character.isalnum() or character in {"-", "_", "."}) for character in variant)
+    ):
+        raise BenchmarkSettingsError("invalid_harness_variant")
+    return variant
+
+
+def _normalized_invocation_id(value: object) -> str:
+    invocation_id = value.strip() if isinstance(value, str) else ""
+    if not invocation_id:
+        return uuid4().hex
+    if (
+        len(invocation_id) > 96
+        or any(
+            not (character.isalnum() or character in {"-", "_", "."})
+            for character in invocation_id
+        )
+    ):
+        raise BenchmarkSettingsError("invalid_invocation_id")
+    return invocation_id
+
+
+def _case_definition_sha256(case: BenchmarkCase) -> str | None:
+    try:
+        source = inspect.getsourcefile(type(case))
+        path = Path(source) if source is not None else None
+        return _sha256_file(path) if path is not None and path.is_file() else None
+    except (OSError, TypeError):
+        return None
+
+
+def _runtime_sha256() -> str:
+    project_root = Path(__file__).resolve().parents[3]
+    lock_path = project_root / "pdm.lock"
+    lock_sha = _sha256_file(lock_path) if lock_path.is_file() else "unavailable"
+    infrastructure_root = Path(__file__).resolve().parent
+    benchmark_runtime_files = (
+        "budgets.py",
+        "case_support.py",
+        "contracts.py",
+        "headed.py",
+        "judge.py",
+        "pytest_plugin.py",
+        "runner.py",
+    )
+    components = [sys.version, sys.platform, platform.machine(), lock_sha]
+    components.extend(
+        f"{name}:{_sha256_file(infrastructure_root / name)}"
+        for name in benchmark_runtime_files
+    )
+    return _sha256_text("|".join(components))
+
+
+def _usage_projection_matches(
+    metrics: BenchmarkMetrics,
+    budget: BenchmarkBudgetSnapshot,
+) -> bool:
+    usage = metrics.token_usage
+    if usage is None:
+        return False
+    return usage.total_tokens == budget.reported_subject_tokens
 
 
 def _benchmark_paths(home: Path) -> AppPaths:
@@ -939,7 +1331,7 @@ def _repository_identity() -> BenchmarkIdentity:
     project_root = Path(__file__).resolve().parents[3]
     try:
         commit = subprocess.run(
-            ["git", "rev-parse", "--short", "HEAD"],
+            ["git", "rev-parse", "HEAD"],
             cwd=project_root,
             check=False,
             capture_output=True,
@@ -966,6 +1358,10 @@ def _sha256_file(path: Path) -> str:
         while chunk := handle.read(1_048_576):
             digest.update(chunk)
     return digest.hexdigest().upper()
+
+
+def _sha256_text(value: str) -> str:
+    return sha256(value.encode("utf-8")).hexdigest().upper()
 
 
 def _safe_file_component(value: str) -> str:

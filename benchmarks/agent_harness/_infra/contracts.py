@@ -7,9 +7,16 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any, Protocol
 
+from .budgets import (
+    BenchmarkBudgetPolicy,
+    BenchmarkBudgetSnapshot,
+    BenchmarkBudgetStatus,
+)
+
 
 class BenchmarkRunStatus(StrEnum):
     COMPLETED = "completed"
+    BUDGET_EXCEEDED = "budget_exceeded"
     INVALID_SETUP = "invalid_setup"
     RUNTIME_ERROR = "runtime_error"
     MEASUREMENT_ERROR = "measurement_error"
@@ -257,6 +264,9 @@ class JudgeMetrics:
 
 @dataclass(frozen=True)
 class JudgeResult:
+    required: bool = False
+    rubric_id: str | None = None
+    rubric_sha256: str | None = None
     status: JudgeStatus = JudgeStatus.NOT_REQUESTED
     verdict: SemanticVerdict = SemanticVerdict.NOT_EVALUATED
     provider_model: str | None = None
@@ -268,6 +278,9 @@ class JudgeResult:
 
     def to_payload(self) -> dict[str, Any]:
         return {
+            "required": self.required,
+            "rubric_id": self.rubric_id,
+            "rubric_sha256": self.rubric_sha256,
             "status": self.status.value,
             "verdict": self.verdict.value,
             "provider_model": self.provider_model,
@@ -287,6 +300,11 @@ class BenchmarkIdentity:
     judge_settings_sha256: str | None = None
     repository_commit: str | None = None
     repository_dirty: bool | None = None
+    effective_settings_sha256: str | None = None
+    harness_variant: str = "baseline"
+    invocation_id: str | None = None
+    case_definition_sha256: str | None = None
+    runtime_sha256: str | None = None
 
     def to_payload(self) -> dict[str, Any]:
         return {
@@ -296,6 +314,11 @@ class BenchmarkIdentity:
             "judge_settings_sha256": self.judge_settings_sha256,
             "repository_commit": self.repository_commit,
             "repository_dirty": self.repository_dirty,
+            "effective_settings_sha256": self.effective_settings_sha256,
+            "harness_variant": self.harness_variant,
+            "invocation_id": self.invocation_id,
+            "case_definition_sha256": self.case_definition_sha256,
+            "runtime_sha256": self.runtime_sha256,
         }
 
 
@@ -307,13 +330,19 @@ class AgentHarnessBenchmarkResult:
     execution_mode: BenchmarkExecutionMode
     run_status: BenchmarkRunStatus
     subject_metrics: BenchmarkMetrics
+    budget: BenchmarkBudgetSnapshot = field(
+        default_factory=lambda: BenchmarkBudgetSnapshot(
+            status=BenchmarkBudgetStatus.NOT_EVALUATED,
+            policy=BenchmarkBudgetPolicy(),
+        )
+    )
     semantic_verdict: SemanticVerdict = SemanticVerdict.NOT_EVALUATED
     semantic_checks: tuple[OutcomeCheck, ...] = ()
     integrity_checks: tuple[OutcomeCheck, ...] = ()
     judge: JudgeResult = field(default_factory=JudgeResult)
     identity: BenchmarkIdentity = field(default_factory=BenchmarkIdentity)
     failure_kind: str | None = None
-    schema_version: int = 4
+    schema_version: int = 5
 
     @property
     def integrity_passed(self) -> bool:
@@ -333,6 +362,7 @@ class AgentHarnessBenchmarkResult:
 
     def to_payload(self) -> dict[str, Any]:
         return {
+            "report_kind": "xenix.agent_harness.cell",
             "schema_version": self.schema_version,
             "case_id": self.case_id,
             "run_id": self.run_id,
@@ -350,6 +380,7 @@ class AgentHarnessBenchmarkResult:
             },
             "judge": self.judge.to_payload(),
             "subject_metrics": self.subject_metrics.to_payload(),
+            "budget": self.budget.to_payload(),
             "identity": self.identity.to_payload(),
             "failure_kind": self.failure_kind,
         }

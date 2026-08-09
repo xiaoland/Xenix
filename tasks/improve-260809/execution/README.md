@@ -29,4 +29,4 @@ Put raw logs, traces, SQLite snapshots/queries, provider payloads, prompts, tran
 4. Update the active workstream's Current Evidence and Next Action.
 5. Update the dashboard only when overall status or the single next step changes.
 
-No execution record exists yet beyond baseline E-001 and the private reference-script qualification summarized by E-006.
+The first bounded record is [B0 offline implementation — 2026-08-09](B0-offline-implementation-260809.md). Paid live Agent evidence has not yet been run for this program.

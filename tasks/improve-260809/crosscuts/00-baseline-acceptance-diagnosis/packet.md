@@ -8,7 +8,7 @@ Hypothesis: preparation, Skill guidance, Tool schemas, orchestration, result gro
 
 ## Status
 
-`IH-B0 started`; the B0 Agent Harness baseline, acceptance, and diagnosis infrastructure is approved for implementation. Detailed design is in [b0-design.md](b0-design.md) and the exact mutation boundary is in [IH-B0](../../handshakes/IH-B0.md).
+`IH-B0 implemented and offline-verified`; the B0 Agent Harness baseline, acceptance, and diagnosis infrastructure is complete. Detailed design is in [b0-design.md](b0-design.md), the exact mutation boundary is in [IH-B0](../../handshakes/IH-B0.md), and bounded results are in the [offline execution record](../../execution/B0-offline-implementation-260809.md).
 
 ## Scope and Non-Goals
 
@@ -71,11 +71,12 @@ All business risks in [Case catalog](../../cases/catalog.md). A live Agent basel
 
 ## Current Evidence
 
-- Current runner/report schema already separates execution, integrity, semantic, Judge, subject metrics, and Judge metrics, but pytest exits zero for semantic/integrity failure.
+- Report schema v5 and the Agent-only evaluator now separate execution, integrity, semantic, Judge, subject metrics, Judge metrics, budget status, and comparison identity. Characterization remains non-gating; formal acceptance is a separate policy decision.
 - Historical live runs show normal cases around 18–24k subject tokens and under 70 seconds, while a difficult cleaning failure consumed about 240k tokens and 18 minutes. B0 therefore needs a hard 12-round limit, a hard 900-second process deadline, and secondary reported-token stops.
-- The default benchmark model behavior runs every configured model when `--model` is omitted; B0 changes the default to exactly the settings snapshot's `default_fq_model_key`, with one optional single-value override.
+- The live runner now selects exactly the settings snapshot's `default_fq_model_key`, with one optional single-value override. Every cell is process-isolated and enforces the approved round/time/token/attempt limits.
+- Five clean-room ML Agent cases extend the catalog from 3 to 8 without copying supplied-corpus bytes. Headless/headed collection match, and an explicit selector collects one paid cell rather than the whole catalog.
 - The ordinary suite has 45 collected tests; six distinct capability workflow tests cross the documented 50-case architecture-review trigger.
 
 ## Next Action
 
-Implement the exact [IH-B0](../../handshakes/IH-B0.md) boundary and record offline verification before any qualified live baseline.
+Draft `IH-F` (foundation: bounded profile/evaluation/result facts and split-aware preparation) and resolve `O-004` before `IH-CF` (clustering trustworthiness and the first native forecast workflow). Paid live characterization remains deferred until the corresponding service selector is implemented and green.

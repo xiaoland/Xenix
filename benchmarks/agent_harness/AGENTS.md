@@ -9,8 +9,10 @@ provider adapters, or production settings.
 
 ## Tripwires
 
-- A subject is exactly one isolated `AgentHarness × configured subject model ×
-  case` cell. Pytest owns case selection and lifecycle; keep `_infra` case-
+- A subject is exactly one isolated `AgentHarness × one pinned subject model ×
+  case × mode × repetition` cell. Omitting `--model` selects only the settings
+  snapshot's `default_fq_model_key`; one `--model` may override it, while model
+  comparison uses separate evidence series. Pytest owns case selection and lifecycle; keep `_infra` case-
   agnostic, while a case owns its submission,
   terminal public-state locator, safe evidence projection, and rubric.
 - A judge is an evaluator after the subject settles, never a second Agent turn.
@@ -24,6 +26,16 @@ provider adapters, or production settings.
   credential, endpoint, raw provider error, or raw judge request/response.
 - Default tests stay offline. Do not add replay/mocks to the product path or a
   network call to ordinary test verification.
+- Every paid cell runs in a killable child process with at most 12 subject
+  sampling rounds, 900 seconds, two provider attempts per sampling round, and
+  500,000 reported subject tokens. An invocation stops at 4,000,000 reported
+  subject tokens.
+  Token limits are response-boundary stops; unreported usage invalidates the
+  cell. Installed limits may be lowered for infrastructure checks, never raised.
+- Service black-box tests under `tests/` and Agent cases in this subtree share
+  no executable helpers, fixtures, reports, or runtime prerequisite. Run the
+  service portfolio first through development guidance or CI `needs` ordering
+  only; the Agent evaluator never reads a service result.
 - A case is its own `test_*.py` benchmark module. Do not create a second
   case-specific test file or restate static/schema guarantees. Ordinary tests
   may prove only dynamic `_infra` boundaries that cannot be established by
@@ -34,6 +46,9 @@ provider adapters, or production settings.
 - Run `pdm run check` for imports and result-shape continuity. Do not recreate an
   ordinary pytest mirror for benchmark schemas, options, case logic, or private
   runner branches.
+- Run `pdm run benchmark-agent-harness-check` for the dedicated offline safety,
+  report-policy, and Judge-calibration checks. These checks are not live Agent
+  evidence and are not part of `pdm run test`.
 - Use `pdm run benchmark-agent-harness -- --collect-only` to verify discovery
   without a provider; use `pdm run benchmark-agent-harness-headed --
   --collect-only` to prove the visible mode discovers that same case catalog.
@@ -41,3 +56,7 @@ provider adapters, or production settings.
   untracked subject, Embedding, and optional Judge settings.
 - Inspect a persisted result for bounded serialization and separate subject and
   judge measurements before treating a live score as evidence.
+- Use `pdm run benchmark-agent-harness-evaluate` to characterize or formally
+  evaluate v5 Agent reports. A v4 report is diagnostic-only and never silently
+  upgraded. Use `pdm run benchmark-agent-harness-calibrate-judge` before a
+  Judge-required formal series.

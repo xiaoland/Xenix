@@ -44,6 +44,19 @@
 - `pdm run i18n-extract` and `pdm run i18n-compile` update Qt translations.
 - `pdm run package` builds the Windows bundle.
 - `pdm run smoke-package` verifies the packaged executable.
+- `pdm run benchmark-agent-harness-check` runs the provider-free safety,
+  report-policy, and Judge-calibration checks owned by the Agent benchmark.
+- `pdm run benchmark-agent-harness -- --collect-only -q` and the headed variant
+  verify the same live-case catalog without provider calls.
+- A paid Agent benchmark is run only after the matching service selector and
+  `pdm run test` pass. The commands remain independently executable: benchmark
+  code never imports service tests or reads their reports. Omit `--model` to use
+  the one configured default model, or supply exactly one override. The manual
+  workflow requires both selectors but passes only job success—not test data or
+  reports—across the service-to-Agent ordering edge.
+- `pdm run benchmark-agent-harness-calibrate-judge` qualifies an explicit Judge
+  suite; `pdm run benchmark-agent-harness-evaluate` evaluates or compares
+  privacy-bounded v5 Agent reports.
 
 Use the smallest verification set that proves the affected contract. Run `pdm run test` and `pdm run check` when the change has repository-wide or uncertain impact.
 

@@ -1,6 +1,6 @@
 # IH-B0 — Independent Paid-Live Agent Evidence Foundation
 
-**Status:** approved and explicitly started by Sir on 2026-08-09.
+**Status:** consumed for implementation and offline-verified on 2026-08-09. Paid live characterization is deferred until matching service black-box selectors land green.
 
 ## Evidence and Decisions
 
@@ -71,7 +71,7 @@ Explicitly outside this handshake:
 `To`:
 
 - every invocation runs exactly one pinned subject model, defaulting to `default_fq_model_key`;
-- every cell is an isolated process with at most 12 sampling rounds, at most 900 seconds, and two provider attempts;
+- every cell is an isolated process with at most 12 sampling rounds, at most 900 seconds, and two provider attempts per sampling round;
 - 500k reported subject tokens per cell and 4,000k per invocation stop future work at response boundaries; missing usage invalidates the cell;
 - five independently owned paid live ML Agent cases produce privacy-bounded reports;
 - an Agent-only versioned evaluator gates identity, execution, integrity, semantic repetitions, Judge status, and budgets;

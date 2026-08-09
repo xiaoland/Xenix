@@ -16,7 +16,7 @@ from PySide6.QtWidgets import QApplication
 
 from xenix.config import AppPaths
 from xenix.services.embedding_service import EmbeddingSettings, EmbeddingSettingsService
-from xenix.services.llm import LLMSettings, LLMSettingsService
+from xenix.services.llm import LLMService, LLMSettings, LLMSettingsService
 
 from .contracts import (
     BenchmarkCase,
@@ -29,7 +29,7 @@ from .contracts import (
 _TERMINAL_TASK_STATUSES = frozenset(
     {"succeeded", "failed", "cancelled", "needs_attention", "reused"}
 )
-_SUBJECT_TURN_TIMEOUT_SECONDS = 3600.0
+_SUBJECT_TURN_TIMEOUT_SECONDS = 900.0
 
 
 class HeadedBenchmarkError(RuntimeError):
@@ -99,6 +99,7 @@ class HeadedBenchmarkCell:
         paths: AppPaths,
         settings: LLMSettings,
         embedding_settings: EmbeddingSettings | None,
+        bounded_llm: LLMService,
     ) -> None:
         self.paths = paths
         self._previous_app_home = os.environ.get("XENIX_APP_HOME")
@@ -125,6 +126,7 @@ class HeadedBenchmarkCell:
             self.pump_events()
             if not self.window.isVisible():
                 raise HeadedBenchmarkError("headed_main_window_not_visible")
+            self._install_bounded_llm_gateway(bounded_llm)
             self.harness = self.window._agent_harness_service  # noqa: SLF001
             self.datasets = self.window._dataset_service  # noqa: SLF001
             self.artifacts = self.window._artifact_service  # noqa: SLF001
@@ -417,6 +419,28 @@ class HeadedBenchmarkCell:
         if selected != fq_model_key:
             raise HeadedBenchmarkError("headed_model_selection_failed")
 
+    def _install_bounded_llm_gateway(self, bounded_llm: LLMService) -> None:
+        harness = self.window._agent_harness_service  # noqa: SLF001
+        conversation = harness._conversation_service  # noqa: SLF001
+        targets = (
+            (self.window, "_llm_service"),
+            (harness, "_llm_service"),
+            (conversation, "_llm_service"),
+        )
+        originals: list[tuple[Any, str, Any]] = []
+        try:
+            for owner, attribute in targets:
+                if not hasattr(owner, attribute):
+                    raise HeadedBenchmarkError("headed_llm_gateway_seam_missing")
+                originals.append((owner, attribute, getattr(owner, attribute)))
+                setattr(owner, attribute, bounded_llm)
+            if any(getattr(owner, attribute) is not bounded_llm for owner, attribute in targets):
+                raise HeadedBenchmarkError("headed_llm_gateway_install_failed")
+        except Exception:
+            for owner, attribute, original in reversed(originals):
+                setattr(owner, attribute, original)
+            raise
+
     def _drop_local_files(self, target: Any, paths: tuple[Path, ...]) -> None:
         mime_data = QMimeData()
         mime_data.setUrls([QUrl.fromLocalFile(str(path)) for path in paths])
@@ -505,9 +529,14 @@ class HeadedBenchmarkCell:
 
     @staticmethod
     def _database_is_readable(database_path: Path) -> bool:
+        if not database_path.is_file():
+            return False
         connection: sqlite3.Connection | None = None
         try:
-            connection = sqlite3.connect(database_path)
+            connection = sqlite3.connect(
+                f"{database_path.resolve().as_uri()}?mode=ro",
+                uri=True,
+            )
             row = connection.execute("PRAGMA integrity_check").fetchone()
         except sqlite3.Error:
             return False

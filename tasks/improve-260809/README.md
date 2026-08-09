@@ -1,6 +1,6 @@
 # Improve ML Capability — Program Dashboard
 
-**Status:** Execute. Sir explicitly started `IH-B0` (B0 Agent Harness baseline, acceptance, and diagnosis infrastructure) on 2026-08-09; implementation is authorized within its exact boundary.
+**Status:** Active. `IH-B0` (B0 Agent Harness baseline, acceptance, and diagnosis infrastructure) is implemented and offline-verified; the paid live baseline remains intentionally deferred until the matching service black-box cases land green.
 **Opened:** 2026-08-09
 
 ## Objective
@@ -32,11 +32,14 @@ The accepted proof topology has three layers:
 
 The benchmark runner remains a paid live measurement surface over one pinned subject model. A versioned Agent-report policy decides acceptance; service qualification is enforced only by development guidance and CI dispatch order. Details are in [Verification architecture](verification.md) and [Case catalog](cases/catalog.md).
 
-Current read-only repository baseline:
+Current verified repository state:
 
 - `pdm run test -q`: 45 passed on 2026-08-09.
-- Headless Agent Harness collect-only: 3 cases.
-- Headed Agent Harness collect-only: the same 3 cases.
+- Provider-free B0 infrastructure/policy/calibration checks: 26 passed.
+- Headless Agent Harness collect-only: 8 live cases.
+- Headed Agent Harness collect-only: the same 8 live cases.
+- An explicit live case selector collects exactly one cell in either mode.
+- `pdm run check` and isolated-runtime `pdm run smoke` pass.
 - No live provider baseline has been run for this program.
 
 ## Current Truth
@@ -48,13 +51,13 @@ Current read-only repository baseline:
 - Cross-cut 00 starts before product implementation, brackets both verticals, and continues after them. It is not a third product vertical or a final cleanup phase.
 - Existing clustering, recommendation, and text implementations have useful model seams but weak product-level evaluation. Native forecasting is absent. Shared preparation is broad but not yet split-aware or reusable enough for every future-apply workflow.
 - The current ordinary test portfolio no longer directly covers real ML lifecycle outcomes. Material-derived cases should restore public-boundary integration coverage without asserting sklearn internals.
-- The current live benchmark is outcome-oriented but too small, defaults to every configured model, has no hard cell budget, and does not fail the process for semantic or integrity failure.
+- The B0 live benchmark now has eight outcome-oriented cases, one pinned subject model, hard cell/invocation safety boundaries, and a separate versioned acceptance policy. Semantic failure remains a valid measurement rather than a pytest infrastructure failure.
 - The supplied corpus is rich enough to qualify cleaning, leakage-safe preparation, clustering, recommendation, forecasting, and bilingual text cases, but it contains severe answer contamination and unresolved redistribution rights.
 - Detailed decisions, uncertainties, topology, working sets, and slice status live in the linked packet files rather than this dashboard.
 
 ## Next Step
 
-Implement [IH-B0](handshakes/IH-B0.md), the B0 Agent Harness baseline, acceptance, and diagnosis infrastructure. It authorizes benchmark/evaluation infrastructure, development guidance, ordered paid CI, and bounded live runs only after the independently owned service tests are green; it does not authorize product behavior or service-test implementations. Sir separately authorized one housekeeping commit before implementation.
+Discuss and draft `IH-F` (foundation: bounded profile/evaluation/result facts and split-aware preparation), then resolve the forecast-scope decision needed by `IH-CF` (clustering trustworthiness and the first native forecast workflow). Once an approved handshake is explicitly started, objective automated acceptance advances the program without a separate phase-review pause; Sir's manual real-world acceptance remains the final program gate. No paid baseline runs before the product slices provide matching green service selectors.
 
 ## Packet Map
 

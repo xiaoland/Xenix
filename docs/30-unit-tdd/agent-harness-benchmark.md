@@ -9,12 +9,19 @@ benchmark code observes public outcomes and does not alter that contract.
 
 ## Subject and Case Boundary
 
-A subject is one isolated `AgentHarness × configured subject model × case`
-cell. It uses the real provider path, then observes the settled public product
+A subject is one isolated `AgentHarness × one pinned subject model × case ×
+execution mode × repetition` cell. It uses the real provider path, then observes the settled public product
 state. The runner is case-agnostic. `headless` submits through the public Harness
 service directly; `headed` drives the same submission through the visible desktop
-UI. Execution mode is recorded in result schema v4 and does not change the case,
+UI. Execution mode is recorded in result schema v5 and does not change the case,
 oracle, Judge, or subject model.
+
+Omitting `--model` selects exactly the external settings snapshot's
+`default_fq_model_key`; one `--model` value may override it. Comparable
+baseline, improvement, and ablation series keep that model and settings hash
+fixed and vary the recorded Harness variant. A different model starts a
+separate evidence series rather than expanding one invocation into a model
+matrix.
 
 `benchmarks/agent_harness/` is the benchmark home. Each `test_*.py` case
 module is both the case definition and its explicitly collected pytest item;
@@ -99,9 +106,48 @@ Subject measurements include the Harness turn's latency, token usage, messages,
 Tool calls/results, retries, and derived outputs. Judge latency, usage, and
 retries are evaluation metadata and never contribute to subject performance.
 
+## Paid Cell Safety
+
+Every live cell runs in its own spawn child process. The parent terminates its
+process tree at 900 seconds and records `budget_exceeded` without a semantic
+verdict. A benchmark-only wrapper around the real `LLMService` admits at most
+12 subject sampling rounds and clamps provider retry attempts to two; optional
+title and completion-guard models are disabled in the effective snapshot so
+their cost cannot escape the subject channel.
+
+Reported subject tokens stop at 500,000 per cell and 4,000,000 per pytest
+invocation. These are response-boundary limits because arbitrary
+OpenAI-compatible providers do not supply a portable pre-request token
+reservation. The current normalized response is counted atomically; no later
+request is admitted after the boundary is reached. Missing usage invalidates
+the cell. Persisted schema v5 records the installed policy, observed counts,
+budget status, effective settings hash, case/runtime identity, invocation ID,
+and Harness variant without retaining settings, provider errors, or paths. The
+runtime identity binds Python/platform, the dependency lock, and the shared
+benchmark execution code so a changed evaluator seam cannot silently enter a
+comparison cohort.
+
+## Report Acceptance and Calibration
+
+The live runner produces measurements. The independent Agent-only report
+policy decides whether v5 reports form a valid characterization or formal
+series; it has no service-report input. A single headless repetition is a
+non-gating characterization. Formal evidence requires three comparable
+headless repetitions and, after their acceptance, one headed repetition.
+Execution, integrity, deterministic prerequisites, budgets, Judge status, and
+subject/Judge metrics remain separate. Legacy v4 reports stay readable for
+diagnosis but are never silently qualified or compared as v5 evidence.
+
+A Judge-required formal series uses an explicit, independent Judge model and a
+calibration report bound to the exact settings and rubric hashes. Calibration
+uses at most four clear hand-labelled packets with three repetitions each.
+Raw prompts, responses, errors, transcripts, and fixture rows are discarded;
+only bounded expected/observed verdicts, reason codes, metrics, and hashes may
+persist.
+
 ## Offline and Live Policy
 
-The default 30-case test suite is deterministic and offline. It does not collect
+The ordinary `pdm run test` service portfolio is deterministic and offline. It does not collect
 the benchmark case directory, open headed benchmark windows, or call a provider.
 Static analysis and benchmark source own schema and option continuity; no ordinary
 pytest case duplicates benchmark case logic, result schemas, types, or Tool checks.
@@ -121,6 +167,21 @@ explicit visible E2E acceptance. Headed execution requires an interactive deskto
 and uses the same external, untracked Subject, Embedding, and optional Judge
 settings as headless execution. Every cell gets a fresh `XENIX_APP_HOME`; real
 fixture files enter through Qt drop events, and no mock/replay provider is admitted.
+
+Run `pdm run benchmark-agent-harness-check` for dedicated offline benchmark
+infrastructure checks. Use `pdm run benchmark-agent-harness-calibrate-judge`
+for an explicitly configured live Judge suite, and
+`pdm run benchmark-agent-harness-evaluate` for characterization, formal
+acceptance, or Harness-variant comparison.
+
+Service black-box integration tests live only under `tests/`; Agent benchmark
+cases and assets live only under `benchmarks/agent_harness/`. Neither tree
+imports, invokes, or consumes reports from the other. Development guidance and
+the manual paid workflow run the explicitly matched service selector and then
+`pdm run test` first solely to avoid spending on an unqualified product path.
+The service selector is a dispatch input, not an Agent runtime input. The CI
+edge passes job success only—no fixture, artifact, verdict, or report. Headed
+acceptance remains local and interactive.
 
 ## Change Guidance
 

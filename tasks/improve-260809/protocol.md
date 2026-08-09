@@ -62,3 +62,7 @@ After a run:
 ## Mutation Rule
 
 Task-packet maintenance is the only standing mutation exception. Every product/test/durable-doc change needs an Impact Handshake naming exact files or symbols, `From -> To`, blast radius, invariants, and verification. New evidence that changes the state diff returns the program to discussion.
+
+## Review Boundary
+
+Human review is a design-stage gate for product direction, technical boundaries, acceptance design, and material decisions. After Sir explicitly starts an approved Impact Handshake, implementation proceeds through its objective automated acceptance without another phase-review pause. Stop only when new information changes the approved state diff, a material decision is still unresolved, or verification cannot establish the intended state. Sir performs the program-level manual real-world acceptance at the end of the task.

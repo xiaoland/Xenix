@@ -107,7 +107,7 @@ Qualified live baseline:
 - run only after the corresponding independent service black-box cases pass through development guidance or CI order;
 - use one subject model: the external settings snapshot's `default_fq_model_key`, or one single `--model` override;
 - run one headless cell per newly qualified Agent workflow, with no headed run or repetition for the first baseline;
-- reduce provider attempts to two and disable optional title/guard models in the snapshot;
+- reduce provider attempts to two per sampling round and disable optional title/guard models in the snapshot;
 - run one isolated process/cell with a hard maximum of 12 sampling rounds and a hard 900-second outer wall deadline;
 - do not dispatch a thirteenth sampling request; terminate a timed-out process; persist either as `budget_exceeded` without semantic verdict;
 - stop further sampling and remaining cells at 500,000 reported subject tokens per cell, 4,000,000 aggregate subject tokens, unreported usage, or infrastructure/integrity failure;

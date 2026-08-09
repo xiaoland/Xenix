@@ -14,6 +14,9 @@ Evidence records observations; it does not authorize or define product behavior.
 | E-008 | Historical successful live cases used about 18–24k subject tokens and under 70 seconds, while a failed complex cleaning case used about 240k tokens and 18 minutes | prior bounded benchmark evidence |
 | E-009 | Current ordinary suite collects 45 cases; the documented portfolio rule requires architecture review when additions cross 50 | `pdm run test -- --collect-only -q` and proof-portfolio decision |
 | E-010 | Current live runner has no hard sampling-round or outer cell-process deadline; reported usage is available only after provider responses, so a portable strict token pre-admission cap cannot be claimed | runner, Harness loop, and provider/settings inspection |
+| E-011 | B0 now runs one pinned subject model per cell behind 12-round, 900-second, 500k-cell, 4m-invocation, two-attempt, usage-required safety boundaries; 26 provider-free infrastructure/policy/calibration checks pass | B0 offline implementation record on 2026-08-09 |
+| E-012 | Five original Agent fixtures have fixed hashes, no detected byte/row match against the ignored corpus, no `tests/` dependency, and public-outcome oracles; live collection is 8 cases in both modes and one explicit selector collects one cell | clean-room audit and offline collection on 2026-08-09 |
+| E-013 | Agent report schema v5 has strict bounded loading, non-gating one-headless characterization, formal three-headless plus one-headed acceptance, exact comparison identity, and independent Judge calibration bound to settings and rubric hashes | report-policy and calibration checks on 2026-08-09 |
 
 Detailed B0 investigation and conclusions are in [B0 research](b0-research.md).
 
