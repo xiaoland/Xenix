@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import math
-import hashlib
-import json
 from typing import Any, Iterable
 
 import numpy as np
@@ -34,6 +32,7 @@ from .contracts import (
     EvaluationVerdict,
     MetricDirection,
 )
+from .digests import prediction_digest
 from .types import EvaluationKind
 
 _POLICIES: dict[EvaluationKind, EvaluationPolicySnapshot] = {
@@ -59,6 +58,17 @@ _POLICIES: dict[EvaluationKind, EvaluationPolicySnapshot] = {
         cv_folds=5,
         random_state=42,
     ),
+    EvaluationKind.RANKING: EvaluationPolicySnapshot(
+        policy_key="ranking.per_user_positive_holdout.v1",
+        evaluation_kind=EvaluationKind.RANKING,
+        primary_metric_name="ndcg_at_k",
+        primary_metric_direction=MetricDirection.MAX,
+        tie_breaker_metrics=["recall_at_k", "hit_rate_at_k", "mrr_at_k"],
+        split_strategy="per_user_positive_holdout.v1",
+        test_size=0.0,
+        cv_folds=None,
+        random_state=42,
+    ),
     EvaluationKind.NONE: EvaluationPolicySnapshot(
         policy_key="none.default.v1",
         evaluation_kind=EvaluationKind.NONE,
@@ -79,6 +89,39 @@ _POLICIES: dict[EvaluationKind, EvaluationPolicySnapshot] = {
         split_strategy="rolling_origin.v1",
         test_size=0.0,
         cv_folds=3,
+        random_state=42,
+    ),
+    EvaluationKind.TEXT_CLUSTERING: EvaluationPolicySnapshot(
+        policy_key="text_clustering.cosine_quality.v1",
+        evaluation_kind=EvaluationKind.TEXT_CLUSTERING,
+        primary_metric_name="cosine_silhouette",
+        primary_metric_direction=MetricDirection.MAX,
+        tie_breaker_metrics=["resampling_stability", "minimum_cluster_share"],
+        split_strategy="group_resampling.v1",
+        test_size=0.0,
+        cv_folds=None,
+        random_state=42,
+    ),
+    EvaluationKind.TOPIC_MODELING: EvaluationPolicySnapshot(
+        policy_key="topic_modeling.group_holdout.v1",
+        evaluation_kind=EvaluationKind.TOPIC_MODELING,
+        primary_metric_name="heldout_perplexity",
+        primary_metric_direction=MetricDirection.MIN,
+        tie_breaker_metrics=["coherence", "topic_diversity", "resampling_stability"],
+        split_strategy="group_hash_holdout.v1",
+        test_size=0.2,
+        cv_folds=None,
+        random_state=42,
+    ),
+    EvaluationKind.RETRIEVAL: EvaluationPolicySnapshot(
+        policy_key="retrieval.relevance_or_diagnostic.v1",
+        evaluation_kind=EvaluationKind.RETRIEVAL,
+        primary_metric_name="ndcg_at_k",
+        primary_metric_direction=MetricDirection.MAX,
+        tie_breaker_metrics=["recall_at_k", "mrr_at_k"],
+        split_strategy="index_self_exclusion.v1",
+        test_size=0.0,
+        cv_folds=None,
         random_state=42,
     ),
 }
@@ -104,7 +147,13 @@ def get_default_policy(
             random_state=42,
         )
     policy = _POLICIES[evaluation_kind].model_copy(deep=True)
-    if not group_aware or evaluation_kind is EvaluationKind.FORECASTING:
+    if not group_aware or evaluation_kind in {
+        EvaluationKind.FORECASTING,
+        EvaluationKind.RANKING,
+        EvaluationKind.TEXT_CLUSTERING,
+        EvaluationKind.TOPIC_MODELING,
+        EvaluationKind.RETRIEVAL,
+    }:
         return policy
     if evaluation_kind not in {EvaluationKind.REGRESSION, EvaluationKind.CLASSIFICATION}:
         raise ValueError("Group-aware holdout is supported only for supervised evaluation.")
@@ -290,30 +339,6 @@ def metric_names_for_policy(policy: EvaluationPolicySnapshot) -> Iterable[str]:
     yield from policy.tie_breaker_metrics
 
 
-def prediction_digest(predictions: Iterable[Any]) -> str:
-    values = [_canonical_prediction(value) for value in np.asarray(list(predictions), dtype=object).reshape(-1)]
-    serialized = json.dumps(values, ensure_ascii=False, separators=(",", ":"))
-    return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
-
-
-def _canonical_prediction(value: Any) -> dict[str, Any]:
-    if isinstance(value, np.generic):
-        value = value.item()
-    if value is None:
-        return {"type": "null", "value": None}
-    if isinstance(value, bool):
-        return {"type": "bool", "value": value}
-    if isinstance(value, int):
-        return {"type": "int", "value": value}
-    if isinstance(value, float):
-        if math.isnan(value):
-            rendered = "nan"
-        elif math.isinf(value):
-            rendered = "infinity" if value > 0 else "-infinity"
-        else:
-            rendered = value.hex()
-        return {"type": "float", "value": rendered}
-    return {"type": type(value).__name__, "value": str(value)}
 
 
 def _classification_labels(

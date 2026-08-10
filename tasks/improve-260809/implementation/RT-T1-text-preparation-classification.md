@@ -1,6 +1,6 @@
 # RT-T1 Implementation Plan — Multilingual Preparation and Grouped Classification
 
-**Status:** Proposed; awaits approval of [IH-RT](../handshakes/IH-RT.md) and completion of RT-R shared-hotspot integration.
+**Status:** Implemented and objectively verified; one paid headless characterization passed on 2026-08-10 under [IH-RT](../handshakes/IH-RT.md).
 
 ## Outcome
 

@@ -14,6 +14,7 @@ from ..exceptions import ValidationError
 from ..observability import record_counter, record_histogram, start_span
 from .data_tokenization_contracts import TokenizeDatasetInput, TokenizeDatasetResult
 from .dataset_inspection import detect_source_format
+from .ml.text_preparation import build_text_preparer
 from .storage.models import DatasetSourceFormat
 from .tabular import (
     TabularSchema,
@@ -90,7 +91,25 @@ class DataTokenizationService:
                 input_data.id_column_indexes,
                 text_column=text_column,
             )
-            tokenized_rows = [self._tokenize_value(value) for value in frame[text_column].tolist()]
+            if tokenizer_profile == _TOKENIZER_PROFILE:
+                if (
+                    input_data.phrase_mode != "unigram"
+                    or input_data.custom_dictionary_resources
+                    or input_data.stopword_resources
+                ):
+                    raise ValidationError(
+                        "The legacy 'zh_business_v1' profile does not accept phrase mode or staged text resources."
+                    )
+                tokenized_rows = [self._tokenize_value(value) for value in frame[text_column].tolist()]
+                preparation_report: dict[str, object] = {}
+            else:
+                preparer = build_text_preparer(input_data)
+                prepared = preparer.prepare_series(frame[text_column])
+                tokenized_rows = prepared.token_rows
+                preparation_report = {
+                    "preparation_specification": preparer.specification.model_dump(mode="json"),
+                    "preparation_quality": prepared.quality_facts.model_dump(mode="json"),
+                }
 
             if output_mode == "token_text":
                 output_frame = self._token_text_frame(frame, tokenized_rows)
@@ -114,6 +133,7 @@ class DataTokenizationService:
                 "tokenized_row_count": int(non_empty_rows),
                 "empty_token_row_count": int(len(frame.index) - non_empty_rows),
                 "token_count": int(total_tokens),
+                **preparation_report,
             }
             self._record_operation(started_at)
             return TokenizeDatasetResult(output_path=str(output_path.resolve()), report=report)

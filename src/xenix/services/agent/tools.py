@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import re
 import time
 from collections.abc import Callable, Iterable
@@ -28,13 +29,14 @@ from ..data_cleaning import (
     cleaning_operation_metadata,
 )
 from ..data_tokenization import DataTokenizationService, TokenizeDatasetInput
+from ..data_tokenization_contracts import StagedTextResourceInput
 from ..data_transform import (
     DataQueryInput,
     DataQueryTransformService,
     DataTransformInput,
     DatasetSqlBinding,
 )
-from ..dataset_inspection import detect_source_format, load_dataframe
+from ..dataset_inspection import InspectDatasetInput, detect_source_format, load_dataframe
 from ..dataset_export_service import DatasetExportService
 from ..dataset_service import DatasetService
 from ..ml.registry import get_model_catalog_entry, list_model_catalog, list_model_keys
@@ -395,8 +397,9 @@ class AgentToolRegistry:
             name="data.tokenize",
             provider_name="data_tokenize",
             description=(
-                "Create a new derived dataset by tokenizing one Chinese text column with the stable "
-                "Xenix profile zh_business_v1. Use output=token_text to keep source rows and append "
+                "Create a derived token Dataset with legacy zh_business_v1 or retained "
+                "multilingual_business_v1 preparation. The multilingual profile can use bounded "
+                "registered one-column custom-dictionary/stopword Datasets. Use output=token_text to keep source rows and append "
                 "token_text for downstream text models, or output=token_rows to explode one token per row. "
                 "Select the text and optional identifier columns by names or zero-based source indexes; "
                 "do not mix the two forms for one selector."
@@ -773,6 +776,14 @@ class AgentToolRegistry:
     ) -> ToolSuccess:
         self._raise_if_cancelled(context)
         dataset = self._dataset_service.get_dataset(input_data.dataset_id)
+        custom_dictionary_resources = self._staged_text_resources(
+            input_data.custom_dictionary_dataset_ids,
+            project_id=dataset.project_id,
+        )
+        stopword_resources = self._staged_text_resources(
+            input_data.stopword_dataset_ids,
+            project_id=dataset.project_id,
+        )
         default_name = f"{dataset.name} tokenized"
         name = input_data.name or default_name
         tokenize_result = self._data_tokenization_service.tokenize_dataset(
@@ -785,6 +796,9 @@ class AgentToolRegistry:
                 id_column_indexes=input_data.id_column_indexes,
                 output=input_data.output,
                 tokenizer_profile=input_data.tokenizer_profile,
+                phrase_mode=input_data.phrase_mode,
+                custom_dictionary_resources=custom_dictionary_resources,
+                stopword_resources=stopword_resources,
             )
         )
         raw_row_count = tokenize_result.report.get("output_row_count", 0)
@@ -804,6 +818,42 @@ class AgentToolRegistry:
         payload["row_count"] = row_count
         payload["tokenization_report"] = tokenize_result.report
         return self._tabular_tool_success("data.tokenize", payload)
+
+    def _staged_text_resources(
+        self,
+        dataset_ids: list[str],
+        *,
+        project_id: str,
+    ) -> list[StagedTextResourceInput]:
+        resources: list[StagedTextResourceInput] = []
+        for dataset_id in dataset_ids:
+            dataset = self._dataset_service.get_dataset(dataset_id)
+            if dataset.project_id != project_id:
+                raise ValidationError(
+                    "Text preparation resources must belong to the input Dataset project."
+                )
+            source_path = Path(dataset.source_path)
+            if not source_path.is_file():
+                raise ValidationError("Text preparation resource source file is missing.")
+            inspection = self._dataset_service.inspect_source_file(
+                InspectDatasetInput(source_path=str(source_path.resolve()))
+            )
+            if inspection.column_count != 1 or not 1 <= inspection.row_count <= 20_000:
+                raise ValidationError(
+                    "Each text preparation resource must contain one term column and 1-20,000 rows."
+                )
+            digest = hashlib.sha256()
+            with source_path.open("rb") as source:
+                for chunk in iter(lambda: source.read(1024 * 1024), b""):
+                    digest.update(chunk)
+            resources.append(
+                StagedTextResourceInput(
+                    dataset_id=dataset.id,
+                    absolute_path=str(source_path.resolve()),
+                    source_sha256=digest.hexdigest(),
+                )
+            )
+        return resources
 
     def _data_query(
         self,
@@ -1100,18 +1150,49 @@ class AgentToolRegistry:
                 "The completed apply task has no public Artifact reference. Re-run apply."
             )
         result_payload = details.task.result_payload or {}
+        typed_result = ApplyTaskResult.model_validate(result_payload)
+        text_apply_facts = typed_result.text_classification_apply_facts
+        raw_text_apply = any(
+            facts is not None
+            for facts in (
+                text_apply_facts,
+                typed_result.text_clustering_apply_facts,
+                typed_result.text_topic_apply_facts,
+                typed_result.text_retrieval_apply_facts,
+            )
+        )
         return ToolSuccess(
             value={
                 "async_state": "completed",
                 "ml_task_id": task.id,
                 "task_ids": [task.id],
                 "ml_tasks": [self._ml_task_payload(task)],
+                "model_key": typed_result.model_key,
                 "training_dataset_id": task.dataset_id,
                 "source_dataset_ids": list(result_payload.get("source_dataset_ids", [])),
                 "source_artifact_ids": list(result_payload.get("source_artifact_ids", [])),
                 "result_dataset_id": result_payload.get("result_dataset_id"),
                 "artifact_id": output_artifact.artifact_id,
                 "row_count": result_payload.get("row_count"),
+                "apply_input_contract": "raw_text" if raw_text_apply else None,
+                "text_classification_apply_facts": (
+                    text_apply_facts.model_dump(mode="json") if text_apply_facts else None
+                ),
+                "text_clustering_apply_facts": (
+                    self._text_discovery_payload(typed_result.text_clustering_apply_facts)
+                    if typed_result.text_clustering_apply_facts
+                    else None
+                ),
+                "text_topic_apply_facts": (
+                    self._text_discovery_payload(typed_result.text_topic_apply_facts)
+                    if typed_result.text_topic_apply_facts
+                    else None
+                ),
+                "text_retrieval_apply_facts": (
+                    self._text_discovery_payload(typed_result.text_retrieval_apply_facts)
+                    if typed_result.text_retrieval_apply_facts
+                    else None
+                ),
             },
         )
 
@@ -1844,6 +1925,33 @@ class AgentToolRegistry:
                         if result.clustering_evaluation
                         else None
                     ),
+                    "recommendation_evaluation": (
+                        self._recommendation_evaluation_payload(
+                            result.recommendation_evaluation
+                        )
+                        if result.recommendation_evaluation
+                        else None
+                    ),
+                    "text_classification_evaluation": (
+                        result.text_classification_evaluation.model_dump(mode="json")
+                        if result.text_classification_evaluation
+                        else None
+                    ),
+                    "text_clustering_evaluation": (
+                        self._text_discovery_payload(result.text_clustering_evaluation)
+                        if result.text_clustering_evaluation
+                        else None
+                    ),
+                    "text_topic_evaluation": (
+                        self._text_discovery_payload(result.text_topic_evaluation)
+                        if result.text_topic_evaluation
+                        else None
+                    ),
+                    "text_retrieval_evaluation": (
+                        self._text_discovery_payload(result.text_retrieval_evaluation)
+                        if result.text_retrieval_evaluation
+                        else None
+                    ),
                 }
             if task.task_type is MLTaskType.APPLY:
                 result = ApplyTaskResult.model_validate(payload)
@@ -1854,6 +1962,26 @@ class AgentToolRegistry:
                     "source_dataset_ids": list(result.source_dataset_ids),
                     "source_artifact_ids": list(result.source_artifact_ids),
                     "result_dataset_id": payload.get("result_dataset_id"),
+                    "text_classification_apply_facts": (
+                        result.text_classification_apply_facts.model_dump(mode="json")
+                        if result.text_classification_apply_facts
+                        else None
+                    ),
+                    "text_clustering_apply_facts": (
+                        self._text_discovery_payload(result.text_clustering_apply_facts)
+                        if result.text_clustering_apply_facts
+                        else None
+                    ),
+                    "text_topic_apply_facts": (
+                        self._text_discovery_payload(result.text_topic_apply_facts)
+                        if result.text_topic_apply_facts
+                        else None
+                    ),
+                    "text_retrieval_apply_facts": (
+                        self._text_discovery_payload(result.text_retrieval_apply_facts)
+                        if result.text_retrieval_apply_facts
+                        else None
+                    ),
                 }
         except PydanticValidationError:
             return {"contract_status": "stored_result_invalid"}
@@ -1874,6 +2002,51 @@ class AgentToolRegistry:
             "preparation_facts": (
                 result.preparation_facts.model_dump(mode="json")
                 if result.preparation_facts
+                else None
+            ),
+            "recommendation_split_facts": (
+                result.recommendation_split_facts.model_dump(mode="json")
+                if result.recommendation_split_facts
+                else None
+            ),
+            "recommendation_preparation_facts": (
+                result.recommendation_preparation_facts.model_dump(mode="json")
+                if result.recommendation_preparation_facts
+                else None
+            ),
+            "text_preparation_specification": (
+                result.text_preparation_specification.model_dump(mode="json")
+                if result.text_preparation_specification
+                else None
+            ),
+            "text_preparation_facts": (
+                result.text_preparation_facts.model_dump(mode="json")
+                if result.text_preparation_facts
+                else None
+            ),
+            "text_leakage_facts": (
+                result.text_leakage_facts.model_dump(mode="json")
+                if result.text_leakage_facts
+                else None
+            ),
+            "text_vectorization_facts": (
+                result.text_vectorization_facts.model_dump(mode="json")
+                if result.text_vectorization_facts
+                else None
+            ),
+            "text_clustering_evaluation": (
+                self._text_discovery_payload(result.text_clustering_evaluation)
+                if result.text_clustering_evaluation
+                else None
+            ),
+            "text_topic_evaluation": (
+                self._text_discovery_payload(result.text_topic_evaluation)
+                if result.text_topic_evaluation
+                else None
+            ),
+            "text_retrieval_evaluation": (
+                self._text_discovery_payload(result.text_retrieval_evaluation)
+                if result.text_retrieval_evaluation
                 else None
             ),
             "training_scope": {
@@ -1931,6 +2104,17 @@ class AgentToolRegistry:
             payload["preparation"] = preparation
         return payload
 
+    def _text_discovery_payload(self, facts: Any) -> dict[str, Any]:
+        """Project typed bounded discovery facts without raw text or document ids."""
+
+        payload = facts.model_dump(mode="json")
+        limitations = payload.get("limitations")
+        if isinstance(limitations, list):
+            payload["limitations"] = [
+                self._bounded_status_message(value) for value in limitations[:8]
+            ]
+        return payload
+
     def _clustering_evaluation_payload(self, facts: Any) -> dict[str, Any]:
         payload = facts.model_dump(mode="json")
         sizes = payload.get("sizes")
@@ -1973,6 +2157,25 @@ class AgentToolRegistry:
         if isinstance(limitations, list):
             payload["limitations"] = [
                 self._bounded_status_message(value) for value in limitations[:10]
+            ]
+        return payload
+
+    def _recommendation_evaluation_payload(self, facts: Any) -> dict[str, Any]:
+        """Project ranking evidence without held-out truth or user/item values."""
+
+        payload = facts.model_dump(mode="json")
+        limitations = payload.get("limitations")
+        if isinstance(limitations, list):
+            payload["limitations"] = [
+                self._bounded_status_message(value) for value in limitations[:10]
+            ]
+        cold_start = payload.get("cold_start")
+        if isinstance(cold_start, dict) and isinstance(
+            cold_start.get("limitations"), list
+        ):
+            cold_start["limitations"] = [
+                self._bounded_status_message(value)
+                for value in cold_start["limitations"][:10]
             ]
         return payload
 
@@ -2187,6 +2390,18 @@ class AgentToolRegistry:
                 "log_loss",
             ]
             return [name for name in names if name in metrics]
+        if evaluation_kind == EvaluationKind.RANKING.value:
+            names = [
+                "ndcg_at_k",
+                "recall_at_k",
+                "hit_rate_at_k",
+                "mrr_at_k",
+                "catalog_coverage_at_k",
+                "mean_novelty_at_k",
+                "mean_intra_list_diversity_at_k",
+                "seen_item_violation_count",
+            ]
+            return [name for name in names if name in metrics]
         return list(metrics)[:5]
 
     def _format_metric_list(self, metrics: dict[str, Any], names: list[str]) -> str:
@@ -2377,9 +2592,11 @@ class AgentToolRegistry:
             return 1
         task_order = {
             ModelTaskKind.SEGMENTER: 2,
-            ModelTaskKind.ANOMALY_SCORER: 3,
-            ModelTaskKind.RULE_MINER: 4,
-            ModelTaskKind.RECOMMENDER: 5,
+            ModelTaskKind.TEXT_ANALYZER: 3,
+            ModelTaskKind.RETRIEVER: 4,
+            ModelTaskKind.ANOMALY_SCORER: 5,
+            ModelTaskKind.RULE_MINER: 6,
+            ModelTaskKind.RECOMMENDER: 7,
         }
         return task_order.get(entry.model_task_kind, 100)
 

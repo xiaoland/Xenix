@@ -1,6 +1,6 @@
 # RT-T2 Implementation Plan — Text Discovery and Retrieval Evidence
 
-**Status:** Proposed; awaits approval of [IH-RT](../handshakes/IH-RT.md) and completion of RT-T1 preparation contracts.
+**Status:** Implemented; service, ordinary Agent, offline Harness, app smoke, package, and frozen binary smoke verified. A completed explicit-privacy paid sample reproduced final-answer grounding and Windows-path privacy defects.
 
 ## Outcome
 
@@ -46,3 +46,13 @@ The existing keyword-frequency case remains independent descriptive evidence. Si
 ## Stop Conditions
 
 Stop for discussion if the implementation needs embeddings/ANN, automatic topic names, relevance claims without truth, provider-generated interpretations as service truth, raw full text in Agent facts, open topic/model search, or semantic changes to existing trained artifacts.
+
+## Implemented Evidence
+
+- Active raw-text clustering, topic, and exact local retrieval keys retain preparation identity, support raw-text apply, and expose task-specific typed evaluation/apply facts. Legacy tokenized keys remain unchanged.
+- Topic evaluation uses connected-group holdout, train-side vocabulary, permutation-matched stability, and one identity digest across Evaluate and Apply. Retrieval is either `relevance_evaluated` or `index_diagnostic`; ranking facts cannot exist in the latter state.
+- Independent service acceptance covers all three active FIT → authoritative EVALUATE → APPLY → finalizer lifecycles, truth/no-truth retrieval, fixed result schemas, lineage/privacy, legacy catalog compatibility, and a 2,001-row pre-dispatch rejection.
+- Ordinary Agent projection covers the complete topic chain, cluster/retrieval states, stable identities, public Dataset/Artifact lineage, shallow schemas, and Provider privacy. The independent topic Harness case is the thirteenth live case and collects exactly once in either mode.
+- Paid diagnosis reproduced a progressive-disclosure mismatch: modeling instructions required `analysis.profile`, but the activated modeling Tool scope omitted it. Inactive Tool disclosure is now Skill-gated, `analysis.profile` is in the modeling scope, and unknown Skill state fails closed.
+- The first frozen binary smoke exposed Joblib physical-core discovery failing under a Windows GUI executable. The packaged entry now supplies `LOKY_MAX_CPU_COUNT` only when no operator value exists; the rebuilt binary smoke exits 0.
+- The explicit topic final-answer privacy requirement and exact-value oracle are implemented. Run `d7ecbdf02fce4f899970818c341f1a10` completed with integrity pass and budget within limits, proving provider recovery, but failed final-answer grounding for quality metrics, group/template isolation, exploratory/offline limits, and Windows-path privacy. No raw transcript or private value was promoted to this packet; [O1](O1-topic-final-answer-diagnosis.md) owns the next bounded diagnosis.

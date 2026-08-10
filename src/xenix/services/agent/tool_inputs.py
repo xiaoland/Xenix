@@ -276,9 +276,27 @@ class DataTokenizeInput(AgentToolInput):
             "one-token-per-row analysis."
         ),
     )
-    tokenizer_profile: Literal["zh_business_v1"] = Field(
+    tokenizer_profile: Literal["zh_business_v1", "multilingual_business_v1"] = Field(
         default="zh_business_v1",
-        description="Stable Chinese-first tokenization profile owned by Xenix.",
+        description="Stable legacy Chinese or retained multilingual business preparation profile.",
+    )
+    phrase_mode: Literal["unigram", "unigram_bigram"] = Field(
+        default="unigram",
+        description="Use short phrases only with multilingual_business_v1.",
+    )
+    custom_dictionary_dataset_ids: Annotated[
+        list[RequiredString],
+        Field(max_length=4),
+    ] = Field(
+        default_factory=list,
+        description="Optional registered one-column term Datasets; at most four.",
+    )
+    stopword_dataset_ids: Annotated[
+        list[RequiredString],
+        Field(max_length=4),
+    ] = Field(
+        default_factory=list,
+        description="Optional registered one-column stopword Datasets; at most four.",
     )
 
     @model_validator(mode="after")
@@ -292,6 +310,22 @@ class DataTokenizeInput(AgentToolInput):
         if self.id_columns is not None and self.id_column_indexes is not None:
             raise ValueError(
                 "data.tokenize accepts either id_columns or id_column_indexes, not both."
+            )
+        if len(set(self.custom_dictionary_dataset_ids)) != len(
+            self.custom_dictionary_dataset_ids
+        ) or len(set(self.stopword_dataset_ids)) != len(self.stopword_dataset_ids):
+            raise ValueError("Text preparation Dataset references cannot contain duplicates.")
+        if set(self.custom_dictionary_dataset_ids) & set(self.stopword_dataset_ids):
+            raise ValueError(
+                "A Dataset cannot be both a custom dictionary and a stopword list."
+            )
+        if self.tokenizer_profile == "zh_business_v1" and (
+            self.phrase_mode != "unigram"
+            or self.custom_dictionary_dataset_ids
+            or self.stopword_dataset_ids
+        ):
+            raise ValueError(
+                "The legacy zh_business_v1 profile does not accept phrase mode or text resources."
             )
         return self
 

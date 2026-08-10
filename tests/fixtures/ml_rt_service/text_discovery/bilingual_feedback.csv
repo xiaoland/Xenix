@@ -1,0 +1,43 @@
+document_id,business_group,relevance_group,text
+food-01,order-01,food,招牌牛肉面汤底浓郁，面条筋道
+food-02,order-01,food,招牌牛肉面汤底很浓郁，面条筋道
+food-03,order-02,food,The noodle broth is rich and the beef is tender
+food-04,order-02,food,The noodle broth tastes rich; beef is tender
+food-05,order-03,food,饺子馅料新鲜，蘸料香而不辣
+food-06,order-03,food,饺子馅料很新鲜，蘸料香而不辣
+food-07,order-04,food,Fresh dumpling filling and fragrant dipping sauce
+food-08,order-04,food,Dumpling filling is fresh with a fragrant sauce
+food-09,order-05,food,炒饭锅气足，米粒分明，味道很好
+food-10,order-05,food,炒饭锅气很足，米粒分明，味道好
+food-11,order-06,food,Wok fried rice is aromatic with separate grains
+food-12,order-06,food,The fried rice is aromatic and each grain is separate
+service-01,visit-01,service,服务员热情耐心，上菜速度很快
+service-02,visit-01,service,服务员非常热情耐心，上菜速度快
+service-03,visit-02,service,Staff were friendly patient and served us quickly
+service-04,visit-02,service,Friendly patient staff brought dishes quickly
+service-05,visit-03,service,前台主动安排座位，解释菜单很清楚
+service-06,visit-03,service,前台主动安排座位，菜单解释清楚
+service-07,visit-04,service,The host arranged seating and explained the menu clearly
+service-08,visit-04,service,Host arranged our seats and gave a clear menu explanation
+service-09,visit-05,service,客服回复及时，退款处理专业顺畅
+service-10,visit-05,service,客服回复很及时，退款处理专业
+service-11,visit-06,service,Support replied promptly and handled the refund professionally
+service-12,visit-06,service,Prompt support handled our refund in a professional way
+delivery-01,shipment-01,delivery,配送准时，包装完整，餐品还是热的
+delivery-02,shipment-01,delivery,配送非常准时，包装完整，餐品很热
+delivery-03,shipment-02,delivery,Delivery arrived on time with intact warm packaging
+delivery-04,shipment-02,delivery,On time delivery kept the package intact and food warm
+delivery-05,shipment-03,delivery,骑手提前联系，送达位置准确方便
+delivery-06,shipment-03,delivery,骑手会提前联系，送达位置准确
+delivery-07,shipment-04,delivery,The courier called ahead and found the right location
+delivery-08,shipment-04,delivery,Courier contacted us early and delivered to the correct place
+delivery-09,shipment-05,delivery,外卖袋密封牢固，汤汁没有洒漏
+delivery-10,shipment-05,delivery,外卖袋密封很牢固，汤汁没有洒
+delivery-11,shipment-06,delivery,The takeaway bag was sealed and nothing leaked
+delivery-12,shipment-06,delivery,Secure sealed takeaway packaging prevented leaks
+food-13,order-07,food,甜点口感细腻，水果清香新鲜
+food-14,order-08,food,Dessert was delicate with fresh fragrant fruit
+service-13,visit-07,service,经理认真听取意见并快速解决问题
+service-14,visit-08,service,The manager listened carefully and resolved the issue
+delivery-13,shipment-07,delivery,配送路线高效，预计时间准确可靠
+delivery-14,shipment-08,delivery,Delivery routing was efficient and the estimate was accurate

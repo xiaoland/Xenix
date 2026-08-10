@@ -34,5 +34,6 @@ Put raw logs, traces, SQLite snapshots/queries, provider payloads, prompts, tran
 - [B0 offline implementation — 2026-08-09](B0-offline-implementation-260809.md)
 - [Foundation execution — 2026-08-09](foundations-2026-08-09.md)
 - [CF-C / CF-F execution — 2026-08-09](CF-2026-08-09.md)
+- [Recommendation and text execution — 2026-08-10](RT-2026-08-10.md)
 
 The Foundation and CF records include paid single-sample characterization and bounded improvement/diagnosis series. Credentials, raw prompts/transcripts, provider responses, private material rows/answers, local paths exposed to the Agent, and unbounded logs remain excluded.

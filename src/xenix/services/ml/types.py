@@ -40,14 +40,20 @@ class ModelTaskKind(StrEnum):
     RULE_MINER = "rule_miner"
     RECOMMENDER = "recommender"
     FORECASTER = "forecaster"
+    TEXT_ANALYZER = "text_analyzer"
+    RETRIEVER = "retriever"
 
 
 class EvaluationKind(StrEnum):
     REGRESSION = "regression"
     CLASSIFICATION = "classification"
+    RANKING = "ranking"
     SUMMARY = "summary"
     NONE = "none"
     FORECASTING = "forecasting"
+    TEXT_CLUSTERING = "text_clustering"
+    TOPIC_MODELING = "topic_modeling"
+    RETRIEVAL = "retrieval"
 
 
 class ApplyMode(StrEnum):
@@ -224,11 +230,9 @@ class ModelServiceBase(ABC):
             if cls.evaluation_kind is not None
             else cls._default_evaluation_kind()
         )
-        summary_metric_name = (
-            cls.summary_metric_name
-            if cls.summary_metric_name is not None
-            else cls._default_summary_metric_name(model_task_kind)
-        )
+        summary_metric_name = cls.summary_metric_name
+        if summary_metric_name is None and evaluation_kind is EvaluationKind.SUMMARY:
+            summary_metric_name = cls._default_summary_metric_name(model_task_kind)
         return ModelCatalogEntry(
             model_key=cls.key,
             display_name=cls.display_name,
@@ -282,6 +286,8 @@ class ModelServiceBase(ABC):
             return ModelFamily.ANOMALY_DETECTION
         if problem_kind is ProblemKind.FORECASTING:
             return ModelFamily.FORECASTING
+        if problem_kind is ProblemKind.RECOMMENDATION:
+            return ModelFamily.RECOMMENDATION
         raise ValueError(f"Model '{cls.key}' has no default model family.")
 
     @classmethod
@@ -295,6 +301,8 @@ class ModelServiceBase(ABC):
             return ModelTaskKind.ANOMALY_SCORER
         if problem_kind is ProblemKind.FORECASTING:
             return ModelTaskKind.FORECASTER
+        if problem_kind is ProblemKind.RECOMMENDATION:
+            return ModelTaskKind.RECOMMENDER
         raise ValueError(f"Model '{cls.key}' has no default model task kind.")
 
     @classmethod
@@ -308,6 +316,8 @@ class ModelServiceBase(ABC):
             return EvaluationKind.SUMMARY
         if problem_kind is ProblemKind.FORECASTING:
             return EvaluationKind.FORECASTING
+        if problem_kind is ProblemKind.RECOMMENDATION:
+            return EvaluationKind.RANKING
         raise ValueError(f"Model '{cls.key}' has no default evaluation kind.")
 
     @classmethod

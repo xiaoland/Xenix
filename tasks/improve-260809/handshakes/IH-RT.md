@@ -1,6 +1,6 @@
 # Impact Handshake RT — Recommendation Ranking and Trustworthy Text
 
-**Status:** Proposed for joint solution-design review; not authorized for product-source mutation.
+**Status:** Consumed on 2026-08-10; RT-R, RT-T1, and RT-T2 are implemented and objectively verified. Further product mutation requires a new exact handshake.
 **Implementation plans:** [RT-R — recommendation ranking](../implementation/RT-R-recommendation-ranking.md), [RT-T1 — multilingual preparation and grouped classification](../implementation/RT-T1-text-preparation-classification.md), and [RT-T2 — text discovery and retrieval](../implementation/RT-T2-text-discovery-retrieval.md).
 
 ## Evidence Consumed
@@ -13,7 +13,7 @@
 
 ## Address and Object
 
-This proposed handshake may change only the following product objects:
+This consumed handshake changed only the following product objects:
 
 - recommendation ranking contracts, split/preparation/evaluation, retained analyzer, lifecycle, public Dataset/Artifact output, Agent projection, Skill guidance, and independently owned service/Agent cases;
 - multilingual raw-text preparation, template/business-group leakage control, classification, text clustering, topic modeling, similarity retrieval, lifecycle, bounded term projection, packaging smoke, and independently owned service/Agent cases;

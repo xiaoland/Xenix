@@ -69,6 +69,61 @@ def source_dataset_ids_from_snapshot(snapshot: Any) -> list[str]:
     return dataset_ids
 
 
+def registered_source_ids_for_digest(
+    *,
+    snapshot: Any,
+    services: BenchmarkCaseServices,
+    digest: str,
+) -> set[str]:
+    """Resolve attachment Dataset identity from the final canonical snapshot.
+
+    Multi-attachment submission can emit an early snapshot before every source
+    is registered. Source immutability still uses the first captured external
+    digest, while identity and lineage resolution use the complete final list.
+    """
+
+    matches: set[str] = set()
+    for dataset_id in source_dataset_ids_from_snapshot(snapshot):
+        try:
+            dataset = services.datasets.get_dataset(dataset_id)
+            registered_path = Path(dataset.source_path)
+            if registered_path.is_file() and sha256_file(registered_path) == digest:
+                matches.add(dataset_id)
+        except Exception:
+            continue
+    return matches
+
+
+def source_dataset_ids_for_external_digest(
+    *,
+    snapshot: Any,
+    services: BenchmarkCaseServices,
+    digest: str,
+) -> set[str]:
+    """Map a canonical Dataset block back to its immutable imported source.
+
+    Registered Dataset rows point at app-owned Parquet materializations, so
+    their content hash intentionally differs from an attached CSV/XLSX file.
+    Source presentation is the read-only provenance seam that retains the
+    original attachment path without projecting it to the subject or report.
+    """
+
+    resolver = getattr(services.datasets, "resolve_dataset_source_presentation", None)
+    if not callable(resolver):
+        return set()
+    matches: set[str] = set()
+    for dataset_id in source_dataset_ids_from_snapshot(snapshot):
+        try:
+            presentation = resolver(dataset_id)
+            open_path = getattr(presentation, "open_path", None)
+            source_path = Path(open_path) if isinstance(open_path, str) else None
+            if source_path is not None and source_path.is_file() and sha256_file(source_path) == digest:
+                matches.add(dataset_id)
+        except Exception:
+            continue
+    return matches
+
+
 def canonical_completion(snapshot: Any) -> bool:
     messages = list(getattr(snapshot, "messages", []))
     if not messages or any(enum_value(getattr(message, "kind", None)) == "pending_llm_sampling" for message in messages):

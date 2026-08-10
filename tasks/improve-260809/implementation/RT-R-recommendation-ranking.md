@@ -1,6 +1,6 @@
 # RT-R Implementation Plan — Personalized Recommendation Ranking
 
-**Status:** Proposed; awaits approval of [IH-RT](../handshakes/IH-RT.md).
+**Status:** Implemented / verification from 2026-08-10 under [IH-RT](../handshakes/IH-RT.md); focused service, Agent projection, smoke, and one paid headless characterization passed.
 
 ## Outcome
 

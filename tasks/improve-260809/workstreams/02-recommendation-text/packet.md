@@ -8,7 +8,7 @@ Hypothesis: user-level ranking, cold-start behavior, leakage-aware multilingual 
 
 ## Status
 
-`solidify / design review`; source/material exploration is complete, `IH-RT` and three independent implementation plans are proposed, and no product mutation is authorized.
+`verification`; Sir approved `IH-RT` on 2026-08-10. RT-R, RT-T1, and RT-T2 implementation and objective proof are complete. A completed post-fix paid topic characterization reproduced final-answer grounding and path-privacy defects.
 
 ## Scope and Non-Goals
 
@@ -42,7 +42,7 @@ Owners are enumerated by [IH-RT](../../handshakes/IH-RT.md) and split across [RT
 - `From`: one item-similarity recommender and several text analyzers with count-only or weak evaluation.
 - `To`: evaluated user-level ranking with cold-start and seen-item rules, plus leakage-aware multilingual text workflows that produce bounded quality evidence and reusable outputs.
 
-This state diff is fully drafted in proposed [IH-RT](../../handshakes/IH-RT.md); it is not approved for implementation until Sir confirms the product decisions in `O-005` and `O-008` through `O-012`.
+This state diff is authorized by [IH-RT](../../handshakes/IH-RT.md). New evidence that requires implicit feedback, cold-item recommendation, embeddings/ANN, raw Provider projection, or incompatible artifact semantics returns to discussion.
 
 ## Invariants
 
@@ -54,7 +54,7 @@ This state diff is fully drafted in proposed [IH-RT](../../handshakes/IH-RT.md);
 
 ## Decisions Consumed
 
-`D-002` through `D-015`; proposed recommendation/text decisions remain open in `O-005` and `O-008` through `O-012`.
+`D-002` through `D-019`; Sir resolved the recommendation/text scope and evidence boundary on 2026-08-10.
 
 ## Cases Consumed
 
@@ -74,7 +74,8 @@ This state diff is fully drafted in proposed [IH-RT](../../handshakes/IH-RT.md);
 - Existing text classification has group-safe supervised evaluation, but analyzers expect pretokenized text and do not retain an upstream preparation spec. Clustering/topic/similarity advertise fit/apply while exposing count-only or no task-quality evidence.
 - The supplied ch14 material has no single independent train → truth → apply closure. Its precomputed Top-10/truth bundle is evaluator-only. The supplied ch16 model data has only 38 analysis texts across 1,500 rows and template-determined labels, so random-split results are leakage evidence, not acceptance truth.
 - Ten bounded logical material sets, clean-room correspondence, hashes/shapes, and fail-closed private triggers are recorded in the [RT adoption plan](../../materials/rt-on-demand-adoption.md); no reference script was executed and no private byte is authorized for Provider upload.
+- RT-R and RT-T1 each have one passing paid characterization. RT-T2 has complete independent service and ordinary Agent evidence, package/binary smoke, and one exact-selector topic case. Its bounded live diagnosis fixed Skill-gated progressive disclosure and packaged CPU discovery; the later completed sample failed only final-answer grounding and Windows-path privacy checks rather than service, integrity, budget, or provider transport.
 
 ## Next Action
 
-Review the six product choices in `O-005` and `O-008` through `O-012`. If Sir approves the proposed package, mark `IH-RT` approved and execute RT-R → RT-T1 → RT-T2 without another design-stage pause unless new evidence changes the state diff.
+Review and, if accepted, execute [O1 topic final-answer diagnosis](../../implementation/O1-topic-final-answer-diagnosis.md). Do not start the formal repetition/Judge series until its exact product optimization, if any, is verified on a clean state.

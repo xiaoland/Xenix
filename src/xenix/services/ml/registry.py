@@ -35,7 +35,10 @@ from .models.forecasting import (
     SarimaForecastingService,
     SeasonalNaiveForecastingService,
 )
-from .models.recommendation import ItemSimilarityRecommendationService
+from .models.recommendation import (
+    CollaborativeTopKRecommendationService,
+    ItemSimilarityRecommendationService,
+)
 from .models.regression import (
     AdaBoostRegressionService,
     BayesianRidgeRegressionService,
@@ -55,6 +58,10 @@ from .models.regression import (
     XGBoostRegressionService,
 )
 from .models.text_analysis import (
+    MultilingualTextClusteringService,
+    MultilingualTextClassificationService,
+    MultilingualTextSimilarityService,
+    MultilingualTextTopicModelingService,
     TokenizedTextClassificationService,
     TokenizedTextClusteringService,
     TokenizedTextSimilarityService,
@@ -158,8 +165,13 @@ _MODEL_SERVICE_TYPES: tuple[type[ModelServiceBase], ...] = (
     LocalOutlierFactorAnomalyService,
     ApyoriAssociationRulesService,
     MlxtendAssociationRulesService,
+    CollaborativeTopKRecommendationService,
     ItemSimilarityRecommendationService,
     TokenizedTextClassificationService,
+    MultilingualTextClassificationService,
+    MultilingualTextClusteringService,
+    MultilingualTextTopicModelingService,
+    MultilingualTextSimilarityService,
     TokenizedTextClusteringService,
     TokenizedTextTopicModelingService,
     TokenizedTextSimilarityService,

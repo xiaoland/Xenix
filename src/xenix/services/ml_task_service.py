@@ -509,13 +509,13 @@ class MLTaskService:
         payload["evaluation_model_artifact_path"] = str(evaluation_model_path)
         if (
             export_path is not None
-            and catalog_entry.model_task_kind is ModelTaskKind.SEGMENTER
+            and "table" in catalog_entry.result_contract.train_result_kinds
         ):
             payload["result_dataset_id"] = self._materialize_fit_result_dataset(
                 session=session,
                 row=row,
                 source_csv_path=export_path,
-                result_name_suffix="cluster assignments",
+                result_name_suffix=self._fit_result_name_suffix(catalog_entry.model_task_kind),
             )
         artifacts = [
             MLTaskArtifactInput(artifact_kind=MLTaskArtifactKind.MODEL, absolute_path=str(canonical_path)),
@@ -645,13 +645,13 @@ class MLTaskService:
         payload["evaluation_model_artifact_path"] = str(evaluation_model_path)
         if (
             export_path is not None
-            and catalog_entry.model_task_kind is ModelTaskKind.SEGMENTER
+            and "table" in catalog_entry.result_contract.train_result_kinds
         ):
             payload["result_dataset_id"] = self._materialize_fit_result_dataset(
                 session=session,
                 row=row,
                 source_csv_path=export_path,
-                result_name_suffix="cluster assignments",
+                result_name_suffix=self._fit_result_name_suffix(catalog_entry.model_task_kind),
             )
         artifacts = [
             MLTaskArtifactInput(artifact_kind=MLTaskArtifactKind.MODEL, absolute_path=str(canonical_path)),
@@ -826,6 +826,15 @@ class MLTaskService:
             ),
         )
         return result_dataset_id
+
+    def _fit_result_name_suffix(self, task_kind: ModelTaskKind) -> str:
+        suffixes = {
+            ModelTaskKind.SEGMENTER: "cluster assignments",
+            ModelTaskKind.RECOMMENDER: "recommendations",
+            ModelTaskKind.TEXT_ANALYZER: "text analysis",
+            ModelTaskKind.RETRIEVER: "retrieval results",
+        }
+        return suffixes.get(task_kind, "analysis results")
 
     def _sql_string(self, value: str) -> str:
         return "'" + value.replace("'", "''") + "'"

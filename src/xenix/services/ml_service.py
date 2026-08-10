@@ -16,6 +16,7 @@ from ..config import AppPaths
 from ..exceptions import DatasetSourceMissingError, ValidationError
 from .dataset_inspection import InspectDatasetInput
 from .dataset_service import DatasetService, MaterializeManualApplyCsvInput
+from .data_tokenization_contracts import StagedTextResourceInput, TextPreparationInput
 from .ml.contracts import (
     ApplyInputFile,
     ApplyModelPayload,
@@ -63,6 +64,17 @@ _COLUMN_NAME_NORMALIZATION_TRANSLATION = str.maketrans(
         "\u00a0": " ",
     }
 )
+_MULTILINGUAL_TEXT_MODEL_KEYS = frozenset(
+    {
+        "text.classification.multilingual_logistic_regression_tfidf",
+        "text.clustering.multilingual_kmeans_tfidf",
+        "text.topic_modeling.multilingual_lda",
+        "text.similarity.multilingual_tfidf_cosine",
+    }
+)
+_MAX_TEXT_RESOURCE_ROWS = 20_000
+_MULTILINGUAL_TEXT_RETRIEVAL_KEY = "text.similarity.multilingual_tfidf_cosine"
+_MAX_EXACT_TEXT_RETRIEVAL_ROWS = 2_000
 
 
 class CreateColumnBindingInput(SQLModel):
@@ -213,6 +225,7 @@ class MLService:
 
     def fit_with_evaluate(self, input_data: FitWithEvaluateInput) -> MLTaskRow:
         context = self._build_training_context(input_data, input_data.model_key)
+        self._validate_model_runtime_admission(context)
         model_service = get_model_service(input_data.model_key)
         try:
             params_model = model_service.validate_params(input_data.params)
@@ -233,6 +246,10 @@ class MLService:
                 if context.catalog.model_family is ModelFamily.FORECASTING
                 else None
             ),
+            text_preparation=self._build_text_preparation_input(
+                context,
+                params_model,
+            ),
             continuation_plan=(
                 TaskContinuationPlan(next_operation=MLTaskType.EVALUATE.value)
                 if context.catalog.supports_evaluation
@@ -246,8 +263,23 @@ class MLService:
         )
         return self._create_and_submit_task(context, MLTaskType.FIT, request)
 
+    @staticmethod
+    def _validate_model_runtime_admission(context: "_TrainingContext") -> None:
+        if (
+            context.catalog.model_key == _MULTILINGUAL_TEXT_RETRIEVAL_KEY
+            and context.inspection.row_count > _MAX_EXACT_TEXT_RETRIEVAL_ROWS
+        ):
+            raise ValidationError(
+                "Exact multilingual text retrieval supports at most "
+                f"{_MAX_EXACT_TEXT_RETRIEVAL_ROWS:,} source rows in v1."
+            )
+
     def tune_with_evaluate(self, input_data: TuneWithEvaluateInput) -> MLTaskRow:
         context = self._build_training_context(input_data, input_data.model_key)
+        if not context.catalog.supports_hyperparameter_tuning:
+            raise ValidationError(
+                f"Model '{input_data.model_key}' does not support hyperparameter tuning."
+            )
         model_service = get_model_service(input_data.model_key)
         try:
             param_grid_model = model_service.validate_param_grid(input_data.param_grid)
@@ -479,6 +511,84 @@ class MLService:
             dataset_column_count=context.inspection.column_count,
             preview_columns=list(context.inspection.preview_columns),
             preview_rows=[list(row) for row in context.inspection.preview_rows],
+        )
+
+    def _build_text_preparation_input(
+        self,
+        context: "_TrainingContext",
+        params_model: Any,
+    ) -> TextPreparationInput | None:
+        if context.catalog.model_key not in _MULTILINGUAL_TEXT_MODEL_KEYS:
+            return None
+        params = params_model.model_dump(mode="python")
+        custom_ids = self._text_resource_dataset_ids(
+            params.get("custom_dictionary_dataset_ids"),
+            field_name="custom_dictionary_dataset_ids",
+        )
+        stopword_ids = self._text_resource_dataset_ids(
+            params.get("stopword_dataset_ids"),
+            field_name="stopword_dataset_ids",
+        )
+        if set(custom_ids) & set(stopword_ids):
+            raise ValidationError(
+                "A text resource Dataset cannot be both a custom dictionary and a stopword list."
+            )
+        return TextPreparationInput.model_validate(
+            {
+                "tokenizer_profile": params.get("preparation_profile"),
+                "phrase_mode": params.get("phrase_mode"),
+                "custom_dictionary_resources": [
+                    self._stage_text_resource(context, dataset_id)
+                    for dataset_id in custom_ids
+                ],
+                "stopword_resources": [
+                    self._stage_text_resource(context, dataset_id)
+                    for dataset_id in stopword_ids
+                ],
+            }
+        )
+
+    @staticmethod
+    def _text_resource_dataset_ids(value: Any, *, field_name: str) -> list[str]:
+        if value is None:
+            return []
+        if not isinstance(value, list) or any(
+            not isinstance(item, str) or not item.strip() for item in value
+        ):
+            raise ValidationError(f"{field_name} must contain registered Dataset ids.")
+        normalized = [item.strip() for item in value]
+        if len(normalized) != len(set(normalized)):
+            raise ValidationError(f"{field_name} cannot contain duplicate Dataset ids.")
+        return normalized
+
+    def _stage_text_resource(
+        self,
+        context: "_TrainingContext",
+        dataset_id: str,
+    ) -> StagedTextResourceInput:
+        dataset = self._dataset_service.get_dataset(dataset_id)
+        if dataset.project_id != context.project_id:
+            raise ValidationError(
+                "Text preparation resources must belong to the training project."
+            )
+        source_path = Path(dataset.source_path)
+        if not source_path.is_file():
+            raise DatasetSourceMissingError("Text preparation resource source file is missing.")
+        inspection = self._dataset_service.inspect_source_file(
+            InspectDatasetInput(source_path=str(source_path.resolve()))
+        )
+        if inspection.column_count != 1 or not 1 <= inspection.row_count <= _MAX_TEXT_RESOURCE_ROWS:
+            raise ValidationError(
+                "Each text preparation resource must contain one term column and 1-20,000 rows."
+            )
+        digest = hashlib.sha256()
+        with source_path.open("rb") as source:
+            for chunk in iter(lambda: source.read(1024 * 1024), b""):
+                digest.update(chunk)
+        return StagedTextResourceInput(
+            dataset_id=dataset.id,
+            absolute_path=str(source_path.resolve()),
+            source_sha256=digest.hexdigest(),
         )
 
     def _create_and_submit_task(

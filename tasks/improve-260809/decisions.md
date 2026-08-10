@@ -96,6 +96,38 @@ The Agent constructs typed per-model parameter objects from the business request
 
 Parameters that can introduce future/holdout leakage, change shared comparison folds or metric meaning, create an open-ended search, or expose solver/optimizer internals remain service-owned versioned policy. This includes split/cutoff construction, resampling seeds, null permutations, SARIMA order candidates/inner selection, convergence controls, optimizer arguments, and fit/time ceilings. Model-specific parameters may not alter the shared Dataset binding, roles, cadence, horizon, fold identities, or primary comparison contract. The service validates every Agent-authored value and fails closed rather than widening or silently rewriting invalid requests.
 
+### D-016 — Explicit-rating personalized recommendation v1
+
+**Status:** confirmed by Sir on 2026-08-10 through approval of `IH-RT`.
+
+Recommendation v1 adds a new personalized explicit-rating collaborative Top-K key while preserving `recommendation.item_similarity`. Candidate and popularity baseline share the same private per-user truth; known-user results exclude admitted seen items, cold users receive deterministic popularity fallback, and cold items are unsupported. Implicit feedback, matrix factorization, and hybrid ranking remain later work.
+
+A valid time role selects latest-positive holdout. Without time, the service uses an explicitly recorded deterministic hash-positive holdout; it never silently changes policies. The Agent may author bounded `top_k`, support, rating-threshold, and role values, while candidate generation, shrinkage, truth membership, metrics, seeds, and tie-breaks remain versioned service policy.
+
+### D-017 — Raw-text analyzers retain preparation identity
+
+**Status:** confirmed by Sir on 2026-08-10 through approval of `IH-RT`.
+
+Active classification, clustering, topic, and retrieval analyzers accept raw text and retain the exact versioned preparation specification used for fit/apply. Atomic `data.tokenize` remains the derived-Dataset path for frequency and explicit inspection. Business/template groups cannot cross evaluation partitions, and vocabulary/IDF fit only on the training side.
+
+### D-018 — Bounded interpretable text projection
+
+**Status:** confirmed by Sir on 2026-08-10 through approval of `IH-RT`.
+
+A small sanitized top-term projection may enter Agent context when required to explain an evaluated text result. Raw or matched text, full vocabulary, template values, document/user/item identifiers, memberships, and retrieval rows remain local Dataset/Artifact content.
+
+### D-019 — Truth-aware retrieval and complete text service scope
+
+**Status:** confirmed by Sir on 2026-08-10 through approval of `IH-RT`.
+
+Classification, clustering, topic modeling, and similarity retrieval all receive honest service contracts in Vertical 02. Retrieval reports relevance metrics only with admitted relevance truth; otherwise it is explicitly `index_diagnostic`. Independent paid classification and topic cases are included, while retrieval remains service-qualified until a relevance-bearing business live case exists.
+
+### D-020 — Skill-gated domain Tool disclosure
+
+**Status:** evidence-derived implementation of `D-012` on 2026-08-10; pending Sir's final task acceptance.
+
+An inactive Agent task receives only the Skill activation entrance and Knowledge lookup. Activating a known Skill discloses its mapped atomic domain Tools plus common building blocks; corrupt or unknown Skill state fails closed. The modeling scope includes `analysis.profile` because the modeling Skill requires privacy-minimized profiling before any purpose-limited value query. This prevents the Skill catalog from being advisory while all domain Tools remain simultaneously exposed.
+
 ## Approved B0 Details
 
 ### P-001 — Versioned acceptance-policy command
@@ -132,24 +164,24 @@ Start with univariate seasonal forecasting and optional independent groups. Use 
 
 ### P-003 — Recommendation v1 scope
 
-**Status:** proposed in `IH-RT`; awaits Sir's design review.
+**Status:** adopted as `D-016` on 2026-08-10.
 
 Start with explicit-rating personalized collaborative Top-K, seen-item exclusion, a same-truth popularity baseline, and deterministic popularity fallback for cold users. Use latest-positive-per-user holdout when a valid time role is bound and an explicitly recorded deterministic hash-positive holdout otherwise. Preserve `recommendation.item_similarity` semantics under its existing key; cold-item inference, implicit feedback, matrix factorization, and hybrid ranking remain later work.
 
 ### P-004 — Text benchmark scope
 
-**Status:** proposed in `IH-RT`; awaits Sir's design review.
+**Status:** adopted as `D-017` and `D-019` on 2026-08-10.
 
 Qualify bilingual raw-text preparation plus classification, clustering, topic modeling, and similarity retrieval through task-appropriate service contracts. Active analyzers retain their exact preparation spec; existing persisted-key semantics remain explicit. Add independently authored grouped-classification and topic live cases. Similarity retrieval remains service-only until a relevance-bearing business live scenario exists. The supplied naïve random classification split is leakage evidence, never generalization evidence.
 
 ### P-008 — Bounded text interpretation in Agent context
 
-**Status:** proposed in `IH-RT`; awaits Sir's design review.
+**Status:** adopted as `D-018` on 2026-08-10.
 
 Permit only a small sanitized list of purpose-required top terms as bounded evaluation facts for Agent explanation. Raw/matched text, complete vocabulary, template values, document/user/item identifiers, retrieval rows, and membership remain local Dataset/Artifact content.
 
 ### P-009 — Retrieval evidence requires relevance truth
 
-**Status:** proposed in `IH-RT`; awaits Sir's design review.
+**Status:** adopted as `D-019` on 2026-08-10.
 
 Similarity retrieval reports Recall/MRR/NDCG only when admitted relevance truth is bound. Without truth it exposes rank/uniqueness/self-exclusion and index health under an explicit `index_diagnostic` state; it does not claim semantic relevance quality.

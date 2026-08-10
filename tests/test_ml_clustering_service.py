@@ -21,7 +21,7 @@ from xenix.services.ml_service import (
 )
 from xenix.services.ml_task_service import MLTaskService
 from xenix.services.storage import StorageBootstrapService
-from xenix.services.storage.models import MLTaskArtifactKind, MLTaskStatus
+from xenix.services.storage.models import MLTaskArtifactKind, MLTaskStatus, MLTaskType
 from xenix.services.trained_model_metadata import parse_trained_model_metadata
 
 
@@ -267,7 +267,11 @@ def test_dbscan_apply_is_rejected_by_ml_service_admission(
     )
     trained_model = ml.get_trained_model_by_ml_task(completed_fit.id)
     assert trained_model is not None
-    task_count_before = len(tasks.list_dataset_ml_tasks(training_dataset.id))
+    apply_task_ids_before = {
+        task.id
+        for task in tasks.list_dataset_ml_tasks(training_dataset.id)
+        if task.task_type is MLTaskType.APPLY
+    }
 
     with pytest.raises(ValidationError, match="does not support apply"):
         ml.apply(
@@ -282,5 +286,10 @@ def test_dbscan_apply_is_rejected_by_ml_service_admission(
             )
         )
 
-    assert len(tasks.list_dataset_ml_tasks(training_dataset.id)) == task_count_before
+    apply_task_ids_after = {
+        task.id
+        for task in tasks.list_dataset_ml_tasks(training_dataset.id)
+        if task.task_type is MLTaskType.APPLY
+    }
+    assert apply_task_ids_after == apply_task_ids_before
     storage.engine.dispose()

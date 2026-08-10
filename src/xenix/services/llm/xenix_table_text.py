@@ -94,6 +94,18 @@ def _render_generated_dataset_preview(tool_name: str, payload: dict[str, Any]) -
     _append_metadata(prefix, "artifact_id", payload.get("artifact_id"))
     _append_metadata(prefix, "summary", payload.get("summary"))
     _append_generated_dataset_metadata(prefix, tool_name, payload)
+    if tool_name == "data.tokenize":
+        prefix.extend(
+            [
+                "notes:",
+                "  - "
+                + _yaml_scalar(
+                    "preview omitted because tokenized rows can reveal source text, "
+                    "business identifiers, or vocabulary; use dataset_id for local follow-up tools."
+                ),
+            ]
+        )
+        return "\n".join(prefix)
     table_text = _render_table_text(
         columns=columns,
         rows=rows,

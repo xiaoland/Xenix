@@ -4,19 +4,21 @@ description: >-
   Use this skill when the user asks Xenix to predict, classify, regress, score,
   rank, train a model, tune hyperparameters, apply a trained model, estimate
   risk/probability, identify drivers through model output, compare supervised
-  models, forecast a regular time series, compare seasonal-naive,
+  models, produce personalized Top-K recommendations from explicit ratings,
+  forecast a regular time series, compare seasonal-naive,
   Holt-Winters, and bounded-auto SARIMA, handle partially labeled data, run text classification, text
   clustering, topic modeling, similarity retrieval, or use neural networks as a
   candidate model. Use for Chinese requests such as “预测一下”, “训练模型”,
   “哪些因素影响结果”, “客户流失预测”, “风险评分”, “转化概率”, “调参”, “应用模型”,
-  “销量预测”, “需求预测”, “未来几周”, “文本分类”, “主题分析”, “相似检索”, or “半监督”.
+  “销量预测”, “需求预测”, “未来几周”, “个性化推荐”, “推荐商品”, “Top-K 推荐”,
+  “文本分类”, “主题分析”, “相似检索”, or “半监督”.
   Do not use for pure descriptive profiling, charts, reporting, or association
   analysis unless modeling is explicitly part of the task; use xenix-data-analysis
   for that. Activate xenix-data-preprocessing first when cleaning,
   transformation, or role binding is not ready.
 license: MIT
 metadata:
-  version: "0.6.0"
+  version: "0.9.0"
   product: "Xenix"
   language: "zh-CN"
   runtime: "tool-only; no script execution"
@@ -30,7 +32,7 @@ Xenix Agent has no script execution environment. Use only available Xenix tools:
 
 - `analysis.profile` first for bounded whole-Dataset shape, type, missingness, duplicate, and numeric facts.
 - `data.query` once with a focused projection or aggregation only when business-role semantics remain materially ambiguous.
-- `data.tokenize` only after activating `xenix-data-preprocessing`, when raw Chinese text must become a tokenized derived dataset before text-analysis models.
+- `data.tokenize` after activating `xenix-data-preprocessing` for explicit token inspection or frequency workflows. Active multilingual analyzers accept raw text and retain preparation themselves.
 - `data.feature.select` to create a role-binding snapshot before training.
 - `model.metadata` before constructing model parameters; browse `model_family: "forecasting"` for native forecast candidates, then inspect each selected `model_key` and its `param_schema`.
 - `model.train` for baseline and candidate model training.
@@ -59,13 +61,22 @@ Xenix Agent has no script execution environment. Use only available Xenix tools:
 15. Forecast apply is horizon-only: call `model.apply` with `trained_model_id` and `horizon`, without `input_sources` or `input_rows`. New observations require a new fit; do not pretend apply mutates retained history.
 16. The Agent fills typed shallow parameters only after reading each model's `param_schema`. Never invent raw SARIMA orders, order grids, optimizer arguments, convergence flags, seeds, or a wider search/budget than the schema exposes.
 17. When distinct model keys share one role binding and comparison contract, submit them together in one `model.train` call with `models` and `params_by_model`. Because `params_by_model` has one object per model key, use separate calls for several parameterizations of the same key. In both cases, reuse returned task ids and trained model ids; never retrain an identical candidate merely to inspect, compare, or apply it.
+18. Personalized recommendation requires explicit `user`, `item`, and numeric `rating` roles plus an optional valid `time` role. Use `recommendation.collaborative_top_k`; keep `recommendation.item_similarity` only for the distinct legacy question “which items resemble this base item?”.
+19. Before setting `positive_rating_threshold`, profile the rating scale and use one focused `data.query` only if the business meaning of a positive rating remains ambiguous. Never guess a five-star threshold for an unknown scale.
+20. Recommendation Evaluate evidence must use the same private per-user truth for candidate and popularity baseline, report the realized latest-positive or deterministic-hash holdout policy, and have zero seen-item violations. Offline ranking metrics do not prove online uplift.
+21. Use `text.classification.multilingual_logistic_regression_tfidf` for active bilingual raw-text classification. Keep `text.classification.logistic_regression_tfidf` only for existing analyzers whose persisted input contract is already pre-tokenized.
+22. Bind one raw `text`, one `target`, and an optional business `group`. The service joins business groups with exact/template/near-duplicate constraints; all reported train/holdout overlap counts must be zero, and TF-IDF vocabulary/IDF must be fitted only on the training partition.
+23. Custom dictionary and stopword inputs are registered one-column Dataset IDs, never inline word dumps or local paths. Use only the advertised maximum of four per purpose and require the retained specification to report the same Dataset identities and hashes.
+24. Use the active multilingual raw-text discovery keys for new clustering, topic, and retrieval work. Existing `text.clustering.kmeans_tfidf`, `text.topic_modeling.lda`, and `text.similarity.tfidf_cosine` analyzers keep their pre-tokenized legacy contracts; never silently reinterpret them as raw-text models.
+25. Treat cluster and topic labels as stable display identities only within their retained analyzer. Require the mapping/identity digest before comparing Evaluate, assignment, and Apply outputs; topic numbering is permutation-invariant and is not a semantic name or observed truth.
+26. Retrieval may report Recall, MRR, or NDCG only when `relevance_group` truth is bound and the authoritative mode is `relevance_evaluated`. In `index_diagnostic` mode, report only index/rank/self-exclusion diagnostics and do not infer semantic relevance quality.
 
 ## Default workflow
 
 1. Clarify or infer the modeling objective: classification, regression, scoring, ranking, regular-series forecasting, semi-supervised labeling, text analysis, or model application.
 2. Use `analysis.profile` for the default bounded Dataset inspection. If target meaning, group meaning, or leakage timing is still ambiguous, use one purpose-limited `data.query` that retrieves only the relevant values or aggregation.
 3. When saved knowledge may define the target, constraints, threshold, human-review policy, or interpretation, call `knowledge.lookup` with a compact business-language query and prefer `mode: "auto"`. Keep its claim separate from current-data and model evidence.
-4. If the task is text classification, text clustering, topic modeling, or similarity retrieval, require a tokenized text dataset first; activate `xenix-data-preprocessing` if the source still contains raw Chinese sentences.
+4. For active multilingual text classification, keep the source as raw text and let the retained analyzer own normalization/tokenization. Use `data.tokenize` only when the requested output is an explicit token Dataset or term-frequency analysis. Legacy persisted text analyzers keep their documented pre-tokenized contract.
 5. Ask for confirmation when multiple targets or business groups are plausible, the target semantics are unclear, missing labels may mean either “negative” or “unlabeled”, or the business threshold is sensitive.
 6. Use `data.feature.select` to bind roles: target, optional group, time for forecasting, partial_target when applicable, text/text_id when applicable, features, and excluded fields with reasons. Exclude identifiers, group/time fields, and post-outcome leakage fields from predictive features.
 7. Call `model.metadata` with `model_family` to browse candidates, then call it again with each selected `model_key` to inspect its role schema and `param_schema` before filling `params_by_model`.
@@ -79,6 +90,20 @@ Xenix Agent has no script execution environment. Use only available Xenix tools:
 
 For a fixed clustering candidate set, create one role binding and inspect the candidate schema. When comparing several parameterizations of one model key—such as KMeans k=2/3/4—use one `model.train` call per parameterization because the input has one parameter object per key; keep the binding and evaluation contract unchanged. Native preparation handles numeric scaling inside the model boundary, so do not create a transformed Dataset merely to pre-scale complete numeric clustering features. Compare the returned evaluation reports, then apply the selected returned `trained_model_id` directly. Do not retrain the winner. Finish by linking the public assignment Dataset and evaluation Artifact and by explaining original-scale profiles and internal-evidence limits.
 
+### Personalized recommendation workflow
+
+For explicit-rating interactions, profile the data grain and rating scale, then bind exactly one `user`, `item`, and `rating`, plus `time` only when it is a valid interaction timestamp. Inspect `recommendation.collaborative_top_k` metadata before choosing bounded `top_k`, minimum user/item support, and positive-rating threshold. Train once and query the authoritative Evaluate task. Compare NDCG@K, Recall@K, HitRate@K, MRR@K, coverage, novelty, diversity, and short-list facts against the same-truth popularity baseline; require `seen_item_violation_count = 0`. Apply the retained analyzer to a Dataset or inline rows containing the trained `user` column. Known users receive unseen personalized recommendations where evidence exists; cold users receive popularity fallback, while unseen cold items are outside v1. Link the local recommendation Dataset and Artifact instead of requesting ranking rows through lifecycle Tools, and state that offline evidence does not establish causal online lift.
+
+### Multilingual raw-text classification workflow
+
+Profile text/target completeness and label counts without retrieving raw text rows by default. Bind `text`, `target`, and an optional stable business `group`; do not transform text into a feature table first. Inspect `text.classification.multilingual_logistic_regression_tfidf`, then choose its preparation profile, unigram/short-phrase mode, train-side feature bounds, class weighting, and any registered dictionary/stopword Dataset IDs. Train once, query the authoritative Evaluate task and require the retained preparation specification, zero business/template/connected overlap, train-only vectorization facts, candidate-versus-dummy metrics, and prediction digest. Apply the returned full-history analyzer directly to raw text with the same column name. Link the public prediction Dataset and authoritative evaluation Artifact, and distinguish offline group-safe classification evidence from causal or automatic-decision authority.
+
+### Multilingual text discovery and retrieval workflow
+
+Keep the source as raw text and inspect exactly one active key before filling its shallow schema: `text.clustering.multilingual_kmeans_tfidf`, `text.topic_modeling.multilingual_lda`, or `text.similarity.multilingual_tfidf_cosine`. For clustering/topic discovery bind `text` plus an optional stable business `group`; for retrieval bind `text`, optional unique `document_id`, and `relevance_group` only when it is genuine evaluator truth. Query the authoritative Evaluate task before interpretation.
+
+For clustering, require cosine silhouette, non-degenerate sizes, connected-group resampling stability, sanitized bounded profiles, and the stable-label mapping digest. For topics, require group-safe held-out perplexity, coherence, diversity, prevalence, permutation-matched stability, zero group overlap, and the topic-label identity digest shared by Evaluate and Apply. For retrieval, require zero self/duplicate/rank violations and distinguish `relevance_evaluated` from `index_diagnostic` before mentioning ranking metrics. Link the local assignment/retrieval Dataset and evaluation Artifact; never request or reproduce raw text, document IDs, relevance groups, vocabulary, or result rows in the final answer. Cluster/topic structure is exploratory, retrieval metrics are offline evidence, and none of them authorizes causal or automatic decisions.
+
 ## Optional References
 
 When the resource tool is available, load only the relevant file:
@@ -86,6 +111,9 @@ When the resource tool is available, load only the relevant file:
 - `references/model-presets.md` before calling `model.train`, `model.hyper_train`, or `model.apply`.
 - `references/supervised-learning.md` for classification or regression tasks.
 - `references/forecasting.md` for regular daily, weekly, or monthly forecasting and future-horizon apply.
+- `references/recommendation.md` for explicit-rating personalized Top-K, cold-user apply, and ranking evidence.
+- `references/text-classification.md` for bilingual raw-text preparation, leakage-safe classification, and raw-text apply.
+- `references/text-discovery-retrieval.md` for raw-text clustering, topic discovery, truth-aware local retrieval, identity, and privacy boundaries.
 - `references/semi-supervised-learning.md` when labels are partially missing or only some samples are labeled.
 - `references/neural-network.md` only when using a neural network as a nonlinear comparison model.
 
@@ -107,3 +135,9 @@ A good modeling answer contains:
 For forecasting, do not finish after `model.apply` until the final answer explicitly names seasonal-naive, Holt-Winters, and SARIMA with their reported results; identifies the selected model and comparison basis; gives the bound roles, cadence, cutoff, shared rolling-fold identity, horizon, and interval evidence; links both the public future Dataset/Artifact and evaluation Artifact; states that empirical intervals are not a coverage guarantee; and gives at least one operational limit or retraining/monitoring trigger.
 
 For clustering, also report every compared candidate (including its cluster count), the selected cluster count, quality and resampling-stability evidence, cluster sizes, original-scale profiles for the business features, the public assignment Dataset and linked evaluation Artifact, and the limits of internal clustering evidence. Keep identifiers out of features and profiles, and recommend an external business validation step.
+
+For personalized recommendation, report the rating and holdout policies, Top-K and support parameters, candidate-versus-same-truth-popularity metrics, zero seen-item violations, cold-user strategy and cold-item limitation, the public recommendation Dataset and evaluation Artifact, and an online experiment/monitoring next step. Do not claim offline ranking improvement is causal business uplift.
+
+For multilingual text classification, report the retained profile/specification digest and registered resource identities, eligible/empty/custom-match facts, business/template/connected group counts with zero overlaps, train-only vocabulary size/digest and OOV facts, candidate-versus-dummy classification metrics, prediction Dataset and evaluation Artifact, and the limits of historical-label evidence. Never print raw text, vocabulary terms, group values, dictionary contents, or stopwords in the final answer.
+
+For multilingual text discovery, report the retained preparation/specification, eligible/empty counts, cluster/topic quality and stability, bounded sanitized terms, label-identity digest, local assignment Dataset, evaluation Artifact, and an external validation step. For retrieval, report the mode, Top-K, self/duplicate/rank diagnostics, and ranking metrics only when relevance truth was admitted. Never print raw text, document IDs, relevance groups, full vocabulary, matched rows, dictionary contents, or stopwords.

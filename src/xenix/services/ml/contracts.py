@@ -6,8 +6,30 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from ..data_tokenization_contracts import TextPreparationInput
 from ..trained_model_metadata import TrainedModelContextPayload
 from .clustering_evidence import ClusteringEvaluationFacts
+from .recommendation_evidence import (
+    RecommendationEvaluationFacts,
+    RecommendationPreparationFacts,
+    RecommendationSplitFacts,
+)
+from .text_preparation import (
+    TextClassificationApplyFacts,
+    TextClassificationEvaluationFacts,
+    TextLeakageFacts,
+    TextPreparationQualityFacts,
+    TextPreparationSpecification,
+    TextVectorizationFacts,
+)
+from .text_discovery import (
+    TextClusteringApplyFacts,
+    TextClusteringEvaluationFacts,
+    TextRetrievalApplyFacts,
+    TextRetrievalEvaluationFacts,
+    TextTopicApplyFacts,
+    TextTopicEvaluationFacts,
+)
 from .types import EvaluationKind
 
 
@@ -86,6 +108,7 @@ class TaskRequestBase(BaseModel):
     evaluation_policy: EvaluationPolicySnapshot
     dataset_snapshot: DatasetSnapshotFact
     forecast_options: ForecastOptions | None = None
+    text_preparation: TextPreparationInput | None = None
 
     @property
     def column_selection(self) -> ColumnSelection:
@@ -343,6 +366,15 @@ class FitTaskResult(TaskResultBase):
     training_scopes: TrainingScopeFacts | None = None
     forecast_split_facts: ForecastSplitFacts | None = None
     forecast_preparation_facts: ForecastPreparationFacts | None = None
+    recommendation_split_facts: RecommendationSplitFacts | None = None
+    recommendation_preparation_facts: RecommendationPreparationFacts | None = None
+    text_preparation_facts: TextPreparationQualityFacts | None = None
+    text_preparation_specification: TextPreparationSpecification | None = None
+    text_leakage_facts: TextLeakageFacts | None = None
+    text_vectorization_facts: TextVectorizationFacts | None = None
+    text_clustering_evaluation: TextClusteringEvaluationFacts | None = None
+    text_topic_evaluation: TextTopicEvaluationFacts | None = None
+    text_retrieval_evaluation: TextRetrievalEvaluationFacts | None = None
     result_summary: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -359,6 +391,13 @@ class HyperparameterTuningTaskResult(TaskResultBase):
     training_scopes: TrainingScopeFacts | None = None
     forecast_split_facts: ForecastSplitFacts | None = None
     forecast_preparation_facts: ForecastPreparationFacts | None = None
+    text_preparation_facts: TextPreparationQualityFacts | None = None
+    text_preparation_specification: TextPreparationSpecification | None = None
+    text_leakage_facts: TextLeakageFacts | None = None
+    text_vectorization_facts: TextVectorizationFacts | None = None
+    text_clustering_evaluation: TextClusteringEvaluationFacts | None = None
+    text_topic_evaluation: TextTopicEvaluationFacts | None = None
+    text_retrieval_evaluation: TextRetrievalEvaluationFacts | None = None
     result_summary: dict[str, Any] = Field(default_factory=dict)
     tuning_summary: TuningSummary
 
@@ -373,6 +412,11 @@ class EvaluateTaskResult(TaskResultBase):
     preparation_facts: PreparationFacts | None = None
     forecast_evaluation: ForecastEvaluationFacts | None = None
     clustering_evaluation: ClusteringEvaluationFacts | None = None
+    recommendation_evaluation: RecommendationEvaluationFacts | None = None
+    text_classification_evaluation: TextClassificationEvaluationFacts | None = None
+    text_clustering_evaluation: TextClusteringEvaluationFacts | None = None
+    text_topic_evaluation: TextTopicEvaluationFacts | None = None
+    text_retrieval_evaluation: TextRetrievalEvaluationFacts | None = None
 
 
 class ApplySummary(BaseModel):
@@ -392,6 +436,10 @@ class ApplyTaskResult(BaseModel):
     summary: ApplySummary
     source_dataset_ids: list[str] = Field(default_factory=list)
     source_artifact_ids: list[str] = Field(default_factory=list)
+    text_classification_apply_facts: TextClassificationApplyFacts | None = None
+    text_clustering_apply_facts: TextClusteringApplyFacts | None = None
+    text_topic_apply_facts: TextTopicApplyFacts | None = None
+    text_retrieval_apply_facts: TextRetrievalApplyFacts | None = None
     error_summary: str | None = None
 
 

@@ -1,6 +1,6 @@
 # Improve ML Capability — Program Dashboard
 
-**Status:** Active. B0, both Foundation slices, trustworthy clustering, and native forecasting are implemented and objectively verified. Vertical 02 exploration is complete; proposed `IH-RT`, three independent implementation plans, and the recommendation/text material-adoption guardrail await design review.
+**Status:** Active. Vertical 01 is committed and verified. Vertical 02 implementation and objective verification are complete; its first completed explicit-privacy topic characterization reproduced final-answer grounding and path-privacy failures.
 **Opened:** 2026-08-09
 
 ## Objective
@@ -34,16 +34,19 @@ The benchmark runner remains a paid live measurement surface over one pinned sub
 
 Current verified repository state:
 
-- `pdm run test -q`: 87 passed on 2026-08-09.
-- Provider-free B0 infrastructure/policy/calibration checks: 27 passed.
-- Headless Agent Harness collect-only: 10 live cases.
-- Headed Agent Harness collect-only: the same 10 live cases.
+- `pdm run test -q`: 136 passed on 2026-08-10.
+- Provider-free B0 infrastructure/policy/calibration checks: 30 passed.
+- Headless Agent Harness collect-only: 13 live cases.
+- Headed Agent Harness collect-only: the same 13 live cases.
 - An explicit live case selector collects exactly one cell in either mode.
 - `pdm run check` and isolated-runtime `pdm run smoke` pass.
-- `pdm run package` passes. A waited frozen `xenix.exe --smoke-test` exits 0 after the three packaged forecast adapters and non-OCR Knowledge smoke complete. Official `pdm run smoke-package` remains blocked before app launch because the locked OCR golden image is absent.
+- `pdm run package` passes. A waited frozen `xenix.exe --smoke-test` exits 0 after recommendation, classification, text-discovery/retrieval, forecast, and non-OCR Knowledge smoke complete. The first RT-T2 frozen run exposed and fixed Joblib CPU discovery under a Windows GUI executable. Official `pdm run smoke-package` remains blocked before app launch because the locked OCR golden image is absent.
 - One live `ml.cleaning_service_tickets` characterization passed on `kimi/kimi-k2.6`: semantic pass, integrity pass, 8 rounds, 69,863 reported tokens, 102.266 seconds.
 - The final clustering sample produced the exact k=3 assignment/report, a grounded final answer, and passed every deterministic semantic/integrity check in 10 rounds and 165,231 tokens; its same-model Judge failed at the provider and exposed a now-fixed semantic/Judge channel coupling.
 - One live `ml.forecast_validation_v1` improvement sample passed semantic and integrity checks on `kimi/kimi-k2.6`: 11 rounds, 191,102 reported tokens, 127.877 seconds; Judge is explicitly `not_configured`, so the result is characterization rather than formal evidence.
+- One live `ml.recommendation_ranking_v1` sample passed semantic and integrity checks on `kimi/kimi-k2.6`: 7 rounds, 104,201 reported tokens, 94.896 seconds; Judge is `not_configured`.
+- One live `ml.text_grouped_classification_v1` sample passed semantic and integrity checks on `kimi/kimi-k2.6`: 8 rounds, 154,981 reported tokens, 122.900 seconds; Judge is `not_configured`.
+- `ml.text_topic_discovery_v1` is service-qualified and collects exactly one cell. Its paid diagnosis proved the complete FIT/EVALUATE/APPLY outcome and exposed Skill-scope/profile plus final-answer privacy gaps. Post-fix run `d7ecbdf02fce4f899970818c341f1a10` completed without a provider/network failure, but failed bounded final-answer grounding and Windows-path privacy checks.
 
 ## Current Truth
 
@@ -52,15 +55,16 @@ Current verified repository state:
   - Vertical 01: foundation + trustworthy clustering + first-class forecasting;
   - Vertical 02: recommendation ranking + text-pipeline quality.
 - Cross-cut 00 starts before product implementation, brackets both verticals, and continues after them. It is not a third product vertical or a final cleanup phase.
-- Clustering now has recomputable trustworthiness evidence and honest apply capability; native seasonal-naive, Holt-Winters, and bounded-auto SARIMA now share chronological comparison, interval, lineage, and future-apply contracts. Recommendation remains a non-personalized item lookup, while text analyzers lack retained raw-text preparation and task-appropriate discovery/retrieval evidence.
-- The ordinary test portfolio now covers bounded profile/cleaning, group-safe supervised lifecycles, clustering trustworthiness/apply, and native forecast evaluation/future apply through public service boundaries without asserting implementation internals.
-- The live benchmark catalog now has ten outcome-oriented cases: the eight-case B0 base plus independently owned CF clustering-selection and forecast-validation cases. It retains one pinned subject model, hard cell/invocation safety boundaries, and a separate versioned acceptance policy. Semantic failure remains a valid measurement rather than a pytest infrastructure failure.
+- Clustering has recomputable trustworthiness evidence and honest apply capability; native seasonal-naive, Holt-Winters, and bounded-auto SARIMA share chronological comparison, interval, lineage, and future-apply contracts. Recommendation has personalized explicit-rating Top-K with same-truth popularity comparison. Active text classification, clustering, topic discovery, and exact local retrieval retain multilingual raw-text preparation and task-specific evidence; retrieval metrics are truth-gated and exact retrieval fails before dispatch above 2,000 source rows.
+- The ordinary test portfolio now covers bounded profile/cleaning, group-safe supervised lifecycles, clustering trustworthiness/apply, native forecast evaluation/future apply, personalized recommendation, multilingual raw-text classification, and text discovery/retrieval through public service boundaries without asserting implementation internals.
+- The live benchmark catalog now has thirteen outcome-oriented cases: the eight-case B0 base plus independently owned clustering-selection, forecast-validation, recommendation-ranking, grouped-classification, and topic-discovery cases. It retains one pinned subject model, hard cell/invocation safety boundaries, and a separate versioned acceptance policy. Semantic failure remains a valid measurement rather than a pytest infrastructure failure.
+- RT-T2 diagnosis made Skill activation an executable progressive-disclosure gate. Inactive tasks see only Skill activation and Knowledge lookup; an activated modeling Skill receives `analysis.profile` plus its atomic modeling Tools. Unknown Skill state fails closed.
 - The supplied corpus is rich enough to qualify cleaning, leakage-safe preparation, clustering, recommendation, forecasting, and bilingual text risks, but it contains severe answer contamination and unresolved redistribution rights. The RT material plan binds ten logical ch14/ch16 sets and explicitly rejects their precomputed recommendations, colocated truth, and template-contaminated random split as product acceptance oracles.
 - Detailed decisions, uncertainties, topology, working sets, and slice status live in the linked packet files rather than this dashboard.
 
 ## Next Step
 
-Review the product decisions in proposed [IH-RT — recommendation ranking and text quality](handshakes/IH-RT.md). On approval, execute the independent plans in order: [personalized recommendation ranking](implementation/RT-R-recommendation-ranking.md), [multilingual preparation and grouped classification](implementation/RT-T1-text-preparation-classification.md), then [text discovery and retrieval evidence](implementation/RT-T2-text-discovery-retrieval.md).
+Review the three independent closure plans: first classify the topic final-answer failure through the proposed bounded `IH-O1` diagnostic, then execute private-material service characterization, and only after the resulting state is clean run the formal six-case Agent acceptance cohort. Product mutation remains gated by a later exact optimization handshake.
 
 ## Packet Map
 

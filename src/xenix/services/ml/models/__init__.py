@@ -37,7 +37,15 @@ from .forecasting import (
     SarimaForecastingService,
     SeasonalNaiveForecastingService,
 )
+from .recommendation import (
+    CollaborativeTopKRecommendationService,
+    ItemSimilarityRecommendationService,
+)
 from .text_analysis import (
+    MultilingualTextClusteringService,
+    MultilingualTextClassificationService,
+    MultilingualTextSimilarityService,
+    MultilingualTextTopicModelingService,
     TokenizedTextClassificationService,
     TokenizedTextClusteringService,
     TokenizedTextSimilarityService,
@@ -49,6 +57,7 @@ __all__ = [
     "AdaBoostRegressionService",
     "BayesianRidgeRegressionService",
     "CalibratedLinearSVCClassificationService",
+    "CollaborativeTopKRecommendationService",
     "DecisionTreeClassificationService",
     "DecisionTreeRegressionService",
     "ElasticNetRegressionService",
@@ -58,6 +67,7 @@ __all__ = [
     "HistGradientBoostingClassificationService",
     "HistGradientBoostingRegressionService",
     "HoltWintersForecastingService",
+    "ItemSimilarityRecommendationService",
     "KNeighborsClassificationService",
     "KNeighborsRegressionService",
     "LabelPropagationClassificationService",
@@ -67,6 +77,10 @@ __all__ = [
     "LogisticRegressionService",
     "MLPClassificationService",
     "MLPRegressionService",
+    "MultilingualTextClassificationService",
+    "MultilingualTextClusteringService",
+    "MultilingualTextSimilarityService",
+    "MultilingualTextTopicModelingService",
     "MultinomialNBClassificationService",
     "NaiveBayesClassificationService",
     "PolynomialRegressionService",

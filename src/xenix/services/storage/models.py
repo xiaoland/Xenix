@@ -79,7 +79,10 @@ class ProblemKind(StrEnum):
     CLASSIFICATION = "classification"
     CLUSTERING = "clustering"
     ANOMALY_DETECTION = "anomaly_detection"
+    RECOMMENDATION = "recommendation"
     FORECASTING = "forecasting"
+    TOPIC_MODELING = "topic_modeling"
+    RETRIEVAL = "retrieval"
 
 
 class MLTaskArtifactKind(StrEnum):

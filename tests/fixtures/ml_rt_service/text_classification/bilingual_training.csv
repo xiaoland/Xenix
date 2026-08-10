@@ -1,0 +1,17 @@
+message,label,account
+"订单 1001 已快速送达，诺华臻享 service 很满意",satisfied,acct-a
+"订单 1002 严重延误，诺华臻享 service 很失望",dissatisfied,acct-a
+"订单 2001 已快速送达，诺华臻享 service 很满意",satisfied,acct-b
+"订单 2002 严重延误，诺华臻享 service 很失望",dissatisfied,acct-b
+"Order 3001 arrived quickly; NovaCare service was excellent",satisfied,acct-c
+"Order 3002 arrived damaged; NovaCare service was awful",dissatisfied,acct-c
+"Order 4001 arrived quickly; NovaCare service was excellent",satisfied,acct-d
+"Order 4002 arrived damaged; NovaCare service was awful",dissatisfied,acct-d
+"客服及时解决 ticket 5001，体验顺畅",satisfied,acct-e
+"客服拒绝处理 ticket 5002，体验糟糕",dissatisfied,acct-e
+"客服及时解决 ticket 6001，体验顺畅",satisfied,acct-f
+"客服拒绝处理 ticket 6002，体验糟糕",dissatisfied,acct-f
+"Support resolved case 7001 promptly and politely",satisfied,acct-g
+"Support ignored case 7002 repeatedly and rudely",dissatisfied,acct-g
+"Support resolved case 8001 promptly and politely",satisfied,acct-h
+"Support ignored case 8002 repeatedly and rudely",dissatisfied,acct-h

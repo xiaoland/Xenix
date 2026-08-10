@@ -18,17 +18,24 @@ Sir resolved `O-004` on 2026-08-09: forecast v1 includes seasonal-naive, Holt-Wi
 | --- | --- | --- |
 | O-004 | Include all three forecast methods | `IH-CF` must qualify bounded temporal SARIMA selection, fail-closed convergence, comparable interval evidence, and grouped runtime limits in the first implementation |
 
-## Recommendation and Text Design Review
+## Resolved Recommendation and Text Design Review
 
-The Dataset-profile privacy default, material-ambiguity role policy, and two-slice foundation structure were resolved as `D-011` through `D-013`. Vertical 01 is complete. The following choices are the complete product-level review boundary for proposed `IH-RT`; implementation details such as DTO names, metric formulas, seeds, and storage plumbing remain engineering-owned.
+Sir approved the complete `IH-RT` decision set on 2026-08-10. The choices below are retained as decision history; none remains open or blocks implementation.
+
+| ID | Resolution | Consequence |
+| --- | --- | --- | --- |
+| O-005 | Explicit-rating personalized Top-K, same-truth popularity fallback, cold-user support, no cold-item/implicit/MF/hybrid | Adopted as `D-016` |
+| O-008 | Explicit latest-positive holdout with time and deterministic hash-positive holdout without time | Adopted as `D-016`; no silent fallback |
+| O-009 | Raw-text active analyzers with retained preparation; keep atomic `data.tokenize` | Adopted as `D-017` |
+| O-010 | Bounded sanitized terms and local-only raw/vocabulary/identifier content | Adopted as `D-018` |
+| O-011 | Relevance metrics only with truth; otherwise `index_diagnostic` | Adopted as `D-019` |
+| O-012 | All four text service contracts, classification/topic live, retrieval service-only until truth exists | Adopted as `D-019` |
+
+## Still-Open External or Evidence-Triggered Questions
 
 | ID | Blocking point | Question | Current recommendation |
 | --- | --- | --- | --- |
-| O-005 | Before approving `IH-RT` | Which recommendation problem is v1? | Explicit-rating personalized collaborative Top-K plus a same-truth popularity baseline; support cold users with popularity, reject cold items, and defer implicit feedback/matrix factorization/hybrid |
-| O-008 | Before approving `IH-RT` | How is recommendation holdout chosen when time is optional? | Make the policy explicit: latest positive interaction when a valid time role exists, deterministic hash-selected positive interaction otherwise; never silently switch policies |
-| O-009 | Before approving `IH-RT` | Do text models consume raw text or require a prior token Dataset? | Active analyzers consume raw text and retain the exact preparation spec; atomic `data.tokenize` remains available for descriptive frequency/inspection and reusable derived data |
-| O-010 | Before approving `IH-RT` | May bounded interpretable terms enter Agent context? | Permit a small sanitized list of top terms for explanation; keep raw text, full vocabulary, document/user/item IDs, matches, and rows local |
-| O-011 | Before approving `IH-RT` | What may similarity retrieval claim without relevance truth? | With bound relevance truth, report ranking metrics; otherwise report only an `index_diagnostic` state and never imply retrieval quality |
-| O-012 | Before approving `IH-RT` | Which advertised text workflows belong in this pass? | Qualify classification, clustering, topics, and similarity through honest service contracts; add independent live classification and topic cases, while retrieval stays service-only until a relevance-bearing business live case exists |
 | O-006 | Before any publication | Can source or derived textbook fixtures be redistributed? | Treat as `internal_only` until provenance review explicitly clears them |
 | O-007 | After an unclassifiable run | Which extra trace fields are required? | Add only the minimum field needed to classify the first divergence |
+| O-013 | Before formal Agent acceptance | Which independently configured subject-disjoint Judge model/settings snapshot will own calibrated semantic verdicts? | Freeze one external Judge snapshot, calibrate exact rubric hashes, and reject same-model/unavailable Judge evidence |
+| O-014 | Before the repository-wide packaged acceptance gate | Where is the locked Native OCR golden image supplied for `pdm run smoke-package`? | Keep the ML frozen-binary smoke as valid scoped evidence; do not claim the official package gate until the golden is restored |

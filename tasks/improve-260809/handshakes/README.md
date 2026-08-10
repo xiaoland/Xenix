@@ -8,8 +8,9 @@ The first handshake has been consumed for implementation. Later product behavior
 | [`IH-F1`](IH-F1.md) — Dataset profile and cleaning evidence | Bounded Dataset-ID profile facts, progressive disclosure, whole-Dataset cleaning scope, and a clean-room service case | consumed; implementation/service acceptance complete and live characterization passed 2026-08-09 |
 | [`IH-F2`](IH-F2.md) — Group-safe preparation, evaluation, and lifecycle facts | Immutable binding identity, group-disjoint preparation/evaluation, baseline comparison, true apply lineage, and bounded Agent results | consumed; implementation/service acceptance complete 2026-08-09; packaged-smoke exception recorded |
 | [`IH-CF`](IH-CF.md) — Trustworthy clustering and native forecasting | Clustering quality/stability/profile/apply truth plus seasonal-naive, Holt-Winters, and bounded-auto SARIMA temporal workflows | consumed; both plans objectively verified and paid characterization recorded 2026-08-09 |
-| [`IH-RT`](IH-RT.md) — Recommendation ranking and text quality workflows | Personalized explicit-rating Top-K, multilingual raw-text preparation, grouped classification, text discovery/retrieval evidence, public outputs, and independent service/Agent cases | proposed; Vertical 01 dependency is satisfied, product decisions await Sir's review |
-| `IH-O<n>` | One exact preprocessing/Skill/Tool/orchestration/observability optimization | evidence-triggered only |
+| [`IH-RT`](IH-RT.md) — Recommendation ranking and text quality workflows | Personalized explicit-rating Top-K, multilingual raw-text preparation, grouped classification, text discovery/retrieval evidence, public outputs, and independent service/Agent cases | consumed; all three plans implemented and objectively verified 2026-08-10; paid topic diagnosis remains open |
+| [`IH-O1`](IH-O1-topic-final-answer-diagnosis.md) — bounded topic final-answer provenance diagnosis | Classify the observed Windows-path and missing-grounding outcome without retaining private values or changing product behavior | proposed; requires Sir's design review before benchmark mutation |
+| `IH-O<n>` | One exact preprocessing/Skill/Tool/orchestration/observability optimization | evidence-triggered only; product mutation follows a reproduced first divergence and a separate exact handshake |
 
 Each detailed handshake must contain:
 
