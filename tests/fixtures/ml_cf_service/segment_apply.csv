@@ -1,0 +1,10 @@
+entity_id,visits_90d,avg_order_value,return_rate,channel
+A001,3,22,0.24,retail
+A002,9,56,0.11,phone
+A003,18,111,0.03,app
+A004,4,24,0.22,marketplace
+A005,10,54,0.10,partner
+A006,17,108,0.04,web
+A007,,23,0.25,retail
+A008,11,,0.09,phone
+A009,19,116,,marketplace

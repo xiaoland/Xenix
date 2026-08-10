@@ -62,3 +62,12 @@ For each approved slice:
 7. `pdm run package` and `pdm run smoke-package` when shipped runtime or dependencies change.
 
 The current benchmark pytest exit code remains measurement-only until proposed `P-001` is approved and implemented.
+
+## Foundation Acceptance Split
+
+Foundation is not one broad mutation batch:
+
+1. **Dataset profile and cleaning evidence** proves typed whole-Dataset facts, privacy-minimized Agent projection, progressive disclosure, source immutability, and derived cleaning lineage. Its first paid cleaning run follows its own green service selector.
+2. **Group-safe preparation, evaluation, and lifecycle facts** proves immutable binding identity, group-disjoint train/holdout semantics, train-only learned preparation, same-holdout baseline comparison, authoritative evaluation references, actual apply lineage, and bounded Agent lifecycle projection.
+
+The second slice does not depend on the first slice's fixture, test helpers, or report. They share only durable service contracts and the planning decisions in this packet.

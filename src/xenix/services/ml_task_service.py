@@ -4,7 +4,7 @@ import json
 import queue
 import shutil
 import threading
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from datetime import datetime, timezone
 from pathlib import Path
 from time import perf_counter
@@ -19,7 +19,9 @@ from sqlmodel import Field, SQLModel
 from ..config import AppPaths
 from ..exceptions import InvalidStateTransitionError, NotFoundError, ValidationError
 from ..observability import extract_context, inject_context, record_counter, record_histogram, start_span
+from .artifact_service import ArtifactService, RegisterArtifactInput
 from .ml.contracts import (
+    ApplyTaskRequest,
     ApplyTaskResult,
     EvaluateTaskResult,
     FitTaskRequest,
@@ -29,6 +31,7 @@ from .ml.contracts import (
     TaskLogEntry,
     TrainedModelContextPayload,
 )
+from .ml.types import ModelTaskKind
 from .ml.execution import MLWorkerRunner
 from .ml.worker_pool import MLWorkerPool
 from .ml.worker_settings import MLWorkerSettingsService
@@ -51,6 +54,7 @@ from .trained_model_metadata import (
     build_saved_name,
 )
 from .storage.models import (
+    ArtifactKind,
     DatasetRow,
     DatasetSourceFormat,
     MLTaskArtifactKind,
@@ -70,6 +74,10 @@ from .storage.repositories import (
 
 def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def _ordered_unique(values: Iterable[str]) -> list[str]:
+    return list(dict.fromkeys(values))
 
 
 def _get_model_catalog_entry(model_key: str):
@@ -134,6 +142,7 @@ class MLTaskService:
         self._datasets = DatasetRepository()
         self._ml_tasks = MLTaskRepository()
         self._trained_models = TrainedModelRepository()
+        self._artifact_service = ArtifactService(session_factory)
         self._worker_runner = worker_runner or MLWorkerPool(
             worker_settings_service or MLWorkerSettingsService(paths)
         )
@@ -419,13 +428,17 @@ class MLTaskService:
         final_model_path = Path(result.final_model_artifact_path) if result.final_model_artifact_path else evaluation_model_path
         holdout_path = Path(result.holdout_artifact_path) if result.holdout_artifact_path else None
         export_path = Path(result.export_artifact_path) if result.export_artifact_path else None
+        report_path = Path(result.report_artifact_path) if result.report_artifact_path else None
         self._require_existing_path(evaluation_model_path)
         self._require_existing_path(final_model_path)
         if holdout_path is not None:
             self._require_existing_path(holdout_path)
         if export_path is not None:
             self._require_existing_path(export_path)
+        if report_path is not None:
+            self._require_existing_path(report_path)
         catalog_entry = _get_model_catalog_entry(result.model_key)
+        training_scopes = result.training_scopes
         model_display_name = catalog_entry.display_name
         artifact_file_name = build_artifact_file_name(
             trained_model_context.run_name,
@@ -439,6 +452,14 @@ class MLTaskService:
             evaluation_kind=trained_model_context.evaluation_kind or catalog_entry.evaluation_kind.value,
             model_family=trained_model_context.model_family or catalog_entry.model_family.value,
             model_task_kind=trained_model_context.model_task_kind or catalog_entry.model_task_kind.value,
+            supports_evaluation=catalog_entry.supports_evaluation,
+            supports_apply=catalog_entry.supports_apply,
+            apply_mode=catalog_entry.apply_mode.value,
+            forecast_options=(
+                request.forecast_options.model_dump(mode="json")
+                if request.forecast_options is not None
+                else None
+            ),
             model_display_name=model_display_name,
             display_name=model_display_name,
             saved_name=build_saved_name(
@@ -460,8 +481,16 @@ class MLTaskService:
             preview_columns=list(trained_model_context.preview_columns),
             preview_rows=[list(row_values) for row_values in trained_model_context.preview_rows],
             training_params=dict(result.params),
-            evaluation_model_training_scope="holdout_train_split" if result.final_model_artifact_path else None,
-            apply_model_training_scope="all_eligible_rows" if result.final_model_artifact_path else None,
+            evaluation_model_training_scope=(
+                training_scopes.evaluation_model
+                if training_scopes is not None
+                else ("holdout_train_split" if result.final_model_artifact_path else None)
+            ),
+            apply_model_training_scope=(
+                training_scopes.apply_model
+                if training_scopes is not None
+                else ("all_eligible_rows" if result.final_model_artifact_path else None)
+            ),
         )
         trained_model = self._trained_models.create(
             session,
@@ -478,6 +507,16 @@ class MLTaskService:
         payload["trained_model_id"] = trained_model.id
         payload["canonical_model_artifact_path"] = str(canonical_path)
         payload["evaluation_model_artifact_path"] = str(evaluation_model_path)
+        if (
+            export_path is not None
+            and catalog_entry.model_task_kind is ModelTaskKind.SEGMENTER
+        ):
+            payload["result_dataset_id"] = self._materialize_fit_result_dataset(
+                session=session,
+                row=row,
+                source_csv_path=export_path,
+                result_name_suffix="cluster assignments",
+            )
         artifacts = [
             MLTaskArtifactInput(artifact_kind=MLTaskArtifactKind.MODEL, absolute_path=str(canonical_path)),
         ]
@@ -494,6 +533,13 @@ class MLTaskService:
                 MLTaskArtifactInput(
                     artifact_kind=MLTaskArtifactKind.EXPORT_FILE,
                     absolute_path=str(export_path),
+                )
+            )
+        if report_path is not None:
+            artifacts.append(
+                MLTaskArtifactInput(
+                    artifact_kind=MLTaskArtifactKind.TRAINING_REPORT,
+                    absolute_path=str(report_path),
                 )
             )
         return payload, artifacts
@@ -514,13 +560,17 @@ class MLTaskService:
         final_model_path = Path(result.final_model_artifact_path) if result.final_model_artifact_path else evaluation_model_path
         holdout_path = Path(result.holdout_artifact_path) if result.holdout_artifact_path else None
         export_path = Path(result.export_artifact_path) if result.export_artifact_path else None
+        report_path = Path(result.report_artifact_path) if result.report_artifact_path else None
         self._require_existing_path(evaluation_model_path)
         self._require_existing_path(final_model_path)
         if holdout_path is not None:
             self._require_existing_path(holdout_path)
         if export_path is not None:
             self._require_existing_path(export_path)
+        if report_path is not None:
+            self._require_existing_path(report_path)
         catalog_entry = _get_model_catalog_entry(result.model_key)
+        training_scopes = result.training_scopes
         model_display_name = catalog_entry.display_name
         artifact_file_name = build_artifact_file_name(
             trained_model_context.run_name,
@@ -534,6 +584,14 @@ class MLTaskService:
             evaluation_kind=trained_model_context.evaluation_kind or catalog_entry.evaluation_kind.value,
             model_family=trained_model_context.model_family or catalog_entry.model_family.value,
             model_task_kind=trained_model_context.model_task_kind or catalog_entry.model_task_kind.value,
+            supports_evaluation=catalog_entry.supports_evaluation,
+            supports_apply=catalog_entry.supports_apply,
+            apply_mode=catalog_entry.apply_mode.value,
+            forecast_options=(
+                request.forecast_options.model_dump(mode="json")
+                if request.forecast_options is not None
+                else None
+            ),
             model_display_name=model_display_name,
             display_name=model_display_name,
             saved_name=build_saved_name(
@@ -559,8 +617,16 @@ class MLTaskService:
                 str(key): list(values)
                 for key, values in request.hyperparameter_tuning.param_grid.items()
             },
-            evaluation_model_training_scope="holdout_train_split" if result.final_model_artifact_path else None,
-            apply_model_training_scope="all_eligible_rows" if result.final_model_artifact_path else None,
+            evaluation_model_training_scope=(
+                training_scopes.evaluation_model
+                if training_scopes is not None
+                else ("holdout_train_split" if result.final_model_artifact_path else None)
+            ),
+            apply_model_training_scope=(
+                training_scopes.apply_model
+                if training_scopes is not None
+                else ("all_eligible_rows" if result.final_model_artifact_path else None)
+            ),
         )
         trained_model = self._trained_models.create(
             session,
@@ -577,6 +643,16 @@ class MLTaskService:
         payload["trained_model_id"] = trained_model.id
         payload["canonical_model_artifact_path"] = str(canonical_path)
         payload["evaluation_model_artifact_path"] = str(evaluation_model_path)
+        if (
+            export_path is not None
+            and catalog_entry.model_task_kind is ModelTaskKind.SEGMENTER
+        ):
+            payload["result_dataset_id"] = self._materialize_fit_result_dataset(
+                session=session,
+                row=row,
+                source_csv_path=export_path,
+                result_name_suffix="cluster assignments",
+            )
         artifacts = [
             MLTaskArtifactInput(artifact_kind=MLTaskArtifactKind.MODEL, absolute_path=str(canonical_path)),
         ]
@@ -595,6 +671,13 @@ class MLTaskService:
                     absolute_path=str(export_path),
                 )
             )
+        if report_path is not None:
+            artifacts.append(
+                MLTaskArtifactInput(
+                    artifact_kind=MLTaskArtifactKind.TRAINING_REPORT,
+                    absolute_path=str(report_path),
+                )
+            )
         return payload, artifacts
 
     def _finalize_evaluate_task(self, row: MLTaskRow) -> tuple[dict[str, Any], list[MLTaskArtifactInput]]:
@@ -603,13 +686,27 @@ class MLTaskService:
         )
         if result.error_summary:
             raise ValidationError(result.error_summary)
-        return result.model_dump(mode="json"), []
+        payload = result.model_dump(mode="json")
+        report_path = task_output_dir(self._paths, row.id) / "evaluation-report.json"
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path.write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True),
+            encoding="utf-8",
+        )
+        return payload, [
+            MLTaskArtifactInput(
+                artifact_kind=MLTaskArtifactKind.EVALUATION_REPORT,
+                absolute_path=str(report_path),
+                ready_to_open=True,
+            )
+        ]
 
     def _finalize_apply_task(
         self,
         session: Any,
         row: MLTaskRow,
     ) -> tuple[dict[str, Any], list[MLTaskArtifactInput]]:
+        request = ApplyTaskRequest.model_validate(row.request_payload)
         result = ApplyTaskResult.model_validate_json(
             task_result_path(self._paths, row.id).read_text(encoding="utf-8")
         )
@@ -619,9 +716,36 @@ class MLTaskService:
         output_path = Path(result.output_file_path)
         self._require_existing_path(output_path)
         canonical_path = self._copy_canonical_apply_output(row, output_path)
-        dataset = self._datasets.get(session, row.dataset_id) if row.dataset_id is not None else None
-        if dataset is None:
+        training_dataset = self._datasets.get(session, row.dataset_id) if row.dataset_id is not None else None
+        if training_dataset is None:
             raise NotFoundError(f"Dataset '{row.dataset_id}' was not found.")
+        source_dataset_ids = (
+            [row.dataset_id]
+            if request.forecast_horizon is not None and row.dataset_id is not None
+            else _ordered_unique(
+                input_file.dataset_id
+                for input_file in request.input_files
+                if input_file.dataset_id
+            )
+        )
+        source_artifact_ids = _ordered_unique(
+            input_file.artifact_id
+            for input_file in request.input_files
+            if input_file.artifact_id
+        )
+        lineage_dataset_id = (
+            row.dataset_id
+            if request.forecast_horizon is not None
+            else (source_dataset_ids[0] if len(source_dataset_ids) == 1 else None)
+        )
+        lineage_dataset = (
+            self._datasets.get(session, lineage_dataset_id)
+            if lineage_dataset_id is not None
+            else None
+        )
+        if lineage_dataset_id is not None and lineage_dataset is None:
+            raise NotFoundError(f"Dataset '{lineage_dataset_id}' was not found.")
+        result_name_owner = lineage_dataset or training_dataset
         result_dataset_id = uuid4().hex
         result_dataset_path = self._materialize_apply_result_dataset(
             source_csv_path=canonical_path,
@@ -630,12 +754,16 @@ class MLTaskService:
         dataset_row = DatasetRow(
             id=result_dataset_id,
             project_id=row.project_id,
-            name=f"{dataset.name} apply results",
+            name=(
+                f"{result_name_owner.name} forecast results"
+                if request.forecast_horizon is not None
+                else f"{result_name_owner.name} apply results"
+            ),
             source_path=str(result_dataset_path),
             source_format=DatasetSourceFormat.PARQUET,
             copied_from=None,
             copied_at=None,
-            derived_from_dataset_id=row.dataset_id,
+            derived_from_dataset_id=lineage_dataset_id,
             ml_task_id=row.id,
         )
         self._datasets.create(session, dataset_row)
@@ -645,6 +773,8 @@ class MLTaskService:
         payload["row_count"] = result.summary.row_count
         payload["input_file_count"] = result.summary.input_file_count
         payload["prediction_column_name"] = result.summary.prediction_column_name
+        payload["source_dataset_ids"] = source_dataset_ids
+        payload["source_artifact_ids"] = source_artifact_ids
         artifacts = [
             MLTaskArtifactInput(
                 artifact_kind=MLTaskArtifactKind.APPLY_RESULT,
@@ -664,6 +794,38 @@ class MLTaskService:
             f"TO {self._sql_string(str(output_path))} (FORMAT PARQUET)"
         )
         return output_path
+
+    def _materialize_fit_result_dataset(
+        self,
+        *,
+        session: Any,
+        row: MLTaskRow,
+        source_csv_path: Path,
+        result_name_suffix: str,
+    ) -> str:
+        if row.dataset_id is None:
+            raise ValidationError("A derived ML result Dataset requires a source Dataset.")
+        source_dataset = self._datasets.get(session, row.dataset_id)
+        if source_dataset is None:
+            raise NotFoundError(f"Dataset '{row.dataset_id}' was not found.")
+        result_dataset_id = uuid4().hex
+        result_dataset_path = self._materialize_apply_result_dataset(
+            source_csv_path=source_csv_path,
+            dataset_id=result_dataset_id,
+        )
+        self._datasets.create(
+            session,
+            DatasetRow(
+                id=result_dataset_id,
+                project_id=row.project_id,
+                name=f"{source_dataset.name} {result_name_suffix}",
+                source_path=str(result_dataset_path),
+                source_format=DatasetSourceFormat.PARQUET,
+                derived_from_dataset_id=source_dataset.id,
+                ml_task_id=row.id,
+            ),
+        )
+        return result_dataset_id
 
     def _sql_string(self, value: str) -> str:
         return "'" + value.replace("'", "''") + "'"
@@ -691,11 +853,45 @@ class MLTaskService:
         for artifact in artifacts:
             artifact_path = Path(artifact.absolute_path)
             self._require_existing_path(artifact_path)
+            public_artifact = None
+            if artifact.ready_to_open:
+                public_artifact = self._artifact_service.register_artifact_in_session(
+                    session,
+                    RegisterArtifactInput(
+                        title=self._public_artifact_title(row, artifact),
+                        absolute_path=str(artifact_path.resolve()),
+                        kind=self._public_artifact_kind(artifact.artifact_kind),
+                        mime_type=self._artifact_mime_type(artifact_path),
+                        metadata_payload={
+                            "ml_task_id": row.id,
+                            "ml_task_artifact_kind": artifact.artifact_kind.value,
+                            **(
+                                {
+                                    "training_dataset_id": row.dataset_id,
+                                    "source_dataset_ids": list(
+                                        result_payload.get("source_dataset_ids", [])
+                                    ),
+                                    "source_artifact_ids": list(
+                                        result_payload.get("source_artifact_ids", [])
+                                    ),
+                                    "result_dataset_id": result_payload.get(
+                                        "result_dataset_id"
+                                    ),
+                                }
+                                if artifact.artifact_kind
+                                is MLTaskArtifactKind.APPLY_RESULT
+                                else {}
+                            ),
+                        },
+                        ready_to_open=True,
+                    ),
+                )
             persisted_artifacts.append(
                 MLTaskArtifactRow(
                     ml_task_id=row.id,
                     artifact_kind=artifact.artifact_kind,
                     absolute_path=str(artifact_path),
+                    artifact_id=public_artifact.id if public_artifact is not None else None,
                     ready_to_open=artifact.ready_to_open,
                     created_at=_utc_now(),
                 )
@@ -708,6 +904,29 @@ class MLTaskService:
             _utc_now(),
             persisted_artifacts,
         )
+
+    @staticmethod
+    def _public_artifact_kind(artifact_kind: MLTaskArtifactKind) -> ArtifactKind:
+        return {
+            MLTaskArtifactKind.MODEL: ArtifactKind.MODEL,
+            MLTaskArtifactKind.TRAINING_REPORT: ArtifactKind.REPORT,
+            MLTaskArtifactKind.EVALUATION_REPORT: ArtifactKind.REPORT,
+            MLTaskArtifactKind.APPLY_RESULT: ArtifactKind.PREDICTION,
+            MLTaskArtifactKind.EXPORT_FILE: ArtifactKind.FILE,
+        }.get(artifact_kind, ArtifactKind.OTHER)
+
+    @staticmethod
+    def _public_artifact_title(row: MLTaskRow, artifact: MLTaskArtifactInput) -> str:
+        label = artifact.artifact_kind.value.replace("_", " ").title()
+        return f"{label} · {row.id[:8]}"
+
+    @staticmethod
+    def _artifact_mime_type(path: Path) -> str | None:
+        return {
+            ".csv": "text/csv",
+            ".json": "application/json",
+            ".parquet": "application/vnd.apache.parquet",
+        }.get(path.suffix.lower())
 
     def _task_attributes(self, row: MLTaskRow) -> dict[str, Any]:
         return {

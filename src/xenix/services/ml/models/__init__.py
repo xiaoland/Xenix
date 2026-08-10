@@ -32,6 +32,11 @@ from .regression import (
     RidgeRegressionService,
     SVRRegressionService,
 )
+from .forecasting import (
+    HoltWintersForecastingService,
+    SarimaForecastingService,
+    SeasonalNaiveForecastingService,
+)
 from .text_analysis import (
     TokenizedTextClassificationService,
     TokenizedTextClusteringService,
@@ -52,6 +57,7 @@ __all__ = [
     "GradientBoostingRegressionService",
     "HistGradientBoostingClassificationService",
     "HistGradientBoostingRegressionService",
+    "HoltWintersForecastingService",
     "KNeighborsClassificationService",
     "KNeighborsRegressionService",
     "LabelPropagationClassificationService",
@@ -70,6 +76,8 @@ __all__ = [
     "SelfTrainingClassificationService",
     "SVCClassificationService",
     "SVRRegressionService",
+    "SarimaForecastingService",
+    "SeasonalNaiveForecastingService",
     "TokenizedTextClassificationService",
     "TokenizedTextClusteringService",
     "TokenizedTextTopicModelingService",

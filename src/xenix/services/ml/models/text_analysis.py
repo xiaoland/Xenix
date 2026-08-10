@@ -13,7 +13,7 @@ from sklearn.decomposition import LatentDirichletAllocation
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics.pairwise import cosine_similarity
-from sklearn.model_selection import GridSearchCV, train_test_split
+from sklearn.model_selection import GridSearchCV
 
 from ....exceptions import ValidationError
 from ...storage.models import ProblemKind
@@ -27,10 +27,25 @@ from ..contracts import (
     FitTaskResult,
     HyperparameterTuningTaskRequest,
     HyperparameterTuningTaskResult,
+    PreparationFacts,
+    SplitFacts,
     TuningSummary,
 )
 from ..dataset_loader import load_dataset, load_holdout_frame
-from ..evaluation import build_metric_snapshot, scoring_name_for_policy
+from ..evaluation import (
+    build_dummy_baseline_metrics,
+    build_evaluation_comparison,
+    build_metric_snapshot,
+    scoring_name_for_policy,
+)
+from ..preparation import (
+    PreparedSupervisedSplit,
+    attach_evaluation_context,
+    build_group_aware_cv,
+    build_text_preparation_facts,
+    prepare_supervised_split,
+    read_evaluation_context,
+)
 from ..types import (
     ColumnRoleKind,
     EvaluationKind,
@@ -104,6 +119,14 @@ class TokenizedTextClassificationService(ModelServiceBase):
                 required=True,
                 description="Target label column to predict.",
             ),
+            ModelRoleDefinition(
+                name="group",
+                kind=ColumnRoleKind.SINGLE_COLUMN,
+                required=False,
+                description=(
+                    "Optional business entity whose rows must remain together across evaluation partitions."
+                ),
+            ),
         ],
         additional_roles=False,
     )
@@ -125,12 +148,23 @@ class TokenizedTextClassificationService(ModelServiceBase):
         params = cls.validate_params(request.manual_training.params)
         text_column = _single_role_column(request.train_role_bindings, "text")
         target_column = _single_role_column(request.train_role_bindings, "target")
-        texts, labels = _prepare_supervised_text(dataframe, text_column=text_column, target_column=target_column)
-        train_texts, holdout_texts, train_labels, holdout_labels = _text_train_test_split(texts, labels, request)
+        group_column = _optional_role_column(request.train_role_bindings, "group")
+        texts, labels, groups = _prepare_supervised_text(
+            dataframe,
+            text_column=text_column,
+            target_column=target_column,
+            group_column=group_column,
+        )
+        prepared = _text_train_test_split(texts, labels, request, groups=groups)
+        train_texts = prepared.train_features
+        holdout_texts = prepared.holdout_features
+        train_labels = prepared.train_target
+        holdout_labels = prepared.holdout_target
 
         estimator = cls._build_estimator(params)
         estimator.text_column = text_column
         estimator.fit(train_texts, train_labels)
+        preparation_facts = build_text_preparation_facts(estimator, fit_row_count=len(train_texts.index))
         final_estimator = cls._build_estimator(params)
         final_estimator.text_column = text_column
         final_estimator.fit(texts, labels)
@@ -142,7 +176,16 @@ class TokenizedTextClassificationService(ModelServiceBase):
         holdout_artifact_path.parent.mkdir(parents=True, exist_ok=True)
         joblib.dump(estimator, model_artifact_path)
         joblib.dump(final_estimator, final_model_artifact_path)
-        _save_text_holdout(holdout_texts, holdout_labels, text_column=text_column, target_column=target_column, path=holdout_artifact_path)
+        _save_text_holdout(
+            holdout_texts,
+            holdout_labels,
+            train_labels,
+            text_column=text_column,
+            target_column=target_column,
+            split_facts=prepared.split_facts,
+            preparation_facts=preparation_facts,
+            path=holdout_artifact_path,
+        )
 
         return FitTaskResult(
             task_id=request.task_id,
@@ -153,6 +196,8 @@ class TokenizedTextClassificationService(ModelServiceBase):
             model_artifact_path=str(model_artifact_path),
             final_model_artifact_path=str(final_model_artifact_path),
             holdout_artifact_path=str(holdout_artifact_path),
+            split_facts=prepared.split_facts,
+            preparation_facts=preparation_facts,
             result_summary={
                 "class_count": int(labels.nunique(dropna=True)),
                 "train_row_count": int(len(train_texts.index)),
@@ -170,8 +215,25 @@ class TokenizedTextClassificationService(ModelServiceBase):
         grid = cls.validate_param_grid(request.hyperparameter_tuning.param_grid)
         text_column = _single_role_column(request.train_role_bindings, "text")
         target_column = _single_role_column(request.train_role_bindings, "target")
-        texts, labels = _prepare_supervised_text(dataframe, text_column=text_column, target_column=target_column)
-        train_texts, holdout_texts, train_labels, holdout_labels = _text_train_test_split(texts, labels, request)
+        group_column = _optional_role_column(request.train_role_bindings, "group")
+        texts, labels, groups = _prepare_supervised_text(
+            dataframe,
+            text_column=text_column,
+            target_column=target_column,
+            group_column=group_column,
+        )
+        prepared = _text_train_test_split(texts, labels, request, groups=groups)
+        train_texts = prepared.train_features
+        holdout_texts = prepared.holdout_features
+        train_labels = prepared.train_target
+        holdout_labels = prepared.holdout_target
+
+        cv, fit_groups = build_group_aware_cv(
+            request.evaluation_policy,
+            request.evaluation_kind,
+            train_labels,
+            prepared.train_groups,
+        )
 
         search = GridSearchCV(
             estimator=cls._build_estimator(),
@@ -180,13 +242,14 @@ class TokenizedTextClassificationService(ModelServiceBase):
                 "vectorizer__ngram_range": [(1, int(value)) for value in grid.ngram_max],
                 "model__C": grid.c,
             },
-            cv=request.evaluation_policy.cv_folds,
+            cv=cv,
             scoring=scoring_name_for_policy(request.evaluation_policy),
             n_jobs=1,
         )
-        search.fit(train_texts, train_labels)
+        search.fit(train_texts, train_labels, groups=fit_groups)
         estimator = search.best_estimator_
         estimator.text_column = text_column
+        preparation_facts = build_text_preparation_facts(estimator, fit_row_count=len(train_texts.index))
         final_estimator = clone(search.best_estimator_)
         final_estimator.text_column = text_column
         final_estimator.fit(texts, labels)
@@ -198,7 +261,16 @@ class TokenizedTextClassificationService(ModelServiceBase):
         holdout_artifact_path.parent.mkdir(parents=True, exist_ok=True)
         joblib.dump(estimator, model_artifact_path)
         joblib.dump(final_estimator, final_model_artifact_path)
-        _save_text_holdout(holdout_texts, holdout_labels, text_column=text_column, target_column=target_column, path=holdout_artifact_path)
+        _save_text_holdout(
+            holdout_texts,
+            holdout_labels,
+            train_labels,
+            text_column=text_column,
+            target_column=target_column,
+            split_facts=prepared.split_facts,
+            preparation_facts=preparation_facts,
+            path=holdout_artifact_path,
+        )
 
         return HyperparameterTuningTaskResult(
             task_id=request.task_id,
@@ -209,6 +281,8 @@ class TokenizedTextClassificationService(ModelServiceBase):
             model_artifact_path=str(model_artifact_path),
             final_model_artifact_path=str(final_model_artifact_path),
             holdout_artifact_path=str(holdout_artifact_path),
+            split_facts=prepared.split_facts,
+            preparation_facts=preparation_facts,
             result_summary={
                 "class_count": int(labels.nunique(dropna=True)),
                 "train_row_count": int(len(train_texts.index)),
@@ -231,6 +305,7 @@ class TokenizedTextClassificationService(ModelServiceBase):
     def evaluate(cls, request: EvaluateTaskRequest, task_dir: Path) -> EvaluateTaskResult:
         estimator = joblib.load(request.evaluate_model.trained_model_artifact_path)
         holdout = load_holdout_frame(Path(request.evaluate_model.holdout_artifact_path))
+        baseline_training_target, split_facts, preparation_facts = read_evaluation_context(holdout)
         text_column = _single_role_column(request.train_role_bindings, "text")
         target_column = _single_role_column(request.train_role_bindings, "target")
         texts = _normalize_token_text_series(holdout[text_column])
@@ -245,6 +320,11 @@ class TokenizedTextClassificationService(ModelServiceBase):
             y_proba=probabilities,
             classes=classes,
         )
+        baseline_metrics = build_dummy_baseline_metrics(
+            request.evaluation_kind,
+            baseline_training_target,
+            labels,
+        )
         return EvaluateTaskResult(
             task_id=request.task_id,
             evaluation_kind=request.evaluation_kind,
@@ -252,6 +332,10 @@ class TokenizedTextClassificationService(ModelServiceBase):
             trained_model_id=request.evaluate_model.trained_model_id,
             model_key=cls.key,
             evaluation=metrics,
+            baseline_evaluation=baseline_metrics,
+            comparison=build_evaluation_comparison(request.evaluation_policy, metrics, baseline_metrics),
+            split_facts=split_facts,
+            preparation_facts=preparation_facts,
         )
 
     @classmethod
@@ -285,6 +369,8 @@ class TokenizedTextClassificationService(ModelServiceBase):
                 input_file_count=len(request.input_files),
                 prediction_column_name="prediction",
             ),
+            source_dataset_ids=[item.dataset_id for item in request.input_files if item.dataset_id],
+            source_artifact_ids=[item.artifact_id for item in request.input_files if item.artifact_id],
         )
 
     @classmethod
@@ -842,11 +928,16 @@ def _prepare_supervised_text(
     *,
     text_column: str,
     target_column: str,
-) -> tuple[pd.Series, pd.Series]:
+    group_column: str | None = None,
+) -> tuple[pd.Series, pd.Series, pd.Series | None]:
     if text_column not in dataframe.columns:
         raise ValidationError(f"Text column '{text_column}' is missing.")
     if target_column not in dataframe.columns:
         raise ValidationError(f"Target column '{target_column}' is missing.")
+    if group_column is not None and group_column not in dataframe.columns:
+        raise ValidationError(f"Group column '{group_column}' is missing.")
+    if group_column in {text_column, target_column}:
+        raise ValidationError("The group column must be distinct from text and target columns.")
     texts = _normalize_token_text_series(dataframe[text_column])
     labels = dataframe[target_column].copy()
     mask = texts.ne("") & labels.notna()
@@ -856,41 +947,38 @@ def _prepare_supervised_text(
     filtered_labels = labels.loc[mask].reset_index(drop=True)
     if filtered_labels.nunique(dropna=True) < 2:
         raise ValidationError("Text classification requires at least two target classes.")
-    return filtered_texts, filtered_labels
+    groups = dataframe.loc[mask, group_column].reset_index(drop=True) if group_column is not None else None
+    return filtered_texts, filtered_labels, groups
 
 
 def _text_train_test_split(
     texts: pd.Series,
     labels: pd.Series,
     request: FitTaskRequest | HyperparameterTuningTaskRequest,
-) -> tuple[pd.Series, pd.Series, pd.Series, pd.Series]:
-    try:
-        return train_test_split(
-            texts,
-            labels,
-            test_size=request.evaluation_policy.test_size,
-            random_state=request.evaluation_policy.random_state,
-            stratify=labels,
-        )
-    except ValueError:
-        return train_test_split(
-            texts,
-            labels,
-            test_size=request.evaluation_policy.test_size,
-            random_state=request.evaluation_policy.random_state,
-            stratify=None,
-        )
+    *,
+    groups: pd.Series | None = None,
+) -> PreparedSupervisedSplit:
+    return prepare_supervised_split(texts, labels, request, groups=groups)
 
 
 def _save_text_holdout(
     texts: pd.Series,
     labels: pd.Series,
+    training_labels: pd.Series,
     *,
     text_column: str,
     target_column: str,
+    split_facts: SplitFacts,
+    preparation_facts: PreparationFacts,
     path: Path,
 ) -> None:
     holdout = pd.DataFrame({text_column: texts.tolist(), target_column: labels.tolist()})
+    attach_evaluation_context(
+        holdout,
+        training_target=training_labels,
+        split_facts=split_facts,
+        preparation_facts=preparation_facts,
+    )
     holdout.to_pickle(path)
 
 

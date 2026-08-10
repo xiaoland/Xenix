@@ -30,6 +30,7 @@ class ModelFamily(StrEnum):
     ASSOCIATION_RULES = "association_rules"
     RECOMMENDATION = "recommendation"
     TEXT_ANALYSIS = "text_analysis"
+    FORECASTING = "forecasting"
 
 
 class ModelTaskKind(StrEnum):
@@ -38,6 +39,7 @@ class ModelTaskKind(StrEnum):
     ANOMALY_SCORER = "anomaly_scorer"
     RULE_MINER = "rule_miner"
     RECOMMENDER = "recommender"
+    FORECASTER = "forecaster"
 
 
 class EvaluationKind(StrEnum):
@@ -45,6 +47,13 @@ class EvaluationKind(StrEnum):
     CLASSIFICATION = "classification"
     SUMMARY = "summary"
     NONE = "none"
+    FORECASTING = "forecasting"
+
+
+class ApplyMode(StrEnum):
+    NONE = "none"
+    ROWS = "rows"
+    FUTURE_HORIZON = "future_horizon"
 
 
 class ColumnRoleKind(StrEnum):
@@ -100,8 +109,6 @@ class ModelRoleSchema(_CatalogDeclaration):
 
     @model_validator(mode="after")
     def _roles_must_be_present_and_unique(self) -> Self:
-        if not self.roles:
-            raise ValueError("Role schema must contain at least one role.")
         role_names = [role.name for role in self.roles]
         if len(set(role_names)) != len(role_names):
             raise ValueError("Role schema must not contain duplicate role names.")
@@ -136,6 +143,9 @@ class ModelCatalogEntry(_CatalogDeclaration):
     recommendation_tier: int = 100
     requires_target: bool
     supports_fit: bool = True
+    supports_evaluation: bool
+    supports_apply: bool
+    apply_mode: ApplyMode
     supports_hyperparameter_tuning: bool
     train_role_schema: ModelRoleSchema
     apply_role_schema: ModelRoleSchema
@@ -167,6 +177,10 @@ class ModelCatalogEntry(_CatalogDeclaration):
             raise ValueError(
                 "summary_metric_name is only valid for summary evaluation."
             )
+        if self.supports_apply is (self.apply_mode is ApplyMode.NONE):
+            raise ValueError(
+                "supports_apply must be false exactly when apply_mode is 'none'."
+            )
         return self
 
 
@@ -181,6 +195,9 @@ class ModelServiceBase(ABC):
     recommendation_tier: ClassVar[int] = 100
     requires_target: ClassVar[bool] = True
     supports_fit: ClassVar[bool] = True
+    supports_evaluation: ClassVar[bool | None] = None
+    supports_apply: ClassVar[bool] = True
+    apply_mode: ClassVar[ApplyMode] = ApplyMode.ROWS
     supports_hyperparameter_tuning: ClassVar[bool] = True
     model_family: ClassVar[ModelFamily | None] = None
     model_task_kind: ClassVar[ModelTaskKind | None] = None
@@ -225,6 +242,13 @@ class ModelServiceBase(ABC):
             recommendation_tier=cls.recommendation_tier,
             requires_target=cls.requires_target,
             supports_fit=cls.supports_fit,
+            supports_evaluation=(
+                cls.requires_target
+                if cls.supports_evaluation is None
+                else cls.supports_evaluation
+            ),
+            supports_apply=cls.supports_apply,
+            apply_mode=cls.apply_mode,
             supports_hyperparameter_tuning=cls.supports_hyperparameter_tuning,
             train_role_schema=cls.train_role_schema or cls._default_train_role_schema(),
             apply_role_schema=cls.apply_role_schema or cls._default_apply_role_schema(),
@@ -256,6 +280,8 @@ class ModelServiceBase(ABC):
             return ModelFamily.CLUSTERING
         if problem_kind is ProblemKind.ANOMALY_DETECTION:
             return ModelFamily.ANOMALY_DETECTION
+        if problem_kind is ProblemKind.FORECASTING:
+            return ModelFamily.FORECASTING
         raise ValueError(f"Model '{cls.key}' has no default model family.")
 
     @classmethod
@@ -267,6 +293,8 @@ class ModelServiceBase(ABC):
             return ModelTaskKind.SEGMENTER
         if problem_kind is ProblemKind.ANOMALY_DETECTION:
             return ModelTaskKind.ANOMALY_SCORER
+        if problem_kind is ProblemKind.FORECASTING:
+            return ModelTaskKind.FORECASTER
         raise ValueError(f"Model '{cls.key}' has no default model task kind.")
 
     @classmethod
@@ -278,6 +306,8 @@ class ModelServiceBase(ABC):
             return EvaluationKind.CLASSIFICATION
         if problem_kind in {ProblemKind.CLUSTERING, ProblemKind.ANOMALY_DETECTION}:
             return EvaluationKind.SUMMARY
+        if problem_kind is ProblemKind.FORECASTING:
+            return EvaluationKind.FORECASTING
         raise ValueError(f"Model '{cls.key}' has no default evaluation kind.")
 
     @classmethod
@@ -307,6 +337,17 @@ class ModelServiceBase(ABC):
                     kind=ColumnRoleKind.SINGLE_COLUMN,
                     required=True,
                     description="Outcome column the analyzer learns to predict.",
+                )
+            )
+        if cls._default_model_family() is ModelFamily.SUPERVISED:
+            roles.append(
+                ModelRoleDefinition(
+                    name="group",
+                    kind=ColumnRoleKind.SINGLE_COLUMN,
+                    required=False,
+                    description=(
+                        "Optional business entity whose rows must remain together across evaluation partitions."
+                    ),
                 )
             )
         return ModelRoleSchema(roles=roles, additional_roles=False)
@@ -355,6 +396,12 @@ class ModelServiceBase(ABC):
             return ModelResultContract(
                 train_result_kinds=["model", "table"],
                 apply_result_kinds=["table"],
+                preview_kinds=["model", "table", "file"],
+            )
+        if model_task_kind is ModelTaskKind.FORECASTER:
+            return ModelResultContract(
+                train_result_kinds=["model", "metrics", "report"],
+                apply_result_kinds=["table", "report"],
                 preview_kinds=["model", "table", "file"],
             )
         raise ValueError(

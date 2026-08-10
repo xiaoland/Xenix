@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import math
+import hashlib
+import json
 from typing import Any, Iterable
 
 import numpy as np
@@ -22,9 +24,16 @@ from sklearn.metrics import (
     recall_score,
     roc_auc_score,
 )
+from sklearn.dummy import DummyClassifier, DummyRegressor
 from sklearn.preprocessing import label_binarize
 
-from .contracts import CandidateMetrics, EvaluationPolicySnapshot, MetricDirection
+from .contracts import (
+    CandidateMetrics,
+    EvaluationComparison,
+    EvaluationPolicySnapshot,
+    EvaluationVerdict,
+    MetricDirection,
+)
 from .types import EvaluationKind
 
 _POLICIES: dict[EvaluationKind, EvaluationPolicySnapshot] = {
@@ -61,6 +70,17 @@ _POLICIES: dict[EvaluationKind, EvaluationPolicySnapshot] = {
         cv_folds=None,
         random_state=42,
     ),
+    EvaluationKind.FORECASTING: EvaluationPolicySnapshot(
+        policy_key="forecasting.rolling_origin.v1",
+        evaluation_kind=EvaluationKind.FORECASTING,
+        primary_metric_name="mae",
+        primary_metric_direction=MetricDirection.MIN,
+        tie_breaker_metrics=["rmse", "smape", "mase"],
+        split_strategy="rolling_origin.v1",
+        test_size=0.0,
+        cv_folds=3,
+        random_state=42,
+    ),
 }
 
 
@@ -68,6 +88,7 @@ def get_default_policy(
     evaluation_kind: EvaluationKind,
     *,
     summary_metric_name: str | None = None,
+    group_aware: bool = False,
 ) -> EvaluationPolicySnapshot:
     if evaluation_kind is EvaluationKind.SUMMARY:
         metric_name = summary_metric_name or "result_count"
@@ -82,7 +103,17 @@ def get_default_policy(
             cv_folds=None,
             random_state=42,
         )
-    return _POLICIES[evaluation_kind].model_copy(deep=True)
+    policy = _POLICIES[evaluation_kind].model_copy(deep=True)
+    if not group_aware or evaluation_kind is EvaluationKind.FORECASTING:
+        return policy
+    if evaluation_kind not in {EvaluationKind.REGRESSION, EvaluationKind.CLASSIFICATION}:
+        raise ValueError("Group-aware holdout is supported only for supervised evaluation.")
+    return policy.model_copy(
+        update={
+            "policy_key": f"{evaluation_kind.value}.group_hash_holdout.v1",
+            "split_strategy": "group_hash_holdout.v1",
+        }
+    )
 
 
 def build_regression_metrics(y_true: pd.Series, y_pred: np.ndarray) -> CandidateMetrics:
@@ -101,6 +132,7 @@ def build_regression_metrics(y_true: pd.Series, y_pred: np.ndarray) -> Candidate
         primary_metric_name="r2",
         primary_metric_value=metrics["r2"],
         metrics=metrics,
+        details={"prediction_digest": prediction_digest(y_pred)},
     )
 
 
@@ -131,6 +163,7 @@ def build_classification_metrics(
         "confusion_matrix": confusion_matrix(y_true, y_pred, labels=labels).astype(int).tolist(),
         "classification_report": _json_safe_classification_report(y_true, y_pred, labels),
         "probability_metrics": {},
+        "prediction_digest": prediction_digest(y_pred),
     }
     metrics.update(_probability_metrics(y_true, y_proba, labels, details))
     return CandidateMetrics(
@@ -164,6 +197,53 @@ def compare_metric_snapshots(
         if comparison != 0:
             return comparison
     return 0
+
+
+def build_dummy_baseline_metrics(
+    evaluation_kind: EvaluationKind,
+    y_train: pd.Series,
+    y_holdout: pd.Series,
+) -> CandidateMetrics:
+    if y_train.empty or y_holdout.empty:
+        raise ValueError("Baseline evaluation requires non-empty training and holdout targets.")
+    train_input = np.zeros((len(y_train.index), 1), dtype=float)
+    holdout_input = np.zeros((len(y_holdout.index), 1), dtype=float)
+    if evaluation_kind is EvaluationKind.CLASSIFICATION:
+        estimator = DummyClassifier(strategy="most_frequent")
+        estimator.fit(train_input, y_train)
+        predictions = estimator.predict(holdout_input)
+        probabilities = estimator.predict_proba(holdout_input)
+        return build_classification_metrics(
+            y_holdout,
+            predictions,
+            y_proba=probabilities,
+            classes=estimator.classes_,
+        )
+    if evaluation_kind is EvaluationKind.REGRESSION:
+        estimator = DummyRegressor(strategy="mean")
+        estimator.fit(train_input, y_train)
+        return build_regression_metrics(y_holdout, estimator.predict(holdout_input))
+    raise ValueError(f"Dummy baselines are not supported for evaluation kind '{evaluation_kind.value}'.")
+
+
+def build_evaluation_comparison(
+    policy: EvaluationPolicySnapshot,
+    candidate: CandidateMetrics,
+    baseline: CandidateMetrics,
+) -> EvaluationComparison:
+    result = compare_metric_snapshots(policy, candidate, baseline)
+    verdict = EvaluationVerdict.TIED
+    if result > 0:
+        verdict = EvaluationVerdict.CANDIDATE_BETTER
+    elif result < 0:
+        verdict = EvaluationVerdict.BASELINE_BETTER
+    return EvaluationComparison(
+        primary_metric_name=policy.primary_metric_name,
+        direction=policy.primary_metric_direction,
+        candidate_value=candidate.primary_metric_value,
+        baseline_value=baseline.primary_metric_value,
+        verdict=verdict,
+    )
 
 
 def _compare_metric(direction: MetricDirection, left: float | None, right: float | None) -> int:
@@ -208,6 +288,32 @@ def scoring_name_for_policy(policy: EvaluationPolicySnapshot) -> str:
 def metric_names_for_policy(policy: EvaluationPolicySnapshot) -> Iterable[str]:
     yield policy.primary_metric_name
     yield from policy.tie_breaker_metrics
+
+
+def prediction_digest(predictions: Iterable[Any]) -> str:
+    values = [_canonical_prediction(value) for value in np.asarray(list(predictions), dtype=object).reshape(-1)]
+    serialized = json.dumps(values, ensure_ascii=False, separators=(",", ":"))
+    return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+
+
+def _canonical_prediction(value: Any) -> dict[str, Any]:
+    if isinstance(value, np.generic):
+        value = value.item()
+    if value is None:
+        return {"type": "null", "value": None}
+    if isinstance(value, bool):
+        return {"type": "bool", "value": value}
+    if isinstance(value, int):
+        return {"type": "int", "value": value}
+    if isinstance(value, float):
+        if math.isnan(value):
+            rendered = "nan"
+        elif math.isinf(value):
+            rendered = "infinity" if value > 0 else "-infinity"
+        else:
+            rendered = value.hex()
+        return {"type": "float", "value": rendered}
+    return {"type": type(value).__name__, "value": str(value)}
 
 
 def _classification_labels(

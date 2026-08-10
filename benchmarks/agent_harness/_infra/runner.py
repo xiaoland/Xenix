@@ -881,7 +881,7 @@ def _run_model_cell(
         run_status=run_status,
         subject_metrics=subject_metrics,
         budget=budget_snapshot,
-        semantic_verdict=_semantic_verdict(assessment=assessment, run_status=run_status, judge_result=judge_result),
+        semantic_verdict=_semantic_verdict(assessment=assessment, run_status=run_status),
         semantic_checks=assessment.semantic_checks if assessment is not None else (),
         integrity_checks=assessment.integrity_checks if assessment is not None else (),
         judge=judge_result,
@@ -1138,7 +1138,6 @@ def _semantic_verdict(
     *,
     assessment: BenchmarkCaseAssessment | None,
     run_status: BenchmarkRunStatus,
-    judge_result: JudgeResult,
 ) -> SemanticVerdict:
     if run_status is not BenchmarkRunStatus.COMPLETED or assessment is None:
         return SemanticVerdict.NOT_EVALUATED
@@ -1148,8 +1147,6 @@ def _semantic_verdict(
         return SemanticVerdict.NOT_EVALUATED
     if not assessment.semantic_checks_passed:
         return SemanticVerdict.FAIL
-    if assessment.judge_required:
-        return judge_result.verdict
     return SemanticVerdict.PASS
 
 

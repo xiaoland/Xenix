@@ -1,0 +1,7 @@
+event_id,customer_id,event_month,orders_30d,avg_response_hours,support_tickets,plan_tier
+A001,C901,2025-05-01,17,2.6,1,basic
+A002,C902,2025-05-01,6,16.1,5,plus
+A003,C903,2025-05-01,25,1.8,0,premium
+A004,C904,2025-05-01,9,,3,enterprise
+A005,C905,2025-05-01,4,20.4,6,basic
+A006,C906,2025-05-01,19,3.1,,enterprise

@@ -41,6 +41,7 @@ _AGENT_SKILL_COMMON_TOOL_NAMES = (
 )
 _AGENT_SKILL_TOOL_NAMES: dict[str, tuple[str, ...]] = {
     "xenix-data-preprocessing": (
+        "analysis.profile",
         "data.integrate",
         "data.clean",
         "data.clean.metadata",
@@ -49,6 +50,7 @@ _AGENT_SKILL_TOOL_NAMES: dict[str, tuple[str, ...]] = {
         "data.feature.select",
     ),
     "xenix-data-analysis": (
+        "analysis.profile",
         "data.transform",
         "analysis.graph",
     ),

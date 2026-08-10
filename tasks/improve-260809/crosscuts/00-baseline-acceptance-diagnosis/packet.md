@@ -79,4 +79,4 @@ All business risks in [Case catalog](../../cases/catalog.md). A live Agent basel
 
 ## Next Action
 
-Draft `IH-F` (foundation: bounded profile/evaluation/result facts and split-aware preparation) and resolve `O-004` before `IH-CF` (clustering trustworthiness and the first native forecast workflow). Paid live characterization remains deferred until the corresponding service selector is implemented and green.
+Review the two proposed foundation handshakes and their independent implementation plans: Dataset profile/cleaning evidence first, then group-safe preparation/evaluation/lifecycle facts. Resolve `O-004` only before the later clustering/forecasting handshake. Paid live characterization remains deferred until the corresponding service selector is implemented and green.

@@ -13,7 +13,7 @@ description: >-
   xenix-data-modeling after the data is ready.
 license: MIT
 metadata:
-  version: "0.4.0"
+  version: "0.5.0"
   product: "Xenix"
   language: "zh-CN"
   runtime: "tool-only; no script execution"
@@ -30,6 +30,7 @@ Use only the advertised Xenix tools; there is no script or filesystem runtime.
 3. Do not drop meaningful rows or columns, merge business categories, change grain, or choose an ambiguous target without explaining it or asking first.
 4. Preserve business meaning. Keep role binding explicit: target, partial_target, feature, exclusions, and reasons.
 5. Hand off reporting/charts to `xenix-data-analysis`, and training/scoring to `xenix-data-modeling`, after preparation is clear.
+6. Treat `data.clean` as a `whole_dataset` business transformation. Its stateful imputation, encoding, and scaling are not holdout-safe learned model preparation; model-fitted preprocessing belongs inside the train/evaluation split.
 
 ## Knowledge-Sensitive Cleaning
 
@@ -42,11 +43,12 @@ conflict or ask the user when it would change the derived dataset.
 
 ## Efficient Cleaning Path
 
-1. For a new dataset, emit **at most one `data.query` call in a provider response**. Begin with a compact schema/sample query such as `SELECT * FROM input LIMIT 50`; add one compatible aggregate only when it changes the cleaning choice.
-2. Wait for that result. Do not issue parallel or repeated schema/sample calls. Make at most one focused follow-up query only when the first evidence leaves a material ambiguity; otherwise call `data.clean` next.
-3. Use `data.clean.metadata` only when the operation or parameters are not covered below or remain genuinely uncertain. Request only its smallest relevant group.
-4. Use `data.transform` for SQL-derived columns, filters, joins, aggregates, reshaping, or grain changes; use `data.integrate` only to vertically append datasets. Use `data.tokenize` for durable Chinese text tokens, and `data.feature.select` for model roles.
-5. Validate a changed result with `data.query`, then report tool-returned facts, the derived dataset, remaining risks, and the next handoff.
+1. For a new dataset, call `analysis.profile` first. Use its value-safe ordered field indexes, logical types, missingness, cardinality, numeric/date summaries, duplicates, correlations, and truncation as the default evidence.
+2. Bind unambiguous structural roles without asking. If business classification remains materially ambiguous, emit at most one purpose-specific bounded `data.query` call for only the relevant columns and values, then wait for it. Do not issue a broad sample, parallel query, or repeated schema call.
+3. Ask the user only when multiple plausible interpretations would change leakage or evaluation meaning. Otherwise call explicit atomic `data.clean` operations next.
+4. Use `data.clean.metadata` only when the operation or parameters are not covered below or remain genuinely uncertain. Request only its smallest relevant group.
+5. Use `data.transform` for SQL-derived columns, filters, joins, aggregates, reshaping, or grain changes; use `data.integrate` only to vertically append datasets. Use `data.tokenize` for durable Chinese text tokens, and `data.feature.select` for model roles.
+6. Validate the derived Dataset with `analysis.profile`; use a focused `data.query` only when exact result membership or values must be checked. Report returned facts, the derived Dataset, remaining risks, and the next handoff.
 
 ## Direct Routine Recipes
 
@@ -60,9 +62,9 @@ These are known operations; call `data.clean` directly instead of metadata:
 
 ## Cleaning Column References
 
-`data.query` returns zero-based column indexes. For `data.clean`, prefer
-`column_index` or `column_indexes` from a source-schema query such as
-`SELECT * FROM input LIMIT 50`. A projected or renamed query result has its
+`analysis.profile` returns stable zero-based indexes for its ordered source fields. For `data.clean`, prefer
+`column_index` or `column_indexes` from that whole-Dataset profile. If a focused `data.query` was necessary,
+use indexes only when it preserved the source schema. A projected or renamed query result has its
 own ordinal positions and must not be reused for a source-dataset operation.
 Use `column_name` or `column_names` only as a fallback, and never mix an index
 form with a name form in one operation. Within one `data.clean` call, treat
@@ -81,7 +83,7 @@ for example, use `input.c2` for source column index 2. This SQL aliasing is
 temporary—never use `c2` as a durable dataset field name.
 
 For `data.feature.select`, prefer per-role `column_indexes` from the current
-dataset's source-schema query, for example `{"role":"target","column_indexes":[5]}`.
+Dataset profile, for example `{"role":"target","column_indexes":[5]}`.
 Never use positions from a projected or renamed query result. Use `columns`
 only as a name fallback; never mix the two forms in one role. Xenix resolves
 indexes against the current dataset and persists canonical names.

@@ -4,10 +4,11 @@ The first handshake has been consumed for implementation. Later product behavior
 
 | ID | Intended scope | Status |
 | --- | --- | --- |
-| [`IH-B0`](IH-B0.md) — B0 Agent Harness baseline, acceptance, and diagnosis infrastructure | Independent Agent benchmark assets, single-model live safety, Judge calibration, Agent-report policy, and guidance/CI ordering; no `tests/` service cases or `src/xenix` product behavior change | consumed for implementation and offline-verified 2026-08-09; live baseline deferred |
-| `IH-F` | Bounded profile/evaluation/result facts and split-aware preparation semantics | not drafted; depends on B0 evidence |
-| `IH-CF` | Clustering trustworthiness and first native forecast workflow | not drafted; depends on O-004 and IH-F |
-| `IH-RT` | Recommendation ranking and text quality workflows | not drafted; depends on O-005 and stable shared contracts |
+| [`IH-B0`](IH-B0.md) — B0 Agent Harness baseline, acceptance, and diagnosis infrastructure | Independent Agent benchmark assets, single-model live safety, Judge calibration, Agent-report policy, and guidance/CI ordering; no `tests/` service cases or `src/xenix` product behavior change | consumed and offline-verified 2026-08-09; one F1 live characterization recorded |
+| [`IH-F1`](IH-F1.md) — Dataset profile and cleaning evidence | Bounded Dataset-ID profile facts, progressive disclosure, whole-Dataset cleaning scope, and a clean-room service case | consumed; implementation/service acceptance complete and live characterization passed 2026-08-09 |
+| [`IH-F2`](IH-F2.md) — Group-safe preparation, evaluation, and lifecycle facts | Immutable binding identity, group-disjoint preparation/evaluation, baseline comparison, true apply lineage, and bounded Agent results | consumed; implementation/service acceptance complete 2026-08-09; packaged-smoke exception recorded |
+| [`IH-CF`](IH-CF.md) — Trustworthy clustering and native forecasting | Clustering quality/stability/profile/apply truth plus seasonal-naive, Holt-Winters, and bounded-auto SARIMA temporal workflows | consumed; both plans objectively verified and paid characterization recorded 2026-08-09 |
+| [`IH-RT`](IH-RT.md) — Recommendation ranking and text quality workflows | Personalized explicit-rating Top-K, multilingual raw-text preparation, grouped classification, text discovery/retrieval evidence, public outputs, and independent service/Agent cases | proposed; Vertical 01 dependency is satisfied, product decisions await Sir's review |
 | `IH-O<n>` | One exact preprocessing/Skill/Tool/orchestration/observability optimization | evidence-triggered only |
 
 Each detailed handshake must contain:
@@ -20,5 +21,7 @@ Each detailed handshake must contain:
 - prerequisite Evidence IDs;
 - status: `proposed`, `approved`, `consumed`, or `superseded`;
 - return-to-discussion triggers.
+
+Detailed execution order belongs in a separate file under [`implementation/`](../implementation/README.md). A handshake authorizes a state diff; an implementation plan owns the working set and coherent passes; `execution/` records completed runs.
 
 The dashboard links to the handshake; it must not copy the detailed authorization and create a second owner.

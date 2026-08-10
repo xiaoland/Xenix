@@ -29,4 +29,10 @@ Put raw logs, traces, SQLite snapshots/queries, provider payloads, prompts, tran
 4. Update the active workstream's Current Evidence and Next Action.
 5. Update the dashboard only when overall status or the single next step changes.
 
-The first bounded record is [B0 offline implementation — 2026-08-09](B0-offline-implementation-260809.md). Paid live Agent evidence has not yet been run for this program.
+## Records
+
+- [B0 offline implementation — 2026-08-09](B0-offline-implementation-260809.md)
+- [Foundation execution — 2026-08-09](foundations-2026-08-09.md)
+- [CF-C / CF-F execution — 2026-08-09](CF-2026-08-09.md)
+
+The Foundation and CF records include paid single-sample characterization and bounded improvement/diagnosis series. Credentials, raw prompts/transcripts, provider responses, private material rows/answers, local paths exposed to the Agent, and unbounded logs remain excluded.

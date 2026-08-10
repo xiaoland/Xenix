@@ -13,6 +13,7 @@ from benchmarks.agent_harness._infra.budgets import (
 )
 from benchmarks.agent_harness._infra.contracts import (
     AgentHarnessBenchmarkResult,
+    BenchmarkCaseAssessment,
     BenchmarkExecutionMode,
     BenchmarkIdentity,
     BenchmarkMetrics,
@@ -37,6 +38,7 @@ from benchmarks.agent_harness._infra.report_policy import (
     evaluate_formal_acceptance,
     load_agent_report,
 )
+from benchmarks.agent_harness._infra.runner import _semantic_verdict
 
 
 _HASH_A = "a" * 64
@@ -48,6 +50,40 @@ _HASH_F = "f" * 64
 _RUBRIC_ID = "analysis.test.v1"
 _SUBJECT_MODEL = "subject/model"
 _JUDGE_MODEL = "judge/model"
+
+
+def test_required_judge_failure_does_not_overwrite_the_semantic_channel() -> None:
+    assessment = BenchmarkCaseAssessment(
+        semantic_checks=(OutcomeCheck("public_outcome", True, "observed"),),
+        integrity_checks=(OutcomeCheck("isolated", True, "isolated"),),
+        judge_required=True,
+    )
+    result = AgentHarnessBenchmarkResult(
+        case_id="case",
+        run_id="run",
+        provider_model=_SUBJECT_MODEL,
+        execution_mode=BenchmarkExecutionMode.HEADLESS,
+        run_status=BenchmarkRunStatus.COMPLETED,
+        subject_metrics=BenchmarkMetrics(),
+        semantic_verdict=_semantic_verdict(
+            assessment=assessment,
+            run_status=BenchmarkRunStatus.COMPLETED,
+        ),
+        semantic_checks=assessment.semantic_checks,
+        integrity_checks=assessment.integrity_checks,
+        judge=JudgeResult(
+            required=True,
+            status=JudgeStatus.PROVIDER_ERROR,
+            verdict=SemanticVerdict.NOT_EVALUATED,
+            summary="judge_provider_error",
+        ),
+    )
+
+    payload = result.to_payload()
+    assert payload["semantic"]["verdict"] == "pass"
+    assert payload["semantic"]["passed"] is True
+    assert payload["judge"]["status"] == "provider_error"
+    assert payload["judge"]["verdict"] == "not_evaluated"
 
 
 def test_v4_is_diagnostic_only_and_v5_requires_the_agent_report_kind(tmp_path: Path) -> None:

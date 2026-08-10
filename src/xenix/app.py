@@ -778,6 +778,10 @@ def _run_smoke_checks(paths) -> None:
     if len(xgboost_prediction) != 1:
         raise RuntimeError("XGBoost packaged runtime smoke fit failed.")
 
+    from .services.forecast_packaged_smoke import run_forecasting_packaged_smoke
+
+    run_forecasting_packaged_smoke()
+
     from .services.knowledge_packaged_smoke import run_knowledge_packaged_smoke
 
     run_knowledge_packaged_smoke(paths)

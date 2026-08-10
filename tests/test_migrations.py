@@ -6,16 +6,22 @@ from pathlib import Path
 import pytest
 from sqlalchemy import inspect, text
 from sqlalchemy.exc import IntegrityError
-from sqlmodel import select
+from sqlmodel import Session, create_engine, select
 
 from xenix.config import ensure_app_dirs, get_app_paths
 from xenix.exceptions import StorageBootstrapError
 from xenix.services.storage import StorageBootstrapService
 from xenix.services.storage.layout import database_path
-from xenix.services.storage.migrations import CURRENT_SCHEMA_VERSION, get_user_version
+from xenix.services.storage.migrations import (
+    CURRENT_SCHEMA_VERSION,
+    get_user_version,
+    migrate_v23_to_v24,
+    migrate_v24_to_v25,
+)
 from xenix.services.storage.models import (
     ArtifactKind,
     ArtifactRow,
+    DatasetColumnBindingRow,
     KnowledgeCanonicalGenerationRow,
     KnowledgeDerivationRow,
     KnowledgeDocumentRow,
@@ -30,6 +36,100 @@ from xenix.services.knowledge_projection import (
 )
 
 _NOW = "2026-07-01T00:00:00+00:00"
+
+
+def test_v23_to_v24_adds_nullable_dataset_snapshot_without_inventing_history(
+    tmp_path: Path,
+) -> None:
+    database = tmp_path / "v23.db"
+    engine = create_engine(f"sqlite:///{database.as_posix()}")
+    with engine.begin() as connection:
+        connection.exec_driver_sql(
+            """
+            CREATE TABLE dataset_column_binding (
+                id VARCHAR NOT NULL PRIMARY KEY,
+                dataset_id VARCHAR NOT NULL,
+                role_bindings JSON NOT NULL,
+                model_key VARCHAR,
+                model_family VARCHAR,
+                model_task_kind VARCHAR,
+                schema_version INTEGER NOT NULL,
+                created_at DATETIME NOT NULL
+            )
+            """
+        )
+        connection.exec_driver_sql(
+            "INSERT INTO dataset_column_binding VALUES "
+            "('binding-legacy', 'dataset-1', '[]', NULL, NULL, NULL, 1, ?)",
+            (_NOW,),
+        )
+        connection.exec_driver_sql("PRAGMA user_version=23")
+
+    assert migrate_v23_to_v24(engine) == 24
+    assert get_user_version(engine) == 24
+    with engine.connect() as connection:
+        columns = {
+            str(row[1])
+            for row in connection.exec_driver_sql(
+                "PRAGMA table_info(dataset_column_binding)"
+            ).all()
+        }
+    assert "dataset_snapshot_payload" in columns
+    with Session(engine) as session:
+        binding = session.get(DatasetColumnBindingRow, "binding-legacy")
+        assert binding is not None
+        assert binding.schema_version == 1
+        assert binding.dataset_snapshot_payload is None
+
+
+def test_v24_to_v25_adds_nullable_public_artifact_reference(tmp_path: Path) -> None:
+    database = tmp_path / "v24.db"
+    engine = create_engine(f"sqlite:///{database.as_posix()}")
+    with engine.begin() as connection:
+        connection.exec_driver_sql(
+            """
+            CREATE TABLE artifact (
+                id VARCHAR NOT NULL PRIMARY KEY
+            )
+            """
+        )
+        connection.exec_driver_sql(
+            """
+            CREATE TABLE ml_task_artifact (
+                id VARCHAR NOT NULL PRIMARY KEY,
+                ml_task_id VARCHAR NOT NULL,
+                artifact_kind VARCHAR NOT NULL,
+                absolute_path VARCHAR NOT NULL,
+                ready_to_open BOOLEAN NOT NULL,
+                created_at DATETIME NOT NULL
+            )
+            """
+        )
+        connection.exec_driver_sql(
+            "INSERT INTO ml_task_artifact VALUES "
+            "('task-artifact-1', 'task-1', 'evaluation_report', 'C:/report.json', 1, ?)",
+            (_NOW,),
+        )
+        connection.exec_driver_sql("PRAGMA user_version=24")
+
+    assert migrate_v24_to_v25(engine) == 25
+    assert get_user_version(engine) == 25
+    with engine.connect() as connection:
+        columns = {
+            str(row[1])
+            for row in connection.exec_driver_sql(
+                "PRAGMA table_info(ml_task_artifact)"
+            ).all()
+        }
+        foreign_keys = connection.exec_driver_sql(
+            "PRAGMA foreign_key_list(ml_task_artifact)"
+        ).all()
+        legacy_artifact_id = connection.exec_driver_sql(
+            "SELECT artifact_id FROM ml_task_artifact WHERE id='task-artifact-1'"
+        ).scalar_one()
+    assert "artifact_id" in columns
+    assert any(row[2] == "artifact" and row[3] == "artifact_id" for row in foreign_keys)
+    assert legacy_artifact_id is None
 
 
 def _create_unsupported_database(db_path: Path, version: int) -> None:
@@ -651,7 +751,7 @@ def test_fresh_v23_schema_is_orm_fts_fk_and_unique_readable(
 
     context = StorageBootstrapService().initialize(paths)
 
-    assert get_user_version(context.engine) == CURRENT_SCHEMA_VERSION == 23
+    assert get_user_version(context.engine) == CURRENT_SCHEMA_VERSION == 25
     assert {
         "knowledge_canonical_generation",
         "knowledge_derivation",
@@ -681,7 +781,7 @@ def test_static_supported_fixture_upgrades_with_orm_fts_and_fk_proof(
 
     context = StorageBootstrapService().initialize(paths)
 
-    assert get_user_version(context.engine) == CURRENT_SCHEMA_VERSION == 23
+    assert get_user_version(context.engine) == CURRENT_SCHEMA_VERSION == 25
     with context.session_factory() as session:
         artifact = session.get(ArtifactRow, "artifact-1")
         assert artifact is not None and artifact.kind is ArtifactKind.FILE

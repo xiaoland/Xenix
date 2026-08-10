@@ -30,6 +30,11 @@ from .models.clustering import (
     KMeansClusteringService,
     MiniBatchKMeansClusteringService,
 )
+from .models.forecasting import (
+    HoltWintersForecastingService,
+    SarimaForecastingService,
+    SeasonalNaiveForecastingService,
+)
 from .models.recommendation import ItemSimilarityRecommendationService
 from .models.regression import (
     AdaBoostRegressionService,
@@ -123,6 +128,9 @@ _MODEL_SERVICE_TYPES: tuple[type[ModelServiceBase], ...] = (
     MLPRegressionService,
     PolynomialRegressionService,
     RandomForestRegressionService,
+    SeasonalNaiveForecastingService,
+    HoltWintersForecastingService,
+    SarimaForecastingService,
     LogisticRegressionService,
     NaiveBayesClassificationService,
     MultinomialNBClassificationService,

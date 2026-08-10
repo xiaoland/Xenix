@@ -8,7 +8,7 @@ Hypothesis: improving evaluation, split semantics, and grounded outputs produces
 
 ## Status
 
-`solidify`; sequence accepted, exact product scope and handshakes pending.
+`complete`; both Foundation slices, CF-C, and CF-F are implemented and objectively verified. `IH-CF` is consumed and bounded paid characterization/diagnosis is recorded in the [CF execution record](../../execution/CF-2026-08-09.md).
 
 ## Scope and Non-Goals
 
@@ -29,7 +29,7 @@ Non-goals for the first pass:
 
 ## Dependencies
 
-- Cross-cut 00 `IH-B0` must qualify `grouped-preparation-v1`, `cluster-selection-v1`, and `forecast-validation-v1` and record a comparable baseline.
+- Cross-cut 00 B0 Agent Harness infrastructure is offline-verified. Matching paid live cases run only after their independently owned service selectors are green; no paid baseline is a prerequisite for foundation service implementation.
 - Shared result/evaluation and role contracts must stabilize before Vertical 02 production integration.
 
 ## Durable Owners / Blast Radius
@@ -43,7 +43,7 @@ Shared hotspot edits are serialized through the integration lane in [Working set
 - `From`: generic preparation can be fitted before a split; clustering returns assignments/counts with weak quality evidence; DBSCAN appears reusable; forecasting has no native workflow.
 - `To`: split-aware preparation and bounded evidence support a defensible clustering workflow and a native temporal workflow with honest validation and registered outputs.
 
-This is not yet an approved Impact Handshake.
+This state diff is approved by [IH-CF](../../handshakes/IH-CF.md); implementation must remain inside its parameter, privacy, comparison, and acceptance boundaries.
 
 ## Invariants
 
@@ -55,7 +55,7 @@ This is not yet an approved Impact Handshake.
 
 ## Decisions Consumed
 
-`D-002` through `D-007`; proposed `P-002` remains open.
+`D-002` through `D-014`; `P-002` is superseded where it proposed deferring SARIMA.
 
 ## Cases Consumed
 
@@ -70,11 +70,12 @@ This is not yet an approved Impact Handshake.
 
 ## Current Evidence
 
-- Five tabular clustering implementations exist, but quality/stability/profile evidence is absent or weak.
-- Generic regression currently uses random holdout and cannot serve as a forecasting contract.
-- A bounded analysis-profile service exists but is not Agent-facing.
-- Representative private clustering and forecasting scripts run under the current environment; exact evaluator results remain private.
+- Grouped supervised training binds immutable Dataset content, keeps groups disjoint, fits learned preparation on the outer train split, compares a same-holdout baseline, and preserves true apply lineage.
+- Clustering publishes recomputable quality/stability/null/profile evidence, retained display labels, honest apply capability, and Dataset/Artifact lineage; the final live sample passed every deterministic semantic and integrity check.
+- Seasonal-naive, Holt-Winters, and bounded-auto SARIMA now use one chronological evaluation/interval contract and retained full-history future apply; the final live forecast sample passed semantic and integrity checks.
+- Full ordinary/check/smoke/package gates pass for the changed capability. Official whole-app packaged smoke remains blocked only by the separately recorded missing OCR golden image; waited frozen forecast smoke exits 0.
+- Repeated focused queries, failed Tool calls, and the discovered semantic/Judge channel coupling produced bounded cross-cut evidence; the coupling is fixed, while query efficiency remains a later optimization lead.
 
 ## Next Action
 
-Resolve `O-004`, then draft separate `IH-F` and `IH-CF` after `IH-B0` establishes qualified cases and baseline evidence.
+Treat this vertical and the [CF execution record](../../execution/CF-2026-08-09.md) as stable predecessors. Return to solution design for [Vertical 02 — recommendation and text](../02-recommendation-text/packet.md); do not widen CF with formal repeated/headed evidence until an independent calibrated Judge is available or program-level manual acceptance begins.

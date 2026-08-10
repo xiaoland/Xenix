@@ -79,6 +79,7 @@ class ProblemKind(StrEnum):
     CLASSIFICATION = "classification"
     CLUSTERING = "clustering"
     ANOMALY_DETECTION = "anomaly_detection"
+    FORECASTING = "forecasting"
 
 
 class MLTaskArtifactKind(StrEnum):
@@ -182,6 +183,10 @@ class DatasetColumnBindingRow(SQLModel, table=True):
         default_factory=list,
         sa_column=Column(JSON, nullable=False),
     )
+    dataset_snapshot_payload: dict[str, Any] | None = Field(
+        default=None,
+        sa_column=Column(JSON, nullable=True),
+    )
     model_key: str | None = Field(default=None, index=True)
     model_family: str | None = Field(default=None, index=True)
     model_task_kind: str | None = Field(default=None, index=True)
@@ -246,6 +251,7 @@ class MLTaskArtifactRow(SQLModel, table=True):
         ),
     )
     absolute_path: str
+    artifact_id: str | None = Field(default=None, foreign_key="artifact.id", index=True)
     ready_to_open: bool = True
     created_at: datetime = Field(default_factory=utc_now)
 

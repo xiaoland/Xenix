@@ -13,7 +13,7 @@ description: >-
   tuning, or applying models; activate xenix-data-modeling for that.
 license: MIT
 metadata:
-  version: "0.4.0"
+  version: "0.5.0"
   product: "Xenix"
   language: "zh-CN"
   runtime: "tool-only; no script execution"
@@ -25,7 +25,8 @@ This skill guides Xenix Agent for business-facing tabular analysis: data underst
 
 Xenix Agent has no script execution environment. Do not rely on Python, shell, local files, validators, or ad-hoc code. Use only available Xenix tools:
 
-- `data.query` for schema inspection, preview rows, field summaries, small samples, and full-data computation through read-only DuckDB SQL.
+- `analysis.profile` first for typed, bounded whole-Dataset structure and quality facts without sample rows, category/group values, or identifier values.
+- `data.query` only when one focused bounded query is needed for material business-semantic ambiguity or for full-data computation through read-only DuckDB SQL.
 - `data.transform` when a chart or report needs a durable derived table.
 - `data.tokenize` only after activating `xenix-data-preprocessing`, when raw Chinese text must be segmented upstream for word clouds.
 - `analysis.graph` for bounded charts or word clouds from chart-ready datasets.
@@ -35,7 +36,7 @@ The language model is the orchestration and interpretation layer. The tools are 
 
 ## Non-negotiable rules
 
-1. Do not send full raw datasets to the language model. Work from metadata, samples, SQL aggregates, model outputs, charts, and logs.
+1. Do not send full raw datasets to the language model. Start from the value-safe profile and disclose exact values only through one purpose-specific bounded query when they materially change the decision.
 2. Do not invent unavailable tools, scripts, local validators, external packages, or background jobs.
 3. Use `data.query` only for read-only SQL. Do not use destructive SQL such as `DROP`, `DELETE`, `UPDATE`, `INSERT`, `CREATE TABLE`, or `ALTER` unless the product explicitly provides a safe temporary-output mechanism.
 4. Prefer the simplest reliable analysis that answers the business question. Do not escalate to modeling to appear sophisticated.
@@ -47,10 +48,10 @@ The language model is the orchestration and interpretation layer. The tools are 
 ## Default workflow
 
 1. Understand the user's business intent. If the user says “帮我看看这个数据”, proceed with automatic data understanding and task planning.
-2. Start with `data.query`: inspect schema, sample rows, field names, row count, and candidate semantic fields.
+2. Start with `analysis.profile` to inspect ordered field indexes, logical types, row/column counts, exact duplicates, missingness, cardinality, numeric/date summaries, correlation, and truncation.
 3. Decide whether user-specific rules, definitions, assumptions, or experience could materially change the computation or interpretation. When relevant, call `knowledge.lookup` with one compact business-language query and default `mode: "auto"`; refine only when the first result lacks a needed fact. Use `keyword` for exact terms or phrases, `semantic` when the same concept may use different wording, and `hybrid` when both signals matter. If an explicit mode is unavailable, recover with `auto` or `keyword` rather than treating the failure as no evidence.
-4. Use `data.query` for profiling: missingness, cardinality, numeric ranges, categorical distributions, date ranges, duplicates, target distribution, and entity-item structure where relevant.
-5. Identify the likely business scene, unit of analysis, key metrics, time fields, subject-item candidates, and data quality blockers.
+4. Bind unambiguous structural roles from the profile without asking. If business classification remains materially ambiguous, issue one focused bounded `data.query` for only the relevant columns and values; do not fall back to a broad preview.
+5. Identify the likely business scene, unit of analysis, key metrics, time fields, subject-item candidates, and data quality blockers. Ask only when multiple plausible interpretations would change leakage or evaluation meaning.
 6. If data quality blocks interpretation, activate `xenix-data-preprocessing`; if prediction/modeling is the true task, activate `xenix-data-modeling`.
 7. For word clouds, prepare a chart-ready frequency table first. If the source is raw Chinese text, activate `xenix-data-preprocessing` so `data.tokenize` can segment upstream before `data.query` or `data.transform` aggregates `word` and `count`.
 8. Load only relevant references through `agent.skill.read_reference` or `agent.skill.read_asset`.
@@ -78,7 +79,7 @@ Use assets only when they match the concrete output:
 
 ## Ask-versus-act policy
 
-Proceed without asking when the next step is reversible and useful: previewing data, profiling fields, drafting a candidate analysis plan, creating aggregate charts, or summarizing tool-returned evidence.
+Proceed without asking when the next step is reversible and useful: profiling fields, binding unambiguous structural roles, issuing one focused bounded query, drafting a candidate analysis plan, creating aggregate charts, or summarizing tool-returned evidence.
 
 Ask the user when:
 

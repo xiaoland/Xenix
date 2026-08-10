@@ -25,6 +25,7 @@ This directory is a program workspace. `README.md` is its small control surface;
 - `cases/catalog.md`: case identity, subject/evaluator partition, and test profiles.
 - `workstreams/*/packet.md`: one vertical's active scope and slice-level verification.
 - `handshakes/`: the only packet location for detailed mutation authorization.
+- `implementation/`: one independently executable plan per proposed/approved handshake; owns exact working set, coherent passes, focused commands, and stop conditions, but grants no authorization.
 - `evidence/`: reusable observations and safe summaries; never normative by itself.
 - `execution/`: bounded command/run history; never a second current-state owner.
 

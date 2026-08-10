@@ -8,21 +8,22 @@ Hypothesis: user-level ranking, cold-start behavior, leakage-aware multilingual 
 
 ## Status
 
-`explore / solidify`; ordering accepted, exact scope pending.
+`solidify / design review`; source/material exploration is complete, `IH-RT` and three independent implementation plans are proposed, and no product mutation is authorized.
 
 ## Scope and Non-Goals
 
 In scope:
 
-- popularity/cold-start baseline and personalized collaborative user Top-K;
+- explicit-rating popularity/cold-start baseline and personalized collaborative user Top-K;
 - seen-item exclusion, ranking metrics, coverage, and bounded diversity/novelty evidence;
-- language-aware normalization, configurable stopwords/custom dictionary, tokenization quality report, duplicate/template leakage checks, and reusable vectorizer/model bundles;
+- explicit latest-positive or deterministic-hash holdout policy, reusable per-user apply, and honest cold-item limitations;
+- language-aware normalization, bounded stopword/custom-dictionary references, tokenization quality report, duplicate/template leakage checks, and reusable preparation/vectorizer/model bundles;
 - appropriate evidence for classification, clustering, topics, and similarity rather than count-only summaries.
 
 Non-goals for the first pass:
 
 - offline metrics presented as online causal uplift;
-- matrix factorization/hybrid before ranking evaluation and apply are proven;
+- implicit-feedback ranking, matrix factorization, and hybrid recommendation before explicit-rating evaluation/apply are proven;
 - vector database/ANN before scale evidence shows the current approach is inadequate;
 - heuristic sentiment, summarization, or information extraction without a defensible contract;
 - naïve random-split classification acceptance on the contaminated ch16 templates.
@@ -34,14 +35,14 @@ Non-goals for the first pass:
 
 ## Durable Owners / Blast Radius
 
-Likely owners include recommendation/text model services, tokenization/preparation, ML registry/contracts/evaluation, lifecycle/finalization, Agent Tool projection, public-boundary tests, and relevant product/unit contracts.
+Owners are enumerated by [IH-RT](../../handshakes/IH-RT.md) and split across [RT-R](../../implementation/RT-R-recommendation-ranking.md), [RT-T1](../../implementation/RT-T1-text-preparation-classification.md), and [RT-T2](../../implementation/RT-T2-text-discovery-retrieval.md). Shared registry/contracts/lifecycle/Agent projection are serialized integration hotspots; recommendation and text domain modules remain separate working sets.
 
 ## Candidate State Diff
 
 - `From`: one item-similarity recommender and several text analyzers with count-only or weak evaluation.
 - `To`: evaluated user-level ranking with cold-start and seen-item rules, plus leakage-aware multilingual text workflows that produce bounded quality evidence and reusable outputs.
 
-This is not yet an approved Impact Handshake.
+This state diff is fully drafted in proposed [IH-RT](../../handshakes/IH-RT.md); it is not approved for implementation until Sir confirms the product decisions in `O-005` and `O-008` through `O-012`.
 
 ## Invariants
 
@@ -53,11 +54,11 @@ This is not yet an approved Impact Handshake.
 
 ## Decisions Consumed
 
-`D-002` through `D-007`; proposed `P-003` and `P-004` remain open.
+`D-002` through `D-015`; proposed recommendation/text decisions remain open in `O-005` and `O-008` through `O-012`.
 
 ## Cases Consumed
 
-`recommendation-ranking-v1`, `bilingual-text-preparation-v1`, and a future safe text topic/grouped-template derivative.
+`recommendation-ranking-v1`, `bilingual-text-preparation-v1`, `text-grouped-classification-v1`, and `text-topic-discovery-v1`. Similarity retrieval is service-qualified only until relevance-bearing live truth exists.
 
 ## Verification Plan
 
@@ -68,10 +69,12 @@ This is not yet an approved Impact Handshake.
 
 ## Current Evidence
 
-- Existing recommendation is item-to-item Euclidean similarity over explicit ratings; it lacks personalized ranking evaluation and cold start.
-- Text classification, clustering, topics, and similarity exist, but raw Chinese needs a separate tokenize step and non-classification quality is weak.
-- The supplied classification split is template-contaminated; bilingual preprocessing is the safer deterministic first service case.
+- Existing recommendation is a global item-to-item Euclidean lookup over explicit ratings. It lacks user ranking, ranking evaluation, seen exclusion, cold-user behavior, reusable user-list apply, and ordinary service acceptance; changing that persisted key in place would break artifact semantics.
+- Recommendation ranking needs a dedicated per-user holdout contract rather than F2 group-disjoint split: one eligible user's train history and held-out truth intentionally coexist. The popularity baseline and candidate must share the exact truth/candidate catalog.
+- Existing text classification has group-safe supervised evaluation, but analyzers expect pretokenized text and do not retain an upstream preparation spec. Clustering/topic/similarity advertise fit/apply while exposing count-only or no task-quality evidence.
+- The supplied ch14 material has no single independent train → truth → apply closure. Its precomputed Top-10/truth bundle is evaluator-only. The supplied ch16 model data has only 38 analysis texts across 1,500 rows and template-determined labels, so random-split results are leakage evidence, not acceptance truth.
+- Ten bounded logical material sets, clean-room correspondence, hashes/shapes, and fail-closed private triggers are recorded in the [RT adoption plan](../../materials/rt-on-demand-adoption.md); no reference script was executed and no private byte is authorized for Provider upload.
 
 ## Next Action
 
-Confirm `O-005` and the safe text live-case shape, then draft `IH-RT` after Vertical 01 shared contracts are stable.
+Review the six product choices in `O-005` and `O-008` through `O-012`. If Sir approves the proposed package, mark `IH-RT` approved and execute RT-R → RT-T1 → RT-T2 without another design-stage pause unless new evidence changes the state diff.
