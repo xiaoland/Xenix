@@ -1,4 +1,4 @@
-"""Run one explicit case-owned Judge calibration suite."""
+"""Run one explicit exact-rubric Judge calibration suite."""
 
 from __future__ import annotations
 
@@ -15,6 +15,9 @@ for import_root in (_PROJECT_ROOT, _PROJECT_ROOT / "src"):
     if str(import_root) not in sys.path:
         sys.path.insert(0, str(import_root))
 
+from benchmarks.agent_harness._infra.calibration_manifest import (  # noqa: E402
+    load_calibration_manifest_suite,
+)
 from benchmarks.agent_harness._infra.judge_calibration import (  # noqa: E402
     JudgeCalibrationError,
     JudgeCalibrationPacket,
@@ -32,7 +35,7 @@ from benchmarks.agent_harness._infra.runner import (  # noqa: E402
 def main(argv: Sequence[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
     try:
-        suite = _load_suite(args.suite_symbol)
+        suite_symbol, suite = _load_requested_suite(args)
         settings_path = resolve_judge_llm_settings_path(args.judge_llm_settings)
         settings, settings_sha256 = load_settings_snapshot(settings_path)
         judge_model = selected_model_key(settings, args.judge_model)
@@ -53,7 +56,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         ):
             raise JudgeCalibrationError("calibration_judge_credentials_missing")
         report = run_judge_calibration(
-            suite_symbol=args.suite_symbol,
+            suite_symbol=suite_symbol,
             packets=suite,
             settings=settings,
             judge_settings_sha256=settings_sha256,
@@ -77,13 +80,49 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "suite_symbol",
-        help="Explicit module:symbol returning one case-owned calibration packet sequence.",
+        nargs="?",
+        help=(
+            "Explicit module:symbol returning one case-owned calibration packet "
+            "sequence; omit when using --manifest and --manifest-suite."
+        ),
+    )
+    parser.add_argument(
+        "--manifest",
+        type=Path,
+        help="Versioned calibration manifest; requires --manifest-suite.",
+    )
+    parser.add_argument(
+        "--manifest-suite",
+        help="Exact rubric/suite identity selected from --manifest.",
     )
     parser.add_argument("--judge-llm-settings", type=Path)
     parser.add_argument("--judge-model")
     parser.add_argument("--subject-model", required=True)
     parser.add_argument("--output", required=True, type=Path)
     return parser
+
+
+def _load_requested_suite(
+    args: argparse.Namespace,
+) -> tuple[str, Iterable[JudgeCalibrationPacket]]:
+    symbol_supplied = isinstance(args.suite_symbol, str) and bool(
+        args.suite_symbol.strip()
+    )
+    manifest_supplied = args.manifest is not None
+    manifest_suite_supplied = isinstance(args.manifest_suite, str) and bool(
+        args.manifest_suite.strip()
+    )
+    if symbol_supplied:
+        if manifest_supplied or manifest_suite_supplied:
+            raise JudgeCalibrationError("calibration_suite_source_invalid")
+        return args.suite_symbol, _load_suite(args.suite_symbol)
+    if not manifest_supplied or not manifest_suite_supplied:
+        raise JudgeCalibrationError("calibration_suite_source_invalid")
+    loaded = load_calibration_manifest_suite(
+        args.manifest,
+        suite_id=args.manifest_suite,
+    )
+    return loaded.suite_symbol, loaded.packets
 
 
 def _load_suite(symbol_reference: str) -> Iterable[JudgeCalibrationPacket]:

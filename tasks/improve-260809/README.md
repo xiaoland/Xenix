@@ -1,6 +1,6 @@
 # Improve ML Capability — Program Dashboard
 
-**Status:** Active. Vertical 01 is committed and verified. Vertical 02 implementation and objective verification are complete; its first completed explicit-privacy topic characterization reproduced final-answer grounding and path-privacy failures.
+**Status:** Active, internally executable scope complete. Both product verticals are implemented and objectively verified. Private-material characterization and Harness readiness are complete; formal paid acceptance is admission-blocked by the missing independent Judge and an immutable final commit. Topic final-answer grounding remains a measured open outcome.
 **Opened:** 2026-08-09
 
 ## Objective
@@ -35,7 +35,7 @@ The benchmark runner remains a paid live measurement surface over one pinned sub
 Current verified repository state:
 
 - `pdm run test -q`: 136 passed on 2026-08-10.
-- Provider-free B0 infrastructure/policy/calibration checks: 30 passed.
+- Provider-free Harness infrastructure/policy/calibration checks: 33 passed.
 - Headless Agent Harness collect-only: 13 live cases.
 - Headed Agent Harness collect-only: the same 13 live cases.
 - An explicit live case selector collects exactly one cell in either mode.
@@ -46,7 +46,9 @@ Current verified repository state:
 - One live `ml.forecast_validation_v1` improvement sample passed semantic and integrity checks on `kimi/kimi-k2.6`: 11 rounds, 191,102 reported tokens, 127.877 seconds; Judge is explicitly `not_configured`, so the result is characterization rather than formal evidence.
 - One live `ml.recommendation_ranking_v1` sample passed semantic and integrity checks on `kimi/kimi-k2.6`: 7 rounds, 104,201 reported tokens, 94.896 seconds; Judge is `not_configured`.
 - One live `ml.text_grouped_classification_v1` sample passed semantic and integrity checks on `kimi/kimi-k2.6`: 8 rounds, 154,981 reported tokens, 122.900 seconds; Judge is `not_configured`.
-- `ml.text_topic_discovery_v1` is service-qualified and collects exactly one cell. Its paid diagnosis proved the complete FIT/EVALUATE/APPLY outcome and exposed Skill-scope/profile plus final-answer privacy gaps. Post-fix run `d7ecbdf02fce4f899970818c341f1a10` completed without a provider/network failure, but failed bounded final-answer grounding and Windows-path privacy checks.
+- `ml.text_topic_discovery_v1` is service-qualified and collects exactly one cell. O1 proved the apparent Windows-path disclosure was at least an evaluator false positive caused by matching `artifact://`, fixed the detector, and showed all missing grounding facts were available before final synthesis. O2's canonical Skill audit improved some samples but did not reliably close isolation/offline grounding. O3's adjacent Apply projection produced no improvement and was therefore rejected and completely rolled back.
+- Private material characterization qualified Foundation and clustering/forecasting at realistic shape. Recommendation stopped at an inadmissible holdout oracle, and text stopped because the supplied two-column normalization map does not match the public one-column staged-resource contract; both failed closed before any invalid substitution.
+- Final current-worktree verification on 2026-08-10: 136 ordinary tests passed, 33 provider-free Harness checks passed, `pdm run check`, isolated app smoke, and package creation passed. The rebuilt executable passed isolated `--smoke-test`; official packaged smoke remains blocked only by the missing locked OCR golden prerequisite.
 
 ## Current Truth
 
@@ -58,13 +60,14 @@ Current verified repository state:
 - Clustering has recomputable trustworthiness evidence and honest apply capability; native seasonal-naive, Holt-Winters, and bounded-auto SARIMA share chronological comparison, interval, lineage, and future-apply contracts. Recommendation has personalized explicit-rating Top-K with same-truth popularity comparison. Active text classification, clustering, topic discovery, and exact local retrieval retain multilingual raw-text preparation and task-specific evidence; retrieval metrics are truth-gated and exact retrieval fails before dispatch above 2,000 source rows.
 - The ordinary test portfolio now covers bounded profile/cleaning, group-safe supervised lifecycles, clustering trustworthiness/apply, native forecast evaluation/future apply, personalized recommendation, multilingual raw-text classification, and text discovery/retrieval through public service boundaries without asserting implementation internals.
 - The live benchmark catalog now has thirteen outcome-oriented cases: the eight-case B0 base plus independently owned clustering-selection, forecast-validation, recommendation-ranking, grouped-classification, and topic-discovery cases. It retains one pinned subject model, hard cell/invocation safety boundaries, and a separate versioned acceptance policy. Semantic failure remains a valid measurement rather than a pytest infrastructure failure.
+- Formal `3 × headless + 1 × headed` acceptance intentionally combines four distinct, independently budgeted pytest invocation IDs. Five versioned exact-rubric calibration suites now load provider-free; their passing calibration reports still require a frozen subject-disjoint external Judge.
 - RT-T2 diagnosis made Skill activation an executable progressive-disclosure gate. Inactive tasks see only Skill activation and Knowledge lookup; an activated modeling Skill receives `analysis.profile` plus its atomic modeling Tools. Unknown Skill state fails closed.
 - The supplied corpus is rich enough to qualify cleaning, leakage-safe preparation, clustering, recommendation, forecasting, and bilingual text risks, but it contains severe answer contamination and unresolved redistribution rights. The RT material plan binds ten logical ch14/ch16 sets and explicitly rejects their precomputed recommendations, colocated truth, and template-contaminated random split as product acceptance oracles.
 - Detailed decisions, uncertainties, topology, working sets, and slice status live in the linked packet files rather than this dashboard.
 
 ## Next Step
 
-Review the three independent closure plans: first classify the topic final-answer failure through the proposed bounded `IH-O1` diagnostic, then execute private-material service characterization, and only after the resulting state is clean run the formal six-case Agent acceptance cohort. Product mutation remains gated by a later exact optimization handshake.
+No further internally admissible execution remains in this phase. To run the formal six-case, 24-cell Agent acceptance cohort, first provide a subject-disjoint Judge settings/model snapshot, obtain five passing exact-rubric calibration reports, and create a clean immutable commit after explicit approval. Topic discovery remains a valid measured Agent failure rather than formal acceptance; any further final-synthesis optimization requires a new evidence-bounded handshake. After Sir's manual acceptance, the recorded textbook-case results are ready for the separately requested Harness-defect synthesis and targeted optimization, especially around data cleaning and preprocessing.
 
 ## Packet Map
 

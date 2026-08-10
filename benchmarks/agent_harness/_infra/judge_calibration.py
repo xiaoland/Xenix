@@ -1,7 +1,9 @@
 """Bounded, hand-labelled qualification for an explicit Agent benchmark Judge.
 
-Calibration suites remain case-owned symbols.  This module supplies only the
-case-agnostic execution, identity, aggregation, and privacy-bounded report.
+Rubrics remain case-owned authorities. Calibration packets may come from an
+explicit case-owned symbol or a strict versioned manifest that resolves one of
+those rubric objects. This module supplies only case-agnostic execution,
+identity, aggregation, and the privacy-bounded report.
 """
 
 from __future__ import annotations

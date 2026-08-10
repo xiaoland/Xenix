@@ -18,7 +18,7 @@ description: >-
   transformation, or role binding is not ready.
 license: MIT
 metadata:
-  version: "0.9.0"
+  version: "0.10.0"
   product: "Xenix"
   language: "zh-CN"
   runtime: "tool-only; no script execution"
@@ -140,4 +140,17 @@ For personalized recommendation, report the rating and holdout policies, Top-K a
 
 For multilingual text classification, report the retained profile/specification digest and registered resource identities, eligible/empty/custom-match facts, business/template/connected group counts with zero overlaps, train-only vocabulary size/digest and OOV facts, candidate-versus-dummy classification metrics, prediction Dataset and evaluation Artifact, and the limits of historical-label evidence. Never print raw text, vocabulary terms, group values, dictionary contents, or stopwords in the final answer.
 
-For multilingual text discovery, report the retained preparation/specification, eligible/empty counts, cluster/topic quality and stability, bounded sanitized terms, label-identity digest, local assignment Dataset, evaluation Artifact, and an external validation step. For retrieval, report the mode, Top-K, self/duplicate/rank diagnostics, and ranking metrics only when relevance truth was admitted. Never print raw text, document IDs, relevance groups, full vocabulary, matched rows, dictionary contents, or stopwords.
+### Multilingual topic pre-finalization audit
+
+Before finalizing a multilingual topic-discovery answer, reconcile the user's requested deliveries with the authoritative Evaluate result and the completed FIT/APPLY results. Do not finalize until the answer:
+
+- states the realized topic count and that topic numbers are permutation-invariant display labels, not semantic names or observed truth;
+- reports the Tool-returned held-out perplexity, coherence, and stability values, plus connected/template group isolation and zero train/holdout overlap;
+- uses only bounded sanitized terms and includes the topic-label identity needed to reconcile Evaluate and Apply;
+- includes every public Dataset ID and Artifact link the user requested and that the completed results returned, using `artifact://` URIs for Artifact links;
+- states that topics are exploratory, names an external validation or review step, and explains that offline evidence neither proves causality nor authorizes automatic business decisions;
+- removes raw text, document IDs, group values, full vocabulary, matched rows, dictionary/stopword contents, and local filesystem paths.
+
+If a requested fact, Dataset ID, or Artifact ID is absent from the public Tool results, state that it is unavailable instead of inventing it or a local path.
+
+For clustering, report the retained preparation/specification, eligible/empty counts, quality and stability, bounded sanitized terms, label-identity digest, local assignment Dataset, evaluation Artifact, and an external validation step. For retrieval, report the mode, Top-K, self/duplicate/rank diagnostics, and ranking metrics only when relevance truth was admitted. Apply the same raw-content and local-path exclusions.

@@ -1,6 +1,6 @@
 # O1 Implementation Plan — Topic Final-Answer Diagnosis
 
-**Status:** Proposed; requires approval of `IH-O1`.
+**Status:** Completed on 2026-08-10: evaluator defect fixed and the final-synthesis divergence classified with paid exact-selector evidence.
 
 ## Outcome
 
@@ -30,3 +30,10 @@ Stop if diagnosis requires retaining a transcript/path, changing the topic promp
 ## Acceptance
 
 O1 is complete when a privacy-safe category distinguishes the origin of the path and confirms whether the missing grounding facts were available to the Agent before finalization. A semantically passing Agent run is not an O1 acceptance requirement; that belongs to the later exact optimization.
+
+## Current Truth — 2026-08-10
+
+- The old `windows_path` category was produced at least by a public `artifact://` URI because the detector accepted the URI's scheme suffix as a drive prefix. The bounded report cannot establish whether another real Windows path coexisted. The evaluator now distinguishes real path syntax and classifies only bounded provenance.
+- All three omitted grounding families were available before finalization through the authoritative Evaluate Tool result plus the user request. Their first divergence is final Provider synthesis, not missing public evidence.
+- Offline Harness checks pass and the exact case collects once in both modes. Paid run `81f8c49b3f1d4cbb882bcac7115f2a89` passed privacy after the detector fix and confirmed that the remaining missing facts diverged only during final Provider synthesis.
+- [Execution record](../execution/O1-topic-final-answer-diagnosis-2026-08-10.md) owns the bounded evidence and proposed O2 state diff.

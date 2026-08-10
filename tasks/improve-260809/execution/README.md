@@ -35,5 +35,12 @@ Put raw logs, traces, SQLite snapshots/queries, provider payloads, prompts, tran
 - [Foundation execution — 2026-08-09](foundations-2026-08-09.md)
 - [CF-C / CF-F execution — 2026-08-09](CF-2026-08-09.md)
 - [Recommendation and text execution — 2026-08-10](RT-2026-08-10.md)
+- [M1 private-material service characterization — 2026-08-10](M1-private-material-service-characterization-2026-08-10.md)
+- [O1 topic final-answer diagnosis — 2026-08-10](O1-topic-final-answer-diagnosis-2026-08-10.md)
+- [O2 topic final-answer delivery audit — 2026-08-10](O2-topic-final-answer-delivery-audit-2026-08-10.md)
+- [O3 topic Apply delivery projection — 2026-08-10](O3-topic-apply-delivery-projection-2026-08-10.md)
+- [A1 formal acceptance preflight — 2026-08-10](A1-preflight-2026-08-10.md)
+- [A2 formal Agent Harness readiness — 2026-08-10](A2-harness-readiness-2026-08-10.md)
+- [Final current-worktree verification — 2026-08-10](final-verification-2026-08-10.md)
 
 The Foundation and CF records include paid single-sample characterization and bounded improvement/diagnosis series. Credentials, raw prompts/transcripts, provider responses, private material rows/answers, local paths exposed to the Agent, and unbounded logs remain excluded.

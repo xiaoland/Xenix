@@ -1,6 +1,7 @@
 # M1 Implementation Plan — Private-Material Service Characterization
 
-**Status:** Ready for design review. It authorizes no product mutation and no Provider upload.
+**Status:** Completed on 2026-08-10 with two qualified bounded characterizations and two stable fail-closed cells. It authorized no product mutation or Provider upload.
+**Execution record:** [M1 private-material service characterization — 2026-08-10](../execution/M1-private-material-service-characterization-2026-08-10.md).
 
 ## Outcome
 
@@ -38,3 +39,5 @@ Stop on hash/license mismatch, unexpected write, unsafe code tail, serialization
 ## Acceptance
 
 M1 is complete when every admitted cell has either a qualified bounded characterization or a stable fail-closed reason. It does not require or permit uploading supplied bytes to the paid Agent.
+
+That condition was met on 2026-08-10: Foundation and clustering/forecasting qualified; recommendation failed closed on `oracle_qualification_failed / recommendation_holdout`; text failed closed on `format_semantic_mismatch / text_resource_admission`. Supporting two-column text normalization mappings would require a new exact Impact Handshake before rerunning the private text cell.

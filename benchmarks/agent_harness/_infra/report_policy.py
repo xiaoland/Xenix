@@ -170,7 +170,12 @@ def evaluate_formal_acceptance(
     *,
     calibrations: Sequence[JudgeCalibrationReport] = (),
 ) -> ReportPolicyDecision:
-    """Apply the v1 formal policy: three headless and one headed cell."""
+    """Apply the v1 formal policy: three headless and one headed cell.
+
+    Invocation identity is dispatch-local rather than a cohort key.  The four
+    cells may therefore come from distinct, independently budgeted pytest
+    invocations while every report must still carry its own invocation ID.
+    """
 
     reasons = _measurement_reasons(
         reports,
@@ -369,6 +374,8 @@ def _cohort_identity_reasons(payloads: Sequence[Mapping[str, Any]]) -> list[str]
         "identity.runtime_sha256",
         "budget.policy",
     )
+    # invocation_id is intentionally absent: it identifies one budget-owning
+    # dispatch, while formal acceptance combines four independent dispatches.
     for field in fields:
         if len({_nested_value(payload, field) for payload in payloads}) != 1:
             reasons.append(f"cohort_{field.replace('.', '_')}_mismatch")

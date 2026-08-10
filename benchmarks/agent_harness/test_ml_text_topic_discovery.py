@@ -45,6 +45,7 @@ _EXPECTED_RESOURCE_IDENTITY_DIGEST = "4a90373f81203fe0c091d125eb86e016af556441d7
 _EXPECTED_SPECIFICATION_DIGEST = "fbdd0c8df797beba6435abfec9701238045d171c472710342e203e7bf0d05ea4"
 _EXPECTED_PREPARED_TEXT_DIGEST = "4c2a2e7a66867eff9ed49615a4a9849aa5c8d25fbad5146d7224951417e1d8ba"
 _EXPECTED_GROUP_ASSIGNMENT_DIGEST = "bb5137e13acefc5556f369e1df3914bdba96e4bd59748ccee488c18290a53224"
+_MAX_JUDGE_TASK_INTENT_CHARS = 512
 _DOCUMENT_COLUMN = "feedback_ref"
 _RAW_TEXT_COLUMN = "feedback"
 _TOPIC_COLUMN = "dominant_topic"
@@ -112,7 +113,12 @@ _ARTIFACT_URI = re.compile(r"artifact://[A-Za-z0-9]+(?:\?[^)\s>]+)?")
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _IDENTIFIER = re.compile(r"(?i)\bPULSE-[A-Z0-9-]+\b")
 _URL_OR_EMAIL = re.compile(r"(?i)(?:https?://|www\.|\S+@\S+)")
-_WINDOWS_PATH = re.compile(r"(?i)[A-Z]:[\\/]")
+_WINDOWS_PATH = re.compile(r"(?i)(?<![A-Z0-9_])[A-Z]:[\\/]")
+_PREFINAL_GROUNDING_FAMILIES: Final = (
+    "quality_metrics",
+    "group_template_isolation",
+    "exploratory_offline_boundary",
+)
 
 
 @dataclass(frozen=True)
@@ -156,16 +162,18 @@ _CANDIDATE_API = _TopicApiContract(
 _FROZEN_API: Final[_TopicApiContract] = _CANDIDATE_API
 
 BUSINESS_PROMPT = (
-    "附件为无标签双语场地反馈。先画像并用 model.metadata 核对 "
-    "text.topic_modeling.multilingual_lda 的 raw text 角色和 7 项参数；将 feedback 绑定 text，"
-    "使用 multilingual_business_v1、unigram、max_features=5000、topic_count=3、"
-    "displayed_term_count=5，两个 resource Dataset ID 列表为空。交付 FIT assignment Dataset/Artifact "
-    "与 held-out Evaluate report Artifact；再用全量 analyzer 对同附件 raw apply，交付 APPLY "
-    "Dataset/Artifact。最终列出两个 result_dataset_id、三个 Artifact 链接和 7 个参数名。"
-    "仅用报告内有限 top terms、perplexity/coherence/stability 和零重叠隔离事实解释结果；说明主题编号可置换、"
-    "主题只是探索结构，离线证据不证明因果效果，也不授予自动业务决策权。最终回答不得复述任何 feedback "
-    "原文、任何 feedback_ref 值或任何本地路径；说明隐私边界时也只使用字段名，不举示例值。"
+    "无标签双语场地反馈：先画像，用 model.metadata 核对 text.topic_modeling.multilingual_lda 的 raw text角色、"
+    "7项参数；feedback绑定text，采用multilingual_business_v1、unigram、max_features=5000、topic_count=3、"
+    "displayed_term_count=5，两类resource Dataset ID均空。交付FIT assignment Dataset/Artifact、"
+    "held-out Evaluate report Artifact；全量analyzer对附件raw apply，交付APPLY Dataset/Artifact。"
+    "终答列2个result_dataset_id、3个Artifact链接及7参数名；仅据有限top terms、"
+    "perplexity/coherence/stability、零重叠隔离事实解释。主题编号可置换且仅为探索结构；离线证据不证因果、"
+    "不授权自动业务决策。禁复述feedback原文、feedback_ref值、本地路径；"
+    "隐私只写字段名。"
 )
+
+if len(BUSINESS_PROMPT) > _MAX_JUDGE_TASK_INTENT_CHARS:
+    raise RuntimeError("topic_business_prompt_exceeds_judge_task_intent_bound")
 
 TOPIC_DISCOVERY_RUBRIC = JudgeRubric(
     rubric_id="ml.text_topic_discovery_v1.business_outcome.v1",
@@ -229,16 +237,23 @@ class TextTopicDiscoveryCase:
         )
 
     def assess(self, *, context: BenchmarkCaseContext) -> BenchmarkCaseAssessment:
+        terminal_text = _terminal_text(context.snapshot)
         outcome = _resolve_topic_outcomes(context)
         report_artifact, report = _resolve_evaluation_report(context)
         frames_agree = _topic_outputs_agree(outcome.fit_frame, outcome.apply_frame)
         grounding_gaps = _final_answer_grounding_gaps(
-            _terminal_text(context.snapshot),
+            terminal_text,
             report,
             fit_dataset=outcome.fit_dataset,
             apply_dataset=outcome.apply_dataset,
         )
-        terminal_privacy_failures = _terminal_privacy_failure_kinds(_terminal_text(context.snapshot))
+        prefinal_grounding = _prefinal_grounding_availability(context.snapshot)
+        terminal_privacy_failures = _terminal_privacy_failure_kinds(terminal_text)
+        path_provenance = _windows_path_provenance(
+            terminal_text,
+            attachment_path=self.source_path,
+            context=context,
+        )
         terminal_safe = not terminal_privacy_failures
         completed = canonical_completion(context.snapshot)
         source_unchanged = _source_unchanged(self, context)
@@ -285,7 +300,12 @@ class TextTopicDiscoveryCase:
                 (
                     "topic_evidence_and_limits_grounded"
                     if not grounding_gaps
-                    else "topic_explanation_not_grounded:" + ",".join(grounding_gaps)
+                    else (
+                        "topic_explanation_not_grounded:"
+                        + ",".join(grounding_gaps)
+                        + ";"
+                        + _prefinal_grounding_summary(prefinal_grounding)
+                    )
                 ),
             ),
             OutcomeCheck(
@@ -294,7 +314,15 @@ class TextTopicDiscoveryCase:
                 (
                     "final_answer_contains_only_bounded_public_facts"
                     if terminal_safe
-                    else "final_answer_private_values:" + ",".join(terminal_privacy_failures)
+                    else (
+                        "final_answer_private_values:"
+                        + ",".join(terminal_privacy_failures)
+                        + (
+                            ";windows_path_provenance:" + ",".join(path_provenance)
+                            if "windows_path" in terminal_privacy_failures
+                            else ""
+                        )
+                    )
                 ),
             ),
         )
@@ -1066,6 +1094,172 @@ def _terminal_privacy_failure_kinds(text: str) -> tuple[str, ...]:
     return tuple(failures)
 
 
+def _windows_path_provenance(
+    text: str,
+    *,
+    attachment_path: Path,
+    context: BenchmarkCaseContext,
+) -> tuple[str, ...]:
+    """Classify disclosed paths without retaining their matched values."""
+
+    normalized = _normalized_path_text(text)
+    if _WINDOWS_PATH.search(normalized) is None:
+        return ()
+
+    known_paths: tuple[tuple[str, tuple[Path, ...]], ...] = (
+        ("attachment_path", (attachment_path.resolve(),)),
+        (
+            "runtime_dataset_path",
+            tuple(
+                Path(str(getattr(dataset, "source_path", "")))
+                for dataset in context.services.datasets.list_datasets()
+                if is_within(
+                    Path(str(getattr(dataset, "source_path", ""))),
+                    context.runtime_home,
+                )
+            ),
+        ),
+        (
+            "runtime_artifact_path",
+            tuple(
+                Path(str(getattr(artifact, "absolute_path", "")))
+                for artifact in _linked_artifacts(context, text=text)
+                if is_within(
+                    Path(str(getattr(artifact, "absolute_path", ""))),
+                    context.runtime_home,
+                )
+            ),
+        ),
+    )
+    categories: list[str] = []
+    remaining = normalized
+    for category, paths in known_paths:
+        matched = False
+        candidates = sorted(
+            {
+                candidate
+                for path in paths
+                if (candidate := _normalized_path_text(str(path)))
+            },
+            key=len,
+            reverse=True,
+        )
+        for candidate in candidates:
+            if candidate not in remaining:
+                continue
+            matched = True
+            remaining = remaining.replace(candidate, "")
+        if matched:
+            categories.append(category)
+    if _WINDOWS_PATH.search(remaining) is not None:
+        categories.append("other_windows_path")
+    return tuple(categories or ("other_windows_path",))
+
+
+def _normalized_path_text(value: str) -> str:
+    normalized = unicodedata.normalize("NFKC", value).replace("\\", "/").casefold()
+    return re.sub(r"/+", "/", normalized)
+
+
+def _prefinal_grounding_availability(snapshot: Any | None) -> frozenset[str]:
+    available: set[str] = set()
+    for facts in _prefinal_topic_evaluation_facts(snapshot):
+        quality = facts.get("quality")
+        stability = facts.get("stability")
+        isolation = facts.get("isolation")
+        split = facts.get("split")
+        limitations = facts.get("limitations")
+        if (
+            isinstance(quality, dict)
+            and isinstance(stability, dict)
+            and _quality_matches(quality)
+            and _stability_matches(stability)
+        ):
+            available.add("quality_metrics")
+        if (
+            isinstance(isolation, dict)
+            and isinstance(split, dict)
+            and _isolation_matches(isolation)
+            and _split_matches(split)
+        ):
+            available.add("group_template_isolation")
+        if (
+            isinstance(limitations, list)
+            and any(
+                isinstance(value, str)
+                and any(marker in value.casefold() for marker in ("exploratory", "探索"))
+                for value in limitations
+            )
+            and all(marker in BUSINESS_PROMPT for marker in ("离线", "因果", "自动业务决策"))
+        ):
+            available.add("exploratory_offline_boundary")
+    return frozenset(available)
+
+
+def _prefinal_topic_evaluation_facts(snapshot: Any | None) -> tuple[dict[str, Any], ...]:
+    messages = list(getattr(snapshot, "messages", [])) if snapshot is not None else []
+    if not messages or enum_value(getattr(messages[-1], "kind", None)) != "assistant":
+        return ()
+    facts: list[dict[str, Any]] = []
+    for message in messages[:-1]:
+        if (
+            enum_value(getattr(message, "kind", None)) != "tool_result"
+            or enum_value(getattr(message, "result_status", None)) != "succeeded"
+        ):
+            continue
+        for candidate in _nested_topic_evaluation_facts(
+            getattr(message, "value_payload", None)
+        ):
+            if (
+                _topic_facts_match(candidate)
+                and _facts_are_bounded(candidate)
+                and candidate not in facts
+            ):
+                facts.append(candidate)
+    return tuple(facts)
+
+
+def _nested_topic_evaluation_facts(
+    value: Any,
+    *,
+    depth: int = 0,
+) -> tuple[dict[str, Any], ...]:
+    if depth > 8:
+        return ()
+    found: list[dict[str, Any]] = []
+    if isinstance(value, dict):
+        candidate = value.get(_FROZEN_API.evaluation_facts_key)
+        if isinstance(candidate, dict):
+            found.append(candidate)
+        for nested in value.values():
+            if isinstance(nested, (dict, list)):
+                found.extend(
+                    _nested_topic_evaluation_facts(nested, depth=depth + 1)
+                )
+    elif isinstance(value, list):
+        for nested in value:
+            if isinstance(nested, (dict, list)):
+                found.extend(
+                    _nested_topic_evaluation_facts(nested, depth=depth + 1)
+                )
+    return tuple(found)
+
+
+def _prefinal_grounding_summary(available: frozenset[str]) -> str:
+    present = tuple(
+        family for family in _PREFINAL_GROUNDING_FAMILIES if family in available
+    )
+    missing = tuple(
+        family for family in _PREFINAL_GROUNDING_FAMILIES if family not in available
+    )
+    return (
+        "prefinal_grounding_available:"
+        + (",".join(present) if present else "none")
+        + ";prefinal_grounding_unavailable:"
+        + (",".join(missing) if missing else "none")
+    )
+
+
 def _final_answer_grounding_gaps(
     text: str,
     report: dict[str, Any] | None,
@@ -1186,10 +1380,16 @@ def _build_judge_input(report: dict[str, Any]) -> JudgeInput:
     )
 
 
-def _linked_artifacts(context: BenchmarkCaseContext) -> tuple[Any, ...]:
+def _linked_artifacts(
+    context: BenchmarkCaseContext,
+    *,
+    text: str | None = None,
+) -> tuple[Any, ...]:
     artifacts: list[Any] = []
     seen: set[str] = set()
-    for uri in _ARTIFACT_URI.findall(_terminal_text(context.snapshot)):
+    for uri in _ARTIFACT_URI.findall(
+        _terminal_text(context.snapshot) if text is None else text
+    ):
         try:
             artifact = context.services.artifacts.resolve_uri(uri)
         except Exception:

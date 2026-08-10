@@ -159,7 +159,7 @@ def test_report_rejects_subject_budget_projection_drift(tmp_path: Path) -> None:
         load_agent_report(path)
 
 
-def test_formal_acceptance_requires_calibrated_independent_judge_and_four_repetitions(
+def test_formal_acceptance_allows_distinct_budgeted_invocations(
     tmp_path: Path,
 ) -> None:
     reports = tuple(
@@ -182,6 +182,10 @@ def test_formal_acceptance_requires_calibrated_independent_judge_and_four_repeti
         ),
     )
     calibration = _calibration_report()
+
+    assert len(
+        {report.payload["identity"]["invocation_id"] for report in reports}
+    ) == 4
 
     accepted = evaluate_formal_acceptance(reports, calibrations=(calibration,))
     uncalibrated = evaluate_formal_acceptance(reports)
