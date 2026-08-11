@@ -1492,9 +1492,6 @@ class ThreadDetailView(QWidget):
             self.retranslate_ui()
         super().changeEvent(event)
 
-    def render_snapshot(self, snapshot: Any) -> None:
-        self.render_events(project_chatbot_events(snapshot))
-
     def set_artifact_resolver(self, resolver: ArtifactResolver | None) -> None:
         self._artifact_resolver = resolver
 

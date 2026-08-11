@@ -8,13 +8,11 @@ import pytest
 
 from xenix.config import ensure_app_dirs, get_app_paths
 from xenix.exceptions import ValidationError
-from xenix.services.agent.tool_inputs import AnalysisProfileInput
 from xenix.services.agent.tools import AgentToolRegistry
 from xenix.services.analysis_profile import (
     AnalysisProfileService,
     MAX_PROFILE_FIELD_LIMIT,
     ProfileDatasetInput,
-    render_dataset_profile_markdown,
 )
 from xenix.services.dataset_service import DatasetService, RegisterDatasetInput
 from xenix.services.llm.tooling import ToolExecutionContext
@@ -115,12 +113,6 @@ def test_analysis_profile_service_returns_typed_bounded_value_safe_facts(
     assert "sample" not in provider_projection
     assert "preview" not in provider_projection
 
-    markdown = render_dataset_profile_markdown(result)
-    assert f"# Dataset profile: {dataset.id}" in markdown
-    assert "| Exact duplicate rows | 1 |" in markdown
-    assert "North" not in markdown
-    assert "C-001" not in markdown
-
 
 def test_analysis_profile_service_exposes_explicit_truncation(monkeypatch, tmp_path: Path) -> None:
     _paths, datasets, dataset = _registered_dataset(monkeypatch, tmp_path)
@@ -175,8 +167,6 @@ def test_analysis_profile_is_registered_as_one_atomic_read_only_tool(
         "correlation_column_limit",
     }
     assert "source_path" not in json.dumps(spec.parameters_schema)
-    assert AnalysisProfileInput.model_validate({"dataset_id": dataset.id}).dataset_id == dataset.id
-
     outcome = registry.execute(
         "analysis.profile",
         {"dataset_id": dataset.id},

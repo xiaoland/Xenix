@@ -1044,7 +1044,6 @@ class AgentToolRegistry:
         )
         if training_result is None:
             return self._training_task_receipt(
-                tool_name="model.train",
                 dataset_id=dataset_id,
                 root_task_ids=created_task_ids,
                 operation="fit",
@@ -1092,7 +1091,6 @@ class AgentToolRegistry:
         )
         if training_result is None:
             return self._training_task_receipt(
-                tool_name="model.hyper_train",
                 dataset_id=dataset_id,
                 root_task_ids=created_task_ids,
                 operation="hyperparameter_tuning",
@@ -1134,7 +1132,6 @@ class AgentToolRegistry:
         )
         if completed_task is None:
             return self._single_task_receipt(
-                tool_name="model.apply",
                 task_id=task.id,
                 operation="apply",
             )
@@ -1683,7 +1680,6 @@ class AgentToolRegistry:
     def _training_task_receipt(
         self,
         *,
-        tool_name: str,
         dataset_id: str,
         root_task_ids: list[str],
         operation: str,
@@ -1706,7 +1702,6 @@ class AgentToolRegistry:
     def _single_task_receipt(
         self,
         *,
-        tool_name: str,
         task_id: str,
         operation: str,
     ) -> ToolSuccess:
@@ -1721,17 +1716,6 @@ class AgentToolRegistry:
             "ml_tasks": [self._ml_task_payload(task)],
         }
         return ToolSuccess(value=payload)
-
-    def _task_receipt_markdown(self, payload: dict[str, Any]) -> str:
-        task_ids = [str(task_id) for task_id in payload.get("task_ids", [])]
-        lines = ["The ML work is still running in the background."]
-        if task_ids:
-            lines.append("")
-            lines.append("Task ids:")
-            lines.extend(f"- `{task_id}`" for task_id in task_ids)
-        lines.append("")
-        lines.append("Use `model.task.query` with these task ids to inspect status and logs.")
-        return "\n".join(lines)
 
     def _ml_task_payload(self, task: MLTaskRow) -> dict[str, Any]:
         return {
@@ -2304,119 +2288,6 @@ class AgentToolRegistry:
         )
         return payload
 
-    def _training_summary_markdown(self, payload: dict[str, Any]) -> str:
-        models = payload.get("trained_models", [])
-        lines = ["Training completed."]
-        for model in models:
-            line = f"- `{model['model_key']}` trained model id: `{model['trained_model_id']}`"
-            evaluation_task_id = model.get("evaluation_task_id")
-            if isinstance(evaluation_task_id, str) and evaluation_task_id:
-                line += f"; authoritative evaluation task: `{evaluation_task_id}`"
-            lines.append(line)
-        return "\n".join(lines)
-
-    def _model_task_query_markdown(self, tasks: list[dict[str, Any]]) -> str:
-        if not tasks:
-            return "No ML tasks were found."
-        lines = ["ML task status:"]
-        for task in tasks:
-            task_id = task.get("task_id")
-            task_type = task.get("task_type")
-            status = task.get("status")
-            model_key = task.get("model_key") or "unknown model"
-            lines.append(f"- `{task_id}` {task_type} for `{model_key}`: `{status}`")
-            error_summary = str(task.get("error_summary") or "").strip()
-            if error_summary:
-                lines.append(f"  Error: {error_summary}")
-            evaluation_lines = self._task_evaluation_summary_lines(task)
-            lines.extend(evaluation_lines)
-            follow_up_task_ids = task.get("follow_up_task_ids")
-            if isinstance(follow_up_task_ids, list) and follow_up_task_ids:
-                joined_ids = ", ".join(f"`{task_id}`" for task_id in follow_up_task_ids)
-                lines.append(f"  Follow-up task ids: {joined_ids}")
-        return "\n".join(lines)
-
-    def _metadata_evaluation_summary(self, metadata: dict[str, Any]) -> str:
-        metric_name = metadata.get("evaluation_primary_metric_name")
-        metric_value = metadata.get("evaluation_primary_metric_value")
-        if not isinstance(metric_name, str) or metric_value is None:
-            return ""
-        return f"{metric_name}={self._format_metric_value(metric_value)}"
-
-    def _task_evaluation_summary_lines(self, task: dict[str, Any]) -> list[str]:
-        if task.get("task_type") != MLTaskType.EVALUATE.value:
-            return []
-        result = task.get("result")
-        if not isinstance(result, dict):
-            return []
-        evaluation = result.get("evaluation")
-        if not isinstance(evaluation, dict):
-            return []
-        metrics = evaluation.get("metrics")
-        if not isinstance(metrics, dict):
-            return []
-
-        lines: list[str] = []
-        primary_name = evaluation.get("primary_metric_name")
-        primary_value = evaluation.get("primary_metric_value")
-        if isinstance(primary_name, str) and primary_value is not None:
-            lines.append(f"  Primary metric: {primary_name}={self._format_metric_value(primary_value)}")
-
-        metric_names = self._summary_metric_names(str(result.get("evaluation_kind") or ""), metrics)
-        metric_text = self._format_metric_list(metrics, metric_names)
-        if metric_text:
-            lines.append(f"  Key metrics: {metric_text}")
-
-        details = evaluation.get("details")
-        if isinstance(details, dict):
-            probability_metrics = details.get("probability_metrics")
-            if isinstance(probability_metrics, dict) and probability_metrics.get("available") is False:
-                reason = probability_metrics.get("reason")
-                if isinstance(reason, str) and reason:
-                    lines.append(f"  Probability metrics unavailable: {reason}.")
-        return lines
-
-    def _summary_metric_names(self, evaluation_kind: str, metrics: dict[str, Any]) -> list[str]:
-        if evaluation_kind == EvaluationKind.REGRESSION.value:
-            return ["r2", "rmse", "mae", "mape", "explained_variance"]
-        if evaluation_kind == EvaluationKind.CLASSIFICATION.value:
-            names = [
-                "accuracy",
-                "balanced_accuracy",
-                "f1_macro",
-                "f1_weighted",
-                "roc_auc",
-                "pr_auc",
-                "log_loss",
-            ]
-            return [name for name in names if name in metrics]
-        if evaluation_kind == EvaluationKind.RANKING.value:
-            names = [
-                "ndcg_at_k",
-                "recall_at_k",
-                "hit_rate_at_k",
-                "mrr_at_k",
-                "catalog_coverage_at_k",
-                "mean_novelty_at_k",
-                "mean_intra_list_diversity_at_k",
-                "seen_item_violation_count",
-            ]
-            return [name for name in names if name in metrics]
-        return list(metrics)[:5]
-
-    def _format_metric_list(self, metrics: dict[str, Any], names: list[str]) -> str:
-        parts: list[str] = []
-        for name in names:
-            if name not in metrics:
-                continue
-            parts.append(f"{name}={self._format_metric_value(metrics[name])}")
-        return ", ".join(parts)
-
-    def _format_metric_value(self, value: Any) -> str:
-        if isinstance(value, (int, float)):
-            return f"{float(value):.4g}"
-        return str(value)
-
     def _model_catalog_payload(
         self,
         entry: ModelCatalogEntry,
@@ -2456,28 +2327,6 @@ class AgentToolRegistry:
         if include_param_grid_schema:
             payload["param_grid_schema"] = entry.param_grid_schema
         return payload
-
-    def _model_metadata_markdown(self, models: list[dict[str, Any]]) -> str:
-        if not models:
-            return "No models match the requested filters."
-        lines = ["Available models:"]
-        for model in models:
-            capabilities = ["fit"] if model["supports_fit"] else []
-            if model["supports_hyperparameter_tuning"]:
-                capabilities.append("hyperparameter_tuning")
-            if model["supports_evaluation"]:
-                capabilities.append("evaluation")
-            if model["supports_apply"]:
-                capabilities.append(f"apply:{model['apply_mode']}")
-            legacy_problem = f", {model['problem_kind']}" if model["problem_kind"] else ""
-            lines.append(
-                "- "
-                f"`{model['model_key']}` ({model['display_name']}{legacy_problem}); "
-                f"evaluation: {model['evaluation_kind']}; "
-                f"task: {model['model_task_kind']}; "
-                f"capabilities: {', '.join(capabilities)}"
-            )
-        return "\n".join(lines)
 
     def _normalize_model_mapping(
         self,

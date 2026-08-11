@@ -116,7 +116,6 @@ platform = "win32"
 mypy_path = "src"
 files = [
     "scripts/build_knowledge_ocr_runtime.py",
-    "src/xenix/datetime_utils.py",
     "src/xenix/release_config.py",
     "src/xenix/trial_lock.py",
     "src/xenix/services/agent/knowledge_tool.py",

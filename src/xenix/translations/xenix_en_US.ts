@@ -186,39 +186,6 @@
     </message>
 </context>
 <context>
-    <name>DatasetSummaryWidget</name>
-    <message>
-        <location filename="../ui/widgets/dataset_summary.py" line="54"/>
-        <source>File</source>
-        <translation>File</translation>
-    </message>
-    <message>
-        <location filename="../ui/widgets/dataset_summary.py" line="55"/>
-        <source>Path</source>
-        <translation>Path</translation>
-    </message>
-    <message>
-        <location filename="../ui/widgets/dataset_summary.py" line="56"/>
-        <source>Format</source>
-        <translation>Format</translation>
-    </message>
-    <message>
-        <location filename="../ui/widgets/dataset_summary.py" line="57"/>
-        <source>Rows</source>
-        <translation>Rows</translation>
-    </message>
-    <message>
-        <location filename="../ui/widgets/dataset_summary.py" line="58"/>
-        <source>Columns</source>
-        <translation>Columns</translation>
-    </message>
-    <message>
-        <location filename="../ui/widgets/dataset_summary.py" line="59"/>
-        <source>Preview</source>
-        <translation>Preview</translation>
-    </message>
-</context>
-<context>
     <name>Exceptions</name>
     <message>
         <location filename="../exceptions.py" line="76"/>
@@ -242,21 +209,6 @@
         <location filename="../ui/widgets/file_drop_zone.py" line="38"/>
         <source>Supports .csv, .xlsx, and .xls</source>
         <translation>Supports .csv, .xlsx, and .xls</translation>
-    </message>
-</context>
-<context>
-    <name>JsonSchemaFormWidget</name>
-    <message>
-        <location filename="../ui/widgets/json_schema_form.py" line="117"/>
-        <location filename="../ui/widgets/json_schema_form.py" line="220"/>
-        <source>One value per line</source>
-        <translation>One value per line</translation>
-    </message>
-    <message>
-        <location filename="../ui/widgets/json_schema_form.py" line="211"/>
-        <location filename="../ui/widgets/json_schema_form.py" line="217"/>
-        <source>No parameters to configure.</source>
-        <translation>No parameters to configure.</translation>
     </message>
 </context>
 <context>
@@ -1391,7 +1343,7 @@ Trigger: %2</translation>
         <location filename="../ui/settings_dialog.py" line="474"/>
         <location filename="../ui/settings_dialog.py" line="800"/>
         <location filename="../ui/settings_dialog.py" line="825"/>
-        <location filename="../ui/settings_dialog.py" line="1050"/>
+        <location filename="../ui/settings_dialog.py" line="1049"/>
         <source>Settings</source>
         <translation>Settings</translation>
     </message>
@@ -1597,7 +1549,7 @@ Trigger: %2</translation>
     </message>
     <message>
         <location filename="../ui/settings_dialog.py" line="563"/>
-        <location filename="../ui/settings_dialog.py" line="998"/>
+        <location filename="../ui/settings_dialog.py" line="997"/>
         <source>Ready</source>
         <translation>Ready</translation>
     </message>
@@ -1681,33 +1633,33 @@ Trigger: %2</translation>
         <translation>Embedding settings were saved, but the vector rebuild could not be queued.</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="851"/>
+        <location filename="../ui/settings_dialog.py" line="850"/>
         <source>Rebuild text vectors?</source>
         <translation>Rebuild text vectors?</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="854"/>
+        <location filename="../ui/settings_dialog.py" line="853"/>
         <source>This change uses a different embedding space. Existing text vectors cannot be reused for current Knowledge content.</source>
         <translation>This change uses a different embedding space. Existing text vectors cannot be reused for current Knowledge content.</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="859"/>
+        <location filename="../ui/settings_dialog.py" line="858"/>
         <source>Save and rebuild now</source>
         <translation>Save and rebuild now</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="863"/>
+        <location filename="../ui/settings_dialog.py" line="862"/>
         <source>Save; rebuild later</source>
         <translation>Save; rebuild later</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="973"/>
+        <location filename="../ui/settings_dialog.py" line="972"/>
         <source>Knowledge index service is unavailable</source>
         <translation>Knowledge index service is unavailable</translation>
     </message>
     <message>
         <location filename="../ui/settings_dialog.py" line="814"/>
-        <location filename="../ui/settings_dialog.py" line="980"/>
+        <location filename="../ui/settings_dialog.py" line="979"/>
         <source>Knowledge index status is unavailable</source>
         <translation>Knowledge index status is unavailable</translation>
     </message>
@@ -1810,44 +1762,44 @@ Trigger: %2</translation>
         <translation type="vanished">Embedding settings changed elsewhere. Your edits are still shown; save again to reapply them.</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="982"/>
+        <location filename="../ui/settings_dialog.py" line="981"/>
         <source>Checking Knowledge index status</source>
         <translation>Checking Knowledge index status</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="988"/>
+        <location filename="../ui/settings_dialog.py" line="987"/>
         <source>Keyword: %1
 Text vectors: %2</source>
         <translation>Keyword: %1
 Text vectors: %2</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="999"/>
+        <location filename="../ui/settings_dialog.py" line="998"/>
         <source>Building</source>
         <translation>Building</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="1000"/>
+        <location filename="../ui/settings_dialog.py" line="999"/>
         <source>Needs rebuild</source>
         <translation>Needs rebuild</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="1001"/>
+        <location filename="../ui/settings_dialog.py" line="1000"/>
         <source>Unavailable</source>
         <translation>Unavailable</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="1002"/>
+        <location filename="../ui/settings_dialog.py" line="1001"/>
         <source>Needs attention</source>
         <translation>Needs attention</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="1004"/>
+        <location filename="../ui/settings_dialog.py" line="1003"/>
         <source>Unknown status</source>
         <translation>Unknown status</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="1013"/>
+        <location filename="../ui/settings_dialog.py" line="1012"/>
         <source>{local_count} local, {ssh_count} SSH, {slots} execution slot(s).</source>
         <translation>{local_count} local, {ssh_count} SSH, {slots} execution slot(s).</translation>
     </message>
@@ -1856,12 +1808,12 @@ Text vectors: %2</translation>
         <translation type="vanished">This provider is managed by a deployment and cannot be removed here.</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="1149"/>
+        <location filename="../ui/settings_dialog.py" line="1148"/>
         <source>Built into packaged app</source>
         <translation>Built into packaged app</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="1200"/>
+        <location filename="../ui/settings_dialog.py" line="1199"/>
         <source>None</source>
         <translation>None</translation>
     </message>
@@ -2125,8 +2077,8 @@ Text vectors: %2</translation>
     </message>
     <message>
         <location filename="../ui/chatbot.py" line="1475"/>
-        <location filename="../ui/chatbot.py" line="1910"/>
-        <location filename="../ui/chatbot.py" line="1921"/>
+        <location filename="../ui/chatbot.py" line="1907"/>
+        <location filename="../ui/chatbot.py" line="1918"/>
         <source>Attach files</source>
         <translation>Attach files</translation>
     </message>
@@ -2142,7 +2094,7 @@ Text vectors: %2</translation>
     </message>
     <message>
         <location filename="../ui/chatbot.py" line="1478"/>
-        <location filename="../ui/chatbot.py" line="1853"/>
+        <location filename="../ui/chatbot.py" line="1850"/>
         <source>Stop</source>
         <translation>Stop</translation>
     </message>
@@ -2162,13 +2114,13 @@ Text vectors: %2</translation>
         <translation>Scroll to bottom</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1855"/>
-        <location filename="../ui/chatbot.py" line="1861"/>
+        <location filename="../ui/chatbot.py" line="1852"/>
+        <location filename="../ui/chatbot.py" line="1858"/>
         <source>Send</source>
         <translation>Send</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1912"/>
+        <location filename="../ui/chatbot.py" line="1909"/>
         <source>Data files (*.csv *.xlsx *.xls)</source>
         <translation>Data files (*.csv *.xlsx *.xls)</translation>
     </message>
@@ -2605,12 +2557,12 @@ State file: {state_path}</translation>
         <translation>Buy license</translation>
     </message>
     <message>
-        <location filename="../app.py" line="802"/>
+        <location filename="../app.py" line="824"/>
         <source>Unable to start Xenix</source>
         <translation>Unable to start Xenix</translation>
     </message>
     <message>
-        <location filename="../app.py" line="803"/>
+        <location filename="../app.py" line="825"/>
         <source>Xenix could not finish startup.
 
 {error}</source>

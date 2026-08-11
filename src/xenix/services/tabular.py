@@ -372,13 +372,6 @@ def format_value(value: Any) -> str:
     return str(value)
 
 
-def format_column(value: Any, index: int) -> str:
-    text = format_value(value)
-    if text:
-        return text
-    return f"Unnamed: {index}"
-
-
 def _load_pandas_frame_for_tools(
     path: Path,
     source_format: DatasetSourceFormat,
