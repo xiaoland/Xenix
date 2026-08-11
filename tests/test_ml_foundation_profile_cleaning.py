@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from pathlib import Path
 from unittest.mock import Mock
 
@@ -29,6 +30,10 @@ def _sha256(path: Path) -> str:
 def _xtt_metadata(value: str, key: str) -> str:
     prefix = f"{key}: "
     return next(line.removeprefix(prefix) for line in value.splitlines() if line.startswith(prefix))
+
+
+def _xtt_json_metadata(value: str, key: str):
+    return json.loads(_xtt_metadata(value, key))
 
 
 def test_clean_room_profile_and_whole_dataset_cleaning_workflow(
@@ -122,6 +127,39 @@ def test_clean_room_profile_and_whole_dataset_cleaning_workflow(
     assert isinstance(clean_outcome.value, str)
     assert "Whole-Dataset cleaned result created" in clean_outcome.value
     assert "not holdout-safe learned model preparation" in clean_outcome.value
+    assert "cleaned rows and schema preview are omitted" in clean_outcome.value
+    assert "shape:" not in clean_outcome.value
+    assert "schema:" not in clean_outcome.value
+    assert "\ndata:" not in clean_outcome.value
+    assert "\nrecords:" not in clean_outcome.value
+    assert "preview_rows" not in clean_outcome.value
+    assert "T-001" not in clean_outcome.value
+    assert "2025-01-01" not in clean_outcome.value
+    assert len(clean_outcome.value) < 4_096
+    assert _xtt_metadata(clean_outcome.value, "source_dataset_id") == source_dataset.id
+    operation_effects = _xtt_json_metadata(clean_outcome.value, "operation_effects")
+    assert operation_effects[2] == {
+        "operation": "missing.fill_median",
+        "column": "revenue",
+        "cells_filled": 1,
+        "resolved_fill_value": 135.0,
+    }
+    assert operation_effects[3] == {
+        "operation": "missing.fill_mode",
+        "column": "region",
+        "cells_filled": 1,
+        "resolved_fill_value": "North",
+    }
+    assert _xtt_json_metadata(clean_outcome.value, "validation_effects") == [
+        {
+            "name": "discount_rate_at_most_one",
+            "column": "discount_rate",
+            "operation": "validation.max",
+            "action": "drop_rows",
+            "violations": 1,
+            "rows_removed": 1,
+        }
+    ]
     derived_dataset_id = _xtt_metadata(clean_outcome.value, "dataset_id")
     artifact_id = _xtt_metadata(clean_outcome.value, "artifact_id")
     derived_dataset = datasets.get_dataset(derived_dataset_id)

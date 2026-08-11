@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import re
 import unicodedata
 from pathlib import Path
@@ -960,18 +961,21 @@ class DataCleaningService:
             missing_before = int(frame[column].isna().sum())
             if missing_before == 0:
                 continue
+            resolved_fill_value: Any | None = None
             if strategy == "forward_fill":
                 frame[column] = frame[column].ffill()
             else:
                 fill_value = self._resolve_fill_value(frame[column], strategy, column, params.get("value"), report)
                 frame[column] = frame[column].fillna(fill_value)
-            report["operations"].append(
-                {
-                    "operation": operation_name,
-                    "column": column,
-                    "cells_filled": missing_before - int(frame[column].isna().sum()),
-                }
-            )
+                resolved_fill_value = self._report_scalar(fill_value)
+            operation_report = {
+                "operation": operation_name,
+                "column": column,
+                "cells_filled": missing_before - int(frame[column].isna().sum()),
+            }
+            if strategy != "forward_fill":
+                operation_report["resolved_fill_value"] = resolved_fill_value
+            report["operations"].append(operation_report)
         return frame
 
     def _apply_drop_high_missing_columns(
@@ -1025,6 +1029,29 @@ class DataCleaningService:
             )
             return ""
         return fill_value
+
+    @staticmethod
+    def _report_scalar(value: Any) -> str | int | float | bool | None:
+        """Normalize one resolved operation value for JSON report persistence."""
+
+        item = value
+        scalar_item = getattr(item, "item", None)
+        if callable(scalar_item):
+            try:
+                item = scalar_item()
+            except (TypeError, ValueError):
+                item = value
+        if isinstance(item, float) and not math.isfinite(item):
+            return str(item)
+        if item is None or isinstance(item, str | int | float | bool):
+            return item
+        isoformat = getattr(item, "isoformat", None)
+        if callable(isoformat):
+            try:
+                return str(isoformat())
+            except (TypeError, ValueError):
+                pass
+        return str(item)
 
     def _apply_type_convert(
         self,

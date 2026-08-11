@@ -119,6 +119,7 @@ def test_ordered_validation_preserves_nullable_rows_for_later_imputation(
         "operation": "missing.fill_median",
         "column": "unit_count",
         "cells_filled": 2,
+        "resolved_fill_value": 22,
     }
     assert _sha256(RAW_FIXTURE) == source_hash
     assert _sha256(source_path) == materialized_source_hash
@@ -286,6 +287,7 @@ def test_operation_order_changes_the_imputation_authority_set(
         "operation": "missing.fill_median",
         "column": "unit_count",
         "cells_filled": 2,
+        "resolved_fill_value": 14,
     }
     assert result.report["validation_rules"][0]["violations"] == 2
     assert result.report["rows_removed"] == 3

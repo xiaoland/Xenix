@@ -119,6 +119,7 @@ MAX_CLEANING_REPORT_WARNING_ENTRIES = 5
 MAX_CLEANING_REPORT_COLUMN_NAMES = 6
 MAX_CLEANING_REPORT_WARNING_CHARS = 240
 MAX_CLEANING_REPORT_COLUMN_NAME_CHARS = 96
+MAX_CLEANING_REPORT_FILL_VALUE_CHARS = 96
 MODEL_HYPER_TRAIN_GRACE_SECONDS = 60.0
 MAX_MODEL_TASK_LOG_CHARS = 500
 MAX_MODEL_METRICS = 24
@@ -734,6 +735,7 @@ class AgentToolRegistry:
         )
         payload["row_count_before"] = row_count_before
         payload["row_count_after"] = row_count_after
+        payload["source_dataset_id"] = dataset.id
         payload["scope"] = "whole_dataset"
         payload["holdout_safe_model_preparation"] = False
         payload["cleaning_report"] = self._compact_cleaning_report(clean_result.report)
@@ -1373,6 +1375,10 @@ class AgentToolRegistry:
                     )
                 else:
                     compact[key] = value
+        if "resolved_fill_value" in operation:
+            compact["resolved_fill_value"] = self._compact_cleaning_scalar(
+                operation.get("resolved_fill_value")
+            )
         feature_range = operation.get("feature_range")
         if (
             isinstance(feature_range, list)
@@ -1418,6 +1424,15 @@ class AgentToolRegistry:
             if isinstance(value, (list, dict)):
                 compact[count_key] = len(value)
         return compact
+
+    @staticmethod
+    def _compact_cleaning_scalar(value: Any) -> str | int | float | bool | None:
+        if value is None or isinstance(value, int | float | bool):
+            return value
+        return AgentToolRegistry._bounded_cleaning_text(
+            value,
+            MAX_CLEANING_REPORT_FILL_VALUE_CHARS,
+        )
 
     def _compact_cleaning_validation_rule(self, rule: dict[str, Any]) -> dict[str, Any]:
         compact: dict[str, Any] = {}

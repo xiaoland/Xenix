@@ -69,6 +69,8 @@ def _render_data_query(payload: dict[str, Any]) -> str | None:
 
 
 def _render_generated_dataset_preview(tool_name: str, payload: dict[str, Any]) -> str | None:
+    if tool_name == "data.clean":
+        return _render_cleaned_dataset_result(payload)
     inspection = payload.get("inspection")
     if not isinstance(inspection, dict):
         return None
@@ -120,6 +122,29 @@ def _render_generated_dataset_preview(tool_name: str, payload: dict[str, Any]) -
     if not prefix:
         return table_text
     return "\n".join(prefix) + "\n\n" + table_text
+
+
+def _render_cleaned_dataset_result(payload: dict[str, Any]) -> str:
+    lines: list[str] = []
+    _append_metadata(lines, "tool", "data.clean")
+    _append_metadata(lines, "dataset_id", payload.get("dataset_id"))
+    _append_metadata(lines, "artifact_id", payload.get("artifact_id"))
+    _append_metadata(lines, "summary", payload.get("summary") or payload.get("message"))
+    _append_generated_dataset_metadata(lines, "data.clean", payload)
+    artifact_id = payload.get("artifact_id")
+    note = (
+        "cleaned rows and schema preview are omitted; use dataset_id for local follow-up tools "
+        "and artifact_id for the user-openable complete result."
+        if artifact_id
+        else "no cleaned Dataset was created; no row or schema preview is included."
+    )
+    lines.extend(
+        [
+            "notes:",
+            "  - " + _yaml_scalar(note),
+        ]
+    )
+    return "\n".join(lines)
 
 
 def _render_table_text(
@@ -201,6 +226,12 @@ def _append_generated_dataset_metadata(lines: list[str], tool_name: str, payload
     _append_metadata(lines, "row_count_before", payload.get("row_count_before"))
     _append_metadata(lines, "row_count_after", payload.get("row_count_after"))
     if tool_name == "data.clean":
+        _append_metadata(lines, "scope", payload.get("scope"))
+        _append_metadata(
+            lines,
+            "holdout_safe_model_preparation",
+            payload.get("holdout_safe_model_preparation"),
+        )
         _append_cleaning_metadata(lines, payload.get("cleaning_report"))
     if tool_name == "data.tokenize":
         _append_tokenization_metadata(lines, payload.get("tokenization_report"))
@@ -210,17 +241,64 @@ def _append_cleaning_metadata(lines: list[str], report: Any) -> None:
     if not isinstance(report, dict):
         return
     _append_metadata(lines, "rows_removed", report.get("rows_removed"))
+    _append_metadata(lines, "no_op", report.get("no_op"))
+    _append_metadata(lines, "operation_count", report.get("operation_count"))
     operations = report.get("operations")
     if isinstance(operations, list):
-        operation_names = [
-            str(operation.get("operation"))
+        operation_effects = [
+            _cleaning_operation_effect(operation)
             for operation in operations
-            if isinstance(operation, dict) and operation.get("operation")
+            if isinstance(operation, dict)
         ]
-        _append_metadata(lines, "operations", operation_names)
+        operation_effects = [effect for effect in operation_effects if effect]
+        _append_json_metadata(lines, "operation_effects", operation_effects)
+    _append_metadata(lines, "omitted_operation_entries", report.get("omitted_operation_entries"))
+    _append_metadata(lines, "validation_rule_count", report.get("validation_rule_count"))
+    validation_rules = report.get("validation_rules")
+    if isinstance(validation_rules, list):
+        validation_effects = [
+            _cleaning_validation_effect(rule)
+            for rule in validation_rules
+            if isinstance(rule, dict)
+        ]
+        validation_effects = [effect for effect in validation_effects if effect]
+        _append_json_metadata(lines, "validation_effects", validation_effects)
+    _append_metadata(lines, "omitted_validation_rules", report.get("omitted_validation_rules"))
+    _append_metadata(lines, "warning_count", report.get("warning_count"))
     warnings = report.get("warnings")
     if isinstance(warnings, list) and warnings:
         _append_metadata(lines, "warnings", [str(warning) for warning in warnings])
+    _append_metadata(lines, "omitted_warnings", report.get("omitted_warnings"))
+
+
+def _cleaning_operation_effect(operation: dict[str, Any]) -> dict[str, Any]:
+    allowed = (
+        "operation",
+        "column",
+        "columns",
+        "rows_removed",
+        "cells_filled",
+        "resolved_fill_value",
+        "cells_changed",
+        "coerced_to_null",
+        "columns_changed",
+        "columns_removed",
+    )
+    return {key: operation[key] for key in allowed if key in operation}
+
+
+def _cleaning_validation_effect(rule: dict[str, Any]) -> dict[str, Any]:
+    allowed = ("name", "column", "operation", "action", "violations", "rows_removed")
+    return {key: rule[key] for key in allowed if key in rule}
+
+
+def _append_json_metadata(lines: list[str], key: str, value: Any) -> None:
+    if not value:
+        return
+    lines.append(
+        f"{key}: "
+        + json.dumps(value, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
+    )
 
 
 def _append_tokenization_metadata(lines: list[str], report: Any) -> None:
