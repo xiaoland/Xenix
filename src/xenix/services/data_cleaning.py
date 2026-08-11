@@ -1116,7 +1116,7 @@ class DataCleaningService:
             {"report_only", "drop_rows"},
             f"{operation_name}.params.action",
         )
-        mask = self._validation_mask(frame[column], operation_name, params)
+        mask = self._validation_mask(frame[column], operation_name, params).fillna(False).astype(bool)
         violations = int(mask.sum())
         entry = {
             "name": str(params.get("name") or operation_name).strip() or operation_name,
@@ -1126,8 +1126,9 @@ class DataCleaningService:
             "violations": violations,
         }
         if action == "drop_rows" and violations:
+            row_count_before = int(len(frame.index))
             frame = frame.loc[~mask].copy()
-            entry["rows_removed"] = violations
+            entry["rows_removed"] = row_count_before - int(len(frame.index))
         report["validation_rules"].append(entry)
         return frame
 

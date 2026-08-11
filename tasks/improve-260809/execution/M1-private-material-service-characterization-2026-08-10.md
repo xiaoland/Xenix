@@ -2,7 +2,7 @@
 
 ## Scope and Safety Result
 
-Four independent internal-only cells ran under the existing material-adoption guardrails. Foundation and clustering/forecasting produced qualified bounded characterizations. Recommendation and text stopped with stable fail-closed reasons. This satisfies M1's acceptance rule without changing product semantics.
+Four independent internal-only cells ran under the existing material-adoption guardrails. Clustering/forecasting produced a qualified bounded characterization. Foundation originally appeared qualified, but O4-A1 later proved its cleaning adapter used aggregate-only assertions and did not compare the supplied expected result; that cleaning subclaim is retracted below. Recommendation and text stopped with stable fail-closed reasons.
 
 All selected files were individually SHA-256-bound. Reference, subject, evaluator, and run roots were physically disjoint, with zero cross-projection content-hash overlap. Provider attempts, reference-code executions, and supplied/reference serialization loads were all zero. Supplied code was static-scanned only; Xenix public ML lifecycles consumed only artifacts they created themselves. No supplied byte or derivative was committed, published, or uploaded.
 
@@ -19,17 +19,17 @@ The selectors remain acceptance authority. Their existing Joblib/NumPy deprecati
 
 ## Qualified Cells
 
-### Foundation
+### Foundation — corrected disposition
 
 - source manifest: `d7582f93f782804a9bddda00cdbab3c586e0ffa2a60f8802fb730b1d5deaa028`;
 - bounded result: `19750babb8ad0f25848b74dedbe4827bf31fd6e3da69c5ce65fdd309d9a76292`;
 - profile: `5,000 × 15`, 15 bounded field facts, 6 numeric summaries, 2 datetime ranges, and no truncation;
-- whole-Dataset cleaning: `227 -> 223` rows, 4 removals, `79 -> 0` missing cells, and verified derived lineage;
+- the original whole-Dataset cleaning observation was `227 -> 223`, 4 removals, `79 -> 0` missing cells, and verified lineage, but it is not qualified cleaning evidence;
 - lifecycle: `2,000` training rows, `80` apply rows, 13 features, ordered apply schema match, stratified holdout, train-side learned preparation, unknown-category ignore, and verified apply lineage;
 - primary metric: candidate `0.7458477061` versus same-holdout baseline `0.6801758087`, verdict `candidate_better`;
 - bounded service time: `1.334 s` total.
 
-These are one private characterization's bounded facts, not a new model-quality threshold or product oracle.
+The profile and lifecycle values remain bounded observations. On 2026-08-11, O4-A1 admitted the supplied complete cleaning result as evaluator-only truth and reran adapter v2. It failed closed at `oracle_qualification_failed / cleaning_complete_result`: Xenix produced `223 × 13`, while the supplied expected result is `218 × 18`. The old cleaning qualification is therefore retracted rather than grandfathered. See the [O4-A1 execution record](O4-A1-cleaning-service-correctness-2026-08-11.md).
 
 ### Clustering and Forecasting
 

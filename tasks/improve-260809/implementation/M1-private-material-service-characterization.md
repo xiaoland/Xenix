@@ -1,6 +1,6 @@
 # M1 Implementation Plan — Private-Material Service Characterization
 
-**Status:** Completed on 2026-08-10 with two qualified bounded characterizations and two stable fail-closed cells. It authorized no product mutation or Provider upload.
+**Status:** Completed, with a 2026-08-11 correction: clustering/forecasting remains qualified; Foundation cleaning is reclassified fail-closed after complete-result comparison; recommendation and text remain fail-closed. It authorized no product mutation or Provider upload.
 **Execution record:** [M1 private-material service characterization — 2026-08-10](../execution/M1-private-material-service-characterization-2026-08-10.md).
 
 ## Outcome
@@ -40,4 +40,4 @@ Stop on hash/license mismatch, unexpected write, unsafe code tail, serialization
 
 M1 is complete when every admitted cell has either a qualified bounded characterization or a stable fail-closed reason. It does not require or permit uploading supplied bytes to the paid Agent.
 
-That condition was met on 2026-08-10: Foundation and clustering/forecasting qualified; recommendation failed closed on `oracle_qualification_failed / recommendation_holdout`; text failed closed on `format_semantic_mismatch / text_resource_admission`. Supporting two-column text normalization mappings would require a new exact Impact Handshake before rerunning the private text cell.
+That condition remains met because a stable fail-closed result is valid characterization evidence. Current dispositions are: clustering/forecasting qualified; Foundation cleaning failed closed on `oracle_qualification_failed / cleaning_complete_result` after its earlier aggregate-only verdict was corrected; recommendation failed closed on `oracle_qualification_failed / recommendation_holdout`; text failed closed on `format_semantic_mismatch / text_resource_admission`. Supporting the newly exposed textbook cleaning semantics or two-column text normalization mappings requires separate exact handshakes.
