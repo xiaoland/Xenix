@@ -20,10 +20,8 @@ from .dataset_inspection import detect_source_format
 from .preprocessing_worker import LocalPreprocessingWorkerRunner, PreprocessingWorkerRunner
 from .storage.models import DatasetSourceFormat
 from .tabular import (
-    LoadedPandasFrame,
     TabularSchema,
     apply_tabular_schema,
-    load_pandas_frame_with_schema,
     load_tabular_schema,
     load_tabular_frame,
     resolve_tabular_schema_for_loaded_frame,
@@ -572,9 +570,9 @@ class DataQueryTransformService:
                 source_format,
                 temp_dir=temp_dir,
             )
-        loaded = self._load_frame_with_schema(path)
-        connection.register(relation_name, loaded.frame)
-        return loaded.schema
+        raise ValidationError(
+            "SQL dataset bindings support .parquet, .xlsx, and .xls source files only."
+        )
 
     def _register_parquet_binding(
         self,
@@ -668,15 +666,6 @@ class DataQueryTransformService:
         if not normalized:
             raise ValidationError("At least one dataset binding is required.")
         return normalized
-
-    def _load_frame(self, path: Path) -> pd.DataFrame:
-        return self._load_frame_with_schema(path).frame
-
-    def _load_frame_with_schema(self, path: Path) -> LoadedPandasFrame:
-        source_format = detect_source_format(path)
-        if source_format is DatasetSourceFormat.UNKNOWN:
-            raise ValidationError("Only .csv, .parquet, .xlsx, and .xls dataset files are supported.")
-        return load_pandas_frame_with_schema(path, source_format)
 
     def _normalize_limit(self, limit: int) -> int:
         try:

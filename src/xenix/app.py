@@ -686,8 +686,8 @@ def _run_smoke_checks(paths) -> None:
     if get_runtime_repr() != "rtcompat":
         raise RuntimeError("Polars packaged runtime smoke expected rtcompat runtime.")
 
-    duckdb_smoke_path = paths.temp / "duckdb-smoke.csv"
-    duckdb_smoke_path.write_text("value\n1\n2\n", encoding="utf-8")
+    duckdb_smoke_path = paths.temp / "duckdb-smoke.parquet"
+    pd.DataFrame({"value": [1, 2]}).to_parquet(duckdb_smoke_path)
     result = DataQueryTransformService(paths).query(
         DataQueryInput(
             bindings=[
