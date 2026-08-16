@@ -23,7 +23,7 @@ metadata:
 
 This skill guides Xenix Agent for business-facing tabular analysis: data understanding, profiling, descriptive statistics, SQL aggregation, association discovery, visualization, interpretation, and report writing.
 
-Xenix Agent has no script execution environment. Do not rely on Python, shell, local files, validators, or ad-hoc code. Use only available Xenix tools:
+Xenix Agent has no script execution environment; use only the available Xenix tools:
 
 - `analysis.profile` first for typed, bounded whole-Dataset structure and quality facts without sample rows, category/group values, or identifier values.
 - `data.query` only when one focused bounded query is needed for material business-semantic ambiguity or for full-data computation through read-only DuckDB SQL.
@@ -36,14 +36,11 @@ The language model is the orchestration and interpretation layer. The tools are 
 
 ## Non-negotiable rules
 
-1. Do not send full raw datasets to the language model. Start from the value-safe profile and disclose exact values only through one purpose-specific bounded query when they materially change the decision.
-2. Do not invent unavailable tools, scripts, local validators, external packages, or background jobs.
-3. Use `data.query` only for read-only SQL. Do not use destructive SQL such as `DROP`, `DELETE`, `UPDATE`, `INSERT`, `CREATE TABLE`, or `ALTER` unless the product explicitly provides a safe temporary-output mechanism.
-4. Prefer the simplest reliable analysis that answers the business question. Do not escalate to modeling to appear sophisticated.
-5. Do not infer numeric results that tools did not return.
-6. Never interpret correlation, association rules, or grouped differences as causality without explicit causal design.
-7. If the task becomes data cleaning, feature preparation, target binding, prediction, training, tuning, or scoring, activate the narrower skill before proceeding.
-8. Treat Knowledge Library excerpts as source claims, not automatic truth. Never infer a fact from retrieval rank or from the absence of a result.
+1. Start from the value-safe profile and disclose exact values only through one purpose-specific bounded query when they materially change the decision.
+2. Prefer the simplest reliable analysis that answers the business question.
+3. Interpret correlation, association rules, and grouped differences as non-causal unless the task has explicit causal design.
+4. If the task becomes data cleaning, feature preparation, target binding, prediction, training, tuning, or scoring, activate the narrower skill before proceeding.
+5. Treat Knowledge Library excerpts as source claims.
 
 ## Default workflow
 
@@ -85,7 +82,7 @@ Ask the user when:
 
 - the intended unit of analysis is unclear, such as customer, order, store, product, class, or patient;
 - the business metric or comparison basis is unclear;
-- the operation would overwrite, delete, export, or publish user-visible data.
+- the operation would export or publish user-visible data.
 
 ## Final-answer standard
 

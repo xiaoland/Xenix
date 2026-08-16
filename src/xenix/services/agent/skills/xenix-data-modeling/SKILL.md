@@ -44,32 +44,32 @@ Xenix Agent has no script execution environment. Use only available Xenix tools:
 
 ## Non-negotiable rules
 
-1. Do not train before identifying the business target, unit of analysis, candidate feature fields, leakage fields, time fields, and sensitive fields.
-2. Do not use identifiers, post-outcome fields, target duplicates, or sensitive/prohibited fields as predictive features.
+1. Identify the business target, unit of analysis, candidate feature fields, leakage fields, time fields, and sensitive fields before training.
+2. Exclude identifiers, post-outcome fields, target duplicates, and sensitive/prohibited fields from predictive features.
 3. Train a simple baseline first. Tune only when the baseline is valid and the business question needs better predictive performance.
-4. Do not claim causality from coefficients, feature importance, associations, or model explanations.
-5. Do not claim the model is suitable for automatic decisions unless threshold, risk, compliance, and human-review boundaries are explicit.
+4. Present coefficients, feature importance, associations, and model explanations as associations, not causality.
+5. State threshold, risk, compliance, and human-review boundaries before presenting any model as automatic-decision ready.
 6. If the dataset needs cleaning, derived features, joins, transformations, or role binding preparation, activate `xenix-data-preprocessing`.
 7. If the user only needs descriptive analysis, charts, association discovery, or a management report, activate `xenix-data-analysis`.
-8. A Knowledge excerpt is a source claim, not label truth, model performance, causal evidence, or authorization for an automatic decision.
-9. Treat `data.clean` as a whole-Dataset business transformation, not proof of holdout-safe model preparation. Learned imputation, encoding, scaling, and vectorization must be fitted inside the model Pipeline on the outer training partition.
-10. When multiple rows belong to one customer, account, device, household, case, or other business entity, bind that entity as `group`. Never use the group as a feature, and never describe row-random evidence as group-safe.
-11. Use the referenced Evaluate ML task as the authority for candidate metrics, same-holdout baseline metrics, actual split facts, and preparation facts. Do not infer those facts from model metadata or algorithm names.
+8. Treat Knowledge excerpts as source claims.
+9. Fit learned imputation, encoding, scaling, and vectorization inside the model Pipeline on the outer training partition; `data.clean` is a whole-Dataset business transformation.
+10. When multiple rows belong to one business entity, bind it as `group`, not as a feature; report only group-safe evidence.
+11. Use the referenced Evaluate ML task as the authority for candidate metrics, same-holdout baseline metrics, actual split facts, and preparation facts.
 12. Forecast only after binding exactly one `time`, exactly one `target`, and at most one independent `group`. Profile first; reject or explicitly repair duplicate time keys, missing periods, mixed/irregular cadence, non-finite targets, or unaligned group cutoffs before training.
-13. Compare `forecasting.seasonal_naive`, `forecasting.holt_winters`, and `forecasting.sarima` on the same cadence, horizon, seasonal period, rolling folds, metric contract, and interval level. Never compare metrics produced from different fold identities as though they were one experiment.
+13. Compare `forecasting.seasonal_naive`, `forecasting.holt_winters`, and `forecasting.sarima` on the same cadence, horizon, seasonal period, rolling folds, metric contract, and interval level.
 14. Treat forecast intervals as empirical training-side residual evidence, not guaranteed coverage. State the reported calibration count, empirical coverage/width where available, and `coverage_guaranteed: false` plainly.
-15. Forecast apply is horizon-only: call `model.apply` with `trained_model_id` and `horizon`, without `input_sources` or `input_rows`. New observations require a new fit; do not pretend apply mutates retained history.
-16. The Agent fills typed shallow parameters only after reading each model's `param_schema`. Never invent raw SARIMA orders, order grids, optimizer arguments, convergence flags, seeds, or a wider search/budget than the schema exposes.
-17. When distinct model keys share one role binding and comparison contract, submit them together in one `model.train` call with `models` and `params_by_model`. Because `params_by_model` has one object per model key, use separate calls for several parameterizations of the same key. In both cases, reuse returned task ids and trained model ids; never retrain an identical candidate merely to inspect, compare, or apply it.
+15. Forecast apply is horizon-only: call `model.apply` with `trained_model_id` and `horizon`, without `input_sources` or `input_rows`. New observations require a new fit.
+16. Fill typed shallow parameters only after reading each model's `param_schema`.
+17. When distinct model keys share one role binding and comparison contract, submit them together in one `model.train` call with `models` and `params_by_model`; use separate calls for several parameterizations of the same key. Reuse returned task and trained model ids.
 18. Personalized recommendation requires explicit `user`, `item`, and numeric `rating` roles plus an optional valid `time` role. Use `recommendation.collaborative_top_k`; keep `recommendation.item_similarity` only for the distinct legacy question “which items resemble this base item?”.
-19. Before setting `positive_rating_threshold`, profile the rating scale and use one focused `data.query` only if the business meaning of a positive rating remains ambiguous. Never guess a five-star threshold for an unknown scale.
-20. Recommendation Evaluate evidence must use the same private per-user truth for candidate and popularity baseline, report the realized latest-positive or deterministic-hash holdout policy, and have zero seen-item violations. Offline ranking metrics do not prove online uplift.
+19. Before setting `positive_rating_threshold`, profile the rating scale; use one focused `data.query` only if the business meaning of a positive rating remains ambiguous.
+20. Recommendation Evaluate evidence must use the same private per-user truth for candidate and popularity baseline, report the realized latest-positive or deterministic-hash holdout policy, and have zero seen-item violations. Treat offline ranking metrics as non-causal.
 21. Use `text.classification.multilingual_logistic_regression_tfidf` for active bilingual raw-text classification. Keep `text.classification.logistic_regression_tfidf` only for existing analyzers whose persisted input contract is already pre-tokenized.
 22. Bind one raw `text`, one `target`, and an optional business `group`. The service joins business groups with exact/template/near-duplicate constraints; all reported train/holdout overlap counts must be zero, and TF-IDF vocabulary/IDF must be fitted only on the training partition.
-23. Custom dictionary and stopword inputs are registered one-column Dataset IDs, never inline word dumps or local paths. Use only the advertised maximum of four per purpose and require the retained specification to report the same Dataset identities and hashes.
-24. Use the active multilingual raw-text discovery keys for new clustering, topic, and retrieval work. Existing `text.clustering.kmeans_tfidf`, `text.topic_modeling.lda`, and `text.similarity.tfidf_cosine` analyzers keep their pre-tokenized legacy contracts; never silently reinterpret them as raw-text models.
+23. Custom dictionary and stopword inputs are registered one-column Dataset IDs; use at most four per purpose and require the retained specification to report the same Dataset identities and hashes.
+24. Use the active multilingual raw-text discovery keys for new clustering, topic, and retrieval work. Existing `text.clustering.kmeans_tfidf`, `text.topic_modeling.lda`, and `text.similarity.tfidf_cosine` analyzers keep their pre-tokenized legacy contracts.
 25. Treat cluster and topic labels as stable display identities only within their retained analyzer. Require the mapping/identity digest before comparing Evaluate, assignment, and Apply outputs; topic numbering is permutation-invariant and is not a semantic name or observed truth.
-26. Retrieval may report Recall, MRR, or NDCG only when `relevance_group` truth is bound and the authoritative mode is `relevance_evaluated`. In `index_diagnostic` mode, report only index/rank/self-exclusion diagnostics and do not infer semantic relevance quality.
+26. Retrieval may report Recall, MRR, or NDCG only when `relevance_group` truth is bound and the authoritative mode is `relevance_evaluated`. In `index_diagnostic` mode, report only index/rank/self-exclusion diagnostics.
 
 ## Default workflow
 

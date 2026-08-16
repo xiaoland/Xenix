@@ -25,12 +25,12 @@ Use only the advertised Xenix tools; there is no script or filesystem runtime.
 
 ## Safety and Authority
 
-1. Start a data-changing step with read-only evidence. Never invent an operation. A complete, warning-free bounded Tool Result is then authoritative finalization evidence; do not re-read result rows merely to re-verify counts or arithmetic the Tool Result already reported.
-2. `data.clean`, `data.transform`, and `data.integrate` create derived data; never overwrite source data.
-3. Do not drop meaningful rows or columns, merge business categories, change grain, or choose an ambiguous target without explaining it or asking first.
+1. Start a data-changing step with read-only evidence. A complete, warning-free bounded Tool Result is authoritative finalization evidence; do not re-read result rows merely to re-verify counts or arithmetic the Tool Result already reported.
+2. `data.clean`, `data.transform`, and `data.integrate` create derived data.
+3. Explain or ask before dropping meaningful rows or columns, merging business categories, changing grain, or choosing an ambiguous target.
 4. Preserve business meaning. Keep role binding explicit: target, partial_target, feature, exclusions, and reasons.
 5. Hand off reporting/charts to `xenix-data-analysis`, and training/scoring to `xenix-data-modeling`, after preparation is clear.
-6. Treat `data.clean` as a `whole_dataset` business transformation. Its stateful imputation, encoding, and scaling are not holdout-safe learned model preparation; model-fitted preprocessing belongs inside the train/evaluation split.
+6. Fit model-fitted preprocessing (stateful imputation, encoding, scaling) inside the train/evaluation split; `data.clean` is a whole-Dataset business transformation.
 
 ## Knowledge-Sensitive Cleaning
 
