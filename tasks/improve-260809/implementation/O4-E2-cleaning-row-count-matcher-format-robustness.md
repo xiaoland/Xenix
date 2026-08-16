@@ -1,7 +1,6 @@
 # O4-E2 Implementation Plan — Cleaning Row-Count Matcher Format Robustness
 
-**Status:** Proposed; awaiting the explicit start of
-[IH-O4-E2](../handshakes/IH-O4-E2-cleaning-row-count-matcher-format-robustness.md).
+**Status:** Superseded by `O4-E3` (retire the regex, option B).
 
 **Handshake:** [IH-O4-E2](../handshakes/IH-O4-E2-cleaning-row-count-matcher-format-robustness.md).
 

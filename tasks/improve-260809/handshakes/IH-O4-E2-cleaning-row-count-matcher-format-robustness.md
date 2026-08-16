@@ -1,7 +1,7 @@
 # Impact Handshake O4-E2 — Cleaning Row-Count Matcher Format Robustness
 
-**Status:** proposed. Harness-only evaluator repair; requires Sir's explicit
-start. A separate owner from `IH-O4-A4` (product) and `IH-O4-E1` (first
+**Status:** superseded by `IH-O4-E3` (option B: retire the regex instead of
+patching it). A separate owner from `IH-O4-A4` (product) and `IH-O4-E1` (first
 wording repair).
 
 ## Evidence Trigger

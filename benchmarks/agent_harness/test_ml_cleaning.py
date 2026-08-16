@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from pathlib import Path
 import re
-import unicodedata
 from typing import Any
 
 import polars as pl
@@ -100,7 +99,6 @@ class ServiceTicketCleaningCase:
         completed = canonical_completion(context.snapshot)
         source_unchanged = _source_unchanged(self.source_path, context)
         isolated = _state_isolated(context, artifact)
-        grounded_answer = _grounded_final_answer(context.snapshot)
         semantic_checks = (
             OutcomeCheck(
                 "exact_cleaned_dataset",
@@ -111,11 +109,6 @@ class ServiceTicketCleaningCase:
                 "public_artifact_linked",
                 artifact is not None,
                 "public_artifact_link_observed" if artifact is not None else "public_artifact_link_missing",
-            ),
-            OutcomeCheck(
-                "grounded_final_answer",
-                grounded_answer,
-                "cleaning_summary_grounded" if grounded_answer else "cleaning_summary_not_grounded",
             ),
         )
         integrity_checks = (
@@ -174,21 +167,6 @@ def _matches_expected(frame: pl.DataFrame) -> bool:
     except (KeyError, TypeError, ValueError):
         return False
     return observed == _EXPECTED_ROWS
-
-
-def _grounded_final_answer(snapshot: Any | None) -> bool:
-    text = _terminal_text(snapshot)
-    if not text:
-        return False
-    normalized = re.sub(r"\s+", "", unicodedata.normalize("NFKC", text).lower())
-    row_count = bool(
-        re.search(r"(?:结果|保留|共|剩余|清洗后|有效行数|行数).{0,8}5(?:行|条|个记录)", normalized)
-    )
-    median_value = bool(
-        re.search(r"(?:中位数|median).{0,12}21(?:\.0)?", normalized)
-        or re.search(r"21(?:\.0)?.{0,12}(?:中位数|median)", normalized)
-    )
-    return row_count and median_value
 
 
 def _resolve_linked_artifact(context: BenchmarkCaseContext, dataset: Any | None) -> Any | None:

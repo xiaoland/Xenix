@@ -48,6 +48,7 @@ Put raw logs, traces, SQLite snapshots/queries, provider payloads, prompts, tran
 - [O4-A3 cleaning Tool/Skill authority implementation and paid characterization — 2026-08-11](O4-A3-cleaning-tool-skill-authority-2026-08-11.md)
 - [O4-E1 cleaning row-count matcher robustness — 2026-08-16](O4-E1-cleaning-row-count-matcher-robustness-2026-08-16.md)
 - [O4-A4 clean-result finalization authority — 2026-08-16](O4-A4-cleaning-result-finalization-authority-2026-08-16.md)
+- [O4-E3 cleaning grounded-answer check retirement — 2026-08-16](O4-E3-cleaning-grounded-answer-retirement-2026-08-16.md)
 - [A1 formal acceptance preflight — 2026-08-10](A1-preflight-2026-08-10.md)
 - [A2 formal Agent Harness readiness — 2026-08-10](A2-harness-readiness-2026-08-10.md)
 - [Final current-worktree verification — 2026-08-10](final-verification-2026-08-10.md)

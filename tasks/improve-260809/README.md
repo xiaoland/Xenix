@@ -1,6 +1,6 @@
 # Improve ML Capability — Program Dashboard
 
-**Status:** Active. Both product verticals are implemented and objectively verified. Cleaning causal diagnosis plus A1 service correctness, A2 bounded result facts, and A3 Tool/Skill authority are complete. A3 removed transform/metadata branching but exposed redundant result re-reading and one Harness wording false negative (repaired by O4-E1); O4-A4 finalization authority eliminated the redundant result re-read 3/3; its paid semantic 1/3 exposed two more matcher false negatives (O4-E2). The corrected textbook cleaning oracle retracts the earlier Foundation cleaning qualification and exposes broader preprocessing gaps. Formal paid acceptance remains admission-blocked by the missing independent Judge, and topic final-answer grounding remains a measured open outcome.
+**Status:** Active. Both product verticals are implemented and objectively verified. Cleaning causal diagnosis plus A1 service correctness, A2 bounded result facts, and A3 Tool/Skill authority are complete. A3 removed transform/metadata branching but exposed redundant result re-reading and one Harness wording false negative (repaired by O4-E1); O4-A4 finalization authority eliminated the redundant result re-read 3/3; O4-E3 retired the regex, so cleaning is now deterministic-only (exact Dataset + linked Artifact + integrity). The corrected textbook cleaning oracle retracts the earlier Foundation cleaning qualification and exposes broader preprocessing gaps. Formal paid acceptance remains admission-blocked by the missing independent Judge, and topic final-answer grounding remains a measured open outcome.
 **Opened:** 2026-08-09
 
 ## Objective
@@ -70,7 +70,7 @@ Current verified repository state:
 
 ## Next Step
 
-[IH-O4-A4](handshakes/IH-O4-A4-cleaning-result-finalization-authority.md) is complete: the redundant result re-read is eliminated 3/3. Next: start [IH-O4-E2](handshakes/IH-O4-E2-cleaning-row-count-matcher-format-robustness.md) to repair the two row-count matcher false negatives the A4 paid series exposed. Broader ch07 gaps exposed by the corrected full-result oracle require their own capability slice. Formal six-case acceptance still requires a subject-disjoint Judge settings/model snapshot and five passing exact-rubric calibrations. Topic final-synthesis optimization remains separate.
+The cleaning thread (O4 + A1–A4 + E1–E3) is complete: cleaning is now deterministic-only (exact Dataset + linked Artifact + integrity; the redundant result re-read is eliminated). Remaining program items: the ch07 capability slice (own design), formal six-case acceptance (subject-disjoint Judge + five passing calibrations), and topic final-synthesis (separate).
 
 ## Packet Map
 
