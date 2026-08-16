@@ -27,6 +27,19 @@ def test_activated_modeling_skill_discloses_only_its_tools_and_common_building_b
     assert "data.clean" not in scope
 
 
+def test_activated_preprocessing_skill_keeps_clean_and_transform_visible() -> None:
+    snapshot = _snapshot_with_activated_skill("xenix-data-preprocessing")
+
+    scope = agent_skill_tool_scope_names(snapshot)
+
+    assert scope is not None
+    assert "analysis.profile" in scope
+    assert "data.query" in scope
+    assert "data.clean" in scope
+    assert "data.clean.metadata" in scope
+    assert "data.transform" in scope
+
+
 def test_unknown_activated_skill_fails_closed_to_initial_scope() -> None:
     snapshot = _snapshot_with_activated_skill("unknown-skill")
 

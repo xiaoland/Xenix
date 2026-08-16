@@ -13,7 +13,7 @@ description: >-
   xenix-data-modeling after the data is ready.
 license: MIT
 metadata:
-  version: "0.5.0"
+  version: "0.6.0"
   product: "Xenix"
   language: "zh-CN"
   runtime: "tool-only; no script execution"
@@ -45,9 +45,9 @@ conflict or ask the user when it would change the derived dataset.
 
 1. For a new dataset, call `analysis.profile` first. Use its value-safe ordered field indexes, logical types, missingness, cardinality, numeric/date summaries, duplicates, correlations, and truncation as the default evidence.
 2. Bind unambiguous structural roles without asking. If business classification remains materially ambiguous, emit at most one purpose-specific bounded `data.query` call for only the relevant columns and values, then wait for it. Do not issue a broad sample, parallel query, or repeated schema call.
-3. Ask the user only when multiple plausible interpretations would change leakage or evaluation meaning. Otherwise call explicit atomic `data.clean` operations next.
+3. Ask the user only when multiple plausible interpretations would change leakage or evaluation meaning. Otherwise build one explicit `data.clean` operation list. Operations execute strictly left-to-right on the current intermediate Dataset: each operation sees every earlier change, so place validation/filtering before imputation when the imputation must fit only the retained rows.
 4. Use `data.clean.metadata` only when the operation or parameters are not covered below or remain genuinely uncertain. Request only its smallest relevant group.
-5. Use `data.transform` for SQL-derived columns, filters, joins, aggregates, reshaping, or grain changes; use `data.integrate` only to vertically append datasets. Use `data.tokenize` for durable Chinese text tokens, and `data.feature.select` for model roles.
+5. Use an advertised atomic `data.clean` validation operation for supported row checks or rejection. Use `data.transform` for filters only when no atomic cleaning operation can express the predicate, and for SQL-derived columns, joins, aggregates, reshaping, or grain changes. Use `data.integrate` only to vertically append datasets, `data.tokenize` for durable Chinese text tokens, and `data.feature.select` for model roles.
 6. Validate the derived Dataset with `analysis.profile`; use a focused `data.query` only when exact result membership or values must be checked. Report returned facts, the derived Dataset, remaining risks, and the next handoff.
 
 ## Direct Routine Recipes
@@ -58,7 +58,15 @@ These are known operations; call `data.clean` directly instead of metadata:
 - categorical/text missing values: `missing.fill_mode` with `{"column_indexes":[...]}`;
 - an explicit replacement: `missing.fill_constant` with `{"column_indexes":[...],"value":...}`;
 - exact duplicate records: `duplicate.exact_rows` with `{"keep":"first"}`;
-- surrounding whitespace: `text.trim` with `{"column_indexes":[...]}`.
+- surrounding whitespace: `text.trim` with `{"column_indexes":[...]}`;
+- lowercase text/categories: `text.lowercase` with `{"column_indexes":[...]}`;
+- reject an explicitly invalid negative numeric value: `validation.non_negative` with `{"column_index":...,"action":"drop_rows"}`.
+
+The same validation owner covers supported `validation.min`, `validation.max`,
+`validation.not_null`, `validation.allowed_values`, and `validation.regex`
+checks. Use `action: "report_only"` to measure violations and
+`action: "drop_rows"` only when row removal is already authorized. Do not
+reimplement these rules in `data.transform`.
 
 ## Cleaning Column References
 
@@ -68,6 +76,9 @@ use indexes only when it preserved the source schema. A projected or renamed que
 own ordinal positions and must not be reused for a source-dataset operation.
 Use `column_name` or `column_names` only as a fallback, and never mix an index
 form with a name form in one operation. Within one `data.clean` call, treat
+the operation list as a strict left-to-right pipeline over the current
+intermediate Dataset. This lets one call express, for example, exact dedupe →
+non-negative row rejection → trim/lowercase → median fill. Also treat
 `missing.drop_high_missing_columns` and `encoding.one_hot` as column-set
 boundaries: after either operation, do not use `column_index` or
 `column_indexes` for a later operation. Use names for the remainder when they

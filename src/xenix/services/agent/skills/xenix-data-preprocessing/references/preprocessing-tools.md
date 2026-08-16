@@ -20,10 +20,10 @@ Use for read-only inspection and quality checks:
 - validation after cleaning or transformation.
 
 Do not use destructive SQL. Prefer CTEs. `data.query` results are replayed as Xenix Table Text: read the metadata first, then the preview table or records block.
-For an Agent pass, start with one compact schema/sample query rather than
-parallel or repeated metadata queries. Batch related aggregate checks in one
-CTE/projection, then make a single focused follow-up only when the result makes
-the cleaning decision materially ambiguous.
+Start with `analysis.profile`; do not issue a broad schema/sample query merely
+to repeat facts the profile already returned. When a material cleaning
+decision still needs values absent from that profile, make one focused query
+for only the relevant columns and evidence, then wait for its result.
 
 When headers contain spaces, punctuation, or Unicode typography, set
 `column_reference: "indexes"`. In that one query, each bound relation exposes
@@ -65,12 +65,25 @@ Use for predefined atomic cleaning operations on one registered dataset:
 
 If `operations` is absent or empty, no cleaning happens. Do not use `data.clean` as a vague instruction such as “clean everything”; provide explicit operations and parameters.
 
-`data.query` returns zero-based column indexes. Prefer `column_index` or
-`column_indexes` in cleaning parameters, but take them only from a
-source-schema query such as `SELECT * FROM input LIMIT 50`; a projection or
-rename has result-local ordinal positions. `column_name` and `column_names` are
-fallback forms. Provide exactly one form for a selected field set—never mix
-index and name references in one operation. In the same call, do not carry
+Operations execute strictly left-to-right against the current intermediate
+Dataset. Each operation sees every earlier change. Therefore a validation row
+rejection before median fill makes the median fit only the retained rows,
+whereas reversing those operations fits the median before rejection.
+
+When an advertised validation operation can express a row check or rejection,
+it is the cleaning owner: `validation.non_negative`, `validation.min`,
+`validation.max`, `validation.not_null`, `validation.allowed_values`, and
+`validation.regex`. Use `data.transform` for a filter only when its predicate
+cannot be expressed by an atomic cleaning operation.
+
+`analysis.profile` returns stable zero-based indexes for the ordered source
+fields. Prefer those indexes for `column_index` or `column_indexes`; do not run
+a broad source-row query merely to rediscover them. If one focused query was
+needed for a business ambiguity, reuse an index only when that query preserved
+the full source schema and order—a projection or rename has result-local
+ordinal positions. `column_name` and `column_names` are fallback forms. Provide
+exactly one form for a selected field set—never mix index and name references
+in one operation. In the same call, do not carry
 indexes past `missing.drop_high_missing_columns` or `encoding.one_hot`, since
 those operations may remove or add columns. Use known column names for later
 operations, or run a new `data.query` and then a new `data.clean` call against
@@ -104,7 +117,8 @@ Do not treat `data.tokenize` as a generic tokenizer wrapper. It does not expose 
 
 Use for SQL-derived datasets:
 
-- filtering rows;
+- filtering rows with predicates that no advertised atomic `data.clean`
+  validation operation can express;
 - selecting or renaming columns;
 - deriving calculated fields;
 - joining or reshaping data;
@@ -136,13 +150,14 @@ indexes in one role.
 
 ## Planning Pattern
 
-1. `data.query` to inspect schema, preview rows, quality, and candidate roles.
-2. `data.clean.metadata` only when the relevant operation or parameter is uncertain.
-3. `data.clean` for explicit atomic cleaning.
-4. `data.tokenize` when raw Chinese text must be segmented into a stable derived dataset.
-5. `data.transform` for derived features, joins, grain changes, and chart/model-ready datasets.
-6. `data.feature.select` when handing off to modeling.
-7. `data.query` to validate the result.
+1. `analysis.profile` for bounded structure and quality facts.
+2. One focused `data.query` only when a business decision needs values absent from the profile.
+3. `data.clean.metadata` only when the relevant operation or parameter is uncertain.
+4. One ordered `data.clean` call for explicit supported atomic cleaning.
+5. `data.tokenize` when raw Chinese text must become a stable derived dataset.
+6. `data.transform` for unsupported predicates, derived features, joins, grain changes, and chart/model-ready datasets.
+7. `data.feature.select` when handing off to modeling.
+8. `analysis.profile`, then a focused query only if necessary, to validate the result.
 
 ## Output Discipline
 

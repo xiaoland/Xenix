@@ -364,7 +364,11 @@ class AgentToolRegistry:
             provider_name="data_clean",
             description=(
                 "Create a new whole-Dataset derived dataset by applying atomic predefined business-cleaning "
-                "operations to one registered dataset. Stateful imputation, encoding, and scaling here fit "
+                "operations to one registered dataset. Operations execute strictly left-to-right against the "
+                "current intermediate dataset; each operation sees every earlier change. Use advertised "
+                "validation operations for supported row checks or rejection, including non-negative, min/max, "
+                "not-null, allowed-values, and regex rules. Use data.transform for a filter only when no atomic "
+                "data.clean operation can express its predicate. Stateful imputation, encoding, and scaling here fit "
                 "the whole Dataset and are not holdout-safe learned model preparation. Prefer zero-based "
                 "column_index or column_indexes from analysis.profile; make one focused data.query only when "
                 "exact values are materially required. Use data.clean.metadata only for unfamiliar operations "
@@ -435,6 +439,9 @@ class AgentToolRegistry:
             provider_name="data_transform",
             description=(
                 "Create a new derived dataset from bounded DuckDB SQL over registered datasets. "
+                "For cleaning filters, use an advertised atomic data.clean validation operation when it can "
+                "express the rule; use data.transform only for unsupported predicates or for SQL-derived columns, "
+                "joins, aggregates, reshaping, and grain changes. "
                 "Use dataset_id for one input aliased as input, or bindings for explicit aliases. "
                 "At least one input source is required. If both are present, bindings wins. "
                 "When column_reference=indexes, each bound relation exposes zero-based c0, c1, ... SQL "

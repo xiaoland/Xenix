@@ -1,6 +1,6 @@
 # Improve ML Capability — Program Dashboard
 
-**Status:** Active. Both product verticals are implemented and objectively verified. Cleaning causal diagnosis plus A1 service correctness and A2 bounded result facts are complete; Tool/Skill authority work remains. The corrected textbook cleaning oracle retracts the earlier Foundation cleaning qualification and exposes broader preprocessing gaps. Formal paid acceptance remains admission-blocked by the missing independent Judge, and topic final-answer grounding remains a measured open outcome.
+**Status:** Active. Both product verticals are implemented and objectively verified. Cleaning causal diagnosis plus A1 service correctness, A2 bounded result facts, and A3 Tool/Skill authority are complete. A3 removed transform/metadata branching but exposed redundant result re-reading and one Harness wording false negative. The corrected textbook cleaning oracle retracts the earlier Foundation cleaning qualification and exposes broader preprocessing gaps. Formal paid acceptance remains admission-blocked by the missing independent Judge, and topic final-answer grounding remains a measured open outcome.
 **Opened:** 2026-08-09
 
 ## Objective
@@ -34,7 +34,7 @@ The benchmark runner remains a paid live measurement surface over one pinned sub
 
 Current verified repository state:
 
-- `pdm run test -q`: 136 passed on 2026-08-10.
+- `pdm run test -q`: 145 passed on 2026-08-11.
 - Provider-free Harness infrastructure/policy/calibration checks: 33 passed.
 - Headless Agent Harness collect-only: 13 live cases.
 - Headed Agent Harness collect-only: the same 13 live cases.
@@ -65,11 +65,12 @@ Current verified repository state:
 - The supplied corpus is rich enough to qualify cleaning, leakage-safe preparation, clustering, recommendation, forecasting, and bilingual text risks, but it contains severe answer contamination and unresolved redistribution rights. The RT material plan binds ten logical ch14/ch16 sets and explicitly rejects their precomputed recommendations, colocated truth, and template-contaminated random split as product acceptance oracles.
 - O4 retained two complete cleaning runtimes. It proved that negative-row removal has overlapping `data.transform` and `data.clean.validation` owners, while the direct recipes and Tool schema do not expose enough ordering/operation detail. Before A1/A2, one valid-looking clean dropped a nullable numeric row before median imputation, Provider XTT omitted validation effects, and the cleaning report omitted the resolved fill value; the staged recovery route passed but used three derived Datasets and eight rounds. The exact 2026-08-09 Tool order remains unknowable because its isolated SQLite runtime was deleted.
 - O4-A2 now keeps the complete cleaned result behind public Dataset/Artifact IDs. The canonical Agent Tool Result has zero row/schema preview and contains only bounded ordered operation effects, validation effects, resolved fill scalars, counts, warnings, and lineage IDs; the five-operation black-box result stays below 4,096 characters.
+- O4-A3 now projects strict current-frame ordering and atomic validation ownership through the Provider schema, Tool descriptions, and preprocessing Skill. Three valid retained paid cells each produced one exact clean descendant without metadata or transform, but all still issued broad `SELECT *`; SQLite reasoning attributes this to redundant verification after the authoritative result already contained every requested fact. One formal semantic miss is a demonstrated row-count wording false negative, not a Dataset failure.
 - Detailed decisions, uncertainties, topology, working sets, and slice status live in the linked packet files rather than this dashboard.
 
 ## Next Step
 
-Design O4-A3 around explicit left-to-right operation semantics and one canonical owner for supported cleaning filters, using the completed [O4-A2 result contract](execution/O4-A2-cleaning-result-facts-2026-08-11.md). Broader ch07 gaps exposed by the corrected full-result oracle require their own capability slice. Formal six-case acceptance still requires a subject-disjoint Judge settings/model snapshot and five passing exact-rubric calibrations. Topic final-synthesis optimization remains separate.
+Approve and start the two separately owned follow-ups drafted from the [O4-A3 execution record](execution/O4-A3-cleaning-tool-skill-authority-2026-08-11.md): [IH-O4-E1](handshakes/IH-O4-E1-cleaning-row-count-matcher-robustness.md) (Harness-only row-count matcher wording robustness) first, then [IH-O4-A4](handshakes/IH-O4-A4-cleaning-result-finalization-authority.md) (product-side clean-result finalization authority) with its paid three-cell characterization under the repaired matcher. Broader ch07 gaps exposed by the corrected full-result oracle require their own capability slice. Formal six-case acceptance still requires a subject-disjoint Judge settings/model snapshot and five passing exact-rubric calibrations. Topic final-synthesis optimization remains separate.
 
 ## Packet Map
 

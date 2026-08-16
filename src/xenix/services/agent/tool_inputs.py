@@ -223,14 +223,33 @@ class AnalysisProfileInput(AgentToolInput):
 
 
 class CleaningOperationInput(AgentToolInput):
-    operation: RequiredString
-    params: dict[str, Any] = Field(default_factory=dict)
+    operation: RequiredString = Field(
+        description=(
+            "One advertised atomic data.clean operation. It executes at this list position "
+            "against the current intermediate dataset produced by every earlier operation."
+        )
+    )
+    params: dict[str, Any] = Field(
+        default_factory=dict,
+        description=(
+            "Parameters for this operation, resolved against the current intermediate dataset. "
+            "When an operation selects columns, use one supported name or index reference form "
+            "and do not mix forms."
+        ),
+    )
 
 
 class DataCleanInput(AgentToolInput):
     dataset_id: RequiredString
     name: OptionalString | None = None
-    operations: list[CleaningOperationInput] = Field(default_factory=list)
+    operations: list[CleaningOperationInput] = Field(
+        default_factory=list,
+        description=(
+            "Ordered atomic operations executed strictly left-to-right. Each operation receives "
+            "the intermediate dataset returned by the preceding operation, so filtering before "
+            "imputation changes the values used to fit that imputation."
+        ),
+    )
 
 
 class DataCleanMetadataInput(AgentToolInput):
