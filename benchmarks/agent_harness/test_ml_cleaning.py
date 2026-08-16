@@ -182,7 +182,7 @@ def _grounded_final_answer(snapshot: Any | None) -> bool:
         return False
     normalized = re.sub(r"\s+", "", unicodedata.normalize("NFKC", text).lower())
     row_count = bool(
-        re.search(r"(?:结果|保留|共|剩余|清洗后).{0,8}5(?:行|条|个记录)", normalized)
+        re.search(r"(?:结果|保留|共|剩余|清洗后|有效行数|行数).{0,8}5(?:行|条|个记录)", normalized)
     )
     median_value = bool(
         re.search(r"(?:中位数|median).{0,12}21(?:\.0)?", normalized)

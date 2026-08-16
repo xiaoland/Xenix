@@ -1,7 +1,6 @@
 # Impact Handshake O4-E1 — Cleaning Row-Count Matcher Wording Robustness
 
-**Status:** proposed. Harness-only evaluator repair; requires Sir's explicit
-start. Never combined with `IH-O4-A4` into one optimization.
+**Status:** consumed; implemented and provider-free verified on 2026-08-16. Harness-only evaluator repair; never combined with `IH-O4-A4` into one optimization.
 
 ## Evidence Trigger
 

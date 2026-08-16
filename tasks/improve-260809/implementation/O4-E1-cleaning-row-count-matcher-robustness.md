@@ -1,7 +1,6 @@
 # O4-E1 Implementation Plan — Cleaning Row-Count Matcher Wording Robustness
 
-**Status:** Proposed; awaiting the explicit start of
-[IH-O4-E1](../handshakes/IH-O4-E1-cleaning-row-count-matcher-robustness.md).
+**Status:** Completed and provider-free verified on 2026-08-16.
 
 **Handshake:** [IH-O4-E1](../handshakes/IH-O4-E1-cleaning-row-count-matcher-robustness.md).
 
