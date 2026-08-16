@@ -46,7 +46,7 @@ def test_preprocessing_skill_catalog_owns_routine_cleaning_route() -> None:
         if skill.name == "xenix-data-preprocessing"
     )
 
-    assert skill.metadata["metadata"]["version"] == "0.6.0"
+    assert skill.metadata["metadata"]["version"] == "0.7.0"
     assert "strictly left-to-right" in skill.body
     assert "validation.non_negative" in skill.body
     assert "text.lowercase" in skill.body
@@ -58,3 +58,20 @@ def test_preprocessing_skill_catalog_owns_routine_cleaning_route() -> None:
     assert "SELECT * FROM input LIMIT 50" not in reference
     assert "Start with `analysis.profile`" in reference
     assert "start with one compact schema/sample query" not in reference
+
+
+def test_preprocessing_skill_owns_clean_result_finalization() -> None:
+    catalog = AgentSkillCatalog.from_default_catalog()
+    skill = next(
+        skill
+        for skill in catalog.list_skills()
+        if skill.name == "xenix-data-preprocessing"
+    )
+
+    assert "authoritative finalization evidence" in skill.body
+    assert "do not re-read result rows" in skill.body
+    assert "trust the Tool Result over the profile" in skill.body
+    assert "do not copy row payload" in skill.body
+    reference = skill.resources["references"]["references/preprocessing-tools.md"]
+    assert "authoritative when complete and warning-free" in reference
+    assert "validation after cleaning or transformation" not in reference

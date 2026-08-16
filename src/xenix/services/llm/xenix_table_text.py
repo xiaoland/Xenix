@@ -133,7 +133,7 @@ def _render_cleaned_dataset_result(payload: dict[str, Any]) -> str:
     _append_generated_dataset_metadata(lines, "data.clean", payload)
     artifact_id = payload.get("artifact_id")
     note = (
-        "cleaned rows and schema preview are omitted; use dataset_id for local follow-up tools "
+        "cleaned rows and schema preview are omitted; use dataset_id for the next operation on this Dataset "
         "and artifact_id for the user-openable complete result."
         if artifact_id
         else "no cleaned Dataset was created; no row or schema preview is included."

@@ -1,9 +1,10 @@
 # Impact Handshake O4-A4 — Clean-Result Finalization Authority
 
-**Status:** proposed. Product-side guidance/projection repair; requires Sir's
-explicit start. Never combined with `IH-O4-E1` into one optimization; the paid
-characterization runs only after `IH-O4-E1` closes so its semantic verdict
-uses the repaired matcher.
+**Status:** consumed; implemented and verified 2026-08-16. Route target met
+3/3 (zero broad query, no row payload copied); paid semantic 1/3 with two
+demonstrated evaluator row-count false negatives owned by `IH-O4-E2`. Never
+combined with `IH-O4-E1` into one optimization; the paid characterization ran
+under the repaired matcher.
 
 ## Evidence Trigger
 

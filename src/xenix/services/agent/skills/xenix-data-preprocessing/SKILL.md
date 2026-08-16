@@ -13,7 +13,7 @@ description: >-
   xenix-data-modeling after the data is ready.
 license: MIT
 metadata:
-  version: "0.6.0"
+  version: "0.7.0"
   product: "Xenix"
   language: "zh-CN"
   runtime: "tool-only; no script execution"
@@ -25,7 +25,7 @@ Use only the advertised Xenix tools; there is no script or filesystem runtime.
 
 ## Safety and Authority
 
-1. Start a data-changing step with read-only evidence. Never invent an operation.
+1. Start a data-changing step with read-only evidence. Never invent an operation. A complete, warning-free bounded Tool Result is then authoritative finalization evidence; do not re-read result rows merely to re-verify counts or arithmetic the Tool Result already reported.
 2. `data.clean`, `data.transform`, and `data.integrate` create derived data; never overwrite source data.
 3. Do not drop meaningful rows or columns, merge business categories, change grain, or choose an ambiguous target without explaining it or asking first.
 4. Preserve business meaning. Keep role binding explicit: target, partial_target, feature, exclusions, and reasons.
@@ -48,7 +48,7 @@ conflict or ask the user when it would change the derived dataset.
 3. Ask the user only when multiple plausible interpretations would change leakage or evaluation meaning. Otherwise build one explicit `data.clean` operation list. Operations execute strictly left-to-right on the current intermediate Dataset: each operation sees every earlier change, so place validation/filtering before imputation when the imputation must fit only the retained rows.
 4. Use `data.clean.metadata` only when the operation or parameters are not covered below or remain genuinely uncertain. Request only its smallest relevant group.
 5. Use an advertised atomic `data.clean` validation operation for supported row checks or rejection. Use `data.transform` for filters only when no atomic cleaning operation can express the predicate, and for SQL-derived columns, joins, aggregates, reshaping, or grain changes. Use `data.integrate` only to vertically append datasets, `data.tokenize` for durable Chinese text tokens, and `data.feature.select` for model roles.
-6. Validate the derived Dataset with `analysis.profile`; use a focused `data.query` only when exact result membership or values must be checked. Report returned facts, the derived Dataset, remaining risks, and the next handoff.
+6. Treat a successful bounded `data.clean` result as authoritative finalization evidence when it reports every requested operation effect, all validation effects, resolved fill values, zero warnings with none omitted, and the public Dataset/Artifact IDs. Do not re-read result rows merely to re-verify counts or arithmetic it already reports; a source-profile statistic may legitimately differ from a post-operation resolved value because operations execute left-to-right, so trust the Tool Result over the profile for resolved values. Use `analysis.profile` or a focused `data.query` afterward only when the result carries warnings or omitted facts, or when a business decision needs values the bounded report does not contain. Report returned facts, the derived Dataset, remaining risks, and the next handoff.
 
 ## Direct Routine Recipes
 
@@ -127,4 +127,4 @@ Ask the user when:
 
 ## Final Answer
 
-State the observed quality findings, operations actually applied, returned derived-dataset or role-binding identifiers, remaining assumptions/risks, and whether the data is ready for analysis, modeling, or needs a user decision.
+State the observed quality findings, operations actually applied, returned derived-dataset or role-binding identifiers, remaining assumptions/risks, and whether the data is ready for analysis, modeling, or needs a user decision. Report bounded facts such as counts, resolved fill values, and public IDs; do not copy row payload into the answer unless the user explicitly asked for row-level inspection.

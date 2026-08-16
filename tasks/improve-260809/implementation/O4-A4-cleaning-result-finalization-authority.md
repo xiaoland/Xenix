@@ -1,7 +1,6 @@
 # O4-A4 Implementation Plan — Clean-Result Finalization Authority
 
-**Status:** Proposed; awaiting the explicit start of
-[IH-O4-A4](../handshakes/IH-O4-A4-cleaning-result-finalization-authority.md).
+**Status:** Completed and verified 2026-08-16. Route target met 3/3; paid semantic 1/3 with two evaluator row-count false negatives owned by `O4-E2`.
 
 **Handshake:** [IH-O4-A4](../handshakes/IH-O4-A4-cleaning-result-finalization-authority.md).
 

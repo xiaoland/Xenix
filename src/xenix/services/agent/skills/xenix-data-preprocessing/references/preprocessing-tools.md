@@ -17,7 +17,7 @@ Use for read-only inspection and quality checks:
 - category frequency and category variants;
 - date parseability and time range;
 - target/feature profiling before role binding;
-- validation after cleaning or transformation.
+- validating a derived result only when the Tool Result carries warnings or omitted facts, or a business decision needs values the bounded report does not report.
 
 Do not use destructive SQL. Prefer CTEs. `data.query` results are replayed as Xenix Table Text: read the metadata first, then the preview table or records block.
 Start with `analysis.profile`; do not issue a broad schema/sample query merely
@@ -157,7 +157,7 @@ indexes in one role.
 5. `data.tokenize` when raw Chinese text must become a stable derived dataset.
 6. `data.transform` for unsupported predicates, derived features, joins, grain changes, and chart/model-ready datasets.
 7. `data.feature.select` when handing off to modeling.
-8. `analysis.profile`, then a focused query only if necessary, to validate the result.
+8. Treat the bounded clean result as authoritative when complete and warning-free; profile or query afterward only when it has warnings or omitted facts.
 
 ## Output Discipline
 

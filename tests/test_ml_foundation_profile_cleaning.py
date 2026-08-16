@@ -128,6 +128,7 @@ def test_clean_room_profile_and_whole_dataset_cleaning_workflow(
     assert "Whole-Dataset cleaned result created" in clean_outcome.value
     assert "not holdout-safe learned model preparation" in clean_outcome.value
     assert "cleaned rows and schema preview are omitted" in clean_outcome.value
+    assert "local follow-up tools" not in clean_outcome.value
     assert "shape:" not in clean_outcome.value
     assert "schema:" not in clean_outcome.value
     assert "\ndata:" not in clean_outcome.value
