@@ -102,20 +102,40 @@ def _associated_pull_requests(
         raise RuntimeError(f"Invalid GitHub repository identity: {repository!r}.")
     if not _COMMIT_PATTERN.fullmatch(commit):
         raise RuntimeError(f"Invalid release commit identity: {commit!r}.")
-    payload = _run(
+    # The commits/{sha}/pulls endpoint does not reliably associate a merge
+    # commit with its promotion pull request. Locate candidate PR numbers
+    # through the search index, then load each full record so the strict
+    # develop -> main / merge-commit filter in _promotion_pr_number stays
+    # unchanged.
+    search_payload = _run(
         [
             "gh",
             "api",
-            f"repos/{repository}/commits/{commit}/pulls",
-            "-H",
-            "Accept: application/vnd.github+json",
+            f"search/issues?q=repo:{repository}+type:pr+sha:{commit}",
         ],
         cwd=root,
     )
-    value = json.loads(payload)
-    if not isinstance(value, list):
-        raise RuntimeError("GitHub associated-pull response is not a list.")
-    return [item for item in value if isinstance(item, dict)]
+    search_value = json.loads(search_payload)
+    if not isinstance(search_value, dict):
+        raise RuntimeError("GitHub associated-pull search response is not an object.")
+    items = search_value.get("items", [])
+    if not isinstance(items, list):
+        raise RuntimeError("GitHub associated-pull search items is not a list.")
+    records: list[dict[str, Any]] = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        number = item.get("number")
+        if type(number) is not int or number <= 0:
+            continue
+        record_payload = _run(
+            ["gh", "api", f"repos/{repository}/pulls/{number}"],
+            cwd=root,
+        )
+        record = json.loads(record_payload)
+        if isinstance(record, dict):
+            records.append(record)
+    return records
 
 
 def _promotion_pr_number(
