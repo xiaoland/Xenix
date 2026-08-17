@@ -111,7 +111,7 @@ def validated_artifacts(
     *,
     expected_tag: str,
     expected_commit: str,
-    expected_promotion_pr: int,
+    expected_promotion_pr: int | None,
     expected_repository: str | None = None,
 ) -> list[dict]:
     if not isinstance(manifest, dict) or manifest.get("schema_version") != MANIFEST_SCHEMA_VERSION:
@@ -129,7 +129,10 @@ def validated_artifacts(
         or release.keys() != {"protocol_version", "tag", "promotion_pr"}
         or release.get("protocol_version") != RELEASE_PROTOCOL_VERSION
         or release.get("tag") != expected_tag
-        or release.get("promotion_pr") != expected_promotion_pr
+        or (
+            expected_promotion_pr is not None
+            and release.get("promotion_pr") != expected_promotion_pr
+        )
         or not isinstance(workflow, dict)
         or workflow.keys() != {"repository", "run_id", "run_attempt"}
         or type(workflow.get("run_id")) is not int
@@ -252,7 +255,7 @@ def build_plan(
     manifest_path: Path,
     expected_tag: str,
     expected_commit: str,
-    expected_promotion_pr: int,
+    expected_promotion_pr: int | None,
     expected_repository: str | None,
 ) -> PublicationPlan:
     manifest_path = manifest_path.resolve()
@@ -606,6 +609,16 @@ def _write_github_outputs(plan: PublicationPlan, result: PublicationResult) -> N
         stream.write(f"visibility_seconds={result.visibility_seconds}\n")
 
 
+def _optional_positive_int(raw: str) -> int | None:
+    value = raw.strip()
+    if not value:
+        return None
+    parsed = int(value)
+    if parsed < 1:
+        raise ValueError("promotion PR must be a positive integer when present")
+    return parsed
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -617,17 +630,17 @@ def main() -> int:
     parser.add_argument("--commit", default=os.environ.get("GITHUB_SHA", ""))
     parser.add_argument(
         "--promotion-pr",
-        type=int,
-        default=os.environ.get("XENIX_PROMOTION_PR"),
+        default=os.environ.get("XENIX_PROMOTION_PR", ""),
     )
     parser.add_argument(
         "--repository",
         default=os.environ.get("GITHUB_REPOSITORY", ""),
     )
     args = parser.parse_args()
-    if not args.tag or not args.commit or not args.promotion_pr or not args.repository:
+    promotion_pr = _optional_positive_int(args.promotion_pr)
+    if not args.tag or not args.commit or not args.repository:
         raise RuntimeError(
-            "Release tag, commit, promotion PR, and repository are required."
+            "Release tag, commit, and repository are required."
         )
     root = Path(__file__).resolve().parents[1]
     plan = build_plan(
@@ -635,7 +648,7 @@ def main() -> int:
         manifest_path=(root / args.manifest),
         expected_tag=args.tag,
         expected_commit=args.commit,
-        expected_promotion_pr=args.promotion_pr,
+        expected_promotion_pr=promotion_pr,
         expected_repository=args.repository,
     )
     store = OssReleaseStore.from_environment(

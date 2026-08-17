@@ -22,11 +22,14 @@ nothing. The only release authorization is a pushed immutable
 `v<project-version>` tag on the current or any historical eligible promotion
 result. The selected commit must:
 
-- be the recorded merge outcome of exactly one same-repository
-  `develop -> main` promotion PR;
 - occur in `origin/main` first-parent history;
 - contain the supported release protocol;
 - declare the same project version as the tag.
+
+The promotion PR number is recorded as best-effort provenance in the release
+manifest and is not a release gate. `main` is already restricted to
+merge-commit pull requests by the `main-promotion` ruleset, so first-parent
+membership alone establishes the promoted state.
 
 Promotion CI is the test authority for the reviewed source. The tag workflow
 re-verifies release identity, runs repository checks, and builds and exercises the
@@ -59,8 +62,9 @@ retried from the unchanged tag and commit.
 
 The tag starts the only `Native Release` workflow:
 
-1. a secretless job verifies tag, version, commit, promotion PR, `main`
-   first-parent membership, and release-protocol identity;
+1. a secretless job verifies tag, version, commit, `main` first-parent
+   membership, and release-protocol identity, and records the promotion PR
+   as best-effort provenance;
 2. the `native-release` Environment admits the verified `v*` ref and supplies
    release configuration and secrets;
 3. the Windows job re-verifies the identity and repository checks on the tag SHA;
@@ -79,8 +83,9 @@ dispatch, or second release approval.
 ## Publication Contract
 
 The release manifest records schema/protocol version, SemVer, tag, commit,
-promotion PR, workflow run/attempt, toolchain, dependency-lock hash, packaged
-smoke result, and every artifact's path, size, type, and SHA-256.
+promotion PR when resolvable, workflow run/attempt, toolchain, dependency-lock
+hash, packaged smoke result, and every artifact's path, size, type, and
+SHA-256.
 
 The publisher is a single globally serialized writer. It:
 

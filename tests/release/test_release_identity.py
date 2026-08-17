@@ -65,7 +65,7 @@ def _promotion_record(
     }
 
 
-def test_promotion_selection_requires_exact_same_repository_merge_outcome() -> None:
+def test_promotion_selection_records_best_effort_provenance() -> None:
     commit = "a" * 40
 
     assert (
@@ -77,12 +77,16 @@ def test_promotion_selection_requires_exact_same_repository_merge_outcome() -> N
         == 42
     )
 
-    with pytest.raises(RuntimeError, match="unique merge outcome"):
+    # A non-develop or otherwise non-matching record yields no provenance
+    # rather than blocking the release.
+    assert (
         release_identity._promotion_pr_number(
             [_promotion_record(commit, head="feature")],
             repository="xiaoland/Xenix",
             commit=commit,
         )
+        is None
+    )
 
 
 def test_verify_accepts_historical_first_parent_promotion(
@@ -119,6 +123,39 @@ def test_verify_accepts_historical_first_parent_promotion(
     assert identity.tag == "v1.2.0"
     assert identity.commit == commit
     assert identity.promotion_pr == 42
+
+
+def test_verify_treats_promotion_pr_as_optional_provenance(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    commit = "a" * 40
+    _write_release_configuration(tmp_path)
+
+    def git(_root: Path, *args: str) -> str:
+        if args == ("rev-parse", "HEAD"):
+            return commit
+        if args == ("tag", "--points-at", commit):
+            return "v1.2.0"
+        if args == ("rev-list", "--first-parent", "origin/main"):
+            return f"{'b' * 40}\n{commit}\n{'c' * 40}"
+        raise AssertionError(args)
+
+    monkeypatch.setattr(release_identity, "_git", git)
+    monkeypatch.setattr(
+        release_identity,
+        "_associated_pull_requests",
+        lambda *_args, **_kwargs: [],
+    )
+
+    identity = release_identity.verify(
+        tmp_path,
+        require_tag=True,
+        require_promotion=True,
+        repository="xiaoland/Xenix",
+    )
+
+    assert identity.promotion_pr is None
 
 
 def test_verify_rejects_side_branch_ancestor(

@@ -98,29 +98,29 @@ def _associated_pull_requests(
     repository: str,
     commit: str,
 ) -> list[dict[str, Any]]:
-    if not _REPOSITORY_PATTERN.fullmatch(repository):
-        raise RuntimeError(f"Invalid GitHub repository identity: {repository!r}.")
-    if not _COMMIT_PATTERN.fullmatch(commit):
-        raise RuntimeError(f"Invalid release commit identity: {commit!r}.")
+    # Best-effort promotion provenance: never blocks the release.
+    #
     # The commits/{sha}/pulls endpoint does not reliably associate a merge
-    # commit with its promotion pull request. Locate candidate PR numbers
-    # through the search index, then load each full record so the strict
-    # develop -> main / merge-commit filter in _promotion_pr_number stays
-    # unchanged.
-    search_payload = _run(
-        [
-            "gh",
-            "api",
-            f"search/issues?q=repo:{repository}+type:pr+sha:{commit}",
-        ],
-        cwd=root,
-    )
-    search_value = json.loads(search_payload)
+    # commit with its promotion PR, and the search index is itself
+    # eventually-consistent. This lookup only records the promotion PR number
+    # for the release manifest; the hard promotion gate is
+    # _require_main_first_parent. Any failure therefore resolves to no
+    # provenance instead of an error.
+    if not _REPOSITORY_PATTERN.fullmatch(repository) or not _COMMIT_PATTERN.fullmatch(commit):
+        return []
+    try:
+        search_payload = _run(
+            ["gh", "api", f"search/issues?q=repo:{repository}+type:pr+sha:{commit}"],
+            cwd=root,
+        )
+        search_value = json.loads(search_payload)
+    except (OSError, subprocess.CalledProcessError, json.JSONDecodeError):
+        return []
     if not isinstance(search_value, dict):
-        raise RuntimeError("GitHub associated-pull search response is not an object.")
+        return []
     items = search_value.get("items", [])
     if not isinstance(items, list):
-        raise RuntimeError("GitHub associated-pull search items is not a list.")
+        return []
     records: list[dict[str, Any]] = []
     for item in items:
         if not isinstance(item, dict):
@@ -128,11 +128,14 @@ def _associated_pull_requests(
         number = item.get("number")
         if type(number) is not int or number <= 0:
             continue
-        record_payload = _run(
-            ["gh", "api", f"repos/{repository}/pulls/{number}"],
-            cwd=root,
-        )
-        record = json.loads(record_payload)
+        try:
+            record_payload = _run(
+                ["gh", "api", f"repos/{repository}/pulls/{number}"],
+                cwd=root,
+            )
+            record = json.loads(record_payload)
+        except (OSError, subprocess.CalledProcessError, json.JSONDecodeError):
+            continue
         if isinstance(record, dict):
             records.append(record)
     return records
@@ -143,7 +146,7 @@ def _promotion_pr_number(
     *,
     repository: str,
     commit: str,
-) -> int:
+) -> int | None:
     matches: list[int] = []
     for record in records:
         head = record.get("head")
@@ -166,12 +169,7 @@ def _promotion_pr_number(
             and number > 0
         ):
             matches.append(number)
-    if len(matches) != 1:
-        raise RuntimeError(
-            "Release commit must be the unique merge outcome of a completed "
-            f"same-repository develop -> main promotion PR; found {matches!r}."
-        )
-    return matches[0]
+    return matches[0] if len(matches) == 1 else None
 
 
 def verify(
@@ -191,11 +189,7 @@ def verify(
     tag = _exact_release_tag(root, commit=commit, version=version) if require_tag else ""
     promotion_pr: int | None = None
     if require_promotion:
-        selected_repository = repository or os.environ.get("GITHUB_REPOSITORY", "")
-        if not selected_repository:
-            raise RuntimeError(
-                "GitHub repository identity is required for promotion verification."
-            )
+        selected_repository = (repository or os.environ.get("GITHUB_REPOSITORY", "")).strip()
         _require_main_first_parent(root, commit=commit, main_ref=main_ref)
         promotion_pr = _promotion_pr_number(
             _associated_pull_requests(
