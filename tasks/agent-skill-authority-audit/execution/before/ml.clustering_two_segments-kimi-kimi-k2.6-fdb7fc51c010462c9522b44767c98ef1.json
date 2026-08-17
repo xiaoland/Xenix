@@ -1,0 +1,130 @@
+{
+  "budget": {
+    "exhaustion_reason": null,
+    "invocation_reported_subject_tokens": 184868,
+    "policy": {
+      "max_provider_attempts": 2,
+      "max_reported_invocation_subject_tokens": 4000000,
+      "max_reported_subject_tokens": 500000,
+      "max_sampling_rounds": 12,
+      "max_wall_seconds": 900.0,
+      "policy_id": "agent-harness-budget-v1",
+      "token_enforcement": "response_boundary"
+    },
+    "provider_attempts_dispatched": 8,
+    "reported_subject_tokens": 90165,
+    "sampling_rounds_admitted": 8,
+    "status": "within_limits"
+  },
+  "case_id": "ml.clustering_two_segments",
+  "execution_mode": "headless",
+  "failure_kind": null,
+  "identity": {
+    "case_definition_sha256": "5D5256CF56D5778FF16006A6E42DF1362F951FBDBB4670288BF883A64961C1EF",
+    "effective_settings_sha256": "E0FC36FEC27A23343B89CDF36E5F5C78F2B95CDFCE072A95CB46F5EF4A54987A",
+    "embedding_settings_sha256": "84855E3EADB8F092BBE6E6E87D5ECAD071F1981359295FBA2826AEC4630F0397",
+    "fixture_sha256": "FB8D3E8D646A64E7901070752CF47E91475A3B4D6F3BC4E2191F40851F827FC5",
+    "harness_variant": "baseline",
+    "invocation_id": "1e27073db905411eb4b6f537a072c09b",
+    "judge_settings_sha256": "56DB3BF53054BF1B1222E602892131C8F0A24DE0E1233912AD69E3483559D1E7",
+    "repository_commit": "5b31fd5db17405c74f1c9d3c70af832de5144849",
+    "repository_dirty": true,
+    "runtime_sha256": "853635FA2B4A071EE50200AAFB804518E2827CBDAD1870AD7EEE8699D7042C1D",
+    "settings_sha256": "578FB6960F5373A00CC77B815CAD41E9150760DCA8E61EE2DA0F60C9E744E026"
+  },
+  "integrity": {
+    "checks": [
+      {
+        "name": "canonical_completion",
+        "passed": true,
+        "summary": "canonical_completion_observed"
+      },
+      {
+        "name": "source_unchanged",
+        "passed": true,
+        "summary": "source_unchanged"
+      },
+      {
+        "name": "state_isolated",
+        "passed": true,
+        "summary": "runtime_state_isolated"
+      }
+    ],
+    "passed": true
+  },
+  "judge": {
+    "independence": "not_applicable",
+    "metrics": {
+      "elapsed_seconds": null,
+      "provider_retry_count": 0,
+      "token_usage": null
+    },
+    "provider_model": null,
+    "reason_codes": [],
+    "required": false,
+    "rubric_id": null,
+    "rubric_sha256": null,
+    "scores": {},
+    "status": "not_requested",
+    "summary": "judge_not_requested",
+    "verdict": "not_evaluated"
+  },
+  "provider_model": "kimi/kimi-k2.6",
+  "report_kind": "xenix.agent_harness.cell",
+  "run_id": "fdb7fc51c010462c9522b44767c98ef1",
+  "run_status": "completed",
+  "schema_version": 5,
+  "semantic": {
+    "checks": [
+      {
+        "name": "exact_two_segment_partition",
+        "passed": true,
+        "summary": "exact_two_segment_partition_observed"
+      },
+      {
+        "name": "public_artifact_linked",
+        "passed": false,
+        "summary": "public_artifact_link_missing"
+      }
+    ],
+    "passed": false,
+    "verdict": "fail"
+  },
+  "subject_metrics": {
+    "assessment_seconds": 0.007969300000695512,
+    "derived_dataset_count": 2,
+    "message_counts": {
+      "assistant": 8,
+      "tool_call": 9,
+      "tool_result": 9,
+      "user": 1
+    },
+    "provider_retry_count": 0,
+    "sampling_round_count": 8,
+    "terminal_shape": [
+      6,
+      4
+    ],
+    "token_usage": {
+      "cached_input_tokens": 68096,
+      "input_tokens": 88360,
+      "output_tokens": 1805,
+      "total_tokens": 90165
+    },
+    "tool_call_counts_by_name": {
+      "agent.skill.activate": 1,
+      "analysis.profile": 1,
+      "data.feature.select": 1,
+      "data.query": 1,
+      "model.apply": 1,
+      "model.metadata": 2,
+      "model.task.query": 1,
+      "model.train": 1
+    },
+    "tool_result_counts_by_status": {
+      "succeeded": 9
+    },
+    "turn_seconds": 65.81080019999354,
+    "usage_reported_primary_response_count": 8
+  }
+}

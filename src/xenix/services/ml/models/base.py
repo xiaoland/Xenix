@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import abstractmethod
+import json
 from pathlib import Path
 from typing import Any
 
@@ -10,7 +11,7 @@ import pandas as pd
 from pydantic import BaseModel, Field
 from sklearn.base import BaseEstimator, ClassifierMixin, clone
 from sklearn.compose import ColumnTransformer
-from sklearn.model_selection import GridSearchCV, train_test_split
+from sklearn.model_selection import GridSearchCV
 from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import LabelEncoder, OneHotEncoder, StandardScaler
@@ -20,17 +21,34 @@ from ..contracts import (
     ApplySummary,
     ApplyTaskRequest,
     ApplyTaskResult,
+    CandidateMetrics,
     EvaluateTaskRequest,
     EvaluateTaskResult,
     FitTaskRequest,
     FitTaskResult,
     HyperparameterTuningTaskRequest,
     HyperparameterTuningTaskResult,
+    PreparationFacts,
+    SplitFacts,
     TuningSummary,
+    TrainingScopeFacts,
 )
+from ..clustering_evidence import ClusteringEvaluationFacts
 from ..dataset_loader import load_dataset, load_holdout_frame
 from ..evaluation import build_metric_snapshot, scoring_name_for_policy
-from ..types import ColumnRoleKind, EvaluationKind, ModelRoleDefinition, ModelRoleSchema, ModelServiceBase
+from ..evaluation import build_dummy_baseline_metrics, build_evaluation_comparison
+from ..preparation import (
+    PreparedSupervisedSplit,
+    attach_evaluation_context,
+    build_group_aware_cv,
+    build_tabular_preparation_facts,
+    canonicalize_group_series,
+    dataset_snapshot_digest,
+    membership_digest,
+    prepare_supervised_split,
+    read_evaluation_context,
+)
+from ..types import ColumnRoleKind, ModelRoleDefinition, ModelRoleSchema, ModelServiceBase
 
 
 class NumericAndCategoricalModelService(ModelServiceBase):
@@ -40,11 +58,16 @@ class NumericAndCategoricalModelService(ModelServiceBase):
     @classmethod
     def fit(cls, request: FitTaskRequest, task_dir: Path) -> FitTaskResult:
         dataframe = load_dataset(Path(request.dataset_source_path))
-        X_train, _X_test, y_train, y_test = cls._prepare_split(dataframe, request)
+        prepared = cls._prepare_split(dataframe, request)
+        X_train = prepared.train_features
+        X_test = prepared.holdout_features
+        y_train = prepared.train_target
+        y_test = prepared.holdout_target
 
         params_model = cls.validate_params(request.manual_training.params)
         estimator = cls._build_pipeline(**cls._estimator_kwargs(params_model))
         estimator.fit(X_train, y_train)
+        preparation_facts = build_tabular_preparation_facts(estimator, X_train)
         final_estimator = cls._build_pipeline(**cls._estimator_kwargs(params_model))
         final_X, final_y = cls._split_frame(
             dataframe,
@@ -60,7 +83,15 @@ class NumericAndCategoricalModelService(ModelServiceBase):
         holdout_artifact_path.parent.mkdir(parents=True, exist_ok=True)
         joblib.dump(estimator, model_artifact_path)
         joblib.dump(final_estimator, final_model_artifact_path)
-        cls._save_holdout_frame(_X_test, y_test, request, holdout_artifact_path)
+        cls._save_holdout_frame(
+            X_test,
+            y_test,
+            y_train,
+            request,
+            prepared.split_facts,
+            preparation_facts,
+            holdout_artifact_path,
+        )
         export_artifact_path, result_summary = cls._write_key_driver_report(final_estimator, final_X, task_dir)
         result_summary = {
             **result_summary,
@@ -78,24 +109,37 @@ class NumericAndCategoricalModelService(ModelServiceBase):
             final_model_artifact_path=str(final_model_artifact_path),
             holdout_artifact_path=str(holdout_artifact_path),
             export_artifact_path=str(export_artifact_path) if export_artifact_path is not None else None,
+            split_facts=prepared.split_facts,
+            preparation_facts=preparation_facts,
             result_summary=result_summary,
         )
 
     @classmethod
     def tune(cls, request: HyperparameterTuningTaskRequest, task_dir: Path) -> HyperparameterTuningTaskResult:
         dataframe = load_dataset(Path(request.dataset_source_path))
-        X_train, _X_test, y_train, y_test = cls._prepare_split(dataframe, request)
+        prepared = cls._prepare_split(dataframe, request)
+        X_train = prepared.train_features
+        X_test = prepared.holdout_features
+        y_train = prepared.train_target
+        y_test = prepared.holdout_target
         param_grid_model = cls.validate_param_grid(request.hyperparameter_tuning.param_grid)
         base_estimator = cls._build_pipeline()
+        cv, fit_groups = build_group_aware_cv(
+            request.evaluation_policy,
+            request.evaluation_kind,
+            y_train,
+            prepared.train_groups,
+        )
         search = GridSearchCV(
             estimator=base_estimator,
             param_grid=cls._build_param_grid(param_grid_model),
-            cv=request.evaluation_policy.cv_folds,
+            cv=cv,
             scoring=scoring_name_for_policy(request.evaluation_policy),
             n_jobs=1,
         )
-        search.fit(X_train, y_train)
+        search.fit(X_train, y_train, groups=fit_groups)
         estimator = search.best_estimator_
+        preparation_facts = build_tabular_preparation_facts(estimator, X_train)
         final_estimator = clone(search.best_estimator_)
         final_X, final_y = cls._split_frame(
             dataframe,
@@ -111,7 +155,15 @@ class NumericAndCategoricalModelService(ModelServiceBase):
         holdout_artifact_path.parent.mkdir(parents=True, exist_ok=True)
         joblib.dump(estimator, model_artifact_path)
         joblib.dump(final_estimator, final_model_artifact_path)
-        cls._save_holdout_frame(_X_test, y_test, request, holdout_artifact_path)
+        cls._save_holdout_frame(
+            X_test,
+            y_test,
+            y_train,
+            request,
+            prepared.split_facts,
+            preparation_facts,
+            holdout_artifact_path,
+        )
         export_artifact_path, result_summary = cls._write_key_driver_report(final_estimator, final_X, task_dir)
         result_summary = {
             **result_summary,
@@ -129,6 +181,8 @@ class NumericAndCategoricalModelService(ModelServiceBase):
             final_model_artifact_path=str(final_model_artifact_path),
             holdout_artifact_path=str(holdout_artifact_path),
             export_artifact_path=str(export_artifact_path) if export_artifact_path is not None else None,
+            split_facts=prepared.split_facts,
+            preparation_facts=preparation_facts,
             result_summary=result_summary,
             tuning_summary=TuningSummary(
                 best_params={str(key): value for key, value in search.best_params_.items()},
@@ -143,6 +197,7 @@ class NumericAndCategoricalModelService(ModelServiceBase):
     def evaluate(cls, request: EvaluateTaskRequest, task_dir: Path) -> EvaluateTaskResult:
         estimator = joblib.load(request.evaluate_model.trained_model_artifact_path)
         holdout = load_holdout_frame(Path(request.evaluate_model.holdout_artifact_path))
+        baseline_training_target, split_facts, preparation_facts = read_evaluation_context(holdout)
         X_eval, y_eval = cls._split_frame(holdout, request.column_selection.feature_columns, request.column_selection.target_columns)
         y_pred = estimator.predict(X_eval)
         y_proba = estimator.predict_proba(X_eval) if hasattr(estimator, "predict_proba") else None
@@ -154,6 +209,11 @@ class NumericAndCategoricalModelService(ModelServiceBase):
             y_proba=y_proba,
             classes=classes,
         )
+        baseline_metrics = build_dummy_baseline_metrics(
+            request.evaluation_kind,
+            baseline_training_target,
+            y_eval,
+        )
 
         return EvaluateTaskResult(
             task_id=request.task_id,
@@ -162,6 +222,10 @@ class NumericAndCategoricalModelService(ModelServiceBase):
             trained_model_id=request.evaluate_model.trained_model_id,
             model_key=cls.key,
             evaluation=metrics,
+            baseline_evaluation=baseline_metrics,
+            comparison=build_evaluation_comparison(request.evaluation_policy, metrics, baseline_metrics),
+            split_facts=split_facts,
+            preparation_facts=preparation_facts,
         )
 
     @classmethod
@@ -197,6 +261,8 @@ class NumericAndCategoricalModelService(ModelServiceBase):
                 input_file_count=len(request.input_files),
                 prediction_column_name="prediction",
             ),
+            source_dataset_ids=[item.dataset_id for item in request.input_files if item.dataset_id],
+            source_artifact_ids=[item.artifact_id for item in request.input_files if item.artifact_id],
         )
 
     @classmethod
@@ -204,29 +270,21 @@ class NumericAndCategoricalModelService(ModelServiceBase):
         cls,
         dataframe: pd.DataFrame,
         request: FitTaskRequest | HyperparameterTuningTaskRequest,
-    ) -> tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]:
+    ) -> PreparedSupervisedSplit:
         X, y = cls._split_frame(
             dataframe,
             request.column_selection.feature_columns,
             request.column_selection.target_columns,
         )
-        stratify = y if request.evaluation_kind is EvaluationKind.CLASSIFICATION else None
-        try:
-            return train_test_split(
-                X,
-                y,
-                test_size=request.evaluation_policy.test_size,
-                random_state=request.evaluation_policy.random_state,
-                stratify=stratify,
-            )
-        except ValueError:
-            return train_test_split(
-                X,
-                y,
-                test_size=request.evaluation_policy.test_size,
-                random_state=request.evaluation_policy.random_state,
-                stratify=None,
-            )
+        group_columns = request.group_columns
+        if len(group_columns) > 1:
+            raise ValidationError("Supervised evaluation accepts at most one group column.")
+        if set(group_columns) & set(request.column_selection.feature_columns):
+            raise ValidationError("The group column cannot also be a model feature.")
+        if set(group_columns) & set(request.column_selection.target_columns):
+            raise ValidationError("The group column cannot also be the target.")
+        groups = dataframe.loc[:, group_columns[0]].copy() if group_columns else None
+        return prepare_supervised_split(X, y, request, groups=groups)
 
     @classmethod
     def _split_frame(
@@ -246,11 +304,20 @@ class NumericAndCategoricalModelService(ModelServiceBase):
         cls,
         X_test: pd.DataFrame,
         y_test: pd.Series,
+        y_train: pd.Series,
         request: FitTaskRequest | HyperparameterTuningTaskRequest,
+        split_facts: SplitFacts,
+        preparation_facts: PreparationFacts,
         holdout_artifact_path: Path,
     ) -> None:
         frame = X_test.copy()
         frame[request.column_selection.target_columns[0]] = y_test
+        attach_evaluation_context(
+            frame,
+            training_target=y_train,
+            split_facts=split_facts,
+            preparation_facts=preparation_facts,
+        )
         frame.to_pickle(holdout_artifact_path)
 
     @classmethod
@@ -521,6 +588,14 @@ class SemiSupervisedClassificationModelService(NumericAndCategoricalModelService
                 required=True,
                 description="Outcome column where blank values represent unlabeled rows.",
             ),
+            ModelRoleDefinition(
+                name="group",
+                kind=ColumnRoleKind.SINGLE_COLUMN,
+                required=False,
+                description=(
+                    "Optional business entity whose rows must remain together across evaluation partitions."
+                ),
+            ),
         ],
         additional_roles=False,
     )
@@ -528,11 +603,15 @@ class SemiSupervisedClassificationModelService(NumericAndCategoricalModelService
     @classmethod
     def fit(cls, request: FitTaskRequest, task_dir: Path) -> FitTaskResult:
         dataframe = load_dataset(Path(request.dataset_source_path))
-        X_train, _X_test, y_train, y_test = cls._prepare_semisupervised_split(dataframe, request)
+        X_train, X_test, y_train, y_test, split_facts = cls._prepare_semisupervised_split(
+            dataframe,
+            request,
+        )
 
         params_model = cls.validate_params(request.manual_training.params)
         estimator = cls._build_pipeline(**cls._estimator_kwargs(params_model))
         estimator.fit(X_train, y_train)
+        preparation_facts = build_tabular_preparation_facts(estimator, X_train)
         final_estimator = cls._build_pipeline(**cls._estimator_kwargs(params_model))
         final_feature_columns = _role_columns(request.train_role_bindings, "feature")
         final_target_column = cls._partial_target_column(request.train_role_bindings)
@@ -547,7 +626,16 @@ class SemiSupervisedClassificationModelService(NumericAndCategoricalModelService
         holdout_artifact_path.parent.mkdir(parents=True, exist_ok=True)
         joblib.dump(estimator, model_artifact_path)
         joblib.dump(final_estimator, final_model_artifact_path)
-        cls._save_semisupervised_holdout_frame(_X_test, y_test, request, holdout_artifact_path)
+        baseline_training_target = y_train.loc[~y_train.map(_is_unlabeled_value)].reset_index(drop=True)
+        cls._save_semisupervised_holdout_frame(
+            X_test,
+            y_test,
+            baseline_training_target,
+            request,
+            split_facts,
+            preparation_facts,
+            holdout_artifact_path,
+        )
         export_artifact_path, result_summary = cls._write_key_driver_report(final_estimator, final_X, task_dir)
         result_summary = {
             **result_summary,
@@ -569,6 +657,8 @@ class SemiSupervisedClassificationModelService(NumericAndCategoricalModelService
             final_model_artifact_path=str(final_model_artifact_path),
             holdout_artifact_path=str(holdout_artifact_path),
             export_artifact_path=str(export_artifact_path) if export_artifact_path is not None else None,
+            split_facts=split_facts,
+            preparation_facts=preparation_facts,
             result_summary=result_summary,
         )
 
@@ -580,6 +670,7 @@ class SemiSupervisedClassificationModelService(NumericAndCategoricalModelService
     def evaluate(cls, request: EvaluateTaskRequest, task_dir: Path) -> EvaluateTaskResult:
         estimator = joblib.load(request.evaluate_model.trained_model_artifact_path)
         holdout = load_holdout_frame(Path(request.evaluate_model.holdout_artifact_path))
+        baseline_training_target, split_facts, preparation_facts = read_evaluation_context(holdout)
         target_column = cls._partial_target_column(request.train_role_bindings)
         feature_columns = _role_columns(request.train_role_bindings, "feature")
         X_eval = holdout.loc[:, feature_columns].copy()
@@ -594,6 +685,11 @@ class SemiSupervisedClassificationModelService(NumericAndCategoricalModelService
             y_proba=y_proba,
             classes=classes,
         )
+        baseline_metrics = build_dummy_baseline_metrics(
+            request.evaluation_kind,
+            baseline_training_target,
+            y_eval,
+        )
 
         return EvaluateTaskResult(
             task_id=request.task_id,
@@ -602,6 +698,10 @@ class SemiSupervisedClassificationModelService(NumericAndCategoricalModelService
             trained_model_id=request.evaluate_model.trained_model_id,
             model_key=cls.key,
             evaluation=metrics,
+            baseline_evaluation=baseline_metrics,
+            comparison=build_evaluation_comparison(request.evaluation_policy, metrics, baseline_metrics),
+            split_facts=split_facts,
+            preparation_facts=preparation_facts,
         )
 
     @classmethod
@@ -609,48 +709,98 @@ class SemiSupervisedClassificationModelService(NumericAndCategoricalModelService
         cls,
         dataframe: pd.DataFrame,
         request: FitTaskRequest | HyperparameterTuningTaskRequest,
-    ) -> tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]:
+    ) -> tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series, SplitFacts]:
         feature_columns = _role_columns(request.train_role_bindings, "feature")
         target_column = cls._partial_target_column(request.train_role_bindings)
         X = dataframe.loc[:, feature_columns].copy()
         y = dataframe.loc[:, target_column].copy()
         unlabeled_mask = y.map(_is_unlabeled_value)
-        labeled_indices = y.index[~unlabeled_mask].tolist()
-        unlabeled_indices = y.index[unlabeled_mask].tolist()
-        if len(labeled_indices) < 2:
+        labeled_positions = np.flatnonzero((~unlabeled_mask).to_numpy(dtype=bool))
+        unlabeled_positions = np.flatnonzero(unlabeled_mask.to_numpy(dtype=bool))
+        if len(labeled_positions) < 2:
             raise ValidationError("Semi-supervised classification requires at least two labeled rows.")
-        if y.loc[labeled_indices].astype(str).nunique(dropna=False) < 2:
+        if y.iloc[labeled_positions].astype(str).nunique(dropna=False) < 2:
             raise ValidationError("Semi-supervised classification requires at least two labeled classes.")
 
-        stratify = y.loc[labeled_indices] if y.loc[labeled_indices].value_counts().min() >= 2 else None
-        try:
-            train_labeled_indices, holdout_indices = train_test_split(
-                labeled_indices,
-                test_size=request.evaluation_policy.test_size,
-                random_state=request.evaluation_policy.random_state,
-                stratify=stratify,
-            )
-        except ValueError:
-            train_labeled_indices, holdout_indices = train_test_split(
-                labeled_indices,
-                test_size=request.evaluation_policy.test_size,
-                random_state=request.evaluation_policy.random_state,
-                stratify=None,
-            )
+        group_columns = request.group_columns
+        if len(group_columns) > 1:
+            raise ValidationError("Semi-supervised evaluation accepts at most one group column.")
+        if set(group_columns) & set(feature_columns):
+            raise ValidationError("The group column cannot also be a model feature.")
+        if group_columns and group_columns[0] == target_column:
+            raise ValidationError("The group column cannot also be the partial target.")
+        all_groups = dataframe.loc[:, group_columns[0]].copy() if group_columns else None
+        labeled_groups = all_groups.iloc[labeled_positions] if all_groups is not None else None
+        prepared = prepare_supervised_split(
+            X.iloc[labeled_positions],
+            y.iloc[labeled_positions],
+            request,
+            groups=labeled_groups,
+        )
+        train_labeled_positions = labeled_positions[prepared.train_positions]
+        holdout_positions = labeled_positions[prepared.holdout_positions]
 
-        train_indices = list(train_labeled_indices) + unlabeled_indices
-        return X.loc[train_indices], X.loc[holdout_indices], y.loc[train_indices], y.loc[holdout_indices]
+        eligible_unlabeled_positions = unlabeled_positions
+        if all_groups is not None and prepared.holdout_groups is not None:
+            canonical_groups = canonicalize_group_series(all_groups)
+            holdout_group_values = set(prepared.holdout_groups.tolist())
+            eligible_unlabeled_positions = np.asarray(
+                [
+                    position
+                    for position in unlabeled_positions
+                    if canonical_groups.iloc[position] not in holdout_group_values
+                ],
+                dtype=int,
+            )
+        train_positions = np.concatenate([train_labeled_positions, eligible_unlabeled_positions])
+        train_positions.sort()
+
+        snapshot_digest = dataset_snapshot_digest(request.dataset_snapshot)
+        split_update: dict[str, Any] = {
+            "eligible_row_count": len(train_positions) + len(holdout_positions),
+            "train_row_count": len(train_positions),
+            "train_membership_digest": membership_digest(snapshot_digest, "train", train_positions),
+            "holdout_membership_digest": membership_digest(snapshot_digest, "holdout", holdout_positions),
+            "evaluation_scope": "labeled_holdout_with_unlabeled_training",
+        }
+        if all_groups is not None:
+            canonical_groups = canonicalize_group_series(all_groups)
+            eligible_positions = np.concatenate([train_positions, holdout_positions])
+            split_update.update(
+                {
+                    "eligible_group_count": int(canonical_groups.iloc[eligible_positions].nunique()),
+                    "train_group_count": int(canonical_groups.iloc[train_positions].nunique()),
+                    "holdout_group_count": int(canonical_groups.iloc[holdout_positions].nunique()),
+                }
+            )
+        split_facts = prepared.split_facts.model_copy(update=split_update)
+        return (
+            X.iloc[train_positions].reset_index(drop=True),
+            X.iloc[holdout_positions].reset_index(drop=True),
+            y.iloc[train_positions].reset_index(drop=True),
+            y.iloc[holdout_positions].reset_index(drop=True),
+            split_facts,
+        )
 
     @classmethod
     def _save_semisupervised_holdout_frame(
         cls,
         X_test: pd.DataFrame,
         y_test: pd.Series,
+        baseline_training_target: pd.Series,
         request: FitTaskRequest | HyperparameterTuningTaskRequest,
+        split_facts: SplitFacts,
+        preparation_facts: PreparationFacts,
         holdout_artifact_path: Path,
     ) -> None:
         frame = X_test.copy()
         frame[cls._partial_target_column(request.train_role_bindings)] = y_test
+        attach_evaluation_context(
+            frame,
+            training_target=baseline_training_target,
+            split_facts=split_facts,
+            preparation_facts=preparation_facts,
+        )
         frame.to_pickle(holdout_artifact_path)
 
     @staticmethod
@@ -690,22 +840,44 @@ class UnsupervisedClusteringModelService(ModelServiceBase):
     @classmethod
     def fit(cls, request: FitTaskRequest, task_dir: Path) -> FitTaskResult:
         dataframe = load_dataset(Path(request.dataset_source_path))
-        X = cls._select_features(dataframe, request.column_selection.feature_columns)
-
         params_model = cls.validate_params(request.manual_training.params)
-        estimator = cls._build_pipeline(**cls._estimator_kwargs(params_model))
-        raw_labels = estimator.fit_predict(X)
-        display_labels, cluster_count, noise_count = cls._normalize_cluster_labels(raw_labels)
+        fit_with_evidence = getattr(cls, "fit_with_evidence", None)
+        if fit_with_evidence is None:
+            raise ValidationError(
+                f"Model '{cls.key}' does not expose trustworthy clustering evidence."
+            )
+        fitted = fit_with_evidence(
+            dataframe,
+            request.column_selection.feature_columns,
+            params_model,
+        )
+        estimator = fitted.estimator
+        display_labels = fitted.display_labels
+        facts: ClusteringEvaluationFacts = fitted.facts
+        cluster_count = facts.quality.cluster_count
+        noise_count = facts.quality.noise_row_count
 
         model_artifact_path = task_dir / "models" / f"{cls.key.replace('.', '_')}.joblib"
         export_artifact_path = task_dir / "output" / "cluster_assignments.csv"
+        evaluation_context_path = task_dir / "input" / "clustering-evaluation.json"
+        report_artifact_path = task_dir / "output" / "clustering-report.json"
         model_artifact_path.parent.mkdir(parents=True, exist_ok=True)
         export_artifact_path.parent.mkdir(parents=True, exist_ok=True)
+        evaluation_context_path.parent.mkdir(parents=True, exist_ok=True)
         joblib.dump(estimator, model_artifact_path)
 
         result_frame = dataframe.copy()
         result_frame[cls.cluster_column_name] = display_labels
         result_frame.to_csv(export_artifact_path, index=False)
+        evidence_payload = facts.model_dump(mode="json")
+        serialized_evidence = json.dumps(
+            evidence_payload,
+            ensure_ascii=False,
+            indent=2,
+            sort_keys=True,
+        )
+        evaluation_context_path.write_text(serialized_evidence, encoding="utf-8")
+        report_artifact_path.write_text(serialized_evidence, encoding="utf-8")
 
         return FitTaskResult(
             task_id=request.task_id,
@@ -714,12 +886,20 @@ class UnsupervisedClusteringModelService(ModelServiceBase):
             model_key=cls.key,
             params=params_model.model_dump(mode="json", by_alias=True),
             model_artifact_path=str(model_artifact_path),
+            final_model_artifact_path=str(model_artifact_path),
+            holdout_artifact_path=str(evaluation_context_path),
             export_artifact_path=str(export_artifact_path),
+            report_artifact_path=str(report_artifact_path),
+            training_scopes=TrainingScopeFacts(
+                evaluation_model="all_eligible_rows",
+                apply_model=("all_eligible_rows" if cls.supports_apply else None),
+            ),
             result_summary={
                 "cluster_column_name": cls.cluster_column_name,
                 "cluster_count": cluster_count,
                 "noise_count": noise_count,
                 "row_count": int(len(result_frame.index)),
+                "clustering_evaluation": evidence_payload,
             },
         )
 
@@ -729,13 +909,65 @@ class UnsupervisedClusteringModelService(ModelServiceBase):
 
     @classmethod
     def evaluate(cls, request: EvaluateTaskRequest, task_dir: Path) -> EvaluateTaskResult:
-        raise ValidationError(f"Model '{cls.key}' does not support evaluation.")
+        facts = ClusteringEvaluationFacts.model_validate_json(
+            Path(request.evaluate_model.holdout_artifact_path).read_text(encoding="utf-8")
+        )
+        candidate = None
+        baseline = None
+        comparison = None
+        if (
+            facts.quality.silhouette is not None
+            and facts.null_baseline.median_silhouette is not None
+        ):
+            candidate_metrics = {
+                "silhouette": facts.quality.silhouette,
+            }
+            if facts.quality.calinski_harabasz is not None:
+                candidate_metrics["calinski_harabasz"] = facts.quality.calinski_harabasz
+            if facts.quality.davies_bouldin is not None:
+                candidate_metrics["davies_bouldin"] = facts.quality.davies_bouldin
+            candidate = CandidateMetrics(
+                primary_metric_name="silhouette",
+                primary_metric_value=facts.quality.silhouette,
+                metrics=candidate_metrics,
+                details={
+                    "assignment_digest": facts.assignment_digest,
+                    "evidence_digest": facts.evidence_digest,
+                },
+            )
+            baseline = CandidateMetrics(
+                primary_metric_name="silhouette",
+                primary_metric_value=facts.null_baseline.median_silhouette,
+                metrics={"silhouette": facts.null_baseline.median_silhouette},
+                details={"baseline_protocol": facts.null_baseline.protocol},
+            )
+            comparison = build_evaluation_comparison(
+                request.evaluation_policy,
+                candidate,
+                baseline,
+            )
+        return EvaluateTaskResult(
+            task_id=request.task_id,
+            evaluation_kind=request.evaluation_kind,
+            evaluation_policy=request.evaluation_policy,
+            trained_model_id=request.evaluate_model.trained_model_id,
+            model_key=cls.key,
+            evaluation=candidate,
+            baseline_evaluation=baseline,
+            comparison=comparison,
+            clustering_evaluation=facts,
+        )
 
     @classmethod
     def apply(cls, request: ApplyTaskRequest, task_dir: Path) -> ApplyTaskResult:
-        estimator = joblib.load(request.apply_model.trained_model_artifact_path)
-        if not hasattr(estimator, "predict"):
+        if not cls.supports_apply:
             raise ValidationError(f"Model '{cls.key}' does not support apply.")
+        estimator = joblib.load(request.apply_model.trained_model_artifact_path)
+        predict_with_retained_labels = getattr(cls, "predict_with_retained_labels", None)
+        if predict_with_retained_labels is None:
+            raise ValidationError(
+                f"Model '{cls.key}' has no retained clustering label contract."
+            )
 
         result_frames: list[pd.DataFrame] = []
         for input_file in request.input_files:
@@ -745,9 +977,11 @@ class UnsupervisedClusteringModelService(ModelServiceBase):
                 raise ValidationError(
                     f"Apply input '{input_file.file_name}' is missing required columns: {', '.join(missing)}."
                 )
-            X_apply = cls._select_features(dataframe, request.feature_columns)
-            raw_predictions = estimator.predict(X_apply)
-            display_labels, _cluster_count, _noise_count = cls._normalize_cluster_labels(raw_predictions)
+            display_labels = predict_with_retained_labels(
+                estimator,
+                dataframe,
+                request.feature_columns,
+            )
             result_frame = dataframe.copy()
             result_frame[cls.cluster_column_name] = display_labels
             if len(request.input_files) > 1:

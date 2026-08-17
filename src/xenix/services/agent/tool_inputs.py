@@ -11,6 +11,14 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
+from ..analysis_profile import (
+    DEFAULT_CORRELATION_COLUMN_LIMIT,
+    DEFAULT_NUMERIC_SUMMARY_LIMIT,
+    DEFAULT_PROFILE_FIELD_LIMIT,
+    MAX_CORRELATION_COLUMN_LIMIT,
+    MAX_NUMERIC_SUMMARY_LIMIT,
+    MAX_PROFILE_FIELD_LIMIT,
+)
 from ..knowledge_service import MAX_KNOWLEDGE_QUERY_CHARS
 
 
@@ -192,15 +200,56 @@ class AnalysisLambdaInput(AgentToolInput):
         return self
 
 
+class AnalysisProfileInput(AgentToolInput):
+    dataset_id: RequiredString = Field(description="Registered Dataset to profile.")
+    field_limit: Annotated[int, Field(ge=1, le=MAX_PROFILE_FIELD_LIMIT)] = Field(
+        default=DEFAULT_PROFILE_FIELD_LIMIT,
+        description="Maximum ordered field facts returned by the whole-Dataset profile.",
+    )
+    numeric_summary_limit: Annotated[
+        int,
+        Field(ge=1, le=MAX_NUMERIC_SUMMARY_LIMIT),
+    ] = Field(
+        default=DEFAULT_NUMERIC_SUMMARY_LIMIT,
+        description="Maximum continuous-numeric summaries returned; identifier fields are excluded.",
+    )
+    correlation_column_limit: Annotated[
+        int,
+        Field(ge=2, le=MAX_CORRELATION_COLUMN_LIMIT),
+    ] = Field(
+        default=DEFAULT_CORRELATION_COLUMN_LIMIT,
+        description="Maximum continuous-numeric fields included in the bounded correlation projection.",
+    )
+
+
 class CleaningOperationInput(AgentToolInput):
-    operation: RequiredString
-    params: dict[str, Any] = Field(default_factory=dict)
+    operation: RequiredString = Field(
+        description=(
+            "One advertised atomic data.clean operation. It executes at this list position "
+            "against the current intermediate dataset produced by every earlier operation."
+        )
+    )
+    params: dict[str, Any] = Field(
+        default_factory=dict,
+        description=(
+            "Parameters for this operation, resolved against the current intermediate dataset. "
+            "When an operation selects columns, use one supported name or index reference form "
+            "and do not mix forms."
+        ),
+    )
 
 
 class DataCleanInput(AgentToolInput):
     dataset_id: RequiredString
     name: OptionalString | None = None
-    operations: list[CleaningOperationInput] = Field(default_factory=list)
+    operations: list[CleaningOperationInput] = Field(
+        default_factory=list,
+        description=(
+            "Ordered atomic operations executed strictly left-to-right. Each operation receives "
+            "the intermediate dataset returned by the preceding operation, so filtering before "
+            "imputation changes the values used to fit that imputation."
+        ),
+    )
 
 
 class DataCleanMetadataInput(AgentToolInput):
@@ -246,9 +295,27 @@ class DataTokenizeInput(AgentToolInput):
             "one-token-per-row analysis."
         ),
     )
-    tokenizer_profile: Literal["zh_business_v1"] = Field(
+    tokenizer_profile: Literal["zh_business_v1", "multilingual_business_v1"] = Field(
         default="zh_business_v1",
-        description="Stable Chinese-first tokenization profile owned by Xenix.",
+        description="Stable legacy Chinese or retained multilingual business preparation profile.",
+    )
+    phrase_mode: Literal["unigram", "unigram_bigram"] = Field(
+        default="unigram",
+        description="Use short phrases only with multilingual_business_v1.",
+    )
+    custom_dictionary_dataset_ids: Annotated[
+        list[RequiredString],
+        Field(max_length=4),
+    ] = Field(
+        default_factory=list,
+        description="Optional registered one-column term Datasets; at most four.",
+    )
+    stopword_dataset_ids: Annotated[
+        list[RequiredString],
+        Field(max_length=4),
+    ] = Field(
+        default_factory=list,
+        description="Optional registered one-column stopword Datasets; at most four.",
     )
 
     @model_validator(mode="after")
@@ -262,6 +329,22 @@ class DataTokenizeInput(AgentToolInput):
         if self.id_columns is not None and self.id_column_indexes is not None:
             raise ValueError(
                 "data.tokenize accepts either id_columns or id_column_indexes, not both."
+            )
+        if len(set(self.custom_dictionary_dataset_ids)) != len(
+            self.custom_dictionary_dataset_ids
+        ) or len(set(self.stopword_dataset_ids)) != len(self.stopword_dataset_ids):
+            raise ValueError("Text preparation Dataset references cannot contain duplicates.")
+        if set(self.custom_dictionary_dataset_ids) & set(self.stopword_dataset_ids):
+            raise ValueError(
+                "A Dataset cannot be both a custom dictionary and a stopword list."
+            )
+        if self.tokenizer_profile == "zh_business_v1" and (
+            self.phrase_mode != "unigram"
+            or self.custom_dictionary_dataset_ids
+            or self.stopword_dataset_ids
+        ):
+            raise ValueError(
+                "The legacy zh_business_v1 profile does not accept phrase mode or text resources."
             )
         return self
 
@@ -389,6 +472,7 @@ ModelFamilyValue = Literal[
     "association_rules",
     "recommendation",
     "text_analysis",
+    "forecasting",
 ]
 
 
@@ -405,7 +489,7 @@ class ModelMetadataInput(AgentToolInput):
         description=(
             "Browse lightweight candidate models in one family such as supervised, "
             "clustering, anomaly_detection, association_rules, recommendation, "
-            "or text_analysis."
+            "text_analysis, or forecasting."
         ),
     )
     include_param_grid_schema: bool = Field(
@@ -428,11 +512,20 @@ class ModelTrainInput(AgentToolInput):
         description="Column role-binding id returned by data.feature.select."
     )
     models: Annotated[list[RequiredString], Field(min_length=1)] = Field(
-        description="One or more chosen model keys or aliases to train."
+        description=(
+            "All distinct chosen model keys or aliases that share this role binding and "
+            "comparison contract. One call accepts one parameter object per model key; "
+            "use separate calls when the same key needs multiple parameterizations. "
+            "Do not retrain a returned trained_model_id merely to compare or apply it."
+        )
     )
     params_by_model: dict[str, dict[str, Any]] | None = Field(
         default=None,
-        description="Optional per-model parameter objects keyed by model key.",
+        description=(
+            "Optional shallow parameter objects keyed by each entry in models. "
+            "Distinct model keys can share one call; repeated parameterizations of one "
+            "model key require separate calls."
+        ),
     )
     run_name: OptionalString = Field(
         default="",
@@ -466,24 +559,36 @@ class ModelApplyInput(AgentToolInput):
     trained_model_id: RequiredString
     input_sources: list[RequiredString] = Field(default_factory=list)
     input_rows: InlineApplyRowsInput | None = None
+    horizon: Annotated[int, Field(ge=1, le=365)] | None = Field(
+        default=None,
+        description=(
+            "Future periods to forecast. Use only for a retained forecasting model, "
+            "without input_sources or input_rows."
+        ),
+    )
 
     @model_validator(mode="after")
     def _has_apply_input(self) -> ModelApplyInput:
-        if not self.input_sources and self.input_rows is None:
-            raise ValueError("model.apply requires input_sources or input_rows.")
+        has_rows = bool(self.input_sources) or self.input_rows is not None
+        has_horizon = self.horizon is not None
+        if has_rows == has_horizon:
+            raise ValueError(
+                "model.apply requires exactly one input mode: input_sources/input_rows "
+                "or a future horizon."
+            )
         return self
 
 
 class ModelTaskQueryInput(AgentToolInput):
-    task_ids: Annotated[list[RequiredString], Field(min_length=1)] = Field(
+    task_ids: Annotated[list[RequiredString], Field(min_length=1, max_length=20)] = Field(
         description="One or more explicit ML task ids to inspect."
     )
     include_logs: bool = Field(
         default=False,
         description="Set true to include bounded task logs in the response.",
     )
-    max_log_entries: Annotated[int, Field(ge=0, le=1000)] = Field(
-        default=200,
+    max_log_entries: Annotated[int, Field(ge=0, le=50)] = Field(
+        default=20,
         description=(
             "Maximum number of log entries to return per task when include_logs is true."
         ),

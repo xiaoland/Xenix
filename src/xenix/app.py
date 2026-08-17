@@ -686,8 +686,8 @@ def _run_smoke_checks(paths) -> None:
     if get_runtime_repr() != "rtcompat":
         raise RuntimeError("Polars packaged runtime smoke expected rtcompat runtime.")
 
-    duckdb_smoke_path = paths.temp / "duckdb-smoke.csv"
-    duckdb_smoke_path.write_text("value\n1\n2\n", encoding="utf-8")
+    duckdb_smoke_path = paths.temp / "duckdb-smoke.parquet"
+    pd.DataFrame({"value": [1, 2]}).to_parquet(duckdb_smoke_path)
     result = DataQueryTransformService(paths).query(
         DataQueryInput(
             bindings=[
@@ -777,6 +777,28 @@ def _run_smoke_checks(paths) -> None:
     xgboost_prediction = xgboost_estimator.predict([[1.5]])
     if len(xgboost_prediction) != 1:
         raise RuntimeError("XGBoost packaged runtime smoke fit failed.")
+
+    from .services.forecast_packaged_smoke import run_forecasting_packaged_smoke
+
+    run_forecasting_packaged_smoke()
+
+    from .services.recommendation_packaged_smoke import (
+        run_recommendation_packaged_smoke,
+    )
+
+    run_recommendation_packaged_smoke()
+
+    from .services.text_classification_packaged_smoke import (
+        run_text_classification_packaged_smoke,
+    )
+
+    run_text_classification_packaged_smoke()
+
+    from .services.text_discovery_packaged_smoke import (
+        run_text_discovery_packaged_smoke,
+    )
+
+    run_text_discovery_packaged_smoke()
 
     from .services.knowledge_packaged_smoke import run_knowledge_packaged_smoke
 

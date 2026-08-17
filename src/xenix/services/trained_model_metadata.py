@@ -29,11 +29,15 @@ class TrainedModelContextPayload(BaseModel):
 
 
 class TrainedModelMetadata(BaseModel):
-    schema_version: int = 4
+    schema_version: int = 6
     model_key: str
     evaluation_kind: str | None = None
     model_family: str | None = None
     model_task_kind: str | None = None
+    supports_evaluation: bool | None = None
+    supports_apply: bool | None = None
+    apply_mode: str | None = None
+    forecast_options: dict[str, Any] | None = None
     model_display_name: str
     display_name: str
     saved_name: str
@@ -56,6 +60,7 @@ class TrainedModelMetadata(BaseModel):
     evaluation_model_training_scope: str | None = None
     apply_model_training_scope: str | None = None
     evaluation_ml_task_id: str | None = None
+    evaluation_facts_authority: str | None = None
     evaluation_primary_metric_name: str | None = None
     evaluation_primary_metric_value: float | None = None
     evaluation_metrics: dict[str, float] = Field(default_factory=dict)
@@ -107,7 +112,7 @@ def with_evaluation(
     evaluation_ml_task_id: str | None = None,
 ) -> TrainedModelMetadata:
     update = {
-        "schema_version": max(metadata.schema_version, 4),
+        "schema_version": max(metadata.schema_version, 6),
         "evaluation_primary_metric_name": evaluation.primary_metric_name,
         "evaluation_primary_metric_value": float(evaluation.primary_metric_value),
         "evaluation_metrics": {
@@ -118,6 +123,7 @@ def with_evaluation(
     }
     if evaluation_ml_task_id:
         update["evaluation_ml_task_id"] = evaluation_ml_task_id
+        update["evaluation_facts_authority"] = "ml_task_result"
     return metadata.model_copy(update=update)
 
 
@@ -125,7 +131,13 @@ def with_evaluation_task(
     metadata: TrainedModelMetadata,
     evaluation_ml_task_id: str,
 ) -> TrainedModelMetadata:
-    return metadata.model_copy(update={"evaluation_ml_task_id": evaluation_ml_task_id})
+    return metadata.model_copy(
+        update={
+            "schema_version": max(metadata.schema_version, 6),
+            "evaluation_ml_task_id": evaluation_ml_task_id,
+            "evaluation_facts_authority": "ml_task_result",
+        }
+    )
 
 
 def artifact_file_name_from_path(artifact_path: str) -> str:

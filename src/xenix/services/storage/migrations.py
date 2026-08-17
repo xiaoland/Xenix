@@ -9,7 +9,7 @@ from sqlmodel import SQLModel
 from ...exceptions import ValidationError
 from . import models  # noqa: F401
 
-CURRENT_SCHEMA_VERSION = 23
+CURRENT_SCHEMA_VERSION = 25
 
 
 def get_user_version(engine: Engine) -> int:
@@ -1669,6 +1669,42 @@ def migrate_v22_to_v23(engine: Engine) -> int:
     return 23
 
 
+def migrate_v23_to_v24(engine: Engine) -> int:
+    """Add immutable Dataset identity to newly created ML column bindings."""
+
+    with engine.begin() as connection:
+        tables = _table_names(connection)
+        if "dataset_column_binding" in tables:
+            columns = _table_columns(connection, "dataset_column_binding")
+            if "dataset_snapshot_payload" not in columns:
+                connection.exec_driver_sql(
+                    "ALTER TABLE dataset_column_binding "
+                    "ADD COLUMN dataset_snapshot_payload JSON"
+                )
+        connection.exec_driver_sql("PRAGMA user_version=24")
+    return 24
+
+
+def migrate_v24_to_v25(engine: Engine) -> int:
+    """Link ready ML task outputs to their one public Artifact identity."""
+
+    with engine.begin() as connection:
+        tables = _table_names(connection)
+        if "ml_task_artifact" in tables:
+            columns = _table_columns(connection, "ml_task_artifact")
+            if "artifact_id" not in columns:
+                connection.exec_driver_sql(
+                    "ALTER TABLE ml_task_artifact ADD COLUMN artifact_id VARCHAR "
+                    "REFERENCES artifact(id)"
+                )
+                connection.exec_driver_sql(
+                    "CREATE INDEX IF NOT EXISTS ix_ml_task_artifact_artifact_id "
+                    "ON ml_task_artifact (artifact_id)"
+                )
+        connection.exec_driver_sql("PRAGMA user_version=25")
+    return 25
+
+
 def _create_v16_knowledge_schema(connection) -> None:
     """Create the fixed historical v16 Knowledge shape without current metadata."""
 
@@ -1801,6 +1837,10 @@ def run_migrations(engine: Engine) -> int:
         current_version = migrate_v21_to_v22(engine)
     if current_version == 22:
         current_version = migrate_v22_to_v23(engine)
+    if current_version == 23:
+        current_version = migrate_v23_to_v24(engine)
+    if current_version == 24:
+        current_version = migrate_v24_to_v25(engine)
     if current_version == CURRENT_SCHEMA_VERSION:
         return current_version
     raise ValidationError(

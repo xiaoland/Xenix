@@ -1,0 +1,49 @@
+record_id,business_group,message,label
+p01-01,acct-north-01,"支付网关 timeout after checkout；客户无法完成付款。",priority
+p01-02,acct-north-01,"Ticket 481: checkout failed at https://pay-a.example；kindly contact ops-a@example.com",priority
+p01-03,acct-north-01,"星云工单显示扣款成功，但订单仍卡在 pending。",priority
+p01-04,acct-north-01,"客户提交了新的服务请求；please review the attached details。",priority
+p02-01,acct-north-02,"支付网关 timeout after checkout；客户无法完成付款。",priority
+p02-02,acct-north-02,"Ticket 992: checkout failed for merchant at https://pay-b.example；kindly contact ops-b@example.com",priority
+p02-03,acct-north-02,"结账页连续报错，the customer cannot place the order。",priority
+p02-04,acct-north-02,"付款完成后库存未锁定，影响当天发货。",priority
+p03-01,acct-north-03,"API callback missing; 回调迟迟未到。",priority
+p03-02,acct-north-03,"Case 310: ＡＰＩ webhook stopped at https://hook-a.example；notify api-a@example.com",priority
+p03-03,acct-north-03,"订单状态不同步，warehouse cannot release the parcel。",priority
+p03-04,acct-north-03,"A business user sent an update；烦请查看补充信息。",priority
+p04-01,acct-north-04,"API callback missing; 回调迟迟未到。",priority
+p04-02,acct-north-04,"Case 874: API webhook stopped for merchant at https://hook-b.example；notify api-b@example.com",priority
+p04-03,acct-north-04,"回调签名校验失败，all fulfillment updates are blocked。",priority
+p04-04,acct-north-04,"Shipping event cannot reach the merchant，烦请检查接口。",priority
+p05-01,acct-north-05,"BlueHarbor mobile app crashes on launch；启动即闪退。",priority
+p05-02,acct-north-05,"Incident 540: BlueHarbor crash on device 18；see https://crash-a.example and qa-a@example.com",priority
+p05-03,acct-north-05,"收银员无法打开移动端，store operations have stopped。",priority
+p05-04,acct-north-05,"新的账户消息已经到达；kindly check the latest note。",priority
+p06-01,acct-north-06,"BlueHarbor mobile app crashes on launch；启动即闪退。",priority
+p06-02,acct-north-06,"Incident 771: ＢｌｕｅＨａｒｂｏｒ mobile crash on device 29；see https://crash-b.example and qa-b@example.com",priority
+p06-03,acct-north-06,"App freezes before the dashboard loads，门店无法营业。",priority
+p06-04,acct-north-06,"",priority
+s01-01,acct-south-01,"How can I export the monthly invoice？如何导出月账单？",standard
+s01-02,acct-south-01,"Request 115: export invoice from https://help-a.example；kindly reply docs-a@example.com",standard
+s01-03,acct-south-01,"想了解账单下载入口，no transaction is blocked。",standard
+s01-04,acct-south-01,"客户提交了新的服务请求；please review the attached details。",standard
+s02-01,acct-south-02,"How can I export the monthly invoice？如何导出月账单？",standard
+s02-02,acct-south-02,"Request 286: export invoice through portal from https://help-b.example；kindly reply docs-b@example.com",standard
+s02-03,acct-south-02,"Where is the PDF invoice archive？烦请提供操作步骤。",standard
+s02-04,acct-south-02,"FYI，月度账单可以按门店筛选吗？just checking the options。",standard
+s03-01,acct-south-03,"请问在哪里更新 delivery address？",standard
+s03-02,acct-south-03,"Question 337: change address at https://profile-a.example；email guide-a@example.com",standard
+s03-03,acct-south-03,"订单尚未提交，想先修改默认收货信息。",standard
+s03-04,acct-south-03,"A business user sent an update；烦请查看补充信息。",standard
+s04-01,acct-south-04,"请问在哪里更新 delivery address？",standard
+s04-02,acct-south-04,"Question 648: change address profile at https://profile-b.example；email guide-b@example.com",standard
+s04-03,acct-south-04,"Can the saved address include a floor number？只是咨询。",standard
+s04-04,acct-south-04,"烦请说明如何删除旧的配送地址。",standard
+s05-01,acct-south-05,"Need instructions for adding a teammate；如何添加成员？",standard
+s05-02,acct-south-05,"Guide 452: invite teammate at https://team-a.example；ask help-a@example.com",standard
+s05-03,acct-south-05,"想给新同事开通只读权限，please share the steps。",standard
+s05-04,acct-south-05,"新的账户消息已经到达；kindly check the latest note。",standard
+s06-01,acct-south-06,"Need instructions for adding a teammate；如何添加成员？",standard
+s06-02,acct-south-06,"Guide 903: invite teammate workspace at https://team-b.example；ask help-b@example.com",standard
+s06-03,acct-south-06,"如何撤销一个尚未接受的成员邀请？",standard
+s06-04,acct-south-06,"   ",standard

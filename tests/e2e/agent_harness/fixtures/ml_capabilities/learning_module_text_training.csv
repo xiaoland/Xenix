@@ -1,0 +1,61 @@
+case_ref,account_batch,message,queue
+NOTE-001,CAMPUS-AMBER,入口受阻。access login portal rejects my code.,access_help
+NOTE-002,CAMPUS-AMBER,入口受阻。access login portal rejects my code.,access_help
+NOTE-003,CAMPUS-AMBER,账单复核。invoice billing seat charge appears twice.,billing_review
+NOTE-004,CAMPUS-AMBER,账单复核。invoice billing seat charge appears twice.,billing_review
+NOTE-005,CAMPUS-AMBER,结业凭证。certificate credential download is missing.,credential_request
+NOTE-006,CAMPUS-AMBER,结业凭证。certificate credential download is missing.,credential_request
+NOTE-007,CAMPUS-BRISK,登录失败。access gateway will not accept my passphrase.,access_help
+NOTE-008,CAMPUS-BRISK,登录失败。access gateway will not accept my passphrase.,access_help
+NOTE-009,CAMPUS-BRISK,费用异常。billing invoice lists a duplicated license.,billing_review
+NOTE-010,CAMPUS-BRISK,费用异常。billing invoice lists a duplicated license.,billing_review
+NOTE-011,CAMPUS-BRISK,证书缺失。credential certificate page shows nothing.,credential_request
+NOTE-012,CAMPUS-BRISK,证书缺失。credential certificate page shows nothing.,credential_request
+NOTE-013,CAMPUS-CEDAR,账号锁定。login access workspace says unauthorized.,access_help
+NOTE-014,CAMPUS-CEDAR,账号锁定。login access workspace says unauthorized.,access_help
+NOTE-015,CAMPUS-CEDAR,发票有误。invoice billing total includes an extra seat.,billing_review
+NOTE-016,CAMPUS-CEDAR,发票有误。invoice billing total includes an extra seat.,billing_review
+NOTE-017,CAMPUS-CEDAR,结业完成。certificate credential link was not created.,credential_request
+NOTE-018,CAMPUS-CEDAR,结业完成。certificate credential link was not created.,credential_request
+NOTE-019,CAMPUS-DELTA,工作台进不去。portal access login returns forbidden.,access_help
+NOTE-020,CAMPUS-DELTA,工作台进不去。portal access login returns forbidden.,access_help
+NOTE-021,CAMPUS-DELTA,扣费重复。billing statement repeats the subscription fee.,billing_review
+NOTE-022,CAMPUS-DELTA,扣费重复。billing statement repeats the subscription fee.,billing_review
+NOTE-023,CAMPUS-DELTA,证明未发放。credential certificate remains unavailable.,credential_request
+NOTE-024,CAMPUS-DELTA,证明未发放。credential certificate remains unavailable.,credential_request
+NOTE-025,CAMPUS-EMBER,验证循环。access login keeps returning to the sign-in page.,access_help
+NOTE-026,CAMPUS-EMBER,验证循环。access login keeps returning to the sign-in page.,access_help
+NOTE-027,CAMPUS-EMBER,账单需纠正。invoice charge contains a second license fee.,billing_review
+NOTE-028,CAMPUS-EMBER,账单需纠正。invoice charge contains a second license fee.,billing_review
+NOTE-029,CAMPUS-EMBER,证书页面空白。certificate download has no credential file.,credential_request
+NOTE-030,CAMPUS-EMBER,证书页面空白。certificate download has no credential file.,credential_request
+NOTE-031,CAMPUS-FJORD,入口报错。login portal blocks workspace access.,access_help
+NOTE-032,CAMPUS-FJORD,入口报错。login portal blocks workspace access.,access_help
+NOTE-033,CAMPUS-FJORD,费用需核对。billing invoice has an unexpected renewal charge.,billing_review
+NOTE-034,CAMPUS-FJORD,费用需核对。billing invoice has an unexpected renewal charge.,billing_review
+NOTE-035,CAMPUS-FJORD,结业证明未生成。credential certificate export is absent.,credential_request
+NOTE-036,CAMPUS-FJORD,结业证明未生成。credential certificate export is absent.,credential_request
+NOTE-037,CAMPUS-GROVE,授权失败。access gateway denies the login attempt.,access_help
+NOTE-038,CAMPUS-GROVE,授权失败。access gateway denies the login attempt.,access_help
+NOTE-039,CAMPUS-GROVE,席位费重复。invoice billing repeats the seat amount.,billing_review
+NOTE-040,CAMPUS-GROVE,席位费重复。invoice billing repeats the seat amount.,billing_review
+NOTE-041,CAMPUS-GROVE,证书按钮无效。certificate credential download does not start.,credential_request
+NOTE-042,CAMPUS-GROVE,证书按钮无效。certificate credential download does not start.,credential_request
+NOTE-043,CAMPUS-HARBOR,无法登录。portal login rejects valid access details.,access_help
+NOTE-044,CAMPUS-HARBOR,无法登录。portal login rejects valid access details.,access_help
+NOTE-045,CAMPUS-HARBOR,订阅账单异常。billing statement adds an extra license charge.,billing_review
+NOTE-046,CAMPUS-HARBOR,订阅账单异常。billing statement adds an extra license charge.,billing_review
+NOTE-047,CAMPUS-HARBOR,凭证链接损坏。credential certificate link returns blank.,credential_request
+NOTE-048,CAMPUS-HARBOR,凭证链接损坏。credential certificate link returns blank.,credential_request
+NOTE-049,CAMPUS-IRIS,登录码失效。access portal says the code is unauthorized.,access_help
+NOTE-050,CAMPUS-IRIS,登录码失效。access portal says the code is unauthorized.,access_help
+NOTE-051,CAMPUS-IRIS,发票重复收费。invoice billing includes the same fee again.,billing_review
+NOTE-052,CAMPUS-IRIS,发票重复收费。invoice billing includes the same fee again.,billing_review
+NOTE-053,CAMPUS-IRIS,结业证书等待中。certificate credential is still unavailable.,credential_request
+NOTE-054,CAMPUS-IRIS,结业证书等待中。certificate credential is still unavailable.,credential_request
+NOTE-055,CAMPUS-JADE,工作区被拒绝。login gateway prevents access to the portal.,access_help
+NOTE-056,CAMPUS-JADE,工作区被拒绝。login gateway prevents access to the portal.,access_help
+NOTE-057,CAMPUS-JADE,账单金额偏高。billing invoice adds an unknown seat charge.,billing_review
+NOTE-058,CAMPUS-JADE,账单金额偏高。billing invoice adds an unknown seat charge.,billing_review
+NOTE-059,CAMPUS-JADE,完成凭证缺失。credential certificate was not issued.,credential_request
+NOTE-060,CAMPUS-JADE,完成凭证缺失。credential certificate was not issued.,credential_request

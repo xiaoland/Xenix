@@ -116,6 +116,6 @@ resources nor exposes the real builder checkout path.
 
 ## Next Step
 
-The approved v1.3.3 release is being promoted through the repository release
-protocol. Existing installed v1.3.2 state remains untouched until its update is
-published through the canonical feed.
+v1.3.3 has been published through the canonical feed after promotion PR #117
+and the successful Native Release workflow. Existing v1.3.2 installations stay
+unchanged until the user accepts the normal application update.

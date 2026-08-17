@@ -69,17 +69,25 @@ guards local ownership and sequence traps.
 
 ## Verification
 
-- Conversation lifecycle, typed blocks, titles, retry, and usage:
-  `tests/test_llm_conversation_lifecycle.py`, `tests/test_llm_message_blocks.py`,
-  `tests/test_llm_conversation_titles.py`, `tests/test_llm_service_retry.py`, and
-  `tests/test_llm_usage_observability.py`.
-- Harness coordination, projection, source enrichment, and UI convergence:
-  `tests/test_agent_harness_foundation.py`,
-  `tests/test_agent_harness_first_slice.py`,
-  `tests/test_agent_harness_streaming.py`,
-  `tests/test_dataset_service_source_presentation.py`, and `tests/test_main.py`.
-- Deletion, migration, and bootstrap: `tests/test_repositories.py`,
-  `tests/test_migrations.py`, and `tests/test_storage_bootstrap.py`.
+- Harness coordination and direct ToolResult/XTT continuity:
+  `tests/agent/test_agent_harness_first_slice.py`.
+- Agent skill scope and AgentTool projection:
+  `tests/agent/test_agent_skill_tool_scope.py`,
+  `tests/agent/test_agent_ml_tool_projection.py`,
+  `tests/agent/test_agent_ml_clustering_projection.py`,
+  `tests/agent/test_agent_ml_forecast_projection.py`,
+  `tests/agent/test_agent_ml_recommendation_projection.py`,
+  `tests/agent/test_agent_ml_text_classification_projection.py`,
+  `tests/agent/test_agent_ml_text_discovery_projection.py`, and
+  `tests/agent/test_agent_data_cleaning_guidance.py`.
+- Knowledge retrieval and the lookup Tool:
+  `tests/knowledge/test_knowledge_retrieval.py` and
+  `tests/knowledge/test_knowledge_lookup_tool.py`.
+- Canonical storage, migration, and bootstrap:
+  `tests/storage/test_migrations.py`,
+  `tests/storage/test_storage_bootstrap.py`, and
+  `tests/storage/test_storage_artifacts.py`.
+- End-to-end Agent behavior (live, paid): `tests/e2e/agent_harness/`.
 
 ## Agent Harness Benchmark
 

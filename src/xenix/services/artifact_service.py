@@ -74,11 +74,6 @@ def build_artifact_uri(artifact_id: str, *, view: str | None = None) -> str:
     return urlunparse(("artifact", artifact_id, "", "", query, ""))
 
 
-def build_artifact_markdown_link(row: ArtifactRow, *, label: str | None = None, view: str | None = None) -> str:
-    link_label = (label or row.title).strip() or row.id
-    return f"[{link_label}]({build_artifact_uri(row.id, view=view)})"
-
-
 class ArtifactService:
     def __init__(self, session_factory: sessionmaker) -> None:
         self._session_factory = session_factory

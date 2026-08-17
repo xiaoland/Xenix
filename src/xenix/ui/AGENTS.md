@@ -13,4 +13,4 @@ Applies to the entire `src/xenix/ui/` subtree. `widgets/AGENTS.md` adds narrower
 
 ### Windows custom-paint hazard
 
-The black user-message bubble deliberately uses `UserMessageCard` plus `UserMessageBody` custom painting. Do not reintroduce a `QFrame.StyledPanel`, `QTextBrowser`, or `QAbstractScrollArea` background stack: on Windows their independent repaint paths can cover the black card or text during updates. Keep the card/body styles transparent and verify `test_thread_detail_view_user_message_uses_native_black_panel` in `tests/test_main.py` after changing this path.
+The black user-message bubble deliberately uses `UserMessageCard` plus `UserMessageBody` custom painting. Do not reintroduce a `QFrame.StyledPanel`, `QTextBrowser`, or `QAbstractScrollArea` background stack: on Windows their independent repaint paths can cover the black card or text during updates. Keep the card/body styles transparent and verify the black user-message bubble after changing this path.

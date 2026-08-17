@@ -1,0 +1,152 @@
+name: Agent Harness Benchmark
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Protected environment containing live benchmark settings
+        required: true
+        type: environment
+      service_selector:
+        description: Matching black-box service test module or node id
+        required: true
+        type: string
+      benchmark_selector:
+        description: One benchmark module or node id
+        required: true
+        default: tests/e2e/agent_harness/test_ml_cleaning.py::test_ml_cleaning
+        type: string
+      harness_variant:
+        description: Stable baseline, improvement, or ablation identity
+        required: true
+        default: baseline
+        type: string
+      subject_model:
+        description: Optional single provider/model override; blank uses the settings default
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  service-acceptance:
+    name: Independent service acceptance
+    runs-on: windows-2022
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.14.2"
+      - run: python -m pip install pdm==2.26.6
+      - name: Install locked dependencies
+        run: pdm install --frozen-lockfile -G :all
+      - name: Run matching black-box service selector
+        shell: pwsh
+        env:
+          SERVICE_SELECTOR: ${{ inputs.service_selector }}
+        run: |
+          if ($env:SERVICE_SELECTOR -notmatch '^tests/[A-Za-z0-9_./-]+\.py(?:::[A-Za-z0-9_]+)?$') {
+            throw "service_selector must name one test module or test node under tests/."
+          }
+          pdm run pytest --direct $env:SERVICE_SELECTOR -q
+      - name: Run independent service portfolio
+        run: pdm run test -vv
+
+  agent-live:
+    name: Paid headless Agent characterization
+    needs: service-acceptance
+    runs-on: windows-2022
+    timeout-minutes: 30
+    environment: ${{ inputs.environment }}
+    env:
+      SUBJECT_SETTINGS_JSON: ${{ secrets.XENIX_AGENT_BENCHMARK_LLM_SETTINGS_JSON }}
+      EMBEDDING_SETTINGS_JSON: ${{ secrets.XENIX_AGENT_BENCHMARK_EMBEDDING_SETTINGS_JSON }}
+      JUDGE_SETTINGS_JSON: ${{ secrets.XENIX_AGENT_BENCHMARK_JUDGE_LLM_SETTINGS_JSON }}
+      BENCHMARK_SELECTOR: ${{ inputs.benchmark_selector }}
+      HARNESS_VARIANT: ${{ inputs.harness_variant }}
+      SUBJECT_MODEL: ${{ inputs.subject_model }}
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.14.2"
+      - run: python -m pip install pdm==2.26.6
+      - name: Install locked dependencies
+        run: pdm install --frozen-lockfile -G :all
+      - name: Run provider-free benchmark infrastructure checks
+        run: pdm run benchmark-agent-harness-check -q
+      - name: Materialize protected settings
+        shell: pwsh
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:SUBJECT_SETTINGS_JSON)) {
+            throw "XENIX_AGENT_BENCHMARK_LLM_SETTINGS_JSON is required."
+          }
+          $utf8 = [System.Text.UTF8Encoding]::new($false)
+          $subjectPath = Join-Path $env:RUNNER_TEMP "agent-subject-settings.json"
+          [System.IO.File]::WriteAllText($subjectPath, $env:SUBJECT_SETTINGS_JSON, $utf8)
+          "AGENT_SUBJECT_SETTINGS_PATH=$subjectPath" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          if (-not [string]::IsNullOrWhiteSpace($env:EMBEDDING_SETTINGS_JSON)) {
+            $embeddingPath = Join-Path $env:RUNNER_TEMP "agent-embedding-settings.json"
+            [System.IO.File]::WriteAllText($embeddingPath, $env:EMBEDDING_SETTINGS_JSON, $utf8)
+            "AGENT_EMBEDDING_SETTINGS_PATH=$embeddingPath" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          }
+          if (-not [string]::IsNullOrWhiteSpace($env:JUDGE_SETTINGS_JSON)) {
+            $judgePath = Join-Path $env:RUNNER_TEMP "agent-judge-settings.json"
+            [System.IO.File]::WriteAllText($judgePath, $env:JUDGE_SETTINGS_JSON, $utf8)
+            "AGENT_JUDGE_SETTINGS_PATH=$judgePath" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          }
+          $reportDirectory = Join-Path $env:RUNNER_TEMP "agent-harness-reports"
+          New-Item -ItemType Directory -Path $reportDirectory | Out-Null
+          "AGENT_REPORT_DIRECTORY=$reportDirectory" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+      - name: Run one bounded paid Agent cell
+        shell: pwsh
+        run: |
+          if ($env:BENCHMARK_SELECTOR -notmatch '^tests/e2e/agent_harness/test_[A-Za-z0-9_]+\.py(?:::[A-Za-z0-9_]+)?$') {
+            throw "benchmark_selector must name one Agent benchmark module or test node."
+          }
+          if ($env:HARNESS_VARIANT -notmatch '^[A-Za-z0-9_.-]{1,96}$') {
+            throw "harness_variant is invalid."
+          }
+          $benchmarkArgs = @(
+            $env:BENCHMARK_SELECTOR,
+            "--llm-settings", $env:AGENT_SUBJECT_SETTINGS_PATH,
+            "--output-dir", $env:AGENT_REPORT_DIRECTORY,
+            "--harness-variant", $env:HARNESS_VARIANT,
+            "-q"
+          )
+          if (-not [string]::IsNullOrWhiteSpace($env:SUBJECT_MODEL)) {
+            $benchmarkArgs += @("--model", $env:SUBJECT_MODEL)
+          }
+          if (-not [string]::IsNullOrWhiteSpace($env:AGENT_EMBEDDING_SETTINGS_PATH)) {
+            $benchmarkArgs += @("--embedding-settings", $env:AGENT_EMBEDDING_SETTINGS_PATH)
+          }
+          if (-not [string]::IsNullOrWhiteSpace($env:AGENT_JUDGE_SETTINGS_PATH)) {
+            $benchmarkArgs += @("--judge-llm-settings", $env:AGENT_JUDGE_SETTINGS_PATH)
+          }
+          pdm run benchmark-agent-harness -- @benchmarkArgs
+      - name: Qualify the characterization report
+        shell: pwsh
+        run: |
+          $reports = @(Get-ChildItem -LiteralPath $env:AGENT_REPORT_DIRECTORY -Filter "*.json" -File)
+          if ($reports.Count -ne 1) {
+            throw "A one-cell characterization must persist exactly one report."
+          }
+          $decisionPath = Join-Path $env:AGENT_REPORT_DIRECTORY "characterization-decision.json"
+          pdm run benchmark-agent-harness-evaluate -- characterize $reports[0].FullName --output $decisionPath
+      - name: Preserve privacy-bounded Agent evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: agent-harness-characterization
+          path: ${{ runner.temp }}/agent-harness-reports
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Remove protected settings
+        if: always()
+        shell: pwsh
+        run: |
+          Remove-Item -LiteralPath (Join-Path $env:RUNNER_TEMP "agent-subject-settings.json") -Force -ErrorAction SilentlyContinue
+          Remove-Item -LiteralPath (Join-Path $env:RUNNER_TEMP "agent-embedding-settings.json") -Force -ErrorAction SilentlyContinue
+          Remove-Item -LiteralPath (Join-Path $env:RUNNER_TEMP "agent-judge-settings.json") -Force -ErrorAction SilentlyContinue

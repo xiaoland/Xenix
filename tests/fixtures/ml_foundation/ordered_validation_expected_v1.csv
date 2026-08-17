@@ -1,0 +1,8 @@
+batch_id,route,unit_count,status
+BATCH-201,EAST,8,open
+BATCH-202,WEST,22,open
+BATCH-203,NORTH,14,review
+BATCH-205,EAST,22,review
+BATCH-206,WEST,35,open
+BATCH-207,NORTH,22,review
+BATCH-208,SOUTH,50,open

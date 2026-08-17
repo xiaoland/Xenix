@@ -37,13 +37,31 @@
 - `pdm run test` runs the curated acceptance portfolio in one process.
 - `pdm run pytest --direct <pytest selectors/options>` runs a focused selection
   with the same isolated temporary-path setup.
-- `pdm run lint` runs Ruff over source, tests, scripts, and benchmarks.
+- `pdm run test-affected` runs only the offline tests affected by source changes
+  via `pytest-testmon`'s coverage-based selection: the first run builds the
+  `.testmondata` baseline (running everything), and later runs re-run only
+  affected tests. `pdm run list-affected` lists the affected set without running.
+  It is a developer aid and never narrows CI.
+- `pdm run lint` runs Ruff over source, tests, and scripts.
 - `pdm run typecheck` runs the strict Mypy slice over typed boundary modules.
 - `pdm run check` regenerates/checks Agent Skills, runs Ruff and Mypy, validates
   the native OCR lock, then compiles the Python tree.
 - `pdm run i18n-extract` and `pdm run i18n-compile` update Qt translations.
 - `pdm run package` builds the Windows bundle.
 - `pdm run smoke-package` verifies the packaged executable.
+- `pdm run benchmark-agent-harness-check` runs the provider-free safety,
+  report-policy, and Judge-calibration checks owned by the Agent benchmark.
+- `pdm run benchmark-agent-harness -- --collect-only -q` and the headed variant
+  verify the same live-case catalog without provider calls.
+- A paid Agent benchmark is run only after the matching service selector and
+  `pdm run test` pass. The commands remain independently executable: benchmark
+  code never imports service tests or reads their reports. Omit `--model` to use
+  the one configured default model, or supply exactly one override. The manual
+  workflow requires both selectors but passes only job success—not test data or
+  reports—across the service-to-Agent ordering edge.
+- `pdm run benchmark-agent-harness-calibrate-judge` qualifies an explicit Judge
+  suite; `pdm run benchmark-agent-harness-evaluate` evaluates or compares
+  privacy-bounded v5 Agent reports.
 
 Use the smallest verification set that proves the affected contract. Run `pdm run test` and `pdm run check` when the change has repository-wide or uncertain impact.
 

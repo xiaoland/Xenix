@@ -62,6 +62,6 @@ requests a normal openable artifact. Both retain the same artifact id authority.
 
 ## Verification
 
-URI parsing and activation are covered through `tests/test_services.py`,
-`tests/test_markdown_renderer.py`, and artifact paths in `tests/test_main.py` and
-the Agent Harness test suites.
+URI parsing and activation are covered through the Agent tool projection tests
+under `tests/agent/`, the artifact registration test under `tests/storage/`, and
+the end-to-end Agent artifact-link checks under `tests/e2e/agent_harness/`.

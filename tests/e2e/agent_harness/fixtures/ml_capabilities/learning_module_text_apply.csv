@@ -1,0 +1,7 @@
+request_ref,message
+ASK-901,登录入口拒绝授权，access portal keeps denying entry.
+ASK-902,无法进入工作台，login access code is rejected.
+ASK-903,发票金额重复，invoice shows a duplicate seat charge.
+ASK-904,账单税额需要复核，billing invoice total looks wrong.
+ASK-905,结业证书无法下载，certificate credential link is absent.
+ASK-906,完成记录已有但凭证未生成，credential certificate is missing.

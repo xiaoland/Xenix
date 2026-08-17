@@ -10,6 +10,9 @@ venv/
 __pypackages__/
 .pdm-python
 .pytest_cache/
+.testmondata
+.coverage
+.coverage.*
 
 # Build artifacts
 build/
@@ -44,6 +47,9 @@ nul
 *.db-journal
 *.db-wal
 *.db-shm
+
+# Mock data
+.mock-data
 
 # IDE
 .vscode\tasks.json

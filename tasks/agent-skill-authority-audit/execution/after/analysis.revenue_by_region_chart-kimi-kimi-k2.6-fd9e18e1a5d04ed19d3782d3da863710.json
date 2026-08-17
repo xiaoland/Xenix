@@ -1,0 +1,130 @@
+{
+  "budget": {
+    "exhaustion_reason": null,
+    "invocation_reported_subject_tokens": 21526,
+    "policy": {
+      "max_provider_attempts": 2,
+      "max_reported_invocation_subject_tokens": 4000000,
+      "max_reported_subject_tokens": 500000,
+      "max_sampling_rounds": 12,
+      "max_wall_seconds": 900.0,
+      "policy_id": "agent-harness-budget-v1",
+      "token_enforcement": "response_boundary"
+    },
+    "provider_attempts_dispatched": 4,
+    "reported_subject_tokens": 21526,
+    "sampling_rounds_admitted": 4,
+    "status": "within_limits"
+  },
+  "case_id": "analysis.revenue_by_region_chart",
+  "execution_mode": "headless",
+  "failure_kind": null,
+  "identity": {
+    "case_definition_sha256": "AF352455E98AD7ACDDD7D7621F4664C350C1BD4E7EFA7C36CD1AEE5A82B01E1A",
+    "effective_settings_sha256": "E0FC36FEC27A23343B89CDF36E5F5C78F2B95CDFCE072A95CB46F5EF4A54987A",
+    "embedding_settings_sha256": "84855E3EADB8F092BBE6E6E87D5ECAD071F1981359295FBA2826AEC4630F0397",
+    "fixture_sha256": "48C6C47CD9DA49A284D4ABF6C1C10A3340A25352C8567C2EE3108AA7AE6DC224",
+    "harness_variant": "skill-prose-compressed",
+    "invocation_id": "ea790a75f51f49428f06a8859e8cb50a",
+    "judge_settings_sha256": "56DB3BF53054BF1B1222E602892131C8F0A24DE0E1233912AD69E3483559D1E7",
+    "repository_commit": "5b31fd5db17405c74f1c9d3c70af832de5144849",
+    "repository_dirty": true,
+    "runtime_sha256": "853635FA2B4A071EE50200AAFB804518E2827CBDAD1870AD7EEE8699D7042C1D",
+    "settings_sha256": "578FB6960F5373A00CC77B815CAD41E9150760DCA8E61EE2DA0F60C9E744E026"
+  },
+  "integrity": {
+    "checks": [
+      {
+        "name": "canonical_completion",
+        "passed": true,
+        "summary": "canonical_assistant_completion"
+      },
+      {
+        "name": "source_unchanged",
+        "passed": true,
+        "summary": "external_and_registered_source_unchanged"
+      },
+      {
+        "name": "state_isolated",
+        "passed": true,
+        "summary": "state_confined_to_cell_runtime"
+      }
+    ],
+    "passed": true
+  },
+  "judge": {
+    "independence": "independent",
+    "metrics": {
+      "elapsed_seconds": 25.79374120000284,
+      "provider_retry_count": 0,
+      "token_usage": {
+        "cached_input_tokens": 256,
+        "input_tokens": 761,
+        "output_tokens": 1272,
+        "total_tokens": 2033
+      }
+    },
+    "provider_model": "kimi/kimi-k2.5",
+    "reason_codes": [
+      "task_fulfilled",
+      "revenue_order_supported",
+      "labels_clear"
+    ],
+    "required": true,
+    "rubric_id": "analysis.regional_sales.v1",
+    "rubric_sha256": "C49725A44DC18E65589E6E380108370A8A039C5DAA2FF88B5E738D92EF4FC549",
+    "scores": {
+      "factual_grounding": 2,
+      "semantic_comprehensibility": 2,
+      "task_fulfilment": 2
+    },
+    "status": "completed",
+    "summary": "judge_completed",
+    "verdict": "pass"
+  },
+  "provider_model": "kimi/kimi-k2.6",
+  "report_kind": "xenix.agent_harness.cell",
+  "run_id": "fd9e18e1a5d04ed19d3782d3da863710",
+  "run_status": "completed",
+  "schema_version": 5,
+  "semantic": {
+    "checks": [
+      {
+        "name": "terminal_artifact_resolved",
+        "passed": true,
+        "summary": "readable_isolated_svg_reference"
+      }
+    ],
+    "passed": true,
+    "verdict": "pass"
+  },
+  "subject_metrics": {
+    "assessment_seconds": 0.013906799998949282,
+    "derived_dataset_count": 0,
+    "message_counts": {
+      "assistant": 4,
+      "tool_call": 3,
+      "tool_result": 3,
+      "user": 1
+    },
+    "provider_retry_count": 0,
+    "sampling_round_count": 4,
+    "terminal_shape": null,
+    "token_usage": {
+      "cached_input_tokens": 13824,
+      "input_tokens": 20397,
+      "output_tokens": 1129,
+      "total_tokens": 21526
+    },
+    "tool_call_counts_by_name": {
+      "agent.skill.activate": 1,
+      "analysis.graph": 1,
+      "data.query": 1
+    },
+    "tool_result_counts_by_status": {
+      "succeeded": 3
+    },
+    "turn_seconds": 32.13927770000009,
+    "usage_reported_primary_response_count": 4
+  }
+}

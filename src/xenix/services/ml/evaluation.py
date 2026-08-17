@@ -22,9 +22,17 @@ from sklearn.metrics import (
     recall_score,
     roc_auc_score,
 )
+from sklearn.dummy import DummyClassifier, DummyRegressor
 from sklearn.preprocessing import label_binarize
 
-from .contracts import CandidateMetrics, EvaluationPolicySnapshot, MetricDirection
+from .contracts import (
+    CandidateMetrics,
+    EvaluationComparison,
+    EvaluationPolicySnapshot,
+    EvaluationVerdict,
+    MetricDirection,
+)
+from .digests import prediction_digest
 from .types import EvaluationKind
 
 _POLICIES: dict[EvaluationKind, EvaluationPolicySnapshot] = {
@@ -50,6 +58,17 @@ _POLICIES: dict[EvaluationKind, EvaluationPolicySnapshot] = {
         cv_folds=5,
         random_state=42,
     ),
+    EvaluationKind.RANKING: EvaluationPolicySnapshot(
+        policy_key="ranking.per_user_positive_holdout.v1",
+        evaluation_kind=EvaluationKind.RANKING,
+        primary_metric_name="ndcg_at_k",
+        primary_metric_direction=MetricDirection.MAX,
+        tie_breaker_metrics=["recall_at_k", "hit_rate_at_k", "mrr_at_k"],
+        split_strategy="per_user_positive_holdout.v1",
+        test_size=0.0,
+        cv_folds=None,
+        random_state=42,
+    ),
     EvaluationKind.NONE: EvaluationPolicySnapshot(
         policy_key="none.default.v1",
         evaluation_kind=EvaluationKind.NONE,
@@ -61,6 +80,50 @@ _POLICIES: dict[EvaluationKind, EvaluationPolicySnapshot] = {
         cv_folds=None,
         random_state=42,
     ),
+    EvaluationKind.FORECASTING: EvaluationPolicySnapshot(
+        policy_key="forecasting.rolling_origin.v1",
+        evaluation_kind=EvaluationKind.FORECASTING,
+        primary_metric_name="mae",
+        primary_metric_direction=MetricDirection.MIN,
+        tie_breaker_metrics=["rmse", "smape", "mase"],
+        split_strategy="rolling_origin.v1",
+        test_size=0.0,
+        cv_folds=3,
+        random_state=42,
+    ),
+    EvaluationKind.TEXT_CLUSTERING: EvaluationPolicySnapshot(
+        policy_key="text_clustering.cosine_quality.v1",
+        evaluation_kind=EvaluationKind.TEXT_CLUSTERING,
+        primary_metric_name="cosine_silhouette",
+        primary_metric_direction=MetricDirection.MAX,
+        tie_breaker_metrics=["resampling_stability", "minimum_cluster_share"],
+        split_strategy="group_resampling.v1",
+        test_size=0.0,
+        cv_folds=None,
+        random_state=42,
+    ),
+    EvaluationKind.TOPIC_MODELING: EvaluationPolicySnapshot(
+        policy_key="topic_modeling.group_holdout.v1",
+        evaluation_kind=EvaluationKind.TOPIC_MODELING,
+        primary_metric_name="heldout_perplexity",
+        primary_metric_direction=MetricDirection.MIN,
+        tie_breaker_metrics=["coherence", "topic_diversity", "resampling_stability"],
+        split_strategy="group_hash_holdout.v1",
+        test_size=0.2,
+        cv_folds=None,
+        random_state=42,
+    ),
+    EvaluationKind.RETRIEVAL: EvaluationPolicySnapshot(
+        policy_key="retrieval.relevance_or_diagnostic.v1",
+        evaluation_kind=EvaluationKind.RETRIEVAL,
+        primary_metric_name="ndcg_at_k",
+        primary_metric_direction=MetricDirection.MAX,
+        tie_breaker_metrics=["recall_at_k", "mrr_at_k"],
+        split_strategy="index_self_exclusion.v1",
+        test_size=0.0,
+        cv_folds=None,
+        random_state=42,
+    ),
 }
 
 
@@ -68,6 +131,7 @@ def get_default_policy(
     evaluation_kind: EvaluationKind,
     *,
     summary_metric_name: str | None = None,
+    group_aware: bool = False,
 ) -> EvaluationPolicySnapshot:
     if evaluation_kind is EvaluationKind.SUMMARY:
         metric_name = summary_metric_name or "result_count"
@@ -82,7 +146,23 @@ def get_default_policy(
             cv_folds=None,
             random_state=42,
         )
-    return _POLICIES[evaluation_kind].model_copy(deep=True)
+    policy = _POLICIES[evaluation_kind].model_copy(deep=True)
+    if not group_aware or evaluation_kind in {
+        EvaluationKind.FORECASTING,
+        EvaluationKind.RANKING,
+        EvaluationKind.TEXT_CLUSTERING,
+        EvaluationKind.TOPIC_MODELING,
+        EvaluationKind.RETRIEVAL,
+    }:
+        return policy
+    if evaluation_kind not in {EvaluationKind.REGRESSION, EvaluationKind.CLASSIFICATION}:
+        raise ValueError("Group-aware holdout is supported only for supervised evaluation.")
+    return policy.model_copy(
+        update={
+            "policy_key": f"{evaluation_kind.value}.group_hash_holdout.v1",
+            "split_strategy": "group_hash_holdout.v1",
+        }
+    )
 
 
 def build_regression_metrics(y_true: pd.Series, y_pred: np.ndarray) -> CandidateMetrics:
@@ -101,6 +181,7 @@ def build_regression_metrics(y_true: pd.Series, y_pred: np.ndarray) -> Candidate
         primary_metric_name="r2",
         primary_metric_value=metrics["r2"],
         metrics=metrics,
+        details={"prediction_digest": prediction_digest(y_pred)},
     )
 
 
@@ -131,6 +212,7 @@ def build_classification_metrics(
         "confusion_matrix": confusion_matrix(y_true, y_pred, labels=labels).astype(int).tolist(),
         "classification_report": _json_safe_classification_report(y_true, y_pred, labels),
         "probability_metrics": {},
+        "prediction_digest": prediction_digest(y_pred),
     }
     metrics.update(_probability_metrics(y_true, y_proba, labels, details))
     return CandidateMetrics(
@@ -164,6 +246,53 @@ def compare_metric_snapshots(
         if comparison != 0:
             return comparison
     return 0
+
+
+def build_dummy_baseline_metrics(
+    evaluation_kind: EvaluationKind,
+    y_train: pd.Series,
+    y_holdout: pd.Series,
+) -> CandidateMetrics:
+    if y_train.empty or y_holdout.empty:
+        raise ValueError("Baseline evaluation requires non-empty training and holdout targets.")
+    train_input = np.zeros((len(y_train.index), 1), dtype=float)
+    holdout_input = np.zeros((len(y_holdout.index), 1), dtype=float)
+    if evaluation_kind is EvaluationKind.CLASSIFICATION:
+        estimator = DummyClassifier(strategy="most_frequent")
+        estimator.fit(train_input, y_train)
+        predictions = estimator.predict(holdout_input)
+        probabilities = estimator.predict_proba(holdout_input)
+        return build_classification_metrics(
+            y_holdout,
+            predictions,
+            y_proba=probabilities,
+            classes=estimator.classes_,
+        )
+    if evaluation_kind is EvaluationKind.REGRESSION:
+        estimator = DummyRegressor(strategy="mean")
+        estimator.fit(train_input, y_train)
+        return build_regression_metrics(y_holdout, estimator.predict(holdout_input))
+    raise ValueError(f"Dummy baselines are not supported for evaluation kind '{evaluation_kind.value}'.")
+
+
+def build_evaluation_comparison(
+    policy: EvaluationPolicySnapshot,
+    candidate: CandidateMetrics,
+    baseline: CandidateMetrics,
+) -> EvaluationComparison:
+    result = compare_metric_snapshots(policy, candidate, baseline)
+    verdict = EvaluationVerdict.TIED
+    if result > 0:
+        verdict = EvaluationVerdict.CANDIDATE_BETTER
+    elif result < 0:
+        verdict = EvaluationVerdict.BASELINE_BETTER
+    return EvaluationComparison(
+        primary_metric_name=policy.primary_metric_name,
+        direction=policy.primary_metric_direction,
+        candidate_value=candidate.primary_metric_value,
+        baseline_value=baseline.primary_metric_value,
+        verdict=verdict,
+    )
 
 
 def _compare_metric(direction: MetricDirection, left: float | None, right: float | None) -> int:
@@ -208,6 +337,8 @@ def scoring_name_for_policy(policy: EvaluationPolicySnapshot) -> str:
 def metric_names_for_policy(policy: EvaluationPolicySnapshot) -> Iterable[str]:
     yield policy.primary_metric_name
     yield from policy.tie_breaker_metrics
+
+
 
 
 def _classification_labels(

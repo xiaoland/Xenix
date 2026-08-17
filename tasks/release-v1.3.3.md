@@ -35,10 +35,20 @@ machine path, its current directory, or a companion `OCR.yaml` file.
   upstream default-config fallback, maps build paths deterministically, and
   verifies the archive from a foreign working directory after removing the
   builder checkout.
-- The candidate native archive is
-  `xenix-knowledge-ocr-win-x64-paddle-inference-3.3.0-paddleocr-3.7.0-win-x64-5f661643218c1028e5dc111321ced3e14bc82a9ce9774a31ff60f9e753a5b5ae.zip`.
+- Promotion PR #117 merged as `c84a06417cdc7072e90dc856a69aed3c41c283a3`.
+  Its Native CI run `30338823462` passed, then local and remote identity checks
+  bound immutable tag `v1.3.3` to that exact promotion result.
+- Native Release run `30339319574` passed on its first attempt. It rebuilt the
+  isolated native runtime, passed frozen-package smoke, published immutable
+  objects, and updated `releases.win-x64-stable.json` last.
+- The released OCR archive is 205,202,103 bytes:
+  `xenix-knowledge-ocr-win-x64-paddle-inference-3.3.0-paddleocr-3.7.0-win-x64-55912b1496f9d3ee6f631070de192e892cee621a84304e41722b420d688a4092.zip`.
+  Its full SHA-256 is
+  `55912b1496f9d3ee6f631070de192e892cee621a84304e41722b420d688a4092`.
+- Publisher time was 838.65 seconds and final visibility verification was
+  387.05 seconds. The canonical stable feed now declares v1.3.3.
 
 ## Next Step
 
-Commit the bounded v1.3.3 candidate to `develop`, promote it to `main`, then
-create and push the immutable tag after the promotion gate passes.
+No release action remains. Retain the immutable tag, workflow evidence,
+release manifest, OCR catalog, publication timing, and rollback-history key.

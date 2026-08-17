@@ -59,6 +59,5 @@ storage libraries are owned by source, migrations, configuration, and tests.
 ## Verification
 
 Storage models and migrations own the mechanical schema. Boundary coverage lives in
-`tests/test_repositories.py`, `tests/test_services.py`,
-`tests/test_storage_bootstrap.py`, `tests/test_migrations.py`, and
-`tests/test_knowledge_document_lifecycle.py`.
+`tests/storage/test_storage_bootstrap.py`, `tests/storage/test_migrations.py`, and
+`tests/storage/test_storage_artifacts.py`.

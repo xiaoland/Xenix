@@ -43,6 +43,13 @@ def _optional_bounded_text(value: Any, *, label: str, limit: int = MAX_BLOCK_FIE
     return _bounded_text(value, label=label, limit=limit)
 
 
+def _truncated_text(value: Any, *, label: str, limit: int) -> str:
+    """Bound an optional diagnostic field by truncation, not rejection."""
+    if not isinstance(value, str):
+        raise ValidationError(f"Message block field '{label}' must be text.")
+    return value if len(value) <= limit else value[:limit]
+
+
 def _dataset_name(value: Any) -> str | None:
     """Validate the logical Dataset label used in the canonical block.
 
@@ -361,7 +368,7 @@ class AssistantOutputItem:
         if text is not None:
             object.__setattr__(self, "text", _bounded_text(text, label="assistant.text", limit=MAX_BLOCK_TEXT_CHARS))
         if self.reasoning is not None:
-            object.__setattr__(self, "reasoning", _bounded_text(self.reasoning, label="assistant.reasoning", limit=MAX_BLOCK_TEXT_CHARS))
+            object.__setattr__(self, "reasoning", _truncated_text(self.reasoning, label="assistant.reasoning", limit=MAX_BLOCK_TEXT_CHARS))
         if self.refusal is not None:
             object.__setattr__(self, "refusal", _bounded_text(self.refusal, label="assistant.refusal", limit=MAX_BLOCK_TEXT_CHARS))
 

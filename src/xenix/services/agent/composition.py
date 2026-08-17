@@ -39,8 +39,13 @@ _AGENT_SKILL_COMMON_TOOL_NAMES = (
     "data.query",
     "knowledge.lookup",
 )
+_AGENT_SKILL_INITIAL_TOOL_NAMES = (
+    "agent.skill.activate",
+    "knowledge.lookup",
+)
 _AGENT_SKILL_TOOL_NAMES: dict[str, tuple[str, ...]] = {
     "xenix-data-preprocessing": (
+        "analysis.profile",
         "data.integrate",
         "data.clean",
         "data.clean.metadata",
@@ -49,10 +54,12 @@ _AGENT_SKILL_TOOL_NAMES: dict[str, tuple[str, ...]] = {
         "data.feature.select",
     ),
     "xenix-data-analysis": (
+        "analysis.profile",
         "data.transform",
         "analysis.graph",
     ),
     "xenix-data-modeling": (
+        "analysis.profile",
         "data.transform",
         "data.feature.select",
         "model.metadata",
@@ -274,7 +281,7 @@ def agent_skill_tool_scope_names(snapshot: Any) -> tuple[str, ...] | None:
 
     active = agent_skill_activated_skill_names(snapshot)
     if not active or any(name not in _AGENT_SKILL_TOOL_NAMES for name in active):
-        return None
+        return _AGENT_SKILL_INITIAL_TOOL_NAMES
     names = list(_AGENT_SKILL_COMMON_TOOL_NAMES)
     for skill_name, skill_tools in _AGENT_SKILL_TOOL_NAMES.items():
         if skill_name in active:

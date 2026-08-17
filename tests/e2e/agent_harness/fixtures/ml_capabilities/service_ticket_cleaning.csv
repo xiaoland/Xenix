@@ -1,0 +1,8 @@
+shipment_id,depot,parcel_count,state
+SHIP-001,DEPOT-N,12," Ready "
+SHIP-002,DEPOT-S,,READY
+SHIP-003,DEPOT-N,18, Hold
+SHIP-003,DEPOT-N,18, Hold
+SHIP-004,DEPOT-S,-3,Ready
+SHIP-005,DEPOT-N,24,"HOLD "
+SHIP-006,DEPOT-S,30," ready "

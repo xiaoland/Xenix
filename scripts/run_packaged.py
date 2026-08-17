@@ -34,6 +34,10 @@ def _emit_startup_timing(event: str, start: float | None = None) -> None:
 def main() -> int:
     _emit_startup_timing("run_packaged.main.start")
 
+    from xenix.packaged_runtime import configure_windows_frozen_process_environment
+
+    configure_windows_frozen_process_environment()
+
     if len(sys.argv) >= 2 and sys.argv[1] == "--analysis-lambda-worker":
         import_start = time.perf_counter()
         from xenix.services.analysis_lambda_worker import main as worker_main

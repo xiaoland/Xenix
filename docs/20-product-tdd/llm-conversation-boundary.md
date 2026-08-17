@@ -216,20 +216,17 @@ opening or cause provider/canonical data to gain a local path.
 
 ## Verification Routes
 
-- Conversation lifecycle, pending/cancellation, titles, usage, message algebra,
-  and retry: `tests/test_llm_conversation_lifecycle.py`,
-  `tests/test_llm_conversation_titles.py`, `tests/test_llm_message_blocks.py`,
-  `tests/test_llm_usage_observability.py`, and `tests/test_llm_service_retry.py`.
-- Harness projection, Tool sequencing, Dataset source presentation, and UI
-  convergence: `tests/test_agent_harness_foundation.py`,
-  `tests/test_agent_harness_first_slice.py`,
-  `tests/test_agent_harness_streaming.py`,
-  `tests/test_dataset_service_source_presentation.py`, and `tests/test_main.py`.
-- Direct ToolResult/XTT continuity, typed ToolFailure, adapter encoding, and
-  Thread-pause races: `tests/test_agent_harness_first_slice.py`,
-  `tests/test_agent_harness_streaming.py`,
-  `tests/test_llm_conversation_lifecycle.py`, and
-  `tests/test_llm_message_blocks.py`.
+- Harness coordination, Tool sequencing, direct ToolResult/XTT continuity, and
+  the command/snapshot boundary: `tests/agent/test_agent_harness_first_slice.py`.
+- Agent skill scope and AgentTool projection:
+  `tests/agent/test_agent_skill_tool_scope.py`,
+  `tests/agent/test_agent_ml_tool_projection.py`, and the per-domain projection
+  tests under `tests/agent/`.
+- Knowledge retrieval and the lookup Tool:
+  `tests/knowledge/test_knowledge_retrieval.py` and
+  `tests/knowledge/test_knowledge_lookup_tool.py`.
 - Canonical storage, deletion ordering, and migration/bootstrap:
-  `tests/test_repositories.py`, `tests/test_migrations.py`, and
-  `tests/test_storage_bootstrap.py`.
+  `tests/storage/test_migrations.py`,
+  `tests/storage/test_storage_bootstrap.py`, and
+  `tests/storage/test_storage_artifacts.py`.
+- End-to-end Agent behavior (live, paid): `tests/e2e/agent_harness/`.

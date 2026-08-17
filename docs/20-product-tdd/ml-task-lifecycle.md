@@ -56,7 +56,7 @@ pending -> cancelled
 
 ## Verification
 
-Lifecycle and placement coverage lives in `tests/test_services.py`,
-`tests/test_ml_execution.py`, `tests/test_ml_workers.py`, and the ML paths in the
-Agent Harness test suites. Persistence mechanics are covered by repository and
-migration tests.
+Lifecycle and placement coverage lives in `tests/ml/test_ml_execution.py`, the
+ML engine/service tests under `tests/ml/`, and the end-to-end Agent paths under
+`tests/e2e/agent_harness/`. Persistence mechanics are covered by the repository
+and migration tests under `tests/storage/`.

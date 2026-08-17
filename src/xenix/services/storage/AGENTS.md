@@ -12,4 +12,4 @@ Applies to SQLite models, repositories, bootstrap, migrations, and storage layou
 - Repair known bad app-owned persisted values through a forward data migration. Do not weaken model reads to conceal them.
 - Keep operational backup, unsupported-state handling, quarantine, restore, and reset guidance in [Deployment](../../../../docs/40-deployment/README.md). Do not copy version numbers or table inventories here.
 
-Verify migration composition and ORM readability in `tests/test_migrations.py` and `tests/test_storage_bootstrap.py`; use focused repository tests for changed persistence behavior.
+Verify migration composition and ORM readability in `tests/storage/test_migrations.py` and `tests/storage/test_storage_bootstrap.py`; use focused repository tests for changed persistence behavior.
