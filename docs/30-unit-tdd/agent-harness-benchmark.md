@@ -23,7 +23,7 @@ fixed and vary the recorded Harness variant. A different model starts a
 separate evidence series rather than expanding one invocation into a model
 matrix.
 
-`benchmarks/agent_harness/` is the benchmark home. Each `test_*.py` case
+`tests/e2e/agent_harness/` is the end-to-end benchmark home. Each `test_*.py` case
 module is both the case definition and its explicitly collected pytest item;
 pytest selects and controls the case matrix. Shared runner, contracts, judge,
 and the deliberately small pytest fixture live in `_infra/`. There is no case
@@ -175,7 +175,7 @@ for an explicitly configured live Judge suite, and
 acceptance, or Harness-variant comparison.
 
 Service black-box integration tests live only under `tests/`; Agent benchmark
-cases and assets live only under `benchmarks/agent_harness/`. Neither tree
+cases and assets live only under `tests/e2e/agent_harness/`. Neither tree
 imports, invokes, or consumes reports from the other. Development guidance and
 the manual paid workflow run the explicitly matched service selector and then
 `pdm run test` first solely to avoid spending on an unqualified product path.
@@ -185,6 +185,6 @@ acceptance remains local and interactive.
 
 ## Change Guidance
 
-Read `benchmarks/agent_harness/AGENTS.md` before changing the benchmark.
+Read `tests/e2e/agent_harness/AGENTS.md` before changing the benchmark.
 Source and focused dynamic-infrastructure tests own exact fields, request
 shapes, and pytest options.

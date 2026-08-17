@@ -12,4 +12,4 @@ Applies only to native ML execution under `src/xenix/services/ml/`.
 - Evaluation policy belongs in `src/xenix/services/ml/evaluation.py`; change it with focused evaluation and execution tests.
 - Do not restate cross-worker authority, no-failover behavior, local finalization, or artifact/storage meaning here.
 
-Verify affected paths in `tests/test_ml_execution.py`, `tests/test_ml_registry.py`, and `tests/test_ml_workers.py`.
+Verify affected paths in `tests/ml/test_ml_execution.py` and `tests/ml/test_ml_registry.py`.

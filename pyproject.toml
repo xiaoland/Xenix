@@ -49,6 +49,7 @@ dev = [
     "ruff>=0.16.0",
     "mypy>=2.3.0",
     "types-jsonschema>=4.26.0.20260518",
+    "pytest-testmon>=2.2.0",
 ]
 release = [
     "oss2==2.19.1",
@@ -61,7 +62,7 @@ distribution = false
 agent-skills-check = "python scripts/agent_skills.py check"
 agent-skills-generate = "python scripts/agent_skills.py generate"
 knowledge-ocr-lock-check = "python scripts/build_knowledge_ocr_runtime.py --check-lock"
-lint = "ruff check src tests scripts benchmarks"
+lint = "ruff check src tests scripts"
 typecheck = "mypy"
 dev = { composite = ["agent-skills-generate", "python scripts/run_dev.py"] }
 i18n-extract = "python scripts/update_translations.py"
@@ -81,12 +82,14 @@ release-publish = "python scripts/publish_oss_release.py"
 dist = "python scripts/build_distribution_zip.py"
 pytest = "python scripts/run_pytest.py"
 test = { composite = ["i18n-compile", "python scripts/run_pytest.py {args}"] }
+test-affected = { cmd = "python scripts/run_pytest.py --testmon {args}", env = { COVERAGE_CORE = "pytrace" } }
+list-affected = { cmd = "python scripts/run_pytest.py --testmon --collect-only {args}", env = { COVERAGE_CORE = "pytrace" } }
 benchmark-agent-harness = "python scripts/run_agent_harness_benchmark.py"
 benchmark-agent-harness-headed = "python scripts/run_agent_harness_headed_benchmark.py"
 benchmark-agent-harness-check = "python scripts/check_agent_harness_benchmark.py"
 benchmark-agent-harness-evaluate = "python scripts/evaluate_agent_harness_reports.py"
 benchmark-agent-harness-calibrate-judge = "python scripts/calibrate_agent_harness_judge.py"
-check = { composite = ["agent-skills-generate", "agent-skills-check", "lint", "typecheck", "knowledge-ocr-lock-check", "python -m compileall src tests benchmarks scripts"] }
+check = { composite = ["agent-skills-generate", "agent-skills-check", "lint", "typecheck", "knowledge-ocr-lock-check", "python -m compileall src tests scripts"] }
 diagnostic-bundle = "python scripts/create_diagnostic_bundle.py"
 
 [tool.pytest.ini_options]

@@ -10,6 +10,9 @@ venv/
 __pypackages__/
 .pdm-python
 .pytest_cache/
+.testmondata
+.coverage
+.coverage.*
 
 # Build artifacts
 build/

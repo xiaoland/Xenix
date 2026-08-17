@@ -37,7 +37,12 @@
 - `pdm run test` runs the curated acceptance portfolio in one process.
 - `pdm run pytest --direct <pytest selectors/options>` runs a focused selection
   with the same isolated temporary-path setup.
-- `pdm run lint` runs Ruff over source, tests, scripts, and benchmarks.
+- `pdm run test-affected` runs only the offline tests affected by source changes
+  via `pytest-testmon`'s coverage-based selection: the first run builds the
+  `.testmondata` baseline (running everything), and later runs re-run only
+  affected tests. `pdm run list-affected` lists the affected set without running.
+  It is a developer aid and never narrows CI.
+- `pdm run lint` runs Ruff over source, tests, and scripts.
 - `pdm run typecheck` runs the strict Mypy slice over typed boundary modules.
 - `pdm run check` regenerates/checks Agent Skills, runs Ruff and Mypy, validates
   the native OCR lock, then compiles the Python tree.

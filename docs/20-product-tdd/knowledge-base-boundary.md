@@ -182,41 +182,20 @@ activation is methodology, not authorization, and does not grant a new tool scop
 
 ## Verification Anchors
 
-- Import formats, deduplication, encrypted retry, canonical CAS, independent
-  derivation, PDF routing, bounded packages, and OCR adaptation:
-  `tests/test_knowledge_import_service.py`,
-  `tests/test_knowledge_import_lifecycle.py`,
-  `tests/test_knowledge_pipeline_boundaries.py`,
-  `tests/test_knowledge_pdf_routing.py`,
-  `tests/test_knowledge_content_store.py`, and
-  `tests/test_paddle_ocr_service.py`.
-- SQLite/FTS, semantic/hybrid retrieval, and tool result shape:
-  `tests/test_knowledge_retrieval.py`, `tests/test_knowledge_semantic_service.py`,
-  `tests/test_knowledge_vector_store.py`, and `tests/test_knowledge_lookup_tool.py`.
-- Independent embedding settings/wire contract and production composition:
-  `tests/test_embedding_service.py`, `tests/test_settings_dialog.py`, and
-  `tests/test_agent_composition.py`.
-- Workspace loading, item removal, and queue composition:
-  `tests/test_knowledge_import_ui.py`, `tests/test_knowledge_document_lifecycle.py`,
-  and `tests/test_knowledge_task_query.py`. Picker/drop parity is covered by the
-  first; the lifecycle suite proves retrieval cutover, reference-aware CAS cleanup,
-  vector invalidation/rebuild, and same-SHA re-import.
-- Import process/log and index lifecycle boundaries:
-  `tests/test_knowledge_import_worker.py`, `tests/test_knowledge_index_service.py`,
-  and `tests/test_settings_dialog.py`.
+- Import worker publication: `tests/knowledge/test_knowledge_import_authority.py`.
+- Keyword/semantic retrieval and the lookup Tool result shape:
+  `tests/knowledge/test_knowledge_retrieval.py` and
+  `tests/knowledge/test_knowledge_lookup_tool.py`.
+- Index status, rebuild, and shutdown lifecycle:
+  `tests/knowledge/test_knowledge_index_service.py`.
+- Embedding-model change confirmation:
+  `tests/knowledge/test_embedding_change_confirmation.py`.
+- Native OCR runtime build, archive provenance, and binary boundaries:
+  `tests/knowledge/test_knowledge_ocr_runtime.py`.
 - Rule-plus-data Agent behavior:
-  `benchmarks/agent_harness/test_rainy_season_restock.py`.
-- Startup reclamation and derived-vector maintenance:
-  `tests/test_knowledge_import_storage_maintenance.py` and
-  `tests/test_knowledge_storage_maintenance.py`.
-- Native OCR protocol and release delivery: `tests/test_paddle_ocr_worker.py`,
-  `tests/test_paddle_ocr_service.py`, `tests/test_release_publication.py`, and
-  `tests/test_knowledge_packaged_smoke.py`. With the locked native archive/image
-  inputs, packaged smoke proves Import→Canonical→Derivation→lookup plus runtime
-  provenance, not activation alone. The same smoke imports DOCX and PPTX through
-  the frozen app's spawned Import worker and derives searchable presentation text.
-  Run
-  `pdm run package` followed by `pdm run smoke-package`.
+  `tests/e2e/agent_harness/test_rainy_season_restock.py`.
+- Release delivery: `tests/release/test_release_publication.py`. Packaged smoke
+  runs `pdm run package` followed by `pdm run smoke-package`.
 
 An image may be canonical-ready while retrieval remains unavailable when local OCR
 is absent or yields no text. Passwords for encrypted documents are attempt-local and

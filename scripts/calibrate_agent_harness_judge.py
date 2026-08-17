@@ -15,16 +15,16 @@ for import_root in (_PROJECT_ROOT, _PROJECT_ROOT / "src"):
     if str(import_root) not in sys.path:
         sys.path.insert(0, str(import_root))
 
-from benchmarks.agent_harness._infra.calibration_manifest import (  # noqa: E402
+from tests.e2e.agent_harness._infra.calibration_manifest import (  # noqa: E402
     load_calibration_manifest_suite,
 )
-from benchmarks.agent_harness._infra.judge_calibration import (  # noqa: E402
+from tests.e2e.agent_harness._infra.judge_calibration import (  # noqa: E402
     JudgeCalibrationError,
     JudgeCalibrationPacket,
     run_judge_calibration,
     write_calibration_report,
 )
-from benchmarks.agent_harness._infra.runner import (  # noqa: E402
+from tests.e2e.agent_harness._infra.runner import (  # noqa: E402
     BenchmarkSettingsError,
     load_settings_snapshot,
     resolve_judge_llm_settings_path,

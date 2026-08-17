@@ -14,7 +14,7 @@ on:
       benchmark_selector:
         description: One benchmark module or node id
         required: true
-        default: benchmarks/agent_harness/test_ml_cleaning.py::test_ml_cleaning
+        default: tests/e2e/agent_harness/test_ml_cleaning.py::test_ml_cleaning
         type: string
       harness_variant:
         description: Stable baseline, improvement, or ablation identity
@@ -103,7 +103,7 @@ jobs:
       - name: Run one bounded paid Agent cell
         shell: pwsh
         run: |
-          if ($env:BENCHMARK_SELECTOR -notmatch '^benchmarks/agent_harness/test_[A-Za-z0-9_]+\.py(?:::[A-Za-z0-9_]+)?$') {
+          if ($env:BENCHMARK_SELECTOR -notmatch '^tests/e2e/agent_harness/test_[A-Za-z0-9_]+\.py(?:::[A-Za-z0-9_]+)?$') {
             throw "benchmark_selector must name one Agent benchmark module or test node."
           }
           if ($env:HARNESS_VARIANT -notmatch '^[A-Za-z0-9_.-]{1,96}$') {
