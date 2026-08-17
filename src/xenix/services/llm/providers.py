@@ -419,7 +419,7 @@ class OpenAICompatibleChatProvider:
             ) from exc
 
     def _http_error(self, endpoint: str, exc: error.HTTPError) -> ValidationError:
-        retryable = exc.code in {408, 409, 425, 429, 500, 502, 503, 504}
+        retryable = exc.code >= 500 or exc.code in {408, 409, 425, 429}
         return ValidationError(
             self._format_http_error(endpoint, exc),
             error_code=f"llm_provider_http_{exc.code}",

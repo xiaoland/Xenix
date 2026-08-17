@@ -1,6 +1,6 @@
 # Improve ML Capability — Program Dashboard
 
-**Status:** Active. Both product verticals are implemented and objectively verified. Cleaning causal diagnosis plus A1 service correctness, A2 bounded result facts, and A3 Tool/Skill authority are complete. A3 removed transform/metadata branching but exposed redundant result re-reading and one Harness wording false negative (repaired by O4-E1); O4-A4 finalization authority eliminated the redundant result re-read 3/3; O4-E3 retired the regex, so cleaning is now deterministic-only (exact Dataset + linked Artifact + integrity). The corrected textbook cleaning oracle retracts the earlier Foundation cleaning qualification and exposes broader preprocessing gaps. Formal paid acceptance remains admission-blocked by the missing independent Judge, and topic final-answer grounding remains a measured open outcome.
+**Status:** Active. Both product verticals are implemented and objectively verified. Cleaning causal diagnosis plus A1 service correctness, A2 bounded result facts, and A3 Tool/Skill authority are complete. A3 removed transform/metadata branching but exposed redundant result re-reading and one Harness wording false negative (repaired by O4-E1); O4-A4 finalization authority eliminated the redundant result re-read 3/3; O4-E3 + B0-GR retired the free-prose regexes across the B0 cases, so their deterministic layer is now structural-only (exact Dataset + linked Artifact + integrity). The corrected textbook cleaning oracle retracts the earlier Foundation cleaning qualification and exposes broader preprocessing gaps. Formal paid acceptance has a subject-disjoint Judge model (kimi/kimi-2.7) but still needs the five calibrations, and topic final-answer grounding remains a measured open outcome.
 **Opened:** 2026-08-09
 
 ## Objective
@@ -70,7 +70,7 @@ Current verified repository state:
 
 ## Next Step
 
-The cleaning thread (O4 + A1–A4 + E1–E3) is complete: cleaning is now deterministic-only (exact Dataset + linked Artifact + integrity; the redundant result re-read is eliminated). Remaining program items: the ch07 capability slice (own design), formal six-case acceptance (subject-disjoint Judge + five passing calibrations), and topic final-synthesis (separate).
+The free-prose grounded-answer regexes are retired across the B0 cases (O4-E3 + B0-GR), and the Judge model is resolved (kimi/kimi-2.7, snapshot at .runtime/dev/config/judge_settings.json). Remaining: run the five exact-rubric calibrations (paid) to unblock A1, design the ch07 capability slice, and topic final-synthesis (separate).
 
 ## Packet Map
 

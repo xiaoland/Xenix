@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 from enum import StrEnum
 from pathlib import Path
 from typing import Any, Callable, Iterator, Protocol
@@ -304,6 +305,7 @@ class LLMService:
                 if not self._should_retry(exc, attempt_number=attempt_number, max_attempts=max_attempts):
                     raise
                 previous_error = exc
+                self._retry_backoff(attempt_number)
 
     def _is_live_tool_call_progress(self, event: ProviderStreamEvent) -> bool:
         return event.is_tool_call_delta and not event.delta_text and event.response is None
@@ -392,12 +394,17 @@ class LLMService:
                 if not self._should_retry(exc, attempt_number=attempt_number, max_attempts=attempts):
                     raise
                 previous_error = exc
+                self._retry_backoff(attempt_number)
         raise AssertionError("LLM retry loop exited without a response or exception.")
 
     def _should_retry(self, exc: Exception, *, attempt_number: int, max_attempts: int) -> bool:
         if attempt_number >= max_attempts:
             return False
         return getattr(exc, "retryable", None) is True
+
+    def _retry_backoff(self, attempt_number: int) -> None:
+        """Sleep before a retry so transient provider throttling can reset."""
+        time.sleep(min(2.0 ** (attempt_number - 1), 8.0))
 
     def _retry_event(self, *, attempt_number: int, max_attempts: int, exc: Exception) -> LLMRetryEvent:
         error_code = getattr(exc, "error_code", None)

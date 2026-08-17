@@ -21,6 +21,7 @@ The first handshake has been consumed for implementation. Later product behavior
 | [`IH-O4-E2`](IH-O4-E2-cleaning-row-count-matcher-format-robustness.md) — cleaning row-count matcher format robustness | Accept the demonstrated table/bullet answer formats while keeping the exact count, unit/label, and median requirements | superseded by `IH-O4-E3` (retire the regex, option B) |
 | [`IH-O4-E3`](IH-O4-E3-cleaning-grounded-answer-retirement.md) — retire cleaning free-prose grounded-answer check | Remove the number regex; keep structural deterministic checks (exact Dataset + linked Artifact) and defer explanation to the Judge (option B) | consumed and provider-free verified 2026-08-16; harness-only evaluator simplification |
 | [`IH-A2`](IH-A2-harness-readiness.md) — formal Agent Harness readiness | Correct formal invocation topology and add strict exact-rubric calibration manifests without changing cases, providers, or budgets | consumed and provider-free verified 2026-08-10 |
+| [`IH-B0-GR`](IH-B0-grounded-answer-retirement.md) — retire legacy free-prose grounded-answer checks | Remove the free-prose `_grounded_final_answer` regex from the five B0 legacy cases; keep deterministic semantic checks structural and add an AGENTS.md tripwire | consumed and provider-free verified 2026-08-16 |
 | `IH-O<n>` | One exact preprocessing/Skill/Tool/orchestration/observability optimization | evidence-triggered only; product mutation follows a reproduced first divergence and a separate exact handshake |
 
 Each detailed handshake must contain:
