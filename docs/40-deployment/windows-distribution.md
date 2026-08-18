@@ -103,8 +103,11 @@ The publisher is a single globally serialized writer. It:
 OSS cannot atomically replace all mutable projections. A failure before the
 canonical feed update leaves the previous release authoritative, although
 intended-public unreferenced files or partially updated projections can exist.
-The unchanged-tag retry deterministically converges. A conflicting immutable
-object fails closed.
+The unchanged-tag retry deterministically converges only when the package
+build is reproducible; packaging pins `SOURCE_DATE_EPOCH` to the tag commit
+and normalizes archive mtimes for this reason. A conflicting immutable object
+fails closed. If a non-reproducible build orphans immutable objects, delete
+them with `pdm run release-publish --cleanup-orphans <tag>` before retrying.
 
 The bucket stays private by default. Anonymous read exposes only `published/*`.
 Routine writes to that prefix outside the release/rollback writer are prohibited.
