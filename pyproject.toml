@@ -67,7 +67,7 @@ typecheck = "mypy"
 dev = { composite = ["agent-skills-generate", "python scripts/run_dev.py"] }
 i18n-extract = "python scripts/update_translations.py"
 i18n-compile = "python scripts/compile_translations.py"
-package = { composite = ["agent-skills-generate", "agent-skills-check", "python scripts/package_app.py"] }
+package = { composite = ["agent-skills-generate", "agent-skills-check", "python scripts/package_app.py"], env = { PYTHONHASHSEED = "0" } }
 build-knowledge-ocr = "python scripts/build_knowledge_ocr_runtime.py"
 smoke = { composite = ["agent-skills-generate", "python scripts/run_dev.py --smoke-test"] }
 smoke-package = "python scripts/verify_packaged_smoke.py"
