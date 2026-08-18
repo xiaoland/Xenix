@@ -89,6 +89,12 @@ def _resolve_build_epoch(project_root: Path) -> str:
     return value
 
 
+def _normalize_mtimes(directory: Path, epoch: int) -> None:
+    for path in directory.rglob("*"):
+        if path.is_file():
+            os.utime(path, (epoch, epoch))
+
+
 def _resolve_app_version(project_root: Path) -> str:
     document = tomllib.loads((project_root / "pyproject.toml").read_text(encoding="utf-8"))
     version = str(document["project"]["version"]).strip()
@@ -273,7 +279,9 @@ def main() -> int:
             print(f"Embedding startup trial lock: {release_config.trial_lock_days} day(s)")
         else:
             print("Embedding startup trial lock: disabled")
-        os.environ.setdefault("SOURCE_DATE_EPOCH", _resolve_build_epoch(project_root))
+        epoch = int(_resolve_build_epoch(project_root))
+        os.environ.setdefault("SOURCE_DATE_EPOCH", str(epoch))
+        _normalize_mtimes(project_root / "src", epoch)
         pyinstaller_run(
             [
                 "--clean",
