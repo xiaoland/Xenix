@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 import tomllib
@@ -20,6 +21,30 @@ def prune_missing_assets(output: Path) -> None:
             json.dumps(retained, ensure_ascii=False, separators=(",", ":")),
             encoding="utf-8",
         )
+
+
+def _resolve_build_epoch(project_root: Path) -> int:
+    raw = os.environ.get("SOURCE_DATE_EPOCH", "").strip()
+    if raw.isdigit():
+        return int(raw)
+    result = subprocess.run(
+        ["git", "show", "-s", "--format=%ct", "HEAD"],
+        check=True,
+        cwd=project_root,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    value = result.stdout.strip()
+    if not value.isdigit():
+        raise RuntimeError(f"Resolved build timestamp is not a Unix epoch: {value!r}.")
+    return int(value)
+
+
+def _normalize_mtimes(directory: Path, epoch: int) -> None:
+    for path in directory.rglob("*"):
+        if path.is_file():
+            os.utime(path, (epoch, epoch))
 
 
 def main() -> int:
@@ -49,7 +74,11 @@ def main() -> int:
         "--icon", str(root / "logo.ico"),
         "--outputDir", str(output),
     ]
-    subprocess.run(command, cwd=root, check=True)
+    epoch = _resolve_build_epoch(root)
+    _normalize_mtimes(staging, epoch)
+    env = dict(os.environ)
+    env["SOURCE_DATE_EPOCH"] = str(epoch)
+    subprocess.run(command, cwd=root, check=True, env=env)
     for portable in output.glob("*-Portable.*"):
         portable.unlink()
     prune_missing_assets(output)

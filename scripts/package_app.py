@@ -65,6 +65,30 @@ def _resolve_build_commit(project_root: Path) -> str:
     return _validate_build_commit(result.stdout)
 
 
+def _resolve_build_epoch(project_root: Path) -> str:
+    epoch = os.environ.get("SOURCE_DATE_EPOCH", "").strip()
+    if epoch:
+        return epoch
+    try:
+        result = subprocess.run(
+            ["git", "show", "-s", "--format=%ct", "HEAD"],
+            check=True,
+            cwd=project_root,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+    except (OSError, subprocess.CalledProcessError) as exc:
+        raise RuntimeError(
+            "Unable to resolve a deterministic build timestamp. "
+            "Run packaging from a git checkout or set SOURCE_DATE_EPOCH."
+        ) from exc
+    value = result.stdout.strip()
+    if not value.isdigit():
+        raise RuntimeError(f"Resolved build timestamp is not a Unix epoch: {value!r}.")
+    return value
+
+
 def _resolve_app_version(project_root: Path) -> str:
     document = tomllib.loads((project_root / "pyproject.toml").read_text(encoding="utf-8"))
     version = str(document["project"]["version"]).strip()
@@ -249,6 +273,7 @@ def main() -> int:
             print(f"Embedding startup trial lock: {release_config.trial_lock_days} day(s)")
         else:
             print("Embedding startup trial lock: disabled")
+        os.environ.setdefault("SOURCE_DATE_EPOCH", _resolve_build_epoch(project_root))
         pyinstaller_run(
             [
                 "--clean",
