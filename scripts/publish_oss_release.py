@@ -408,6 +408,9 @@ class OssReleaseStore:
     def put_bytes_mutable(self, key: str, data: bytes) -> None:
         self.bucket.put_object(key, data, headers={"Cache-Control": "no-cache"})
 
+    def delete(self, key: str) -> None:
+        self.bucket.delete_object(key)
+
     def copy(
         self,
         source: str,
@@ -619,8 +622,53 @@ def _optional_positive_int(raw: str) -> int | None:
     return parsed
 
 
+def cleanup_orphans(tag: str, store: OssReleaseStore) -> None:
+    """Delete orphaned immutable objects left by a failed publish.
+
+    A transient failure after the immutable uploads leaves the versioned
+    package and OCR objects plus the manifest, while the canonical feed still
+    points at the previous release. Removing only those immutable objects lets
+    an unchanged-tag retry converge instead of failing closed on a byte
+    mismatch caused by a non-reproducible rebuild.
+    """
+    manifest_key = f"published/release-manifests/{tag}.json"
+    if not store.exists(manifest_key):
+        print(f"cleanup_manifest_missing key={manifest_key}")
+        return
+    manifest = json.loads(store.read(manifest_key))
+    if not isinstance(manifest, dict):
+        raise RuntimeError("Release manifest is not an object.")
+    artifacts = manifest.get("artifacts")
+    if not isinstance(artifacts, list):
+        raise RuntimeError("Release manifest has no artifacts.")
+    excluded = FEED_NAMES | {
+        str(item.get("name") or "")
+        for item in artifacts
+        if isinstance(item, dict)
+        and item.get("type") == "desktop_release"
+        and str(item.get("name") or "").endswith("-Setup.exe")
+    }
+    keys = [
+        f"published/{item['name']}"
+        for item in artifacts
+        if isinstance(item, dict) and item.get("name") not in excluded
+    ] + [manifest_key]
+    for key in keys:
+        if store.exists(key):
+            store.delete(key)
+            print(f"cleanup_deleted key={key}")
+        else:
+            print(f"cleanup_absent key={key}")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--cleanup-orphans",
+        dest="cleanup_tag",
+        default="",
+        help="Delete orphaned immutable objects for a release tag instead of publishing.",
+    )
     parser.add_argument(
         "--manifest",
         type=Path,
@@ -637,6 +685,12 @@ def main() -> int:
         default=os.environ.get("GITHUB_REPOSITORY", ""),
     )
     args = parser.parse_args()
+    if args.cleanup_tag:
+        store = OssReleaseStore.from_environment(
+            checkpoint_root=Path("build") / "release-upload-checkpoints",
+        )
+        cleanup_orphans(args.cleanup_tag, store)
+        return 0
     promotion_pr = _optional_positive_int(args.promotion_pr)
     if not args.tag or not args.commit or not args.repository:
         raise RuntimeError(
