@@ -6,7 +6,7 @@ from xenix.services.knowledge_job_handlers import (
     _reconcile,
 )
 from xenix.services.storage import StorageBootstrapService
-from xenix.services.storage.models import JobDomain, JobRow, JobStatus, utc_now
+from xenix.services.storage.models import JobDomain, JobRow, JobStatus
 from sqlmodel import select
 
 

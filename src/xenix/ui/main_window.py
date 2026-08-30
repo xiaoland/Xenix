@@ -59,6 +59,7 @@ if TYPE_CHECKING:
     from ..services.knowledge_service import KnowledgeService
     from ..services.knowledge_task_query import KnowledgeTaskQueryService
     from ..services.knowledge_workspace_service import KnowledgeWorkspaceService
+    from ..services.job_scheduler import JobScheduler
     from ..services.job_service import JobQueryService
     from ..services.ml_service import MLService
     from ..services.paddle_ocr_service import PaddleOcrDeploymentService
@@ -124,6 +125,7 @@ class MainWindow(QMainWindow):
         paddle_ocr_deployment: PaddleOcrDeploymentService | None = None,
         knowledge_task_query_service: KnowledgeTaskQueryService | None = None,
         job_query_service: JobQueryService | None = None,
+        scheduler: JobScheduler | None = None,
         knowledge_workspace_service: KnowledgeWorkspaceService | None = None,
         knowledge_document_lifecycle_service: KnowledgeDocumentLifecycleService
         | None = None,
@@ -155,6 +157,7 @@ class MainWindow(QMainWindow):
         self._paddle_ocr_deployment = paddle_ocr_deployment
         self._knowledge_task_query_service = knowledge_task_query_service
         self._job_query_service = job_query_service
+        self._scheduler = scheduler
         self._knowledge_workspace_service = knowledge_workspace_service
         self._knowledge_document_lifecycle_service = (
             knowledge_document_lifecycle_service
@@ -443,7 +446,11 @@ class MainWindow(QMainWindow):
         if self._job_center is None:
             from .job_center import JobCenterDialog
 
-            self._job_center = JobCenterDialog(self._job_query_service, parent=self)
+            self._job_center = JobCenterDialog(
+                self._job_query_service,
+                scheduler=self._scheduler,
+                parent=self,
+            )
         self._job_center.show()
         self._job_center.raise_()
         self._job_center.activateWindow()

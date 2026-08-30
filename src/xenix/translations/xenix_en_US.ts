@@ -366,17 +366,17 @@
 <context>
     <name>JobCenterDialog</name>
     <message>
-        <location filename="../ui/job_center.py" line="150"/>
+        <location filename="../ui/job_center.py" line="162"/>
         <source>Jobs could not be loaded.</source>
         <translation>Jobs could not be loaded.</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="181"/>
+        <location filename="../ui/job_center.py" line="194"/>
         <source>%1 jobs · %2 active · %3 failed</source>
         <translation>%1 jobs · %2 active · %3 failed</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="201"/>
+        <location filename="../ui/job_center.py" line="231"/>
         <source>Reference: %1
 Domain: %2
 Type: %3
@@ -393,146 +393,151 @@ Phase: %6
 Updated: %7</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="214"/>
+        <location filename="../ui/job_center.py" line="244"/>
         <source>
 Error: %1</source>
         <translation>
 Error: %1</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="215"/>
+        <location filename="../ui/job_center.py" line="245"/>
         <source>Job Details</source>
         <translation>Job Details</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="219"/>
         <location filename="../ui/job_center.py" line="249"/>
+        <location filename="../ui/job_center.py" line="279"/>
         <source>Knowledge</source>
         <translation>Knowledge</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="220"/>
         <location filename="../ui/job_center.py" line="250"/>
+        <location filename="../ui/job_center.py" line="280"/>
         <source>Machine learning</source>
         <translation>Machine learning</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="225"/>
+        <location filename="../ui/job_center.py" line="255"/>
         <source>Queued</source>
         <translation>Queued</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="226"/>
+        <location filename="../ui/job_center.py" line="256"/>
         <source>Running</source>
         <translation>Running</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="227"/>
+        <location filename="../ui/job_center.py" line="257"/>
         <source>Succeeded</source>
         <translation>Succeeded</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="228"/>
+        <location filename="../ui/job_center.py" line="258"/>
         <source>Failed</source>
         <translation>Failed</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="229"/>
+        <location filename="../ui/job_center.py" line="259"/>
         <source>Cancelled</source>
         <translation>Cancelled</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="234"/>
+        <location filename="../ui/job_center.py" line="264"/>
         <source>Import</source>
         <translation>Import</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="235"/>
+        <location filename="../ui/job_center.py" line="265"/>
         <source>Content preparation</source>
         <translation>Content preparation</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="236"/>
+        <location filename="../ui/job_center.py" line="266"/>
         <source>Index build</source>
         <translation>Index build</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="237"/>
+        <location filename="../ui/job_center.py" line="267"/>
         <source>Model training</source>
         <translation>Model training</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="238"/>
+        <location filename="../ui/job_center.py" line="268"/>
         <source>Parameter tuning</source>
         <translation>Parameter tuning</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="239"/>
+        <location filename="../ui/job_center.py" line="269"/>
         <source>Evaluation</source>
         <translation>Evaluation</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="240"/>
+        <location filename="../ui/job_center.py" line="270"/>
         <source>Apply model</source>
         <translation>Apply model</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="246"/>
+        <location filename="../ui/job_center.py" line="276"/>
         <source>Jobs</source>
         <translation>Jobs</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="248"/>
+        <location filename="../ui/job_center.py" line="278"/>
         <source>All services</source>
         <translation>All services</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="252"/>
+        <location filename="../ui/job_center.py" line="282"/>
         <source>All statuses</source>
         <translation>All statuses</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="257"/>
+        <location filename="../ui/job_center.py" line="287"/>
         <source>Search jobs</source>
         <translation>Search jobs</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="260"/>
+        <location filename="../ui/job_center.py" line="290"/>
         <source>Service</source>
         <translation>Service</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="261"/>
+        <location filename="../ui/job_center.py" line="291"/>
         <source>Type</source>
         <translation>Type</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="262"/>
+        <location filename="../ui/job_center.py" line="292"/>
         <source>Target</source>
         <translation>Target</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="263"/>
+        <location filename="../ui/job_center.py" line="293"/>
         <source>Status</source>
         <translation>Status</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="264"/>
+        <location filename="../ui/job_center.py" line="294"/>
         <source>Updated</source>
         <translation>Updated</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="267"/>
+        <location filename="../ui/job_center.py" line="297"/>
         <source>Details</source>
         <translation>Details</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="268"/>
+        <location filename="../ui/job_center.py" line="298"/>
+        <source>Cancel</source>
+        <translation>Cancel</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="299"/>
         <source>Refresh</source>
         <translation>Refresh</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="269"/>
+        <location filename="../ui/job_center.py" line="300"/>
         <source>Close</source>
         <translation>Close</translation>
     </message>
@@ -1527,160 +1532,160 @@ Trigger: %2</translation>
         <translation type="vanished">Downloading Xenix {version}...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="307"/>
+        <location filename="../ui/main_window.py" line="310"/>
         <source>Xenix Native</source>
         <translation>Xenix Native</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="308"/>
+        <location filename="../ui/main_window.py" line="311"/>
         <source>Xenix</source>
         <translation>Xenix</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="309"/>
+        <location filename="../ui/main_window.py" line="312"/>
         <source>Settings</source>
         <translation>Settings</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="310"/>
+        <location filename="../ui/main_window.py" line="313"/>
         <source>Knowledge</source>
         <translation>Knowledge</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="311"/>
-        <location filename="../ui/main_window.py" line="439"/>
+        <location filename="../ui/main_window.py" line="314"/>
+        <location filename="../ui/main_window.py" line="442"/>
         <source>Jobs</source>
         <translation>Jobs</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="312"/>
-        <location filename="../ui/main_window.py" line="455"/>
+        <location filename="../ui/main_window.py" line="315"/>
+        <location filename="../ui/main_window.py" line="462"/>
         <source>Datasets</source>
         <translation>Datasets</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="313"/>
+        <location filename="../ui/main_window.py" line="316"/>
         <source>History</source>
         <translation>History</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="315"/>
+        <location filename="../ui/main_window.py" line="318"/>
         <source>New thread</source>
         <translation>New thread</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="408"/>
+        <location filename="../ui/main_window.py" line="411"/>
         <source>Knowledge Workspace</source>
         <translation>Knowledge Workspace</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="409"/>
+        <location filename="../ui/main_window.py" line="412"/>
         <source>Knowledge services are not available.</source>
         <translation>Knowledge services are not available.</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="440"/>
+        <location filename="../ui/main_window.py" line="443"/>
         <source>Job services are not available.</source>
         <translation>Job services are not available.</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="456"/>
+        <location filename="../ui/main_window.py" line="463"/>
         <source>Open a conversation to review the datasets it produced.</source>
         <translation>Open a conversation to review the datasets it produced.</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="576"/>
+        <location filename="../ui/main_window.py" line="583"/>
         <source>The selected source path is not a file.</source>
         <translation>The selected source path is not a file.</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="760"/>
-        <location filename="../ui/main_window.py" line="777"/>
+        <location filename="../ui/main_window.py" line="767"/>
+        <location filename="../ui/main_window.py" line="784"/>
         <source>Opening link...</source>
         <translation>Opening link...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="778"/>
+        <location filename="../ui/main_window.py" line="785"/>
         <source>Open Link</source>
         <translation>Open Link</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="832"/>
+        <location filename="../ui/main_window.py" line="839"/>
         <source>The submitted message is being prepared and cannot be stopped.</source>
         <translation>The submitted message is being prepared and cannot be stopped.</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="845"/>
+        <location filename="../ui/main_window.py" line="852"/>
         <source>Stopped.</source>
         <translation>Stopped.</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="901"/>
+        <location filename="../ui/main_window.py" line="908"/>
         <source>Rename</source>
         <translation>Rename</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="902"/>
+        <location filename="../ui/main_window.py" line="909"/>
         <source>Generate title...</source>
         <translation>Generate title...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="903"/>
+        <location filename="../ui/main_window.py" line="910"/>
         <source>Copy thread ID</source>
         <translation>Copy thread ID</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="904"/>
+        <location filename="../ui/main_window.py" line="911"/>
         <source>Delete</source>
         <translation>Delete</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="929"/>
+        <location filename="../ui/main_window.py" line="936"/>
         <source>Rename Thread</source>
         <translation>Rename Thread</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="930"/>
-        <location filename="../ui/main_window.py" line="997"/>
+        <location filename="../ui/main_window.py" line="937"/>
+        <location filename="../ui/main_window.py" line="1004"/>
         <source>Thread name</source>
         <translation>Thread name</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="946"/>
-        <location filename="../ui/main_window.py" line="977"/>
-        <location filename="../ui/main_window.py" line="1007"/>
-        <location filename="../ui/main_window.py" line="1017"/>
+        <location filename="../ui/main_window.py" line="953"/>
+        <location filename="../ui/main_window.py" line="984"/>
+        <location filename="../ui/main_window.py" line="1014"/>
+        <location filename="../ui/main_window.py" line="1024"/>
         <source>Generate Thread Title</source>
         <translation>Generate Thread Title</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="947"/>
+        <location filename="../ui/main_window.py" line="954"/>
         <source>Thread title model is not configured.</source>
         <translation>Thread title model is not configured.</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="970"/>
+        <location filename="../ui/main_window.py" line="977"/>
         <source>Generating thread title...</source>
         <translation>Generating thread title...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="996"/>
+        <location filename="../ui/main_window.py" line="1003"/>
         <source>Apply Generated Title</source>
         <translation>Apply Generated Title</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="1032"/>
-        <location filename="../ui/main_window.py" line="1040"/>
+        <location filename="../ui/main_window.py" line="1039"/>
+        <location filename="../ui/main_window.py" line="1047"/>
         <source>Delete Thread</source>
         <translation>Delete Thread</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="1033"/>
+        <location filename="../ui/main_window.py" line="1040"/>
         <source>Stop the current run before deleting this thread.</source>
         <translation>Stop the current run before deleting this thread.</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="1041"/>
+        <location filename="../ui/main_window.py" line="1048"/>
         <source>Delete &quot;{title}&quot;? This action cannot be undone.</source>
         <translation>Delete &quot;{title}&quot;? This action cannot be undone.</translation>
     </message>
@@ -2905,12 +2910,12 @@ State file: {state_path}</translation>
         <translation>Buy license</translation>
     </message>
     <message>
-        <location filename="../app.py" line="831"/>
+        <location filename="../app.py" line="854"/>
         <source>Unable to start Xenix</source>
         <translation>Unable to start Xenix</translation>
     </message>
     <message>
-        <location filename="../app.py" line="832"/>
+        <location filename="../app.py" line="855"/>
         <source>Xenix could not finish startup.
 
 {error}</source>

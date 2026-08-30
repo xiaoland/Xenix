@@ -656,6 +656,7 @@ def build_main_window(
             paddle_ocr_deployment=paddle_ocr_deployment,
             knowledge_task_query_service=knowledge_task_query_service,
             job_query_service=job_query_service,
+            scheduler=scheduler,
             knowledge_workspace_service=knowledge_workspace_service,
             knowledge_document_lifecycle_service=(
                 knowledge_document_lifecycle_service

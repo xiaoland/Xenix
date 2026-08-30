@@ -132,6 +132,17 @@ class JobScheduler:
             self._lock.notify()
         return job.id
 
+    def capabilities(self, domain: JobDomain, reference: str) -> JobCapabilities:
+        """Return the management capabilities for a specific job."""
+        handler = self._handlers.get(domain)
+        if handler is None:
+            return JobCapabilities()
+        with self._session_factory() as session:
+            job = self._find(session, domain, reference)
+            if job is None:
+                return JobCapabilities()
+            return handler.capabilities(job)
+
     def request_cancel(self, domain: JobDomain, reference: str) -> None:
         """Cancel a queued or running job through its domain handler."""
         handler = self._handlers.get(domain)

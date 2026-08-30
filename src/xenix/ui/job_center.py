@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ..services.job_scheduler import JobScheduler
 from ..services.job_service import JobDomain, JobItem, JobQueryService, JobStatus
 
 JOB_POLL_INTERVAL_MS = 2_000
@@ -59,11 +60,18 @@ class _JobLoad(QRunnable):
 class JobCenterDialog(QDialog):
     """Global, read-only view over background jobs owned by product services."""
 
-    def __init__(self, service: JobQueryService, parent: QWidget | None = None) -> None:
+    def __init__(
+        self,
+        service: JobQueryService,
+        *,
+        scheduler: JobScheduler | None = None,
+        parent: QWidget | None = None,
+    ) -> None:
         super().__init__(parent)
         self.setWindowModality(Qt.WindowModality.NonModal)
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, False)
         self._service = service
+        self._scheduler = scheduler
         self._thread_pool = QThreadPool(self)
         self._generation = 0
         self._load: _JobLoad | None = None
@@ -92,10 +100,13 @@ class JobCenterDialog(QDialog):
         self._summary = QLabel(self)
         self._details_button = QPushButton(self)
         self._details_button.clicked.connect(self._show_details)
+        self._cancel_button = QPushButton(self)
+        self._cancel_button.clicked.connect(self._cancel_selected_job)
         self._refresh_button = QPushButton(self)
         self._refresh_button.clicked.connect(self.refresh)
         self._close_button = QPushButton(self)
         self._close_button.clicked.connect(self.hide)
+        self._table.itemSelectionChanged.connect(self._update_action_buttons)
 
         filters = QHBoxLayout()
         filters.addWidget(self._domain_filter)
@@ -105,6 +116,7 @@ class JobCenterDialog(QDialog):
         actions.addWidget(self._summary)
         actions.addStretch(1)
         actions.addWidget(self._details_button)
+        actions.addWidget(self._cancel_button)
         actions.addWidget(self._refresh_button)
         actions.addWidget(self._close_button)
         layout = QVBoxLayout(self)
@@ -150,6 +162,7 @@ class JobCenterDialog(QDialog):
             self._summary.setText(self.tr("Jobs could not be loaded."))
         elif isinstance(result, list):
             self._render_jobs(result)
+            self._update_action_buttons()
         if self._load_pending:
             self._load_pending = False
             self.refresh()
@@ -193,6 +206,23 @@ class JobCenterDialog(QDialog):
     def _selected_reference(self) -> str | None:
         job = self._selected_job()
         return job.reference if job is not None else None
+
+    def _update_action_buttons(self) -> None:
+        job = self._selected_job()
+        can_cancel = False
+        if job is not None and self._scheduler is not None:
+            can_cancel = self._scheduler.capabilities(
+                job.domain,
+                job.raw_reference,
+            ).can_cancel
+        self._cancel_button.setEnabled(can_cancel)
+
+    def _cancel_selected_job(self) -> None:
+        job = self._selected_job()
+        if job is None or self._scheduler is None:
+            return
+        self._scheduler.request_cancel(job.domain, job.raw_reference)
+        self.refresh()
 
     def _show_details(self, *_args: object) -> None:
         job = self._selected_job()
@@ -265,8 +295,10 @@ class JobCenterDialog(QDialog):
             ]
         )
         self._details_button.setText(self.tr("Details"))
+        self._cancel_button.setText(self.tr("Cancel"))
         self._refresh_button.setText(self.tr("Refresh"))
         self._close_button.setText(self.tr("Close"))
+        self._update_action_buttons()
 
     @staticmethod
     def _restore_filter(combo: QComboBox, value: object) -> None:

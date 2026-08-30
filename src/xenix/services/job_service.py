@@ -15,6 +15,7 @@ class JobItem:
     """Stable presentation projection over a domain-owned unit of work."""
 
     reference: str
+    raw_reference: str
     domain: JobDomain
     kind: str
     target: str
@@ -77,6 +78,9 @@ class JobQueryService:
         return [
             JobItem(
                 reference=f"knowledge:{task.reference}",
+                raw_reference=(
+                    task.import_id if task.kind == "import" else task.owner_id
+                ),
                 domain=JobDomain.KNOWLEDGE,
                 kind=task.kind,
                 target=task.target,
@@ -110,6 +114,7 @@ class JobQueryService:
         return [
             JobItem(
                 reference=f"ml:{task.id}",
+                raw_reference=task.id,
                 domain=JobDomain.ML,
                 kind=task.task_type.value,
                 target=(
