@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, exists, or_
 from sqlmodel import Session, select
 
-from ..models import DatasetRow
+from ..models import DatasetDerivationInputRow, DatasetDerivationRow, DatasetRow
 
 
 class DatasetRepository:
@@ -39,6 +39,7 @@ class DatasetRepository:
                     DatasetRow.copied_from.is_(None),
                     DatasetRow.derived_from_dataset_id.is_(None),
                     DatasetRow.ml_task_id.is_(None),
+                    ~exists().where(DatasetDerivationRow.dataset_id == DatasetRow.id),
                 )
             )
             .order_by(DatasetRow.created_at)
@@ -53,6 +54,7 @@ class DatasetRepository:
                     DatasetRow.copied_from.is_(None),
                     DatasetRow.derived_from_dataset_id.is_(None),
                     DatasetRow.ml_task_id.is_(None),
+                    ~exists().where(DatasetDerivationRow.dataset_id == DatasetRow.id),
                 )
             )
             .order_by(DatasetRow.created_at)
@@ -68,6 +70,7 @@ class DatasetRepository:
                     or_(
                         DatasetRow.ml_task_id.is_not(None),
                         DatasetRow.derived_from_dataset_id.is_not(None),
+                        exists().where(DatasetDerivationRow.dataset_id == DatasetRow.id),
                     ),
                 )
             )
@@ -82,6 +85,7 @@ class DatasetRepository:
                 or_(
                     DatasetRow.ml_task_id.is_not(None),
                     DatasetRow.derived_from_dataset_id.is_not(None),
+                    exists().where(DatasetDerivationRow.dataset_id == DatasetRow.id),
                 )
             )
             .order_by(DatasetRow.created_at)
@@ -99,7 +103,16 @@ class DatasetRepository:
     def list_derived_by_source(self, session: Session, source_dataset_id: str) -> list[DatasetRow]:
         statement = (
             select(DatasetRow)
-            .where(DatasetRow.derived_from_dataset_id == source_dataset_id)
+            .where(
+                or_(
+                    DatasetRow.derived_from_dataset_id == source_dataset_id,
+                    DatasetRow.id.in_(
+                        select(DatasetDerivationInputRow.derivation_dataset_id).where(
+                            DatasetDerivationInputRow.input_dataset_id == source_dataset_id
+                        )
+                    ),
+                )
+            )
             .order_by(DatasetRow.created_at)
         )
         return list(session.exec(statement))

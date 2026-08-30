@@ -36,11 +36,13 @@ Chatbot events, UI code, and integration tests.
   final frontier needs the next sample.
 - **Projection:** First run the pure structural snapshot projection. Then, and
   only then, enrich Dataset blocks through DatasetService's read-only source
-  presentation resolver. A failed resolver is a soft omission, not a Thread
+  presentation resolver and enrich Tool events with persisted Dataset derivation
+  evidence resolved by ToolCall identity. Derivation projection must not inspect
+  ToolResult content. A failed source resolver is a soft omission, not a Thread
   open failure. The Chatbot renderer determines displayability: reasoning-only
-  Assistant events allocate no Bubble. The derived source-attachment
-  presentation is neither a canonical block nor provider context; its
-  originating DatasetBlock remains both.
+  Assistant events allocate no Bubble. The derived source-attachment presentation
+  is neither a canonical block nor provider context; its originating DatasetBlock
+  remains both.
 - **Deletion and usage:** Route deletion through the LLM Conversation service
   so its writer gate and repository dependency order remain intact. Project
   usage only from LLM Conversation's observability-derived overview after the
@@ -70,7 +72,8 @@ guards local ownership and sequence traps.
 ## Verification
 
 - Harness coordination and direct ToolResult/XTT continuity:
-  `tests/agent/test_agent_harness_first_slice.py`.
+  `tests/agent/test_agent_harness_first_slice.py` and
+  `tests/agent/test_agent_dataset_audit.py`.
 - Agent skill scope and AgentTool projection:
   `tests/agent/test_agent_skill_tool_scope.py`,
   `tests/agent/test_agent_ml_tool_projection.py`,

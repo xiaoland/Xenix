@@ -38,7 +38,11 @@ from ..data_transform import (
 )
 from ..dataset_inspection import InspectDatasetInput, detect_source_format, load_dataframe
 from ..dataset_export_service import DatasetExportService
-from ..dataset_service import DatasetService
+from ..dataset_service import (
+    DatasetDerivationInput,
+    DatasetDerivationSourceInput,
+    DatasetService,
+)
 from ..ml.registry import get_model_catalog_entry, list_model_catalog, list_model_keys
 from ..ml.contracts import (
     ApplyTaskResult,
@@ -553,6 +557,18 @@ class AgentToolRegistry:
             output_path=output_path,
             name=name,
             summary="Integrated dataset created.",
+            derivation=DatasetDerivationInput(
+                operation_name="data.integrate",
+                inputs=[
+                    DatasetDerivationSourceInput(dataset_id=dataset.id)
+                    for dataset in datasets
+                ],
+                parameters_payload=input_data.model_dump(
+                    mode="json",
+                    exclude={"dataset_ids"},
+                    exclude_none=True,
+                ),
+            ),
             metadata_payload={"input_dataset_ids": input_dataset_ids},
         )
         payload["input_dataset_ids"] = input_dataset_ids
@@ -737,7 +753,17 @@ class AgentToolRegistry:
                 f"Whole-Dataset cleaned result created. Rows: {row_count_before} -> {row_count_after}. "
                 "This business transformation is not holdout-safe learned model preparation."
             ),
-            derived_from_dataset_id=dataset.id,
+            derivation=DatasetDerivationInput(
+                operation_name="data.clean",
+                inputs=[
+                    DatasetDerivationSourceInput(dataset_id=dataset.id, alias="input")
+                ],
+                parameters_payload=input_data.model_dump(
+                    mode="json",
+                    exclude={"dataset_id"},
+                    exclude_none=True,
+                ),
+            ),
             metadata_payload={"cleaning_report": clean_result.report},
         )
         payload["row_count_before"] = row_count_before
@@ -821,7 +847,36 @@ class AgentToolRegistry:
             output_path=Path(tokenize_result.output_path),
             name=name,
             summary=f"Tokenized dataset created. Rows: {row_count}.",
-            derived_from_dataset_id=dataset.id,
+            derivation=DatasetDerivationInput(
+                operation_name="data.tokenize",
+                inputs=[
+                    DatasetDerivationSourceInput(dataset_id=dataset.id, alias="input"),
+                    *[
+                        DatasetDerivationSourceInput(
+                            dataset_id=dataset_id,
+                            alias="custom_dictionary",
+                        )
+                        for dataset_id in input_data.custom_dictionary_dataset_ids
+                    ],
+                    *[
+                        DatasetDerivationSourceInput(
+                            dataset_id=dataset_id,
+                            alias="stopwords",
+                        )
+                        for dataset_id in input_data.stopword_dataset_ids
+                    ],
+                ],
+                parameters_payload=input_data.model_dump(
+                    mode="json",
+                    exclude={
+                        "dataset_id",
+                        "custom_dictionary_dataset_ids",
+                        "stopword_dataset_ids",
+                    },
+                    exclude_none=True,
+                ),
+            ),
+            compatibility_parent_dataset_id=dataset.id,
             metadata_payload={"tokenization_report": tokenize_result.report},
         )
         payload["row_count"] = row_count
@@ -910,13 +965,27 @@ class AgentToolRegistry:
                 column_reference=input_data.column_reference,
             )
         )
-        derived_from_dataset_id = input_dataset_ids[0] if len(set(input_dataset_ids)) == 1 else None
         payload = self._register_generated_dataset_result(
             context,
             output_path=Path(transform_result.output_path),
             name=name,
             summary=f"Transformed dataset created. Rows: {transform_result.row_count}.",
-            derived_from_dataset_id=derived_from_dataset_id,
+            derivation=DatasetDerivationInput(
+                operation_name="data.transform",
+                inputs=[
+                    DatasetDerivationSourceInput(
+                        dataset_id=binding.dataset_id,
+                        alias=binding.alias,
+                    )
+                    for binding in bindings
+                ],
+                parameters_payload=input_data.model_dump(
+                    mode="json",
+                    exclude={"dataset_id", "bindings", "explanation"},
+                    exclude_none=True,
+                ),
+                agent_explanation=input_data.explanation,
+            ),
             metadata_payload={
                 "transform_report": transform_result.transform_report,
                 "input_dataset_ids": input_dataset_ids,
@@ -1512,7 +1581,8 @@ class AgentToolRegistry:
         output_path: Path,
         name: str,
         summary: str,
-        derived_from_dataset_id: str | None = None,
+        derivation: DatasetDerivationInput,
+        compatibility_parent_dataset_id: str | None = None,
         metadata_payload: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         resolved_output_path = output_path.resolve()
@@ -1522,7 +1592,10 @@ class AgentToolRegistry:
                 "output_path": str(resolved_output_path),
                 "name": name,
                 "summary": summary,
-                "derived_from_dataset_id": derived_from_dataset_id,
+                "derivation": derivation.model_copy(
+                    update={"tool_call_message_id": context.tool_call_message_id}
+                ).model_dump(mode="json"),
+                "derived_from_dataset_id": compatibility_parent_dataset_id,
                 "metadata_payload": dict(metadata_payload or {}),
             },
             paths=self._paths,

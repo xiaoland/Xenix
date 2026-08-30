@@ -75,6 +75,12 @@ Tool modules.
   snapshot is loaded, Harness may derive an ephemeral source attachment for
   Chatbot display. That presentation is not canonical content, provider input,
   or a recovery record; a missing original source is a soft display result.
+- The LLM boundary passes the staged ToolCall Message identity into Tool execution.
+  A Dataset-producing Tool may persist that stable reference with DatasetService
+  derivation evidence before the ToolCall is finalized. Harness later resolves the
+  evidence by that reference and projects it into the matching Tool event; it does
+  not parse ToolResult content or create a second result authority. Agent-authored
+  explanations are annotations, not system-verified evidence.
 - Thinking, activity, connection, and usage are Chatbot Events. Observability
   may retain bounded diagnostics/usage but never restores, repairs, or replays
   conversation or Tool state.
@@ -195,6 +201,10 @@ sequenceDiagram
 The UI opening target is a short-lived desktop capability, not ordinary event
 content. A missing/malformed source therefore cannot prevent the snapshot from
 opening or cause provider/canonical data to gain a local path.
+
+The same post-snapshot seam may attach Dataset derivation evidence to a Tool event
+by its ToolCall identity. Unlike source presentation, this evidence is persisted
+Dataset authority; the Chatbot block remains only its read-only UI projection.
 
 ## Safety and Change Rules
 

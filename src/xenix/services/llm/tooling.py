@@ -136,6 +136,7 @@ class ToolExecutionContext:
     """Bounded live context supplied to an injected implementation."""
 
     thread_id: str
+    tool_call_message_id: str | None = None
     dataset_ids: tuple[str, ...] = ()
     cancel_requested: Callable[[], bool] = lambda: False
 

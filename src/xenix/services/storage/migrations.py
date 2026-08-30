@@ -9,7 +9,7 @@ from sqlmodel import SQLModel
 from ...exceptions import ValidationError
 from . import models  # noqa: F401
 
-CURRENT_SCHEMA_VERSION = 25
+CURRENT_SCHEMA_VERSION = 26
 
 
 def get_user_version(engine: Engine) -> int:
@@ -1705,6 +1705,58 @@ def migrate_v24_to_v25(engine: Engine) -> int:
     return 25
 
 
+def migrate_v25_to_v26(engine: Engine) -> int:
+    """Add authoritative Dataset derivation records and ordered input edges."""
+
+    with engine.begin() as connection:
+        connection.exec_driver_sql(
+            """
+            CREATE TABLE dataset_derivation (
+                dataset_id VARCHAR NOT NULL PRIMARY KEY,
+                operation_name VARCHAR NOT NULL,
+                parameters_payload JSON NOT NULL,
+                agent_explanation VARCHAR,
+                tool_call_message_id VARCHAR,
+                created_at DATETIME NOT NULL,
+                FOREIGN KEY(dataset_id) REFERENCES dataset (id)
+            )
+            """
+        )
+        connection.exec_driver_sql(
+            "CREATE INDEX ix_dataset_derivation_operation_name "
+            "ON dataset_derivation (operation_name)"
+        )
+        connection.exec_driver_sql(
+            "CREATE INDEX ix_dataset_derivation_tool_call_message_id "
+            "ON dataset_derivation (tool_call_message_id)"
+        )
+        connection.exec_driver_sql(
+            """
+            CREATE TABLE dataset_derivation_input (
+                id VARCHAR NOT NULL PRIMARY KEY,
+                derivation_dataset_id VARCHAR NOT NULL,
+                input_dataset_id VARCHAR NOT NULL,
+                input_position INTEGER NOT NULL,
+                alias VARCHAR,
+                CONSTRAINT uq_dataset_derivation_input_position
+                    UNIQUE (derivation_dataset_id, input_position),
+                FOREIGN KEY(derivation_dataset_id) REFERENCES dataset_derivation (dataset_id),
+                FOREIGN KEY(input_dataset_id) REFERENCES dataset (id)
+            )
+            """
+        )
+        connection.exec_driver_sql(
+            "CREATE INDEX ix_dataset_derivation_input_derivation_dataset_id "
+            "ON dataset_derivation_input (derivation_dataset_id)"
+        )
+        connection.exec_driver_sql(
+            "CREATE INDEX ix_dataset_derivation_input_input_dataset_id "
+            "ON dataset_derivation_input (input_dataset_id)"
+        )
+        connection.exec_driver_sql("PRAGMA user_version=26")
+    return 26
+
+
 def _create_v16_knowledge_schema(connection) -> None:
     """Create the fixed historical v16 Knowledge shape without current metadata."""
 
@@ -1841,6 +1893,8 @@ def run_migrations(engine: Engine) -> int:
         current_version = migrate_v23_to_v24(engine)
     if current_version == 24:
         current_version = migrate_v24_to_v25(engine)
+    if current_version == 25:
+        current_version = migrate_v25_to_v26(engine)
     if current_version == CURRENT_SCHEMA_VERSION:
         return current_version
     raise ValidationError(

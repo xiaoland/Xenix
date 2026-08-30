@@ -129,7 +129,11 @@ def _register_generated_dataset(payload: dict[str, Any], paths: AppPaths) -> dic
     from .artifact_service import ArtifactService
     from .dataset_export_service import DatasetExportService
     from .dataset_inspection import InspectDatasetInput
-    from .dataset_service import DatasetService, RegisterDatasetInput
+    from .dataset_service import (
+        DatasetDerivationInput,
+        DatasetService,
+        RegisterDatasetInput,
+    )
     from .storage import StorageBootstrapService
 
     output_path = Path(str(payload.get("output_path") or "")).expanduser()
@@ -157,6 +161,7 @@ def _register_generated_dataset(payload: dict[str, Any], paths: AppPaths) -> dic
             source_path=str(output_path.resolve()),
             name=name,
             derived_from_dataset_id=payload.get("derived_from_dataset_id"),
+            derivation=DatasetDerivationInput.model_validate(payload.get("derivation")),
         )
     )
     try:

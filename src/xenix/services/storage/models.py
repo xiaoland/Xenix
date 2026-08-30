@@ -151,6 +151,43 @@ class DatasetRow(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=utc_now)
 
 
+class DatasetDerivationRow(SQLModel, table=True):
+    """Authoritative operation record for one generated Dataset."""
+
+    __tablename__ = "dataset_derivation"
+
+    dataset_id: str = Field(primary_key=True, foreign_key="dataset.id")
+    operation_name: str = Field(index=True)
+    parameters_payload: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    agent_explanation: str | None = None
+    # Tool execution happens before the staged ToolCall Message is committed,
+    # so this is a stable future reference rather than an immediate FK.
+    tool_call_message_id: str | None = Field(default=None, index=True)
+    created_at: datetime = Field(default_factory=utc_now)
+
+
+class DatasetDerivationInputRow(SQLModel, table=True):
+    """One ordered input edge in a Dataset derivation."""
+
+    __tablename__ = "dataset_derivation_input"
+    __table_args__ = (
+        UniqueConstraint(
+            "derivation_dataset_id",
+            "input_position",
+            name="uq_dataset_derivation_input_position",
+        ),
+    )
+
+    id: str = Field(default_factory=generate_id, primary_key=True)
+    derivation_dataset_id: str = Field(foreign_key="dataset_derivation.dataset_id", index=True)
+    input_dataset_id: str = Field(foreign_key="dataset.id", index=True)
+    input_position: int
+    alias: str | None = None
+
+
 class DatasetImportRow(SQLModel, table=True):
     __tablename__ = "dataset_import"
 
