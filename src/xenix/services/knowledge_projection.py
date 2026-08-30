@@ -6,12 +6,12 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 
 
-RETRIEVAL_PROJECTION_VERSION = 3
-CORPUS_FINGERPRINT_SCHEMA = 3
+RETRIEVAL_PROJECTION_VERSION = 4
+CORPUS_FINGERPRINT_SCHEMA = 4
 
-_PROJECTION_FINGERPRINT_DOMAIN = "xenix.knowledge-projection/v3"
-_CORPUS_FINGERPRINT_DOMAIN = "xenix.knowledge-corpus/v3"
-_UNIT_ID_DOMAIN = "xenix.knowledge-unit/v3"
+_PROJECTION_FINGERPRINT_DOMAIN = "xenix.knowledge-projection/v4"
+_CORPUS_FINGERPRINT_DOMAIN = "xenix.knowledge-corpus/v4"
+_UNIT_ID_DOMAIN = "xenix.knowledge-unit/v4"
 
 
 @dataclass(frozen=True)
