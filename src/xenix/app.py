@@ -299,6 +299,7 @@ def _load_runtime_imports(
     )
     knowledge_index = load_module("xenix.services.knowledge_index_service")
     knowledge_task_query = load_module("xenix.services.knowledge_task_query")
+    job_service = load_module("xenix.services.job_service")
     knowledge_workspace = load_module("xenix.services.knowledge_workspace_service")
     paddle_ocr = load_module("xenix.services.paddle_ocr_service")
     lazy_ml_service = load_module("xenix.services.lazy_ml_service")
@@ -328,6 +329,7 @@ def _load_runtime_imports(
         ),
         KnowledgeIndexService=knowledge_index.KnowledgeIndexService,
         KnowledgeTaskQueryService=knowledge_task_query.KnowledgeTaskQueryService,
+        JobQueryService=job_service.JobQueryService,
         KnowledgeWorkspaceService=knowledge_workspace.KnowledgeWorkspaceService,
         PaddleOcrDeploymentService=paddle_ocr.PaddleOcrDeploymentService,
         PaddleOcrService=paddle_ocr.PaddleOcrService,
@@ -597,6 +599,10 @@ def build_main_window(
         knowledge_task_query_service = runtime.KnowledgeTaskQueryService(
             context.session_factory
         )
+        job_query_service = runtime.JobQueryService(
+            context.session_factory,
+            knowledge_task_query_service,
+        )
         knowledge_workspace_service = runtime.KnowledgeWorkspaceService(
             knowledge_service=agent_services.knowledge,
             task_query=knowledge_task_query_service,
@@ -627,6 +633,7 @@ def build_main_window(
             knowledge_index_service=knowledge_index_service,
             paddle_ocr_deployment=paddle_ocr_deployment,
             knowledge_task_query_service=knowledge_task_query_service,
+            job_query_service=job_query_service,
             knowledge_workspace_service=knowledge_workspace_service,
             knowledge_document_lifecycle_service=(
                 knowledge_document_lifecycle_service
