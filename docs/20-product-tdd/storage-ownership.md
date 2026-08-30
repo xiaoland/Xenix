@@ -31,8 +31,11 @@ storage libraries are owned by source, migrations, configuration, and tests.
   file an Artifact authority. Harness may derive an ephemeral Chatbot source
   presentation from that provenance; an unavailable original file never makes
   the canonical Thread unreadable.
-- Data preparation registers derived data separately and retains available lineage
-  to its source inputs.
+- Data preparation registers derived data separately. DatasetService owns one
+  derivation record per generated Dataset plus its ordered input edges; the record
+  keeps the operation, parameters, optional Agent-authored explanation, and stable
+  originating ToolCall reference. `derived_from_dataset_id` remains a legacy
+  best-effort primary-parent projection, not the lineage authority.
 - User-openable result identity and activation follow the
   [artifact link contract](artifact-links.md).
 - Trained analyzers and ML results use durable records that point to canonical local

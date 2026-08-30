@@ -693,6 +693,7 @@ class LLMConversationService:
                 arguments=call.arguments,
                 context=ToolExecutionContext(
                     thread_id=exchange.thread_id,
+                    tool_call_message_id=call.staged_call_id,
                     dataset_ids=exchange.scope.dataset_ids,
                     cancel_requested=cancel_requested,
                 ),

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import StrEnum
+import json
 from pathlib import Path
 import secrets
 from types import SimpleNamespace
@@ -225,6 +226,8 @@ def _render_content_blocks(
             # Chatbot attachments.  Harness enrichment supplies a separate
             # UI-only source_attachment block when one can be resolved.
             continue
+        elif block_type == "dataset_audit":
+            parts.append(_dataset_audit_markdown(block))
         elif block_type == "step_confirmation":
             parts.append(str(block.get("text", "")))
         elif block_type == "thinking":
@@ -259,6 +262,95 @@ def _render_content_blocks(
                 text = f"{text} {error_summary}"
             parts.append(text)
     return "\n\n".join(part for part in parts if part)
+
+
+def _dataset_audit_markdown(block: dict[str, Any]) -> str:
+    name = str(block["name"])
+    dataset_id = str(block["dataset_id"])
+    operation_name = str(block["operation_name"])
+    generation = int(block["generation"])
+    created_at = str(block["created_at"])
+    audit_heading = QCoreApplication.translate("DatasetAudit", "Dataset audit")
+    lines = [
+        f"### {audit_heading}",
+        "",
+        QCoreApplication.translate(
+            "DatasetAudit",
+            "Dataset: `{name}` (`{dataset_id}`)",
+        ).format(name=_markdown_code(name), dataset_id=_markdown_code(dataset_id)),
+        QCoreApplication.translate(
+            "DatasetAudit",
+            "Generation: {generation}",
+        ).format(generation=generation),
+        QCoreApplication.translate(
+            "DatasetAudit",
+            "Recorded operation: `{operation}`",
+        ).format(operation=_markdown_code(operation_name)),
+        QCoreApplication.translate(
+            "DatasetAudit",
+            "Recorded at: {created_at}",
+        ).format(created_at=created_at),
+    ]
+    raw_inputs = block.get("inputs")
+    if isinstance(raw_inputs, list) and raw_inputs:
+        inputs_heading = QCoreApplication.translate("DatasetAudit", "Inputs")
+        lines.extend(["", f"#### {inputs_heading}"])
+        for item in raw_inputs:
+            if not isinstance(item, dict):
+                continue
+            input_name = _markdown_code(str(item.get("name") or ""))
+            input_id = _markdown_code(str(item.get("dataset_id") or ""))
+            position = int(item.get("position", 0)) + 1
+            input_line = QCoreApplication.translate(
+                "DatasetAudit",
+                "Input {position}: `{name}` (`{dataset_id}`)",
+            ).format(position=position, name=input_name, dataset_id=input_id)
+            alias = str(item.get("alias") or "").strip()
+            if alias:
+                input_line += " — " + QCoreApplication.translate(
+                    "DatasetAudit",
+                    "alias `{alias}`",
+                ).format(alias=_markdown_code(alias))
+            lines.append(f"- {input_line}")
+    explanation = str(block.get("agent_explanation") or "").strip()
+    if explanation:
+        explanation_heading = QCoreApplication.translate(
+            "DatasetAudit",
+            "Agent-authored explanation",
+        )
+        verification_notice = QCoreApplication.translate(
+            "DatasetAudit",
+            "Not system-verified.",
+        )
+        lines.extend(
+            [
+                "",
+                f"#### {explanation_heading}",
+                f"*{verification_notice}*",
+                "",
+                explanation,
+            ]
+        )
+    parameters = block.get("parameters_payload")
+    if isinstance(parameters, dict) and parameters:
+        parameters_heading = QCoreApplication.translate(
+            "DatasetAudit",
+            "Recorded parameters",
+        )
+        lines.extend(
+            [
+                "",
+                f"#### {parameters_heading}",
+                "```json",
+                json.dumps(parameters, ensure_ascii=False, indent=2, default=str),
+                "```",
+            ]
+        )
+    return "\n".join(lines)
+
+
+def _markdown_code(value: str) -> str:
+    return value.replace("`", "\\`")
 
 
 def _chatbot_block_is_visible(block: dict[str, Any]) -> bool:

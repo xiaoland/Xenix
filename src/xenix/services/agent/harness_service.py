@@ -191,6 +191,7 @@ class AgentHarnessService:
             canonical_events,
             self._resolve_dataset_source_presentation,
         )
+        canonical_events = self._enrich_dataset_audits(canonical_events)
         usage_by_terminal = {
             overview.terminal_llm_message_id: _usage_chatbot_event(overview)
             for overview in self._conversation_service.usage_overviews(snapshot)
@@ -202,6 +203,34 @@ class AgentHarnessService:
             if usage_event is not None:
                 events.append(usage_event)
         return events
+
+    def _enrich_dataset_audits(
+        self,
+        events: list[ChatbotEvent],
+    ) -> list[ChatbotEvent]:
+        if self._dataset_service is None:
+            return events
+        enriched: list[ChatbotEvent] = []
+        for event in events:
+            if event.kind is not ChatbotEventKind.TOOL or not event.tool_call_id:
+                enriched.append(event)
+                continue
+            audits = self._dataset_service.resolve_dataset_audits_for_tool_call(
+                event.tool_call_id
+            )
+            if not audits:
+                enriched.append(event)
+                continue
+            detail_blocks = [*event.detail_blocks]
+            detail_blocks.extend(
+                {
+                    "type": "dataset_audit",
+                    **audit.model_dump(mode="json"),
+                }
+                for audit in audits
+            )
+            enriched.append(event.model_copy(update={"detail_blocks": detail_blocks}))
+        return enriched
 
     def set_provider(self, provider: AgentProvider | None) -> None:
         self._provider = provider

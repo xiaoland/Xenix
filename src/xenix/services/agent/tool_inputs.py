@@ -425,6 +425,16 @@ class DataTransformInput(AgentToolInput):
         default=None,
         description="Optional name for the generated transformed dataset.",
     )
+    explanation: Annotated[
+        str,
+        StringConstraints(strip_whitespace=True, max_length=2048),
+    ] | None = Field(
+        default=None,
+        description=(
+            "Optional Agent-authored explanation of why this transformation supports the analysis. "
+            "It is recorded for audit and is not system-verified evidence."
+        ),
+    )
 
     @model_validator(mode="after")
     def _has_input_source(self) -> DataTransformInput:

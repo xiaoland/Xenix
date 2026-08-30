@@ -17,11 +17,14 @@ from xenix.services.storage.migrations import (
     get_user_version,
     migrate_v23_to_v24,
     migrate_v24_to_v25,
+    migrate_v25_to_v26,
 )
 from xenix.services.storage.models import (
     ArtifactKind,
     ArtifactRow,
     DatasetColumnBindingRow,
+    DatasetDerivationInputRow,
+    DatasetDerivationRow,
     KnowledgeCanonicalGenerationRow,
     KnowledgeDerivationRow,
     KnowledgeDocumentRow,
@@ -130,6 +133,43 @@ def test_v24_to_v25_adds_nullable_public_artifact_reference(tmp_path: Path) -> N
     assert "artifact_id" in columns
     assert any(row[2] == "artifact" and row[3] == "artifact_id" for row in foreign_keys)
     assert legacy_artifact_id is None
+
+
+def test_v25_to_v26_adds_dataset_derivation_tables(tmp_path: Path) -> None:
+    database = tmp_path / "v25.db"
+    engine = create_engine(f"sqlite:///{database.as_posix()}")
+    with engine.begin() as connection:
+        connection.exec_driver_sql("PRAGMA user_version=25")
+
+    assert migrate_v25_to_v26(engine) == 26
+    assert get_user_version(engine) == 26
+    inspector = inspect(engine)
+    assert {"dataset_derivation", "dataset_derivation_input"}.issubset(
+        inspector.get_table_names()
+    )
+    with engine.begin() as connection:
+        connection.exec_driver_sql(
+            "INSERT INTO dataset_derivation VALUES (?, ?, ?, ?, ?, ?)",
+            (
+                "dataset-output",
+                "data.transform",
+                '{"sql":"SELECT 1"}',
+                "keep valid rows",
+                "tool-call-1",
+                _NOW,
+            ),
+        )
+        connection.exec_driver_sql(
+            "INSERT INTO dataset_derivation_input VALUES (?, ?, ?, ?, ?)",
+            ("edge-1", "dataset-output", "dataset-input", 0, "input"),
+        )
+    with Session(engine) as session:
+        derivation = session.get(DatasetDerivationRow, "dataset-output")
+        edge = session.get(DatasetDerivationInputRow, "edge-1")
+        assert derivation is not None
+        assert derivation.parameters_payload == {"sql": "SELECT 1"}
+        assert derivation.tool_call_message_id == "tool-call-1"
+        assert edge is not None and edge.input_position == 0
 
 
 def _create_unsupported_database(db_path: Path, version: int) -> None:
@@ -751,7 +791,7 @@ def test_fresh_v23_schema_is_orm_fts_fk_and_unique_readable(
 
     context = StorageBootstrapService().initialize(paths)
 
-    assert get_user_version(context.engine) == CURRENT_SCHEMA_VERSION == 25
+    assert get_user_version(context.engine) == CURRENT_SCHEMA_VERSION == 26
     assert {
         "knowledge_canonical_generation",
         "knowledge_derivation",
@@ -781,7 +821,7 @@ def test_static_supported_fixture_upgrades_with_orm_fts_and_fk_proof(
 
     context = StorageBootstrapService().initialize(paths)
 
-    assert get_user_version(context.engine) == CURRENT_SCHEMA_VERSION == 25
+    assert get_user_version(context.engine) == CURRENT_SCHEMA_VERSION == 26
     with context.session_factory() as session:
         artifact = session.get(ArtifactRow, "artifact-1")
         assert artifact is not None and artifact.kind is ArtifactKind.FILE
