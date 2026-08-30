@@ -33,8 +33,8 @@ supports, and what uncertainty remains.
    models, reports, and apply results as local artifacts.
 5. Configure supported LLM providers and choose the LLM model used by the next
    assistant response without changing sampling already in progress.
-6. Open the Knowledge Workspace, select or drop TXT, DOC/DOCX, PPT/PPTX, PDF, JPEG,
-   or PNG material, and let the Agent apply relevant saved knowledge through
+6. Open the Knowledge Workspace, select or drop TXT, DOC/DOCX, PPT/PPTX, RTF, EPUB, ODT/ODP, PDF,
+   JPEG, or PNG material, and let the Agent apply relevant saved knowledge through
    source-linked lookup.
 7. Open About to review the installed Xenix version and manually check for
    software updates. A confirmed download reports percentage progress in a
@@ -56,9 +56,9 @@ supports, and what uncertainty remains.
   multiple-library instances, but no library-management UI is promised.
 - Knowledge import preserves the selected source and canonical content locally.
   Local OCR is installed explicitly through the Knowledge Workspace and supports
-  standalone JPEG/PNG sources and scanned PDF pages. PPTX uses the canonical Docling
-  path; legacy PPT uses an explicit LibreOffice-to-PPTX normalization. VLM and
-  Markdown are outside MVP.
+  standalone JPEG/PNG sources and scanned PDF pages. documents and presentations use a bounded local Rust parser adapted into the
+  canonical Docling content IR. Retrieval preserves heading hierarchy and bounded
+  sentence-aware overlap. VLM and Markdown imports are outside MVP.
 - Browser-first operation, an always-on Xenix server, and hosted product authority
   are out of scope.
 - Trial builds may enforce a build-time expiry and direct the user to a purchase or
