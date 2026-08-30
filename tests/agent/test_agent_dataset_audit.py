@@ -179,6 +179,9 @@ def test_multi_input_transform_records_and_projects_dataset_audit(
     assert audit_block["generation"] == 1
     assert audit_block["agent_explanation"] == audit.agent_explanation
 
+    session_audits = harness.resolve_session_dataset_audits(snapshot.thread.id)
+    assert [audit.dataset_id for audit in session_audits] == [generated.id]
+
     concrete_tools.execute(
         "data.transform",
         {

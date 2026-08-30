@@ -21,7 +21,11 @@ from sqlmodel import Field, SQLModel
 
 from ...exceptions import NotFoundError, ValidationError
 from ...observability import start_span
-from ..dataset_service import DatasetService, RegisterDatasetInput
+from ..dataset_service import (
+    DatasetAuditPresentation,
+    DatasetService,
+    RegisterDatasetInput,
+)
 from ..llm import (
     AppendUserMessageInput,
     CanonicalMessageBlock,
@@ -232,6 +236,21 @@ class AgentHarnessService:
             )
             enriched.append(event.model_copy(update={"detail_blocks": detail_blocks}))
         return enriched
+
+    def resolve_session_dataset_audits(
+        self,
+        thread_id: str,
+    ) -> list[DatasetAuditPresentation]:
+        """Resolve generated-Dataset evidence for one conversation Thread."""
+
+        if self._dataset_service is None:
+            return []
+        tool_call_ids = self._conversation_service.list_tool_call_message_ids(
+            thread_id
+        )
+        return self._dataset_service.resolve_dataset_audits_for_tool_calls(
+            tool_call_ids
+        )
 
     def set_provider(self, provider: AgentProvider | None) -> None:
         self._provider = provider

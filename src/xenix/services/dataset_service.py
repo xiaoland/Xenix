@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Collection
+
 import csv
 import codecs
 import logging
@@ -13,7 +15,7 @@ from uuid import uuid4
 import polars as pl
 from pydantic import StringConstraints
 from sqlalchemy.orm import sessionmaker
-from sqlmodel import Field, SQLModel, select
+from sqlmodel import Field, SQLModel, col, select
 
 from ..config import AppPaths
 from ..exceptions import NotFoundError, ValidationError
@@ -441,9 +443,26 @@ class DatasetService:
     ) -> list[DatasetAuditPresentation]:
         """Resolve generated Dataset evidence by its originating ToolCall."""
 
+        if not tool_call_message_id:
+            return []
+        return self.resolve_dataset_audits_for_tool_calls([tool_call_message_id])
+
+    def resolve_dataset_audits_for_tool_calls(
+        self,
+        tool_call_message_ids: Collection[str],
+    ) -> list[DatasetAuditPresentation]:
+        """Resolve generated Dataset evidence for a set of originating ToolCalls."""
+
+        requested = {
+            message_id
+            for message_id in tool_call_message_ids
+            if isinstance(message_id, str) and message_id
+        }
+        if not requested:
+            return []
         statement = (
             select(DatasetDerivationRow)
-            .where(DatasetDerivationRow.tool_call_message_id == tool_call_message_id)
+            .where(col(DatasetDerivationRow.tool_call_message_id).in_(requested))
             .order_by(DatasetDerivationRow.created_at, DatasetDerivationRow.dataset_id)
         )
         with self._session_factory() as session:

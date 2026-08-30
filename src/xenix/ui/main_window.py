@@ -169,6 +169,7 @@ class MainWindow(QMainWindow):
         self._settings_dialog: SettingsDialog | None = None
         self._knowledge_workspace = None
         self._job_center = None
+        self._dataset_audit_dialog = None
         self._tool_call_detail_views: list[ToolCallDetailView] = []
         self._thread_title_progress_dialog: QProgressDialog | None = None
         self._service_link_progress_dialog: QProgressDialog | None = None
@@ -181,6 +182,8 @@ class MainWindow(QMainWindow):
         self._knowledge_button.clicked.connect(self._open_knowledge_workspace)
         self._jobs_button = QPushButton(parent=self)
         self._jobs_button.clicked.connect(self._open_job_center)
+        self._datasets_button = QPushButton(parent=self)
+        self._datasets_button.clicked.connect(self._open_session_dataset_audit)
 
         self._history_sidebar = QFrame(parent=self)
         self._history_sidebar.setObjectName("historySidebar")
@@ -244,10 +247,12 @@ class MainWindow(QMainWindow):
         self._settings_button.setMinimumWidth(96)
         self._knowledge_button.setMinimumWidth(112)
         self._jobs_button.setMinimumWidth(96)
+        self._datasets_button.setMinimumWidth(96)
         header_layout.addWidget(self._title_label)
         header_layout.addStretch(1)
         header_layout.addWidget(self._knowledge_button)
         header_layout.addWidget(self._jobs_button)
+        header_layout.addWidget(self._datasets_button)
         header_layout.addWidget(self._settings_button)
         layout.addLayout(header_layout)
 
@@ -292,6 +297,8 @@ class MainWindow(QMainWindow):
                 self._knowledge_workspace.shutdown()
             if self._job_center is not None:
                 self._job_center.shutdown()
+            if self._dataset_audit_dialog is not None:
+                self._dataset_audit_dialog.close()
             if self._settings_dialog is not None:
                 self._settings_dialog.shutdown()
             self.closing.emit()
@@ -302,6 +309,7 @@ class MainWindow(QMainWindow):
         self._settings_button.setText(self.tr("Settings"))
         self._knowledge_button.setText(self.tr("Knowledge"))
         self._jobs_button.setText(self.tr("Jobs"))
+        self._datasets_button.setText(self.tr("Datasets"))
         self._history_label.setText(self.tr("History"))
         self._new_thread_button.setText("")
         self._new_thread_button.setToolTip(self.tr("New thread"))
@@ -312,6 +320,8 @@ class MainWindow(QMainWindow):
             self._knowledge_workspace.retranslate_ui()
         if self._job_center is not None:
             self._job_center.retranslate_ui()
+        if self._dataset_audit_dialog is not None:
+            self._dataset_audit_dialog.retranslate_ui()
         self._retranslate_service_link_progress()
         if self._software_update_controller is not None:
             self._software_update_controller.retranslate_ui()
@@ -437,6 +447,28 @@ class MainWindow(QMainWindow):
         self._job_center.show()
         self._job_center.raise_()
         self._job_center.activateWindow()
+
+    def _open_session_dataset_audit(self) -> None:
+        if self._agent_thread_id is None:
+            QMessageBox.information(
+                self,
+                self.tr("Datasets"),
+                self.tr("Open a conversation to review the datasets it produced."),
+            )
+            return
+        if self._dataset_audit_dialog is None:
+            from .dataset_audit_dialog import DatasetAuditDialog
+
+            self._dataset_audit_dialog = DatasetAuditDialog(
+                harness=self._agent_harness_service,
+                thread_id=self._agent_thread_id,
+                parent=self,
+            )
+        else:
+            self._dataset_audit_dialog.set_thread_id(self._agent_thread_id)
+        self._dataset_audit_dialog.show()
+        self._dataset_audit_dialog.raise_()
+        self._dataset_audit_dialog.activateWindow()
 
     def _submit_chat_message(self, text: str, file_paths: list[str], fq_model_key: str) -> None:
         if self._pending_composer_submission is not None or self._active_pending_message_id is not None:

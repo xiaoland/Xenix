@@ -124,3 +124,34 @@ test). These require the Impact Handshake before mutation.
 
 Verification: `pdm run check` = 0 (All checks passed); focused pytest = 47 passed
 (was 46 passed / 1 failed). Dataset-audit test now passes on multi-drive Windows.
+
+---
+
+## Round 2 — small fixes + PR4 session-audit GUI (in progress)
+
+### Doc typo
+- `docs/10-prd/README.md`: fixed lowercase "documents" -> "Documents" + reflow.
+
+### PR4 modeless session audit window (approved design: session-level list)
+Service (authority-preserving):
+- `DatasetService.resolve_dataset_audits_for_tool_calls(ids)` (plural); single-id
+  method delegates to it.
+- `LLMConversationService.list_tool_call_message_ids(thread_id)`.
+- `AgentHarnessService.resolve_session_dataset_audits(thread_id)` composes the two.
+
+GUI:
+- New `src/xenix/ui/dataset_audit_dialog.py` — `DatasetAuditDialog` (NonModal,
+  WA_DeleteOnClose False), table (Dataset/Generation/Operation/Inputs/Recorded) +
+  detail pane (inputs, parameters, unverified explanation).
+- `main_window.py`: header "Datasets" button -> `_open_session_dataset_audit`.
+
+i18n: 20 new strings extracted + completed in en_US/zh_CN (445/445), compiled.
+
+Verification: `pdm run check` = 0; focused pytest = 45 passed (incl. new
+session-level assertion in test_agent_dataset_audit.py).
+
+### Remaining PR1 nits (not changed — mostly nits/false-alarm)
+- `_knowledge_status` silent SUCCEEDED default (defensible for a projection).
+- `JobSummary.total_count` mislabel (test-only API; GUI computes its own).
+- `.replace("%1")` vs `.arg()` in job_center (roughly equivalent edge cases).
+- `JobItem.target` None: false alarm — MLTaskRow.project_id is non-nullable.

@@ -244,6 +244,100 @@
     </message>
 </context>
 <context>
+    <name>DatasetAuditDialog</name>
+    <message>
+        <location filename="../ui/dataset_audit_dialog.py" line="143"/>
+        <source>Dataset: {name} ({dataset_id})</source>
+        <translation>Dataset: {name} ({dataset_id})</translation>
+    </message>
+    <message>
+        <location filename="../ui/dataset_audit_dialog.py" line="146"/>
+        <source>Generation: {generation}</source>
+        <translation>Generation: {generation}</translation>
+    </message>
+    <message>
+        <location filename="../ui/dataset_audit_dialog.py" line="147"/>
+        <source>Recorded operation: {operation}</source>
+        <translation>Recorded operation: {operation}</translation>
+    </message>
+    <message>
+        <location filename="../ui/dataset_audit_dialog.py" line="150"/>
+        <source>Recorded at: {created_at}</source>
+        <translation>Recorded at: {created_at}</translation>
+    </message>
+    <message>
+        <location filename="../ui/dataset_audit_dialog.py" line="156"/>
+        <location filename="../ui/dataset_audit_dialog.py" line="186"/>
+        <source>Inputs</source>
+        <translation>Inputs</translation>
+    </message>
+    <message>
+        <location filename="../ui/dataset_audit_dialog.py" line="158"/>
+        <source>{position}. {name} ({dataset_id})</source>
+        <translation>{position}. {name} ({dataset_id})</translation>
+    </message>
+    <message>
+        <location filename="../ui/dataset_audit_dialog.py" line="164"/>
+        <source>alias {alias}</source>
+        <translation>alias {alias}</translation>
+    </message>
+    <message>
+        <location filename="../ui/dataset_audit_dialog.py" line="168"/>
+        <source>Recorded parameters</source>
+        <translation>Recorded parameters</translation>
+    </message>
+    <message>
+        <location filename="../ui/dataset_audit_dialog.py" line="174"/>
+        <source>Agent-authored explanation</source>
+        <translation>Agent-authored explanation</translation>
+    </message>
+    <message>
+        <location filename="../ui/dataset_audit_dialog.py" line="175"/>
+        <source>Not system-verified.</source>
+        <translation>Not system-verified.</translation>
+    </message>
+    <message>
+        <location filename="../ui/dataset_audit_dialog.py" line="180"/>
+        <source>Session Datasets</source>
+        <translation>Session Datasets</translation>
+    </message>
+    <message>
+        <location filename="../ui/dataset_audit_dialog.py" line="183"/>
+        <source>Dataset</source>
+        <translation>Dataset</translation>
+    </message>
+    <message>
+        <location filename="../ui/dataset_audit_dialog.py" line="184"/>
+        <source>Generation</source>
+        <translation>Generation</translation>
+    </message>
+    <message>
+        <location filename="../ui/dataset_audit_dialog.py" line="185"/>
+        <source>Operation</source>
+        <translation>Operation</translation>
+    </message>
+    <message>
+        <location filename="../ui/dataset_audit_dialog.py" line="187"/>
+        <source>Recorded</source>
+        <translation>Recorded</translation>
+    </message>
+    <message>
+        <location filename="../ui/dataset_audit_dialog.py" line="191"/>
+        <source>No datasets have been produced by this conversation yet.</source>
+        <translation>No datasets have been produced by this conversation yet.</translation>
+    </message>
+    <message>
+        <location filename="../ui/dataset_audit_dialog.py" line="193"/>
+        <source>Refresh</source>
+        <translation>Refresh</translation>
+    </message>
+    <message>
+        <location filename="../ui/dataset_audit_dialog.py" line="194"/>
+        <source>Close</source>
+        <translation>Close</translation>
+    </message>
+</context>
+<context>
     <name>Exceptions</name>
     <message>
         <location filename="../exceptions.py" line="76"/>
@@ -1433,149 +1527,160 @@ Trigger: %2</translation>
         <translation type="vanished">Downloading Xenix {version}...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="300"/>
+        <location filename="../ui/main_window.py" line="307"/>
         <source>Xenix Native</source>
         <translation>Xenix Native</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="301"/>
+        <location filename="../ui/main_window.py" line="308"/>
         <source>Xenix</source>
         <translation>Xenix</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="302"/>
+        <location filename="../ui/main_window.py" line="309"/>
         <source>Settings</source>
         <translation>Settings</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="303"/>
+        <location filename="../ui/main_window.py" line="310"/>
         <source>Knowledge</source>
         <translation>Knowledge</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="304"/>
-        <location filename="../ui/main_window.py" line="429"/>
+        <location filename="../ui/main_window.py" line="311"/>
+        <location filename="../ui/main_window.py" line="439"/>
         <source>Jobs</source>
         <translation>Jobs</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="305"/>
+        <location filename="../ui/main_window.py" line="312"/>
+        <location filename="../ui/main_window.py" line="455"/>
+        <source>Datasets</source>
+        <translation>Datasets</translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="313"/>
         <source>History</source>
         <translation>History</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="307"/>
+        <location filename="../ui/main_window.py" line="315"/>
         <source>New thread</source>
         <translation>New thread</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="398"/>
+        <location filename="../ui/main_window.py" line="408"/>
         <source>Knowledge Workspace</source>
         <translation>Knowledge Workspace</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="399"/>
+        <location filename="../ui/main_window.py" line="409"/>
         <source>Knowledge services are not available.</source>
         <translation>Knowledge services are not available.</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="430"/>
+        <location filename="../ui/main_window.py" line="440"/>
         <source>Job services are not available.</source>
         <translation>Job services are not available.</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="544"/>
+        <location filename="../ui/main_window.py" line="456"/>
+        <source>Open a conversation to review the datasets it produced.</source>
+        <translation>Open a conversation to review the datasets it produced.</translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="576"/>
         <source>The selected source path is not a file.</source>
         <translation>The selected source path is not a file.</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="728"/>
-        <location filename="../ui/main_window.py" line="745"/>
+        <location filename="../ui/main_window.py" line="760"/>
+        <location filename="../ui/main_window.py" line="777"/>
         <source>Opening link...</source>
         <translation>Opening link...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="746"/>
+        <location filename="../ui/main_window.py" line="778"/>
         <source>Open Link</source>
         <translation>Open Link</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="800"/>
+        <location filename="../ui/main_window.py" line="832"/>
         <source>The submitted message is being prepared and cannot be stopped.</source>
         <translation>The submitted message is being prepared and cannot be stopped.</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="813"/>
+        <location filename="../ui/main_window.py" line="845"/>
         <source>Stopped.</source>
         <translation>Stopped.</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="869"/>
+        <location filename="../ui/main_window.py" line="901"/>
         <source>Rename</source>
         <translation>Rename</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="870"/>
+        <location filename="../ui/main_window.py" line="902"/>
         <source>Generate title...</source>
         <translation>Generate title...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="871"/>
+        <location filename="../ui/main_window.py" line="903"/>
         <source>Copy thread ID</source>
         <translation>Copy thread ID</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="872"/>
+        <location filename="../ui/main_window.py" line="904"/>
         <source>Delete</source>
         <translation>Delete</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="897"/>
+        <location filename="../ui/main_window.py" line="929"/>
         <source>Rename Thread</source>
         <translation>Rename Thread</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="898"/>
-        <location filename="../ui/main_window.py" line="965"/>
+        <location filename="../ui/main_window.py" line="930"/>
+        <location filename="../ui/main_window.py" line="997"/>
         <source>Thread name</source>
         <translation>Thread name</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="914"/>
-        <location filename="../ui/main_window.py" line="945"/>
-        <location filename="../ui/main_window.py" line="975"/>
-        <location filename="../ui/main_window.py" line="985"/>
+        <location filename="../ui/main_window.py" line="946"/>
+        <location filename="../ui/main_window.py" line="977"/>
+        <location filename="../ui/main_window.py" line="1007"/>
+        <location filename="../ui/main_window.py" line="1017"/>
         <source>Generate Thread Title</source>
         <translation>Generate Thread Title</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="915"/>
+        <location filename="../ui/main_window.py" line="947"/>
         <source>Thread title model is not configured.</source>
         <translation>Thread title model is not configured.</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="938"/>
+        <location filename="../ui/main_window.py" line="970"/>
         <source>Generating thread title...</source>
         <translation>Generating thread title...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="964"/>
+        <location filename="../ui/main_window.py" line="996"/>
         <source>Apply Generated Title</source>
         <translation>Apply Generated Title</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="1000"/>
-        <location filename="../ui/main_window.py" line="1008"/>
+        <location filename="../ui/main_window.py" line="1032"/>
+        <location filename="../ui/main_window.py" line="1040"/>
         <source>Delete Thread</source>
         <translation>Delete Thread</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="1001"/>
+        <location filename="../ui/main_window.py" line="1033"/>
         <source>Stop the current run before deleting this thread.</source>
         <translation>Stop the current run before deleting this thread.</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="1009"/>
+        <location filename="../ui/main_window.py" line="1041"/>
         <source>Delete &quot;{title}&quot;? This action cannot be undone.</source>
         <translation>Delete &quot;{title}&quot;? This action cannot be undone.</translation>
     </message>

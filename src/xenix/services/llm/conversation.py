@@ -325,6 +325,16 @@ class LLMConversationService:
                 raise NotFoundError(f"Conversation Thread '{thread_id}' was not found.")
             return ConversationSnapshot(thread=thread, messages=self._repository.list_messages(session, thread_id))
 
+    def list_tool_call_message_ids(self, thread_id: str) -> list[str]:
+        """Return the committed ToolCall message ids for one Thread, in order."""
+
+        snapshot = self.get_thread_snapshot(thread_id)
+        return [
+            message.id
+            for message in snapshot.messages
+            if message.kind is ConversationMessageKind.TOOL_CALL
+        ]
+
     def usage_overviews(self, snapshot: ConversationSnapshot) -> tuple[ConversationUsageOverview, ...]:
         """Read safe token totals for completed User-to-LLM interactions.
 
