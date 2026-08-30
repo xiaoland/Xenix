@@ -5,7 +5,7 @@
 groups = ["default", "dev", "release"]
 strategy = ["inherit_metadata"]
 lock_version = "4.5.0"
-content_hash = "sha256:8490b36baea3e4c0dd03f6394dba3b6e005d418fa304c8a725c6e4d89640fb31"
+content_hash = "sha256:bdc62b268b244ffd1cbc9472b49fb2c01796dd91fb2033dd551cfe59214ec0a3"
 
 [[metadata.targets]]
 requires_python = "==3.14.2"
@@ -2722,6 +2722,22 @@ dependencies = [
 files = [
     {file = "pytest-9.1.1-py3-none-any.whl", hash = "sha256:37a86b45efb9a47a61a36449063e8e18d0cab3161329fc099eb21783169c4f0c"},
     {file = "pytest-9.1.1.tar.gz", hash = "sha256:1088fbde8f2b49d95a549a195707afa7a76a3ce9bcadc26b6d71f0ffda5fe313"},
+]
+
+[[package]]
+name = "pytest-qt"
+version = "4.5.0"
+requires_python = ">=3.9"
+summary = "pytest support for PyQt and PySide applications"
+groups = ["dev"]
+dependencies = [
+    "pluggy>=1.1",
+    "pytest",
+    "typing-extensions",
+]
+files = [
+    {file = "pytest_qt-4.5.0-py3-none-any.whl", hash = "sha256:ed21ea9b861247f7d18090a26bfbda8fb51d7a8a7b6f776157426ff2ccf26eff"},
+    {file = "pytest_qt-4.5.0.tar.gz", hash = "sha256:51620e01c488f065d2036425cbc1cbcf8a6972295105fd285321eb47e66a319f"},
 ]
 
 [[package]]

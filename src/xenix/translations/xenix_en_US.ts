@@ -4,52 +4,52 @@
 <context>
     <name>AboutDialog</name>
     <message>
-        <location filename="../ui/settings_dialog.py" line="150"/>
+        <location filename="../ui/settings_dialog.py" line="151"/>
         <source>About</source>
         <translation>About</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="151"/>
+        <location filename="../ui/settings_dialog.py" line="152"/>
         <source>App home</source>
         <translation>App home</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="152"/>
+        <location filename="../ui/settings_dialog.py" line="153"/>
         <source>State</source>
         <translation>State</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="153"/>
+        <location filename="../ui/settings_dialog.py" line="154"/>
         <source>Artifacts</source>
         <translation>Artifacts</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="154"/>
+        <location filename="../ui/settings_dialog.py" line="155"/>
         <source>Database</source>
         <translation>Database</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="155"/>
+        <location filename="../ui/settings_dialog.py" line="156"/>
         <source>Current log file</source>
         <translation>Current log file</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="156"/>
+        <location filename="../ui/settings_dialog.py" line="157"/>
         <source>App version</source>
         <translation>App version</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="157"/>
+        <location filename="../ui/settings_dialog.py" line="158"/>
         <source>Build commit</source>
         <translation>Build commit</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="158"/>
+        <location filename="../ui/settings_dialog.py" line="159"/>
         <source>Open log directory</source>
         <translation>Open log directory</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="159"/>
+        <location filename="../ui/settings_dialog.py" line="160"/>
         <source>Check for updates</source>
         <translation>Check for updates</translation>
     </message>
@@ -98,17 +98,17 @@
 <context>
     <name>ChatMessageBubble</name>
     <message>
-        <location filename="../ui/chatbot.py" line="889"/>
+        <location filename="../ui/chatbot.py" line="890"/>
         <source>You</source>
         <translation>You</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="891"/>
+        <location filename="../ui/chatbot.py" line="892"/>
         <source>Tool</source>
         <translation>Tool</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="893"/>
+        <location filename="../ui/chatbot.py" line="894"/>
         <source>System</source>
         <translation>System</translation>
     </message>
@@ -150,37 +150,37 @@
 <context>
     <name>ConnectionRetryItem</name>
     <message>
-        <location filename="../ui/chatbot.py" line="1125"/>
+        <location filename="../ui/chatbot.py" line="1126"/>
         <source>Connecting ({attempt}/{max})</source>
         <translation>Connecting ({attempt}/{max})</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1137"/>
+        <location filename="../ui/chatbot.py" line="1138"/>
         <source>Hide details</source>
         <translation>Hide details</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1137"/>
+        <location filename="../ui/chatbot.py" line="1138"/>
         <source>Show details</source>
         <translation>Show details</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1164"/>
+        <location filename="../ui/chatbot.py" line="1165"/>
         <source>LLM connection retry</source>
         <translation>LLM connection retry</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1171"/>
+        <location filename="../ui/chatbot.py" line="1172"/>
         <source>Attempt {attempt}/{max}</source>
         <translation>Attempt {attempt}/{max}</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1177"/>
+        <location filename="../ui/chatbot.py" line="1178"/>
         <source>Attempt</source>
         <translation>Attempt</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1181"/>
+        <location filename="../ui/chatbot.py" line="1182"/>
         <source>Error code: `{code}`</source>
         <translation>Error code: `{code}`</translation>
     </message>
@@ -1201,138 +1201,139 @@ Trigger: %2</translation>
         <translation type="vanished">Downloading Xenix {version}...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="290"/>
+        <location filename="../ui/main_window.py" line="298"/>
         <source>Xenix Native</source>
         <translation>Xenix Native</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="291"/>
+        <location filename="../ui/main_window.py" line="299"/>
         <source>Xenix</source>
         <translation>Xenix</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="292"/>
+        <location filename="../ui/main_window.py" line="300"/>
         <source>Settings</source>
         <translation>Settings</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="293"/>
+        <location filename="../ui/main_window.py" line="301"/>
         <source>Knowledge</source>
         <translation>Knowledge</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="294"/>
+        <location filename="../ui/main_window.py" line="302"/>
         <source>History</source>
         <translation>History</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="296"/>
+        <location filename="../ui/main_window.py" line="304"/>
+        <location filename="../ui/main_window.py" line="305"/>
         <source>New thread</source>
         <translation>New thread</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="385"/>
+        <location filename="../ui/main_window.py" line="394"/>
         <source>Knowledge Workspace</source>
         <translation>Knowledge Workspace</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="386"/>
+        <location filename="../ui/main_window.py" line="395"/>
         <source>Knowledge services are not available.</source>
         <translation>Knowledge services are not available.</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="515"/>
+        <location filename="../ui/main_window.py" line="524"/>
         <source>The selected source path is not a file.</source>
         <translation>The selected source path is not a file.</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="699"/>
-        <location filename="../ui/main_window.py" line="716"/>
+        <location filename="../ui/main_window.py" line="708"/>
+        <location filename="../ui/main_window.py" line="725"/>
         <source>Opening link...</source>
         <translation>Opening link...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="717"/>
+        <location filename="../ui/main_window.py" line="726"/>
         <source>Open Link</source>
         <translation>Open Link</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="771"/>
+        <location filename="../ui/main_window.py" line="780"/>
         <source>The submitted message is being prepared and cannot be stopped.</source>
         <translation>The submitted message is being prepared and cannot be stopped.</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="784"/>
+        <location filename="../ui/main_window.py" line="793"/>
         <source>Stopped.</source>
         <translation>Stopped.</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="840"/>
+        <location filename="../ui/main_window.py" line="849"/>
         <source>Rename</source>
         <translation>Rename</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="841"/>
+        <location filename="../ui/main_window.py" line="850"/>
         <source>Generate title...</source>
         <translation>Generate title...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="842"/>
+        <location filename="../ui/main_window.py" line="851"/>
         <source>Copy thread ID</source>
         <translation>Copy thread ID</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="843"/>
+        <location filename="../ui/main_window.py" line="852"/>
         <source>Delete</source>
         <translation>Delete</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="868"/>
+        <location filename="../ui/main_window.py" line="877"/>
         <source>Rename Thread</source>
         <translation>Rename Thread</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="869"/>
-        <location filename="../ui/main_window.py" line="936"/>
+        <location filename="../ui/main_window.py" line="878"/>
+        <location filename="../ui/main_window.py" line="945"/>
         <source>Thread name</source>
         <translation>Thread name</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="885"/>
-        <location filename="../ui/main_window.py" line="916"/>
-        <location filename="../ui/main_window.py" line="946"/>
-        <location filename="../ui/main_window.py" line="956"/>
+        <location filename="../ui/main_window.py" line="894"/>
+        <location filename="../ui/main_window.py" line="925"/>
+        <location filename="../ui/main_window.py" line="955"/>
+        <location filename="../ui/main_window.py" line="965"/>
         <source>Generate Thread Title</source>
         <translation>Generate Thread Title</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="886"/>
+        <location filename="../ui/main_window.py" line="895"/>
         <source>Thread title model is not configured.</source>
         <translation>Thread title model is not configured.</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="909"/>
+        <location filename="../ui/main_window.py" line="918"/>
         <source>Generating thread title...</source>
         <translation>Generating thread title...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="935"/>
+        <location filename="../ui/main_window.py" line="944"/>
         <source>Apply Generated Title</source>
         <translation>Apply Generated Title</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="971"/>
-        <location filename="../ui/main_window.py" line="979"/>
+        <location filename="../ui/main_window.py" line="980"/>
+        <location filename="../ui/main_window.py" line="988"/>
         <source>Delete Thread</source>
         <translation>Delete Thread</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="972"/>
+        <location filename="../ui/main_window.py" line="981"/>
         <source>Stop the current run before deleting this thread.</source>
         <translation>Stop the current run before deleting this thread.</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="980"/>
+        <location filename="../ui/main_window.py" line="989"/>
         <source>Delete &quot;{title}&quot;? This action cannot be undone.</source>
         <translation>Delete &quot;{title}&quot;? This action cannot be undone.</translation>
     </message>
@@ -1340,194 +1341,194 @@ Trigger: %2</translation>
 <context>
     <name>SettingsDialog</name>
     <message>
-        <location filename="../ui/settings_dialog.py" line="474"/>
-        <location filename="../ui/settings_dialog.py" line="800"/>
-        <location filename="../ui/settings_dialog.py" line="825"/>
-        <location filename="../ui/settings_dialog.py" line="1049"/>
+        <location filename="../ui/settings_dialog.py" line="510"/>
+        <location filename="../ui/settings_dialog.py" line="836"/>
+        <location filename="../ui/settings_dialog.py" line="861"/>
+        <location filename="../ui/settings_dialog.py" line="1085"/>
         <source>Settings</source>
         <translation>Settings</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="475"/>
+        <location filename="../ui/settings_dialog.py" line="511"/>
         <source>Language</source>
         <translation>Language</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="476"/>
+        <location filename="../ui/settings_dialog.py" line="512"/>
         <source>AI</source>
         <translation>AI</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="479"/>
+        <location filename="../ui/settings_dialog.py" line="515"/>
         <source>Knowledge Base</source>
         <translation>Knowledge Base</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="483"/>
+        <location filename="../ui/settings_dialog.py" line="519"/>
         <source>ML Workers</source>
         <translation>ML Workers</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="485"/>
+        <location filename="../ui/settings_dialog.py" line="521"/>
         <source>Global models</source>
         <translation>Global models</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="486"/>
+        <location filename="../ui/settings_dialog.py" line="522"/>
         <source>LLM providers</source>
         <translation>LLM providers</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="487"/>
+        <location filename="../ui/settings_dialog.py" line="523"/>
         <source>Provider</source>
         <translation>Provider</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="488"/>
+        <location filename="../ui/settings_dialog.py" line="524"/>
         <source>Provider key</source>
         <translation>Provider key</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="489"/>
+        <location filename="../ui/settings_dialog.py" line="525"/>
         <source>Provider name</source>
         <translation>Provider name</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="490"/>
+        <location filename="../ui/settings_dialog.py" line="526"/>
         <source>Dialect</source>
         <translation>Dialect</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="491"/>
-        <location filename="../ui/settings_dialog.py" line="502"/>
+        <location filename="../ui/settings_dialog.py" line="527"/>
+        <location filename="../ui/settings_dialog.py" line="538"/>
         <source>Base URL</source>
         <translation>Base URL</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="492"/>
-        <location filename="../ui/settings_dialog.py" line="503"/>
+        <location filename="../ui/settings_dialog.py" line="528"/>
+        <location filename="../ui/settings_dialog.py" line="539"/>
         <source>API key</source>
         <translation>API key</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="493"/>
+        <location filename="../ui/settings_dialog.py" line="529"/>
         <source>Models</source>
         <translation>Models</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="494"/>
-        <location filename="../ui/settings_dialog.py" line="508"/>
+        <location filename="../ui/settings_dialog.py" line="530"/>
+        <location filename="../ui/settings_dialog.py" line="544"/>
         <source>Timeout</source>
         <translation>Timeout</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="495"/>
+        <location filename="../ui/settings_dialog.py" line="531"/>
         <source>Streaming</source>
         <translation>Streaming</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="496"/>
+        <location filename="../ui/settings_dialog.py" line="532"/>
         <source>Default model</source>
         <translation>Default model</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="497"/>
+        <location filename="../ui/settings_dialog.py" line="533"/>
         <source>Turn guard model</source>
         <translation>Turn guard model</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="498"/>
+        <location filename="../ui/settings_dialog.py" line="534"/>
         <source>Thread title model</source>
         <translation>Thread title model</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="499"/>
+        <location filename="../ui/settings_dialog.py" line="535"/>
         <source>LLM retry attempts</source>
         <translation>LLM retry attempts</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="500"/>
+        <location filename="../ui/settings_dialog.py" line="536"/>
         <source>Embedding provider</source>
         <translation>Embedding provider</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="501"/>
+        <location filename="../ui/settings_dialog.py" line="537"/>
         <source>Enabled</source>
         <translation>Enabled</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="504"/>
+        <location filename="../ui/settings_dialog.py" line="540"/>
         <source>Model</source>
         <translation>Model</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="505"/>
+        <location filename="../ui/settings_dialog.py" line="541"/>
         <source>Dimensions</source>
         <translation>Dimensions</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="506"/>
+        <location filename="../ui/settings_dialog.py" line="542"/>
         <source>Provider default (0)</source>
         <translation>Provider default (0)</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="507"/>
+        <location filename="../ui/settings_dialog.py" line="543"/>
         <source>Batch size</source>
         <translation>Batch size</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="509"/>
+        <location filename="../ui/settings_dialog.py" line="545"/>
         <source>OCR</source>
         <translation>OCR</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="510"/>
-        <location filename="../ui/settings_dialog.py" line="664"/>
+        <location filename="../ui/settings_dialog.py" line="546"/>
+        <location filename="../ui/settings_dialog.py" line="700"/>
         <source>Set up local PaddleOCR</source>
         <translation>Set up local PaddleOCR</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="511"/>
+        <location filename="../ui/settings_dialog.py" line="547"/>
         <source>Indexes</source>
         <translation>Indexes</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="512"/>
+        <location filename="../ui/settings_dialog.py" line="548"/>
         <source>Rebuild indexes...</source>
         <translation>Rebuild indexes...</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="513"/>
+        <location filename="../ui/settings_dialog.py" line="549"/>
         <source>Add</source>
         <translation>Add</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="514"/>
+        <location filename="../ui/settings_dialog.py" line="550"/>
         <source>Remove</source>
         <translation>Remove</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="515"/>
+        <location filename="../ui/settings_dialog.py" line="551"/>
         <source>OpenAI-compatible</source>
         <translation>OpenAI-compatible</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="517"/>
+        <location filename="../ui/settings_dialog.py" line="553"/>
         <source>ML workers</source>
         <translation>ML workers</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="518"/>
+        <location filename="../ui/settings_dialog.py" line="554"/>
         <source>Add SSH worker...</source>
         <translation>Add SSH worker...</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="519"/>
+        <location filename="../ui/settings_dialog.py" line="555"/>
         <source>About</source>
         <translation>About</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="520"/>
+        <location filename="../ui/settings_dialog.py" line="556"/>
         <source>Save</source>
         <translation>Save</translation>
     </message>
@@ -1548,43 +1549,43 @@ Trigger: %2</translation>
         <translation type="vanished">Preparing OCR models</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="563"/>
-        <location filename="../ui/settings_dialog.py" line="997"/>
+        <location filename="../ui/settings_dialog.py" line="599"/>
+        <location filename="../ui/settings_dialog.py" line="1033"/>
         <source>Ready</source>
         <translation>Ready</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="565"/>
+        <location filename="../ui/settings_dialog.py" line="601"/>
         <source>Preparing local OCR</source>
         <translation>Preparing local OCR</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="567"/>
+        <location filename="../ui/settings_dialog.py" line="603"/>
         <source>Local OCR setup: %1</source>
         <translation>Local OCR setup: %1</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="586"/>
+        <location filename="../ui/settings_dialog.py" line="622"/>
         <source>Local OCR Setup Failed</source>
         <translation>Local OCR Setup Failed</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="611"/>
+        <location filename="../ui/settings_dialog.py" line="647"/>
         <source>Local OCR setup could not be completed.</source>
         <translation>Local OCR setup could not be completed.</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="640"/>
+        <location filename="../ui/settings_dialog.py" line="676"/>
         <source>Local PaddleOCR service is unavailable</source>
         <translation>Local PaddleOCR service is unavailable</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="643"/>
+        <location filename="../ui/settings_dialog.py" line="679"/>
         <source>Checking local PaddleOCR status</source>
         <translation>Checking local PaddleOCR status</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="646"/>
+        <location filename="../ui/settings_dialog.py" line="682"/>
         <source>Local PaddleOCR is ready</source>
         <translation>Local PaddleOCR is ready</translation>
     </message>
@@ -1593,27 +1594,27 @@ Trigger: %2</translation>
         <translation type="vanished">Local PaddleOCR runtime is installed; models are not ready</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="662"/>
+        <location filename="../ui/settings_dialog.py" line="698"/>
         <source>Local PaddleOCR is not installed</source>
         <translation>Local PaddleOCR is not installed</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="711"/>
+        <location filename="../ui/settings_dialog.py" line="747"/>
         <source>English</source>
         <translation>English</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="712"/>
+        <location filename="../ui/settings_dialog.py" line="748"/>
         <source>Simplified Chinese</source>
         <translation>Simplified Chinese</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="736"/>
+        <location filename="../ui/settings_dialog.py" line="772"/>
         <source>Language Switch Failed</source>
         <translation>Language Switch Failed</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="737"/>
+        <location filename="../ui/settings_dialog.py" line="773"/>
         <source>Unable to switch the application language.
 
 {details}</source>
@@ -1622,130 +1623,130 @@ Trigger: %2</translation>
 {details}</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="813"/>
-        <location filename="../ui/settings_dialog.py" line="839"/>
+        <location filename="../ui/settings_dialog.py" line="849"/>
+        <location filename="../ui/settings_dialog.py" line="875"/>
         <source>Knowledge Indexes</source>
         <translation>Knowledge Indexes</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="841"/>
+        <location filename="../ui/settings_dialog.py" line="877"/>
         <source>Embedding settings were saved, but the vector rebuild could not be queued.</source>
         <translation>Embedding settings were saved, but the vector rebuild could not be queued.</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="850"/>
+        <location filename="../ui/settings_dialog.py" line="886"/>
         <source>Rebuild text vectors?</source>
         <translation>Rebuild text vectors?</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="853"/>
+        <location filename="../ui/settings_dialog.py" line="889"/>
         <source>This change uses a different embedding space. Existing text vectors cannot be reused for current Knowledge content.</source>
         <translation>This change uses a different embedding space. Existing text vectors cannot be reused for current Knowledge content.</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="858"/>
+        <location filename="../ui/settings_dialog.py" line="894"/>
         <source>Save and rebuild now</source>
         <translation>Save and rebuild now</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="862"/>
+        <location filename="../ui/settings_dialog.py" line="898"/>
         <source>Save; rebuild later</source>
         <translation>Save; rebuild later</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="972"/>
+        <location filename="../ui/settings_dialog.py" line="1008"/>
         <source>Knowledge index service is unavailable</source>
         <translation>Knowledge index service is unavailable</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="814"/>
-        <location filename="../ui/settings_dialog.py" line="979"/>
+        <location filename="../ui/settings_dialog.py" line="850"/>
+        <location filename="../ui/settings_dialog.py" line="1015"/>
         <source>Knowledge index status is unavailable</source>
         <translation>Knowledge index status is unavailable</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="558"/>
+        <location filename="../ui/settings_dialog.py" line="594"/>
         <source>Downloading OCR component</source>
         <translation>Downloading OCR component</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="559"/>
+        <location filename="../ui/settings_dialog.py" line="595"/>
         <source>Unpacking OCR component</source>
         <translation>Unpacking OCR component</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="560"/>
+        <location filename="../ui/settings_dialog.py" line="596"/>
         <source>Verifying OCR component</source>
         <translation>Verifying OCR component</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="561"/>
+        <location filename="../ui/settings_dialog.py" line="597"/>
         <source>Testing OCR component</source>
         <translation>Testing OCR component</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="562"/>
+        <location filename="../ui/settings_dialog.py" line="598"/>
         <source>Activating OCR component</source>
         <translation>Activating OCR component</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="592"/>
+        <location filename="../ui/settings_dialog.py" line="628"/>
         <source>Local OCR is unavailable in this build.</source>
         <translation>Local OCR is unavailable in this build.</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="594"/>
+        <location filename="../ui/settings_dialog.py" line="630"/>
         <source>Local OCR download source is unavailable.</source>
         <translation>Local OCR download source is unavailable.</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="596"/>
+        <location filename="../ui/settings_dialog.py" line="632"/>
         <source>Local OCR component could not be downloaded.</source>
         <translation>Local OCR component could not be downloaded.</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="598"/>
+        <location filename="../ui/settings_dialog.py" line="634"/>
         <source>Local OCR bundle source is unavailable.</source>
         <translation>Local OCR bundle source is unavailable.</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="604"/>
+        <location filename="../ui/settings_dialog.py" line="640"/>
         <source>Local OCR component failed integrity verification.</source>
         <translation>Local OCR component failed integrity verification.</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="610"/>
+        <location filename="../ui/settings_dialog.py" line="646"/>
         <source>Local OCR component failed its self-test.</source>
         <translation>Local OCR component failed its self-test.</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="648"/>
+        <location filename="../ui/settings_dialog.py" line="684"/>
         <source>Reinstall local PaddleOCR</source>
         <translation>Reinstall local PaddleOCR</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="650"/>
+        <location filename="../ui/settings_dialog.py" line="686"/>
         <source>Local PaddleOCR requires repair</source>
         <translation>Local PaddleOCR requires repair</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="652"/>
+        <location filename="../ui/settings_dialog.py" line="688"/>
         <source>Repair local PaddleOCR</source>
         <translation>Repair local PaddleOCR</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="654"/>
-        <location filename="../ui/settings_dialog.py" line="656"/>
+        <location filename="../ui/settings_dialog.py" line="690"/>
+        <location filename="../ui/settings_dialog.py" line="692"/>
         <source>Preparing local PaddleOCR</source>
         <translation>Preparing local PaddleOCR</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="658"/>
+        <location filename="../ui/settings_dialog.py" line="694"/>
         <source>Local PaddleOCR setup needs attention</source>
         <translation>Local PaddleOCR setup needs attention</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="660"/>
+        <location filename="../ui/settings_dialog.py" line="696"/>
         <source>Try local PaddleOCR setup again</source>
         <translation>Try local PaddleOCR setup again</translation>
     </message>
@@ -1762,44 +1763,44 @@ Trigger: %2</translation>
         <translation type="vanished">Embedding settings changed elsewhere. Your edits are still shown; save again to reapply them.</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="981"/>
+        <location filename="../ui/settings_dialog.py" line="1017"/>
         <source>Checking Knowledge index status</source>
         <translation>Checking Knowledge index status</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="987"/>
+        <location filename="../ui/settings_dialog.py" line="1023"/>
         <source>Keyword: %1
 Text vectors: %2</source>
         <translation>Keyword: %1
 Text vectors: %2</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="998"/>
+        <location filename="../ui/settings_dialog.py" line="1034"/>
         <source>Building</source>
         <translation>Building</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="999"/>
+        <location filename="../ui/settings_dialog.py" line="1035"/>
         <source>Needs rebuild</source>
         <translation>Needs rebuild</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="1000"/>
+        <location filename="../ui/settings_dialog.py" line="1036"/>
         <source>Unavailable</source>
         <translation>Unavailable</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="1001"/>
+        <location filename="../ui/settings_dialog.py" line="1037"/>
         <source>Needs attention</source>
         <translation>Needs attention</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="1003"/>
+        <location filename="../ui/settings_dialog.py" line="1039"/>
         <source>Unknown status</source>
         <translation>Unknown status</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="1012"/>
+        <location filename="../ui/settings_dialog.py" line="1048"/>
         <source>{local_count} local, {ssh_count} SSH, {slots} execution slot(s).</source>
         <translation>{local_count} local, {ssh_count} SSH, {slots} execution slot(s).</translation>
     </message>
@@ -1808,12 +1809,12 @@ Text vectors: %2</translation>
         <translation type="vanished">This provider is managed by a deployment and cannot be removed here.</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="1148"/>
+        <location filename="../ui/settings_dialog.py" line="1184"/>
         <source>Built into packaged app</source>
         <translation>Built into packaged app</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="1199"/>
+        <location filename="../ui/settings_dialog.py" line="1235"/>
         <source>None</source>
         <translation>None</translation>
     </message>
@@ -2020,107 +2021,118 @@ Text vectors: %2</translation>
 <context>
     <name>ThreadDetailView</name>
     <message>
-        <location filename="../ui/chatbot.py" line="192"/>
+        <location filename="../ui/chatbot.py" line="193"/>
         <source>Error: {message}</source>
         <translation>Error: {message}</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="235"/>
+        <location filename="../ui/chatbot.py" line="236"/>
         <source>Thinking...</source>
         <translation>Thinking...</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="241"/>
-        <location filename="../ui/chatbot.py" line="251"/>
+        <location filename="../ui/chatbot.py" line="242"/>
+        <location filename="../ui/chatbot.py" line="252"/>
         <source>tool</source>
         <translation>tool</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="244"/>
+        <location filename="../ui/chatbot.py" line="245"/>
         <source>Calling `{tool_name}`...</source>
         <translation>Calling `{tool_name}`...</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="255"/>
+        <location filename="../ui/chatbot.py" line="256"/>
         <source>`{tool_name}` {status}.</source>
         <translation>`{tool_name}` {status}.</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="351"/>
+        <location filename="../ui/chatbot.py" line="352"/>
         <source>completed</source>
         <translation>completed</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="353"/>
+        <location filename="../ui/chatbot.py" line="354"/>
         <source>failed</source>
         <translation>failed</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="355"/>
+        <location filename="../ui/chatbot.py" line="356"/>
         <source>cancelled</source>
         <translation>cancelled</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="357"/>
+        <location filename="../ui/chatbot.py" line="358"/>
         <source>running</source>
         <translation>running</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="359"/>
+        <location filename="../ui/chatbot.py" line="360"/>
         <source>requested</source>
         <translation>requested</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1474"/>
+        <location filename="../ui/chatbot.py" line="1485"/>
+        <location filename="../ui/chatbot.py" line="1486"/>
         <source>Message Xenix</source>
         <translation>Message Xenix</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1475"/>
-        <location filename="../ui/chatbot.py" line="1907"/>
-        <location filename="../ui/chatbot.py" line="1918"/>
+        <location filename="../ui/chatbot.py" line="1487"/>
+        <location filename="../ui/chatbot.py" line="1488"/>
+        <location filename="../ui/chatbot.py" line="1929"/>
+        <location filename="../ui/chatbot.py" line="1940"/>
         <source>Attach files</source>
         <translation>Attach files</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1476"/>
+        <location filename="../ui/chatbot.py" line="1489"/>
+        <location filename="../ui/chatbot.py" line="1490"/>
         <source>Model for the next turn</source>
         <translation>Model for the next turn</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1477"/>
+        <location filename="../ui/chatbot.py" line="1491"/>
         <source>Continue</source>
         <translation>Continue</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1478"/>
-        <location filename="../ui/chatbot.py" line="1850"/>
+        <location filename="../ui/chatbot.py" line="1492"/>
+        <location filename="../ui/chatbot.py" line="1865"/>
+        <location filename="../ui/chatbot.py" line="1876"/>
         <source>Stop</source>
         <translation>Stop</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1479"/>
+        <location filename="../ui/chatbot.py" line="1493"/>
         <source>Drop files to attach</source>
         <translation>Drop files to attach</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1480"/>
+        <location filename="../ui/chatbot.py" line="1494"/>
         <source>Release here to add them to the next message</source>
         <translation>Release here to add them to the next message</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1481"/>
+        <location filename="../ui/chatbot.py" line="1495"/>
+        <location filename="../ui/chatbot.py" line="1496"/>
         <source>Scroll to bottom</source>
         <translation>Scroll to bottom</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1852"/>
-        <location filename="../ui/chatbot.py" line="1858"/>
+        <location filename="../ui/chatbot.py" line="1867"/>
+        <location filename="../ui/chatbot.py" line="1873"/>
+        <location filename="../ui/chatbot.py" line="1880"/>
         <source>Send</source>
         <translation>Send</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1909"/>
+        <location filename="../ui/chatbot.py" line="1878"/>
+        <source>Preparing attachments</source>
+        <translation>Preparing attachments</translation>
+    </message>
+    <message>
+        <location filename="../ui/chatbot.py" line="1931"/>
         <source>Data files (*.csv *.xlsx *.xls)</source>
         <translation>Data files (*.csv *.xlsx *.xls)</translation>
     </message>
@@ -2207,267 +2219,267 @@ Text vectors: %2</translation>
 <context>
     <name>ToolCallItem</name>
     <message>
-        <location filename="../ui/chatbot.py" line="365"/>
+        <location filename="../ui/chatbot.py" line="366"/>
         <source>Running tool...</source>
         <translation>Running tool...</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="367"/>
+        <location filename="../ui/chatbot.py" line="368"/>
         <source>Ran tool</source>
         <translation>Ran tool</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="369"/>
+        <location filename="../ui/chatbot.py" line="370"/>
         <source>Cancelled tool run</source>
         <translation>Cancelled tool run</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="371"/>
+        <location filename="../ui/chatbot.py" line="372"/>
         <source>Searching knowledge...</source>
         <translation>Searching knowledge...</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="373"/>
+        <location filename="../ui/chatbot.py" line="374"/>
         <source>Searched knowledge</source>
         <translation>Searched knowledge</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="375"/>
+        <location filename="../ui/chatbot.py" line="376"/>
         <source>Failed to search knowledge</source>
         <translation>Failed to search knowledge</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="377"/>
+        <location filename="../ui/chatbot.py" line="378"/>
         <source>Cancelled knowledge search</source>
         <translation>Cancelled knowledge search</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="379"/>
+        <location filename="../ui/chatbot.py" line="380"/>
         <source>Inspecting dataset...</source>
         <translation>Inspecting dataset...</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="381"/>
+        <location filename="../ui/chatbot.py" line="382"/>
         <source>Inspected dataset</source>
         <translation>Inspected dataset</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="383"/>
+        <location filename="../ui/chatbot.py" line="384"/>
         <source>Cancelled dataset inspection</source>
         <translation>Cancelled dataset inspection</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="385"/>
+        <location filename="../ui/chatbot.py" line="386"/>
         <source>Integrating data...</source>
         <translation>Integrating data...</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="387"/>
+        <location filename="../ui/chatbot.py" line="388"/>
         <source>Integrated data</source>
         <translation>Integrated data</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="389"/>
+        <location filename="../ui/chatbot.py" line="390"/>
         <source>Cancelled data integration</source>
         <translation>Cancelled data integration</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="391"/>
+        <location filename="../ui/chatbot.py" line="392"/>
         <source>Profiling dataset...</source>
         <translation>Profiling dataset...</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="393"/>
+        <location filename="../ui/chatbot.py" line="394"/>
         <source>Profiled dataset</source>
         <translation>Profiled dataset</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="395"/>
+        <location filename="../ui/chatbot.py" line="396"/>
         <source>Cancelled dataset profile</source>
         <translation>Cancelled dataset profile</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="397"/>
+        <location filename="../ui/chatbot.py" line="398"/>
         <source>Drawing graph...</source>
         <translation>Drawing graph...</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="399"/>
+        <location filename="../ui/chatbot.py" line="400"/>
         <source>Drew graph</source>
         <translation>Drew graph</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="401"/>
+        <location filename="../ui/chatbot.py" line="402"/>
         <source>Cancelled graph drawing</source>
         <translation>Cancelled graph drawing</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="403"/>
+        <location filename="../ui/chatbot.py" line="404"/>
         <source>Cleaning dataset...</source>
         <translation>Cleaning dataset...</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="405"/>
+        <location filename="../ui/chatbot.py" line="406"/>
         <source>Cleaned dataset</source>
         <translation>Cleaned dataset</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="407"/>
+        <location filename="../ui/chatbot.py" line="408"/>
         <source>Cancelled dataset cleaning</source>
         <translation>Cancelled dataset cleaning</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="409"/>
+        <location filename="../ui/chatbot.py" line="410"/>
         <source>Querying dataset...</source>
         <translation>Querying dataset...</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="411"/>
+        <location filename="../ui/chatbot.py" line="412"/>
         <source>Queried dataset</source>
         <translation>Queried dataset</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="413"/>
+        <location filename="../ui/chatbot.py" line="414"/>
         <source>Cancelled dataset query</source>
         <translation>Cancelled dataset query</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="415"/>
+        <location filename="../ui/chatbot.py" line="416"/>
         <source>Transforming dataset...</source>
         <translation>Transforming dataset...</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="417"/>
+        <location filename="../ui/chatbot.py" line="418"/>
         <source>Transformed dataset</source>
         <translation>Transformed dataset</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="419"/>
+        <location filename="../ui/chatbot.py" line="420"/>
         <source>Cancelled dataset transformation</source>
         <translation>Cancelled dataset transformation</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="421"/>
+        <location filename="../ui/chatbot.py" line="422"/>
         <source>Selecting features...</source>
         <translation>Selecting features...</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="423"/>
+        <location filename="../ui/chatbot.py" line="424"/>
         <source>Selected features</source>
         <translation>Selected features</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="425"/>
+        <location filename="../ui/chatbot.py" line="426"/>
         <source>Cancelled feature selection</source>
         <translation>Cancelled feature selection</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="427"/>
+        <location filename="../ui/chatbot.py" line="428"/>
         <source>Loading model metadata...</source>
         <translation>Loading model metadata...</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="429"/>
+        <location filename="../ui/chatbot.py" line="430"/>
         <source>Loaded model metadata</source>
         <translation>Loaded model metadata</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="431"/>
+        <location filename="../ui/chatbot.py" line="432"/>
         <source>Cancelled model metadata lookup</source>
         <translation>Cancelled model metadata lookup</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="433"/>
+        <location filename="../ui/chatbot.py" line="434"/>
         <source>Training model...</source>
         <translation>Training model...</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="435"/>
+        <location filename="../ui/chatbot.py" line="436"/>
         <source>Trained model</source>
         <translation>Trained model</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="437"/>
+        <location filename="../ui/chatbot.py" line="438"/>
         <source>Cancelled model training</source>
         <translation>Cancelled model training</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="439"/>
+        <location filename="../ui/chatbot.py" line="440"/>
         <source>Tuning model...</source>
         <translation>Tuning model...</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="441"/>
+        <location filename="../ui/chatbot.py" line="442"/>
         <source>Tuned model</source>
         <translation>Tuned model</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="443"/>
+        <location filename="../ui/chatbot.py" line="444"/>
         <source>Model tuning running in background</source>
         <translation>Model tuning running in background</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="445"/>
+        <location filename="../ui/chatbot.py" line="446"/>
         <source>Cancelled model tuning</source>
         <translation>Cancelled model tuning</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="447"/>
+        <location filename="../ui/chatbot.py" line="448"/>
         <source>Applying model...</source>
         <translation>Applying model...</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="449"/>
+        <location filename="../ui/chatbot.py" line="450"/>
         <source>Applied model</source>
         <translation>Applied model</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="451"/>
+        <location filename="../ui/chatbot.py" line="452"/>
         <source>Model training running in background</source>
         <translation>Model training running in background</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="453"/>
+        <location filename="../ui/chatbot.py" line="454"/>
         <source>Model apply running in background</source>
         <translation>Model apply running in background</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="455"/>
+        <location filename="../ui/chatbot.py" line="456"/>
         <source>Checking model task...</source>
         <translation>Checking model task...</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="457"/>
+        <location filename="../ui/chatbot.py" line="458"/>
         <source>Checked model task</source>
         <translation>Checked model task</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="459"/>
+        <location filename="../ui/chatbot.py" line="460"/>
         <source>Cancelled model task check</source>
         <translation>Cancelled model task check</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="461"/>
+        <location filename="../ui/chatbot.py" line="462"/>
         <source>Cancelled model apply</source>
         <translation>Cancelled model apply</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1016"/>
+        <location filename="../ui/chatbot.py" line="1017"/>
         <source>Details</source>
         <translation>Details</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1017"/>
+        <location filename="../ui/chatbot.py" line="1018"/>
         <source>Open tool call details</source>
         <translation>Open tool call details</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1025"/>
+        <location filename="../ui/chatbot.py" line="1026"/>
         <source>Hide result</source>
         <translation>Hide result</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1025"/>
+        <location filename="../ui/chatbot.py" line="1026"/>
         <source>Show result</source>
         <translation>Show result</translation>
     </message>
@@ -2475,12 +2487,12 @@ Text vectors: %2</translation>
 <context>
     <name>UsageOverviewItem</name>
     <message>
-        <location filename="../ui/chatbot.py" line="479"/>
+        <location filename="../ui/chatbot.py" line="480"/>
         <source> ({cached} cached)</source>
         <translation> ({cached} cached)</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="483"/>
+        <location filename="../ui/chatbot.py" line="484"/>
         <source>↑ {input} · ↓ {output}</source>
         <translation>↑ {input} · ↓ {output}</translation>
     </message>

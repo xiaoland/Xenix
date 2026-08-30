@@ -2,12 +2,11 @@ from __future__ import annotations
 
 import threading
 import time
-from collections.abc import Callable
 from concurrent.futures import Future
 from pathlib import Path
 
-import pytest
 from PySide6.QtWidgets import QApplication
+from pytestqt.qtbot import QtBot
 
 from xenix.config import ensure_app_dirs, get_app_paths
 from xenix.i18n import TranslationManager
@@ -16,28 +15,6 @@ from xenix.services.knowledge_index_service import KnowledgeIndexOverview
 from xenix.services.llm import LLMService, LLMSettingsService
 from xenix.services.ml.worker_settings import MLWorkerSettingsService
 from xenix.ui.settings_dialog import SettingsDialog
-
-
-@pytest.fixture()
-def app(monkeypatch) -> QApplication:
-    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
-    return QApplication.instance() or QApplication([])
-
-
-def _wait_until(
-    app: QApplication,
-    condition: Callable[[], bool],
-    *,
-    timeout_seconds: float = 3.0,
-) -> bool:
-    deadline = time.perf_counter() + timeout_seconds
-    while time.perf_counter() < deadline:
-        app.processEvents()
-        if condition():
-            return True
-        time.sleep(0.001)
-    app.processEvents()
-    return condition()
 
 
 def _overview(state: str, *, unit_count: int) -> KnowledgeIndexOverview:
@@ -55,7 +32,7 @@ def _overview(state: str, *, unit_count: int) -> KnowledgeIndexOverview:
 
 def _build_dialog(
     *,
-    app: QApplication,
+    qapp: QApplication,
     monkeypatch,
     tmp_path: Path,
     index_service,
@@ -67,7 +44,7 @@ def _build_dialog(
         paths,
         paths.logs / "xenix.log",
         paths.state / "xenix.db",
-        TranslationManager(app, paths),
+        TranslationManager(qapp, paths),
         LLMService(llm_settings),
         llm_settings,
         MLWorkerSettingsService(paths),
@@ -77,10 +54,46 @@ def _build_dialog(
     return dialog
 
 
+def test_settings_controls_have_stable_unique_semantic_identities(
+    monkeypatch,
+    tmp_path: Path,
+    qapp: QApplication,
+    qtbot: QtBot,
+) -> None:
+    dialog = _build_dialog(
+        qapp=qapp,
+        monkeypatch=monkeypatch,
+        tmp_path=tmp_path,
+        index_service=None,
+    )
+    qtbot.addWidget(dialog)
+    controls = (
+        dialog._language_selector,
+        dialog._about_button,
+        dialog._save_button,
+        dialog._ocr_setup_button,
+        dialog._index_rebuild_button,
+        dialog._ml_workers_setup_button,
+        dialog._provider_selector,
+        dialog._add_provider_button,
+        dialog._remove_provider_button,
+        dialog._provider_api_key_input,
+        dialog._embedding_api_key_input,
+    )
+
+    identities = [control.accessibleIdentifier() for control in controls]
+
+    assert all(identities)
+    assert len(identities) == len(set(identities))
+    dialog.close()
+    dialog.shutdown()
+
+
 def test_settings_dialog_opens_before_index_status_finishes(
     monkeypatch,
     tmp_path: Path,
-    app: QApplication,
+    qapp: QApplication,
+    qtbot: QtBot,
 ) -> None:
     class BlockingIndexes:
         def __init__(self) -> None:
@@ -111,17 +124,18 @@ def test_settings_dialog_opens_before_index_status_finishes(
     indexes = BlockingIndexes()
     main_thread_id = threading.get_ident()
     dialog = _build_dialog(
-        app=app,
+        qapp=qapp,
         monkeypatch=monkeypatch,
         tmp_path=tmp_path,
         index_service=indexes,
     )
+    qtbot.addWidget(dialog)
     try:
         assert indexes.calls == 0
 
         dialog.show()
 
-        assert _wait_until(app, indexes.entered.is_set)
+        qtbot.waitUntil(indexes.entered.is_set, timeout=3_000)
         assert dialog.isVisible()
         assert indexes.calls == 1
         assert indexes.thread_id != main_thread_id
@@ -131,7 +145,7 @@ def test_settings_dialog_opens_before_index_status_finishes(
         assert not dialog._index_rebuild_button.isEnabled()
 
         indexes.release.set()
-        assert _wait_until(app, dialog._index_rebuild_button.isEnabled)
+        qtbot.waitUntil(dialog._index_rebuild_button.isEnabled, timeout=3_000)
         assert dialog.tr("Ready") in dialog._index_status_label.text()
     finally:
         indexes.release.set()
@@ -142,7 +156,8 @@ def test_settings_dialog_opens_before_index_status_finishes(
 def test_settings_dialog_discards_status_from_previous_activation(
     monkeypatch,
     tmp_path: Path,
-    app: QApplication,
+    qapp: QApplication,
+    qtbot: QtBot,
 ) -> None:
     class SequencedIndexes:
         def __init__(self) -> None:
@@ -186,28 +201,29 @@ def test_settings_dialog_discards_status_from_previous_activation(
 
     indexes = SequencedIndexes()
     dialog = _build_dialog(
-        app=app,
+        qapp=qapp,
         monkeypatch=monkeypatch,
         tmp_path=tmp_path,
         index_service=indexes,
     )
+    qtbot.addWidget(dialog)
     try:
         dialog.show()
-        assert _wait_until(app, indexes.entered[0].is_set)
+        qtbot.waitUntil(indexes.entered[0].is_set, timeout=3_000)
 
         dialog.hide()
-        app.processEvents()
+        qtbot.waitUntil(lambda: not dialog.isVisible(), timeout=3_000)
         dialog.show()
-        app.processEvents()
+        qtbot.waitUntil(dialog.isVisible, timeout=3_000)
         assert indexes.calls == 1
 
         indexes.release[0].set()
-        assert _wait_until(app, indexes.entered[1].is_set)
+        qtbot.waitUntil(indexes.entered[1].is_set, timeout=3_000)
         assert dialog.tr("Needs attention") not in dialog._index_status_label.text()
         assert not dialog._index_rebuild_button.isEnabled()
 
         indexes.release[1].set()
-        assert _wait_until(app, dialog._index_rebuild_button.isEnabled)
+        qtbot.waitUntil(dialog._index_rebuild_button.isEnabled, timeout=3_000)
         assert indexes.calls == 2
         assert indexes.max_in_flight == 1
         assert dialog.tr("Ready") in dialog._index_status_label.text()
@@ -221,7 +237,8 @@ def test_settings_dialog_discards_status_from_previous_activation(
 def test_settings_dialog_shutdown_does_not_wait_for_running_index_status(
     monkeypatch,
     tmp_path: Path,
-    app: QApplication,
+    qapp: QApplication,
+    qtbot: QtBot,
 ) -> None:
     class ObservedFuture(Future[KnowledgeIndexOverview]):
         def __init__(self) -> None:
@@ -244,11 +261,12 @@ def test_settings_dialog_shutdown_does_not_wait_for_running_index_status(
 
     indexes = RunningIndexes()
     dialog = _build_dialog(
-        app=app,
+        qapp=qapp,
         monkeypatch=monkeypatch,
         tmp_path=tmp_path,
         index_service=indexes,
     )
+    qtbot.addWidget(dialog)
     fallback = threading.Timer(
         1.0,
         indexes.future.set_result,
@@ -257,7 +275,7 @@ def test_settings_dialog_shutdown_does_not_wait_for_running_index_status(
     fallback.daemon = True
     try:
         dialog.show()
-        assert _wait_until(app, lambda: indexes.calls == 1)
+        qtbot.waitUntil(lambda: indexes.calls == 1, timeout=3_000)
 
         started = time.perf_counter()
         dialog.shutdown()

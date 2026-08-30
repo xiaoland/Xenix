@@ -51,6 +51,7 @@ from ..services.update_service import UpdateService
 from .knowledge_index_status import KnowledgeIndexStatusRequest
 from .knowledge_index_ui import KnowledgeIndexRebuildDialog
 from .ocr_deployment_tasks import OcrInstallTask, OcrStatusTask
+from .semantic_identity import identify
 from .ssh_worker_setup_wizard import SshWorkerSetupWizard
 
 
@@ -341,6 +342,7 @@ class SettingsDialog(QDialog):
         self._embedding_timeout_input.setRange(1, 3_600)
         self._embedding_timeout_input.setSuffix(" s")
         self._tab_indexes: dict[SettingsTab, int] = {}
+        self._assign_semantic_identities()
 
         self.resize(760, 760)
         self._build_ui()
@@ -348,6 +350,40 @@ class SettingsDialog(QDialog):
         self._load_agent_settings()
         self._load_embedding_settings()
         self.retranslate_ui()
+
+    def _assign_semantic_identities(self) -> None:
+        identities = (
+            (self._language_selector, "settings.general.language"),
+            (self._about_button, "settings.about.open"),
+            (self._save_button, "settings.save"),
+            (self._ocr_setup_button, "settings.knowledge.ocr.setup"),
+            (self._index_rebuild_button, "settings.knowledge.indexes.rebuild"),
+            (self._ml_workers_setup_button, "settings.ml-workers.add-ssh"),
+            (self._provider_selector, "settings.llm.provider.selector"),
+            (self._add_provider_button, "settings.llm.provider.add"),
+            (self._remove_provider_button, "settings.llm.provider.remove"),
+            (self._provider_key_input, "settings.llm.provider.key"),
+            (self._provider_name_input, "settings.llm.provider.name"),
+            (self._provider_dialect_selector, "settings.llm.provider.dialect"),
+            (self._provider_base_url_input, "settings.llm.provider.base-url"),
+            (self._provider_api_key_input, "settings.llm.provider.api-key"),
+            (self._provider_models_input, "settings.llm.provider.models"),
+            (self._provider_timeout_input, "settings.llm.provider.timeout"),
+            (self._provider_streaming_checkbox, "settings.llm.provider.streaming"),
+            (self._llm_default_model_selector, "settings.llm.default-model"),
+            (self._llm_guard_model_selector, "settings.llm.turn-guard-model"),
+            (self._llm_thread_title_model_selector, "settings.llm.thread-title-model"),
+            (self._llm_retry_attempts_input, "settings.llm.retry-attempts"),
+            (self._embedding_enabled_checkbox, "settings.embedding.enabled"),
+            (self._embedding_base_url_input, "settings.embedding.base-url"),
+            (self._embedding_api_key_input, "settings.embedding.api-key"),
+            (self._embedding_model_input, "settings.embedding.model"),
+            (self._embedding_dimensions_input, "settings.embedding.dimensions"),
+            (self._embedding_batch_size_input, "settings.embedding.batch-size"),
+            (self._embedding_timeout_input, "settings.embedding.timeout"),
+        )
+        for widget, semantic_id in identities:
+            identify(widget, semantic_id)
 
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)

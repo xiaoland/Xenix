@@ -44,6 +44,7 @@ from .icons import (
     tool_icon,
 )
 from .markdown_renderer import render_chat_markdown
+from .semantic_identity import identify
 
 USER_MESSAGE_BACKGROUND = QColor("#000000")
 USER_MESSAGE_FOREGROUND = QColor("#ffffff")
@@ -1402,6 +1403,7 @@ class ThreadDetailView(QWidget):
         self._step_stop_button = QPushButton()
         self._step_stop_button.setObjectName("stepStopButton")
         self._step_stop_button.clicked.connect(self.step_budget_stop_requested.emit)
+        self._assign_semantic_identities()
 
         step_confirmation_layout.addWidget(self._step_confirmation_label, 1)
         step_confirmation_layout.addWidget(self._step_continue_button, 0, Qt.AlignVCenter)
@@ -1470,15 +1472,28 @@ class ThreadDetailView(QWidget):
         self._sync_scroll_to_bottom_button_geometry()
         self._sync_scroll_to_bottom_button_visibility()
 
+    def _assign_semantic_identities(self) -> None:
+        identify(self._scroll_to_bottom_button, "chat.timeline.scroll-to-bottom")
+        identify(self._attach_button, "chat.composer.attach-files")
+        identify(self._editor, "chat.composer.editor")
+        identify(self._model_picker, "chat.composer.model-picker")
+        identify(self._send_button, "chat.composer.send-or-stop")
+        identify(self._step_continue_button, "chat.step-budget.continue")
+        identify(self._step_stop_button, "chat.step-budget.stop")
+
     def retranslate_ui(self) -> None:
         self._editor.setPlaceholderText(self.tr("Message Xenix"))
+        self._editor.setAccessibleName(self.tr("Message Xenix"))
         self._attach_button.setToolTip(self.tr("Attach files"))
+        self._attach_button.setAccessibleName(self.tr("Attach files"))
         self._model_picker.setToolTip(self.tr("Model for the next turn"))
+        self._model_picker.setAccessibleName(self.tr("Model for the next turn"))
         self._step_continue_button.setText(self.tr("Continue"))
         self._step_stop_button.setText(self.tr("Stop"))
         self._composer_drop_title.setText(self.tr("Drop files to attach"))
         self._composer_drop_hint.setText(self.tr("Release here to add them to the next message"))
         self._scroll_to_bottom_button.setToolTip(self.tr("Scroll to bottom"))
+        self._scroll_to_bottom_button.setAccessibleName(self.tr("Scroll to bottom"))
         self._sync_send_button_text()
         for index in range(self._message_layout.count()):
             item = self._message_layout.itemAt(index)
@@ -1857,6 +1872,13 @@ class ThreadDetailView(QWidget):
         else:
             send_text = self.tr("Send")
         self._send_button.setText(send_text)
+        if self._running:
+            accessible_name = self.tr("Stop")
+        elif self._has_pending_attachments():
+            accessible_name = self.tr("Preparing attachments")
+        else:
+            accessible_name = self.tr("Send")
+        self._send_button.setAccessibleName(accessible_name)
 
     def show_step_confirmation(self, message: str) -> None:
         self._awaiting_step_confirmation = True

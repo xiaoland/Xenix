@@ -29,6 +29,11 @@ pdm run smoke
 
 ## Phase 1 — Shared pytest-qt foundation and semantic IDs
 
+**Status: complete.** pytest-qt 4.5.0 is locked, direct Widget tests live under
+the scoped offscreen boundary, manual event polling is removed, and the first
+semantic/accessibility contracts pass 18/18 in 4.00s (6.998s runner wall time).
+The generated-catalog full suite passes 163/163.
+
 - Add the qualified pytest-qt dependency and lock update.
 - Add shared UI pytest configuration/fixtures under `tests/ui/` or root test
   support; keep offscreen QPA setup scoped to `tests/ui/`, and delete duplicated

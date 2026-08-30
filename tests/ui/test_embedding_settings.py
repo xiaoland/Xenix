@@ -1,8 +1,8 @@
 from pathlib import Path
 from types import SimpleNamespace
 
-import pytest
 from PySide6.QtWidgets import QApplication
+from pytestqt.qtbot import QtBot
 
 from xenix.config import ensure_app_dirs, get_app_paths
 from xenix.i18n import TranslationManager
@@ -15,16 +15,11 @@ from xenix.services.ml.worker_settings import MLWorkerSettingsService
 from xenix.ui.settings_dialog import SettingsDialog
 
 
-@pytest.fixture()
-def app(monkeypatch) -> QApplication:
-    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
-    return QApplication.instance() or QApplication([])
-
-
 def test_embedding_model_change_requires_user_confirmation_before_rebuild(
     monkeypatch,
     tmp_path: Path,
-    app: QApplication,
+    qapp: QApplication,
+    qtbot: QtBot,
 ) -> None:
     class Indexes:
         def __init__(self) -> None:
@@ -60,13 +55,14 @@ def test_embedding_model_change_requires_user_confirmation_before_rebuild(
         paths,
         paths.logs / "xenix.log",
         paths.state / "xenix.db",
-        TranslationManager(app, paths),
+        TranslationManager(qapp, paths),
         LLMService(llm_settings),
         llm_settings,
         MLWorkerSettingsService(paths),
         embeddings,
         knowledge_index_service=indexes,
     )
+    qtbot.addWidget(dialog)
 
     try:
         monkeypatch.setattr(

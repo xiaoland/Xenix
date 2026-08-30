@@ -4,52 +4,52 @@
 <context>
     <name>AboutDialog</name>
     <message>
-        <location filename="../ui/settings_dialog.py" line="150"/>
+        <location filename="../ui/settings_dialog.py" line="151"/>
         <source>About</source>
         <translation>关于</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="151"/>
+        <location filename="../ui/settings_dialog.py" line="152"/>
         <source>App home</source>
         <translation>应用目录</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="152"/>
+        <location filename="../ui/settings_dialog.py" line="153"/>
         <source>State</source>
         <translation>状态目录</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="153"/>
+        <location filename="../ui/settings_dialog.py" line="154"/>
         <source>Artifacts</source>
         <translation>制品目录</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="154"/>
+        <location filename="../ui/settings_dialog.py" line="155"/>
         <source>Database</source>
         <translation>数据库</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="155"/>
+        <location filename="../ui/settings_dialog.py" line="156"/>
         <source>Current log file</source>
         <translation>当前日志文件</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="156"/>
+        <location filename="../ui/settings_dialog.py" line="157"/>
         <source>App version</source>
         <translation>应用版本</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="157"/>
+        <location filename="../ui/settings_dialog.py" line="158"/>
         <source>Build commit</source>
         <translation>构建提交</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="158"/>
+        <location filename="../ui/settings_dialog.py" line="159"/>
         <source>Open log directory</source>
         <translation>打开日志目录</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="159"/>
+        <location filename="../ui/settings_dialog.py" line="160"/>
         <source>Check for updates</source>
         <translation>检查更新</translation>
     </message>
@@ -125,17 +125,17 @@
 <context>
     <name>ChatMessageBubble</name>
     <message>
-        <location filename="../ui/chatbot.py" line="889"/>
+        <location filename="../ui/chatbot.py" line="890"/>
         <source>You</source>
         <translation>你</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="891"/>
+        <location filename="../ui/chatbot.py" line="892"/>
         <source>Tool</source>
         <translation>工具</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="893"/>
+        <location filename="../ui/chatbot.py" line="894"/>
         <source>System</source>
         <translation>系统</translation>
     </message>
@@ -223,37 +223,37 @@ This route will stay available after model selection is connected.</source>
 <context>
     <name>ConnectionRetryItem</name>
     <message>
-        <location filename="../ui/chatbot.py" line="1125"/>
+        <location filename="../ui/chatbot.py" line="1126"/>
         <source>Connecting ({attempt}/{max})</source>
         <translation>正在连接（{attempt}/{max}）</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1137"/>
+        <location filename="../ui/chatbot.py" line="1138"/>
         <source>Hide details</source>
         <translation>隐藏详情</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1137"/>
+        <location filename="../ui/chatbot.py" line="1138"/>
         <source>Show details</source>
         <translation>显示详情</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1164"/>
+        <location filename="../ui/chatbot.py" line="1165"/>
         <source>LLM connection retry</source>
         <translation>LLM 连接重试</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1171"/>
+        <location filename="../ui/chatbot.py" line="1172"/>
         <source>Attempt {attempt}/{max}</source>
         <translation>第 {attempt}/{max} 次尝试</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1177"/>
+        <location filename="../ui/chatbot.py" line="1178"/>
         <source>Attempt</source>
         <translation>尝试</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1181"/>
+        <location filename="../ui/chatbot.py" line="1182"/>
         <source>Error code: `{code}`</source>
         <translation>错误代码：`{code}`</translation>
     </message>
@@ -1286,32 +1286,33 @@ Trigger: %2</source>
 <context>
     <name>MainWindow</name>
     <message>
-        <location filename="../ui/main_window.py" line="290"/>
+        <location filename="../ui/main_window.py" line="298"/>
         <source>Xenix Native</source>
         <translation>Xenix 原生版</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="291"/>
+        <location filename="../ui/main_window.py" line="299"/>
         <source>Xenix</source>
         <translation>Xenix</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="292"/>
+        <location filename="../ui/main_window.py" line="300"/>
         <source>Settings</source>
         <translation>设置</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="293"/>
+        <location filename="../ui/main_window.py" line="301"/>
         <source>Knowledge</source>
         <translation>知识库</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="294"/>
+        <location filename="../ui/main_window.py" line="302"/>
         <source>History</source>
         <translation>历史</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="296"/>
+        <location filename="../ui/main_window.py" line="304"/>
+        <location filename="../ui/main_window.py" line="305"/>
         <source>New thread</source>
         <translation>新建线程</translation>
     </message>
@@ -1332,18 +1333,18 @@ Trigger: %2</source>
         <translation type="vanished">无法打开产物：{path}</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="699"/>
-        <location filename="../ui/main_window.py" line="716"/>
+        <location filename="../ui/main_window.py" line="708"/>
+        <location filename="../ui/main_window.py" line="725"/>
         <source>Opening link...</source>
         <translation>正在打开链接...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="717"/>
+        <location filename="../ui/main_window.py" line="726"/>
         <source>Open Link</source>
         <translation>打开链接</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="771"/>
+        <location filename="../ui/main_window.py" line="780"/>
         <source>The submitted message is being prepared and cannot be stopped.</source>
         <translation>已提交的消息正在准备中，无法停止。</translation>
     </message>
@@ -1388,92 +1389,92 @@ Trigger: %2</source>
         <translation type="vanished">正在下载 Xenix {version}...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="385"/>
+        <location filename="../ui/main_window.py" line="394"/>
         <source>Knowledge Workspace</source>
         <translation>知识工作区</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="386"/>
+        <location filename="../ui/main_window.py" line="395"/>
         <source>Knowledge services are not available.</source>
         <translation>知识库服务当前不可用。</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="515"/>
+        <location filename="../ui/main_window.py" line="524"/>
         <source>The selected source path is not a file.</source>
         <translation>所选源路径不是文件。</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="784"/>
+        <location filename="../ui/main_window.py" line="793"/>
         <source>Stopped.</source>
         <translation>已停止。</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="840"/>
+        <location filename="../ui/main_window.py" line="849"/>
         <source>Rename</source>
         <translation>重命名</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="841"/>
+        <location filename="../ui/main_window.py" line="850"/>
         <source>Generate title...</source>
         <translation>生成标题...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="842"/>
+        <location filename="../ui/main_window.py" line="851"/>
         <source>Copy thread ID</source>
         <translation>复制线程 ID</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="843"/>
+        <location filename="../ui/main_window.py" line="852"/>
         <source>Delete</source>
         <translation>删除</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="868"/>
+        <location filename="../ui/main_window.py" line="877"/>
         <source>Rename Thread</source>
         <translation>重命名线程</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="869"/>
-        <location filename="../ui/main_window.py" line="936"/>
+        <location filename="../ui/main_window.py" line="878"/>
+        <location filename="../ui/main_window.py" line="945"/>
         <source>Thread name</source>
         <translation>线程名称</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="885"/>
-        <location filename="../ui/main_window.py" line="916"/>
-        <location filename="../ui/main_window.py" line="946"/>
-        <location filename="../ui/main_window.py" line="956"/>
+        <location filename="../ui/main_window.py" line="894"/>
+        <location filename="../ui/main_window.py" line="925"/>
+        <location filename="../ui/main_window.py" line="955"/>
+        <location filename="../ui/main_window.py" line="965"/>
         <source>Generate Thread Title</source>
         <translation>生成线程标题</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="886"/>
+        <location filename="../ui/main_window.py" line="895"/>
         <source>Thread title model is not configured.</source>
         <translation>未配置线程标题模型。</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="909"/>
+        <location filename="../ui/main_window.py" line="918"/>
         <source>Generating thread title...</source>
         <translation>正在生成线程标题...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="935"/>
+        <location filename="../ui/main_window.py" line="944"/>
         <source>Apply Generated Title</source>
         <translation>应用生成的标题</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="971"/>
-        <location filename="../ui/main_window.py" line="979"/>
+        <location filename="../ui/main_window.py" line="980"/>
+        <location filename="../ui/main_window.py" line="988"/>
         <source>Delete Thread</source>
         <translation>删除线程</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="972"/>
+        <location filename="../ui/main_window.py" line="981"/>
         <source>Stop the current run before deleting this thread.</source>
         <translation>删除此线程前请先停止当前运行。</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="980"/>
+        <location filename="../ui/main_window.py" line="989"/>
         <source>Delete &quot;{title}&quot;? This action cannot be undone.</source>
         <translation>删除“{title}”？此操作无法撤销。</translation>
     </message>
@@ -1481,15 +1482,15 @@ Trigger: %2</source>
 <context>
     <name>SettingsDialog</name>
     <message>
-        <location filename="../ui/settings_dialog.py" line="474"/>
-        <location filename="../ui/settings_dialog.py" line="800"/>
-        <location filename="../ui/settings_dialog.py" line="825"/>
-        <location filename="../ui/settings_dialog.py" line="1049"/>
+        <location filename="../ui/settings_dialog.py" line="510"/>
+        <location filename="../ui/settings_dialog.py" line="836"/>
+        <location filename="../ui/settings_dialog.py" line="861"/>
+        <location filename="../ui/settings_dialog.py" line="1085"/>
         <source>Settings</source>
         <translation>设置</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="475"/>
+        <location filename="../ui/settings_dialog.py" line="511"/>
         <source>Language</source>
         <translation>语言</translation>
     </message>
@@ -1498,161 +1499,161 @@ Trigger: %2</source>
         <translation type="vanished">LLM 提供商</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="491"/>
-        <location filename="../ui/settings_dialog.py" line="502"/>
+        <location filename="../ui/settings_dialog.py" line="527"/>
+        <location filename="../ui/settings_dialog.py" line="538"/>
         <source>Base URL</source>
         <translation>基础 URL</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="492"/>
-        <location filename="../ui/settings_dialog.py" line="503"/>
+        <location filename="../ui/settings_dialog.py" line="528"/>
+        <location filename="../ui/settings_dialog.py" line="539"/>
         <source>API key</source>
         <translation>API 密钥</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="504"/>
+        <location filename="../ui/settings_dialog.py" line="540"/>
         <source>Model</source>
         <translation>模型</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="497"/>
+        <location filename="../ui/settings_dialog.py" line="533"/>
         <source>Turn guard model</source>
         <translation>轮次守卫模型</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="498"/>
+        <location filename="../ui/settings_dialog.py" line="534"/>
         <source>Thread title model</source>
         <translation>线程标题模型</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="494"/>
-        <location filename="../ui/settings_dialog.py" line="508"/>
+        <location filename="../ui/settings_dialog.py" line="530"/>
+        <location filename="../ui/settings_dialog.py" line="544"/>
         <source>Timeout</source>
         <translation>超时</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="476"/>
+        <location filename="../ui/settings_dialog.py" line="512"/>
         <source>AI</source>
         <translation>AI</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="479"/>
+        <location filename="../ui/settings_dialog.py" line="515"/>
         <source>Knowledge Base</source>
         <translation>知识库</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="483"/>
+        <location filename="../ui/settings_dialog.py" line="519"/>
         <source>ML Workers</source>
         <translation>ML 工作器</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="485"/>
+        <location filename="../ui/settings_dialog.py" line="521"/>
         <source>Global models</source>
         <translation>全局模型</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="486"/>
+        <location filename="../ui/settings_dialog.py" line="522"/>
         <source>LLM providers</source>
         <translation>LLM 提供商</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="487"/>
+        <location filename="../ui/settings_dialog.py" line="523"/>
         <source>Provider</source>
         <translation>提供商</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="488"/>
+        <location filename="../ui/settings_dialog.py" line="524"/>
         <source>Provider key</source>
         <translation>提供商键</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="489"/>
+        <location filename="../ui/settings_dialog.py" line="525"/>
         <source>Provider name</source>
         <translation>提供商名称</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="490"/>
+        <location filename="../ui/settings_dialog.py" line="526"/>
         <source>Dialect</source>
         <translation>方言</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="493"/>
+        <location filename="../ui/settings_dialog.py" line="529"/>
         <source>Models</source>
         <translation>模型</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="495"/>
+        <location filename="../ui/settings_dialog.py" line="531"/>
         <source>Streaming</source>
         <translation>流式输出</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="496"/>
+        <location filename="../ui/settings_dialog.py" line="532"/>
         <source>Default model</source>
         <translation>默认模型</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="499"/>
+        <location filename="../ui/settings_dialog.py" line="535"/>
         <source>LLM retry attempts</source>
         <translation>LLM 重试次数</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="500"/>
+        <location filename="../ui/settings_dialog.py" line="536"/>
         <source>Embedding provider</source>
         <translation>嵌入模型提供商</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="501"/>
+        <location filename="../ui/settings_dialog.py" line="537"/>
         <source>Enabled</source>
         <translation>启用</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="505"/>
+        <location filename="../ui/settings_dialog.py" line="541"/>
         <source>Dimensions</source>
         <translation>向量维度</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="506"/>
+        <location filename="../ui/settings_dialog.py" line="542"/>
         <source>Provider default (0)</source>
         <translation>使用提供商默认值（0）</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="507"/>
+        <location filename="../ui/settings_dialog.py" line="543"/>
         <source>Batch size</source>
         <translation>批次大小</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="509"/>
+        <location filename="../ui/settings_dialog.py" line="545"/>
         <source>OCR</source>
         <translation>OCR</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="510"/>
-        <location filename="../ui/settings_dialog.py" line="664"/>
+        <location filename="../ui/settings_dialog.py" line="546"/>
+        <location filename="../ui/settings_dialog.py" line="700"/>
         <source>Set up local PaddleOCR</source>
         <translation>部署本地 PaddleOCR</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="511"/>
+        <location filename="../ui/settings_dialog.py" line="547"/>
         <source>Indexes</source>
         <translation>索引</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="512"/>
+        <location filename="../ui/settings_dialog.py" line="548"/>
         <source>Rebuild indexes...</source>
         <translation>重建索引...</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="513"/>
+        <location filename="../ui/settings_dialog.py" line="549"/>
         <source>Add</source>
         <translation>添加</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="514"/>
+        <location filename="../ui/settings_dialog.py" line="550"/>
         <source>Remove</source>
         <translation>移除</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="515"/>
+        <location filename="../ui/settings_dialog.py" line="551"/>
         <source>OpenAI-compatible</source>
         <translation>OpenAI 兼容</translation>
     </message>
@@ -1673,17 +1674,17 @@ Trigger: %2</source>
         <translation type="vanished">AIMock API 密钥</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="517"/>
+        <location filename="../ui/settings_dialog.py" line="553"/>
         <source>ML workers</source>
         <translation>ML 工作器</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="518"/>
+        <location filename="../ui/settings_dialog.py" line="554"/>
         <source>Add SSH worker...</source>
         <translation>添加 SSH 工作器...</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="519"/>
+        <location filename="../ui/settings_dialog.py" line="555"/>
         <source>About</source>
         <translation>关于</translation>
     </message>
@@ -1716,7 +1717,7 @@ Trigger: %2</source>
         <translation type="vanished">打开日志目录</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="520"/>
+        <location filename="../ui/settings_dialog.py" line="556"/>
         <source>Save</source>
         <translation>保存</translation>
     </message>
@@ -1737,43 +1738,43 @@ Trigger: %2</source>
         <translation type="vanished">正在准备 OCR 模型</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="563"/>
-        <location filename="../ui/settings_dialog.py" line="997"/>
+        <location filename="../ui/settings_dialog.py" line="599"/>
+        <location filename="../ui/settings_dialog.py" line="1033"/>
         <source>Ready</source>
         <translation>就绪</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="565"/>
+        <location filename="../ui/settings_dialog.py" line="601"/>
         <source>Preparing local OCR</source>
         <translation>正在准备本地 OCR</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="567"/>
+        <location filename="../ui/settings_dialog.py" line="603"/>
         <source>Local OCR setup: %1</source>
         <translation>本地 OCR 部署：%1</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="586"/>
+        <location filename="../ui/settings_dialog.py" line="622"/>
         <source>Local OCR Setup Failed</source>
         <translation>本地 OCR 部署失败</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="611"/>
+        <location filename="../ui/settings_dialog.py" line="647"/>
         <source>Local OCR setup could not be completed.</source>
         <translation>无法完成本地 OCR 部署。</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="640"/>
+        <location filename="../ui/settings_dialog.py" line="676"/>
         <source>Local PaddleOCR service is unavailable</source>
         <translation>本地 PaddleOCR 服务不可用</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="643"/>
+        <location filename="../ui/settings_dialog.py" line="679"/>
         <source>Checking local PaddleOCR status</source>
         <translation>正在检查本地 PaddleOCR 状态</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="646"/>
+        <location filename="../ui/settings_dialog.py" line="682"/>
         <source>Local PaddleOCR is ready</source>
         <translation>本地 PaddleOCR 已就绪</translation>
     </message>
@@ -1782,27 +1783,27 @@ Trigger: %2</source>
         <translation type="vanished">本地 PaddleOCR 运行时已安装，模型尚未就绪</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="662"/>
+        <location filename="../ui/settings_dialog.py" line="698"/>
         <source>Local PaddleOCR is not installed</source>
         <translation>本地 PaddleOCR 尚未安装</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="711"/>
+        <location filename="../ui/settings_dialog.py" line="747"/>
         <source>English</source>
         <translation>English</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="712"/>
+        <location filename="../ui/settings_dialog.py" line="748"/>
         <source>Simplified Chinese</source>
         <translation>简体中文</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="736"/>
+        <location filename="../ui/settings_dialog.py" line="772"/>
         <source>Language Switch Failed</source>
         <translation>语言切换失败</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="737"/>
+        <location filename="../ui/settings_dialog.py" line="773"/>
         <source>Unable to switch the application language.
 
 {details}</source>
@@ -1811,130 +1812,130 @@ Trigger: %2</source>
 {details}</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="813"/>
-        <location filename="../ui/settings_dialog.py" line="839"/>
+        <location filename="../ui/settings_dialog.py" line="849"/>
+        <location filename="../ui/settings_dialog.py" line="875"/>
         <source>Knowledge Indexes</source>
         <translation>知识库索引</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="841"/>
+        <location filename="../ui/settings_dialog.py" line="877"/>
         <source>Embedding settings were saved, but the vector rebuild could not be queued.</source>
         <translation>Embedding 设置已保存，但无法将文本向量重建加入队列。</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="850"/>
+        <location filename="../ui/settings_dialog.py" line="886"/>
         <source>Rebuild text vectors?</source>
         <translation>重建文本向量？</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="853"/>
+        <location filename="../ui/settings_dialog.py" line="889"/>
         <source>This change uses a different embedding space. Existing text vectors cannot be reused for current Knowledge content.</source>
         <translation>此更改将使用不同的 Embedding 空间。现有文本向量无法用于当前知识库内容。</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="858"/>
+        <location filename="../ui/settings_dialog.py" line="894"/>
         <source>Save and rebuild now</source>
         <translation>保存并立即重建</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="862"/>
+        <location filename="../ui/settings_dialog.py" line="898"/>
         <source>Save; rebuild later</source>
         <translation>保存；稍后重建</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="972"/>
+        <location filename="../ui/settings_dialog.py" line="1008"/>
         <source>Knowledge index service is unavailable</source>
         <translation>知识库索引服务不可用</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="814"/>
-        <location filename="../ui/settings_dialog.py" line="979"/>
+        <location filename="../ui/settings_dialog.py" line="850"/>
+        <location filename="../ui/settings_dialog.py" line="1015"/>
         <source>Knowledge index status is unavailable</source>
         <translation>无法获取知识库索引状态</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="558"/>
+        <location filename="../ui/settings_dialog.py" line="594"/>
         <source>Downloading OCR component</source>
         <translation>正在下载 OCR 组件</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="559"/>
+        <location filename="../ui/settings_dialog.py" line="595"/>
         <source>Unpacking OCR component</source>
         <translation>正在解压 OCR 组件</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="560"/>
+        <location filename="../ui/settings_dialog.py" line="596"/>
         <source>Verifying OCR component</source>
         <translation>正在校验 OCR 组件</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="561"/>
+        <location filename="../ui/settings_dialog.py" line="597"/>
         <source>Testing OCR component</source>
         <translation>正在测试 OCR 组件</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="562"/>
+        <location filename="../ui/settings_dialog.py" line="598"/>
         <source>Activating OCR component</source>
         <translation>正在激活 OCR 组件</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="592"/>
+        <location filename="../ui/settings_dialog.py" line="628"/>
         <source>Local OCR is unavailable in this build.</source>
         <translation>当前构建不提供本地 OCR。</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="594"/>
+        <location filename="../ui/settings_dialog.py" line="630"/>
         <source>Local OCR download source is unavailable.</source>
         <translation>本地 OCR 下载源不可用。</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="596"/>
+        <location filename="../ui/settings_dialog.py" line="632"/>
         <source>Local OCR component could not be downloaded.</source>
         <translation>无法下载本地 OCR 组件。</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="598"/>
+        <location filename="../ui/settings_dialog.py" line="634"/>
         <source>Local OCR bundle source is unavailable.</source>
         <translation>本地 OCR 组件源不可用。</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="604"/>
+        <location filename="../ui/settings_dialog.py" line="640"/>
         <source>Local OCR component failed integrity verification.</source>
         <translation>本地 OCR 组件未通过完整性校验。</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="610"/>
+        <location filename="../ui/settings_dialog.py" line="646"/>
         <source>Local OCR component failed its self-test.</source>
         <translation>本地 OCR 组件未通过自检。</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="648"/>
+        <location filename="../ui/settings_dialog.py" line="684"/>
         <source>Reinstall local PaddleOCR</source>
         <translation>重新安装本地 PaddleOCR</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="650"/>
+        <location filename="../ui/settings_dialog.py" line="686"/>
         <source>Local PaddleOCR requires repair</source>
         <translation>本地 PaddleOCR 需要修复</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="652"/>
+        <location filename="../ui/settings_dialog.py" line="688"/>
         <source>Repair local PaddleOCR</source>
         <translation>修复本地 PaddleOCR</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="654"/>
-        <location filename="../ui/settings_dialog.py" line="656"/>
+        <location filename="../ui/settings_dialog.py" line="690"/>
+        <location filename="../ui/settings_dialog.py" line="692"/>
         <source>Preparing local PaddleOCR</source>
         <translation>正在准备本地 PaddleOCR</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="658"/>
+        <location filename="../ui/settings_dialog.py" line="694"/>
         <source>Local PaddleOCR setup needs attention</source>
         <translation>本地 PaddleOCR 设置需要处理</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="660"/>
+        <location filename="../ui/settings_dialog.py" line="696"/>
         <source>Try local PaddleOCR setup again</source>
         <translation>重试设置本地 PaddleOCR</translation>
     </message>
@@ -1951,44 +1952,44 @@ Trigger: %2</source>
         <translation type="vanished">Embedding 设置已在其他位置更改。您的编辑仍显示在此处；请再次保存以重新应用。</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="981"/>
+        <location filename="../ui/settings_dialog.py" line="1017"/>
         <source>Checking Knowledge index status</source>
         <translation>正在检查知识索引状态</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="987"/>
+        <location filename="../ui/settings_dialog.py" line="1023"/>
         <source>Keyword: %1
 Text vectors: %2</source>
         <translation>关键词：%1
 文本向量：%2</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="998"/>
+        <location filename="../ui/settings_dialog.py" line="1034"/>
         <source>Building</source>
         <translation>正在构建</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="999"/>
+        <location filename="../ui/settings_dialog.py" line="1035"/>
         <source>Needs rebuild</source>
         <translation>需要重建</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="1000"/>
+        <location filename="../ui/settings_dialog.py" line="1036"/>
         <source>Unavailable</source>
         <translation>不可用</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="1001"/>
+        <location filename="../ui/settings_dialog.py" line="1037"/>
         <source>Needs attention</source>
         <translation>需要处理</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="1003"/>
+        <location filename="../ui/settings_dialog.py" line="1039"/>
         <source>Unknown status</source>
         <translation>未知状态</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="1012"/>
+        <location filename="../ui/settings_dialog.py" line="1048"/>
         <source>{local_count} local, {ssh_count} SSH, {slots} execution slot(s).</source>
         <translation>{local_count} 个本地，{ssh_count} 个 SSH，{slots} 个执行槽。</translation>
     </message>
@@ -1997,12 +1998,12 @@ Text vectors: %2</source>
         <translation type="vanished">此提供商由部署管理，无法在此处移除。</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="1148"/>
+        <location filename="../ui/settings_dialog.py" line="1184"/>
         <source>Built into packaged app</source>
         <translation>已内置于打包应用</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.py" line="1199"/>
+        <location filename="../ui/settings_dialog.py" line="1235"/>
         <source>None</source>
         <translation>无</translation>
     </message>
@@ -2221,107 +2222,118 @@ Text vectors: %2</source>
         <translation type="vanished">图片</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="192"/>
+        <location filename="../ui/chatbot.py" line="193"/>
         <source>Error: {message}</source>
         <translation>错误：{message}</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="235"/>
+        <location filename="../ui/chatbot.py" line="236"/>
         <source>Thinking...</source>
         <translation>思考中...</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="241"/>
-        <location filename="../ui/chatbot.py" line="251"/>
+        <location filename="../ui/chatbot.py" line="242"/>
+        <location filename="../ui/chatbot.py" line="252"/>
         <source>tool</source>
         <translation>工具</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="244"/>
+        <location filename="../ui/chatbot.py" line="245"/>
         <source>Calling `{tool_name}`...</source>
         <translation>正在调用 `{tool_name}`...</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="255"/>
+        <location filename="../ui/chatbot.py" line="256"/>
         <source>`{tool_name}` {status}.</source>
         <translation>`{tool_name}` {status}。</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="351"/>
+        <location filename="../ui/chatbot.py" line="352"/>
         <source>completed</source>
         <translation>已完成</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="353"/>
+        <location filename="../ui/chatbot.py" line="354"/>
         <source>failed</source>
         <translation>失败</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="355"/>
+        <location filename="../ui/chatbot.py" line="356"/>
         <source>cancelled</source>
         <translation>已取消</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="357"/>
+        <location filename="../ui/chatbot.py" line="358"/>
         <source>running</source>
         <translation>运行中</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="359"/>
+        <location filename="../ui/chatbot.py" line="360"/>
         <source>requested</source>
         <translation>已请求</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1474"/>
+        <location filename="../ui/chatbot.py" line="1485"/>
+        <location filename="../ui/chatbot.py" line="1486"/>
         <source>Message Xenix</source>
         <translation>给 Xenix 发消息</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1475"/>
-        <location filename="../ui/chatbot.py" line="1907"/>
-        <location filename="../ui/chatbot.py" line="1918"/>
+        <location filename="../ui/chatbot.py" line="1487"/>
+        <location filename="../ui/chatbot.py" line="1488"/>
+        <location filename="../ui/chatbot.py" line="1929"/>
+        <location filename="../ui/chatbot.py" line="1940"/>
         <source>Attach files</source>
         <translation>添加文件</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1476"/>
+        <location filename="../ui/chatbot.py" line="1489"/>
+        <location filename="../ui/chatbot.py" line="1490"/>
         <source>Model for the next turn</source>
         <translation>下一轮使用的模型</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1477"/>
+        <location filename="../ui/chatbot.py" line="1491"/>
         <source>Continue</source>
         <translation>继续</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1478"/>
-        <location filename="../ui/chatbot.py" line="1850"/>
+        <location filename="../ui/chatbot.py" line="1492"/>
+        <location filename="../ui/chatbot.py" line="1865"/>
+        <location filename="../ui/chatbot.py" line="1876"/>
         <source>Stop</source>
         <translation>停止</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1479"/>
+        <location filename="../ui/chatbot.py" line="1493"/>
         <source>Drop files to attach</source>
         <translation>拖放文件以添加附件</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1480"/>
+        <location filename="../ui/chatbot.py" line="1494"/>
         <source>Release here to add them to the next message</source>
         <translation>松开后添加到下一条消息</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1481"/>
+        <location filename="../ui/chatbot.py" line="1495"/>
+        <location filename="../ui/chatbot.py" line="1496"/>
         <source>Scroll to bottom</source>
         <translation>滚动到底部</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1852"/>
-        <location filename="../ui/chatbot.py" line="1858"/>
+        <location filename="../ui/chatbot.py" line="1867"/>
+        <location filename="../ui/chatbot.py" line="1873"/>
+        <location filename="../ui/chatbot.py" line="1880"/>
         <source>Send</source>
         <translation>发送</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1909"/>
+        <location filename="../ui/chatbot.py" line="1878"/>
+        <source>Preparing attachments</source>
+        <translation>正在准备附件</translation>
+    </message>
+    <message>
+        <location filename="../ui/chatbot.py" line="1931"/>
         <source>Data files (*.csv *.xlsx *.xls)</source>
         <translation>数据文件 (*.csv *.xlsx *.xls)</translation>
     </message>
@@ -2420,257 +2432,257 @@ Text vectors: %2</source>
 <context>
     <name>ToolCallItem</name>
     <message>
-        <location filename="../ui/chatbot.py" line="365"/>
+        <location filename="../ui/chatbot.py" line="366"/>
         <source>Running tool...</source>
         <translation>正在运行工具...</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="367"/>
+        <location filename="../ui/chatbot.py" line="368"/>
         <source>Ran tool</source>
         <translation>工具已运行</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="369"/>
+        <location filename="../ui/chatbot.py" line="370"/>
         <source>Cancelled tool run</source>
         <translation>工具运行已取消</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="371"/>
+        <location filename="../ui/chatbot.py" line="372"/>
         <source>Searching knowledge...</source>
         <translation>正在搜索知识...</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="373"/>
+        <location filename="../ui/chatbot.py" line="374"/>
         <source>Searched knowledge</source>
         <translation>已搜索知识</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="375"/>
+        <location filename="../ui/chatbot.py" line="376"/>
         <source>Failed to search knowledge</source>
         <translation>知识搜索失败</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="377"/>
+        <location filename="../ui/chatbot.py" line="378"/>
         <source>Cancelled knowledge search</source>
         <translation>已取消知识搜索</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="379"/>
+        <location filename="../ui/chatbot.py" line="380"/>
         <source>Inspecting dataset...</source>
         <translation>正在检查数据集...</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="381"/>
+        <location filename="../ui/chatbot.py" line="382"/>
         <source>Inspected dataset</source>
         <translation>已检查数据集</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="383"/>
+        <location filename="../ui/chatbot.py" line="384"/>
         <source>Cancelled dataset inspection</source>
         <translation>数据集检查已取消</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="385"/>
+        <location filename="../ui/chatbot.py" line="386"/>
         <source>Integrating data...</source>
         <translation>正在整合数据...</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="387"/>
+        <location filename="../ui/chatbot.py" line="388"/>
         <source>Integrated data</source>
         <translation>数据已整合</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="389"/>
+        <location filename="../ui/chatbot.py" line="390"/>
         <source>Cancelled data integration</source>
         <translation>数据整合已取消</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="391"/>
+        <location filename="../ui/chatbot.py" line="392"/>
         <source>Profiling dataset...</source>
         <translation>正在分析数据集...</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="393"/>
+        <location filename="../ui/chatbot.py" line="394"/>
         <source>Profiled dataset</source>
         <translation>数据集分析完成</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="395"/>
+        <location filename="../ui/chatbot.py" line="396"/>
         <source>Cancelled dataset profile</source>
         <translation>数据集分析已取消</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="397"/>
+        <location filename="../ui/chatbot.py" line="398"/>
         <source>Drawing graph...</source>
         <translation>正在绘制图表...</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="399"/>
+        <location filename="../ui/chatbot.py" line="400"/>
         <source>Drew graph</source>
         <translation>图表已绘制</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="401"/>
+        <location filename="../ui/chatbot.py" line="402"/>
         <source>Cancelled graph drawing</source>
         <translation>图表绘制已取消</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="403"/>
+        <location filename="../ui/chatbot.py" line="404"/>
         <source>Cleaning dataset...</source>
         <translation>正在清洗数据集...</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="405"/>
+        <location filename="../ui/chatbot.py" line="406"/>
         <source>Cleaned dataset</source>
         <translation>数据集已清洗</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="407"/>
+        <location filename="../ui/chatbot.py" line="408"/>
         <source>Cancelled dataset cleaning</source>
         <translation>数据集清洗已取消</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="409"/>
+        <location filename="../ui/chatbot.py" line="410"/>
         <source>Querying dataset...</source>
         <translation>正在查询数据集...</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="411"/>
+        <location filename="../ui/chatbot.py" line="412"/>
         <source>Queried dataset</source>
         <translation>数据集已查询</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="413"/>
+        <location filename="../ui/chatbot.py" line="414"/>
         <source>Cancelled dataset query</source>
         <translation>数据集查询已取消</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="415"/>
+        <location filename="../ui/chatbot.py" line="416"/>
         <source>Transforming dataset...</source>
         <translation>正在转换数据集...</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="417"/>
+        <location filename="../ui/chatbot.py" line="418"/>
         <source>Transformed dataset</source>
         <translation>数据集已转换</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="419"/>
+        <location filename="../ui/chatbot.py" line="420"/>
         <source>Cancelled dataset transformation</source>
         <translation>数据集转换已取消</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="421"/>
+        <location filename="../ui/chatbot.py" line="422"/>
         <source>Selecting features...</source>
         <translation>正在选择特征...</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="423"/>
+        <location filename="../ui/chatbot.py" line="424"/>
         <source>Selected features</source>
         <translation>特征已选择</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="425"/>
+        <location filename="../ui/chatbot.py" line="426"/>
         <source>Cancelled feature selection</source>
         <translation>特征选择已取消</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="427"/>
+        <location filename="../ui/chatbot.py" line="428"/>
         <source>Loading model metadata...</source>
         <translation>正在加载模型元数据...</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="429"/>
+        <location filename="../ui/chatbot.py" line="430"/>
         <source>Loaded model metadata</source>
         <translation>模型元数据已加载</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="431"/>
+        <location filename="../ui/chatbot.py" line="432"/>
         <source>Cancelled model metadata lookup</source>
         <translation>模型元数据查询已取消</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="433"/>
+        <location filename="../ui/chatbot.py" line="434"/>
         <source>Training model...</source>
         <translation>正在训练模型...</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="435"/>
+        <location filename="../ui/chatbot.py" line="436"/>
         <source>Trained model</source>
         <translation>模型已训练</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="437"/>
+        <location filename="../ui/chatbot.py" line="438"/>
         <source>Cancelled model training</source>
         <translation>模型训练已取消</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="439"/>
+        <location filename="../ui/chatbot.py" line="440"/>
         <source>Tuning model...</source>
         <translation>正在调优模型...</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="441"/>
+        <location filename="../ui/chatbot.py" line="442"/>
         <source>Tuned model</source>
         <translation>模型已调优</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="443"/>
+        <location filename="../ui/chatbot.py" line="444"/>
         <source>Model tuning running in background</source>
         <translation>模型调优正在后台运行</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="445"/>
+        <location filename="../ui/chatbot.py" line="446"/>
         <source>Cancelled model tuning</source>
         <translation>模型调优已取消</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="447"/>
+        <location filename="../ui/chatbot.py" line="448"/>
         <source>Applying model...</source>
         <translation>正在应用模型...</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="449"/>
+        <location filename="../ui/chatbot.py" line="450"/>
         <source>Applied model</source>
         <translation>模型已应用</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="451"/>
+        <location filename="../ui/chatbot.py" line="452"/>
         <source>Model training running in background</source>
         <translation>模型训练正在后台运行</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="453"/>
+        <location filename="../ui/chatbot.py" line="454"/>
         <source>Model apply running in background</source>
         <translation>模型应用正在后台运行</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="455"/>
+        <location filename="../ui/chatbot.py" line="456"/>
         <source>Checking model task...</source>
         <translation>正在检查模型任务...</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="457"/>
+        <location filename="../ui/chatbot.py" line="458"/>
         <source>Checked model task</source>
         <translation>模型任务已检查</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="459"/>
+        <location filename="../ui/chatbot.py" line="460"/>
         <source>Cancelled model task check</source>
         <translation>模型任务检查已取消</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="461"/>
+        <location filename="../ui/chatbot.py" line="462"/>
         <source>Cancelled model apply</source>
         <translation>模型应用已取消</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1016"/>
+        <location filename="../ui/chatbot.py" line="1017"/>
         <source>Details</source>
         <translation>详情</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1017"/>
+        <location filename="../ui/chatbot.py" line="1018"/>
         <source>Open tool call details</source>
         <translation>打开工具调用详情</translation>
     </message>
@@ -2723,12 +2735,12 @@ Text vectors: %2</source>
         <translation type="vanished">预测运行已取消</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1025"/>
+        <location filename="../ui/chatbot.py" line="1026"/>
         <source>Hide result</source>
         <translation>隐藏结果</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="1025"/>
+        <location filename="../ui/chatbot.py" line="1026"/>
         <source>Show result</source>
         <translation>显示结果</translation>
     </message>
@@ -2736,12 +2748,12 @@ Text vectors: %2</source>
 <context>
     <name>UsageOverviewItem</name>
     <message>
-        <location filename="../ui/chatbot.py" line="479"/>
+        <location filename="../ui/chatbot.py" line="480"/>
         <source> ({cached} cached)</source>
         <translation>（{cached} 缓存命中）</translation>
     </message>
     <message>
-        <location filename="../ui/chatbot.py" line="483"/>
+        <location filename="../ui/chatbot.py" line="484"/>
         <source>↑ {input} · ↓ {output}</source>
         <translation>↑ {input} · ↓ {output}</translation>
     </message>

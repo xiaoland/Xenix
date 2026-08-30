@@ -45,6 +45,7 @@ from .chatbot import ComposerAttachmentStatus, ThreadDetailView
 from .icons import plus_icon
 from .layout_debug import dump_layout_if_enabled
 from .native_widgets import emphasize_label
+from .semantic_identity import identify
 from .settings_dialog import SettingsDialog, SettingsTab
 from .software_update import SoftwareUpdateController
 from .tool_call_detail_view import ToolCallDetailView
@@ -191,6 +192,7 @@ class MainWindow(QMainWindow):
         self._history_list.setContextMenuPolicy(Qt.CustomContextMenu)
         self._history_list.customContextMenuRequested.connect(self._open_history_item_menu)
         self._refreshing_history = False
+        self._assign_semantic_identities()
 
         self._thread_detail_view = ThreadDetailView(parent=self)
         self._thread_detail_view.set_artifact_resolver(self._artifact_service.resolve_uri)
@@ -275,6 +277,12 @@ class MainWindow(QMainWindow):
             self._open_history_thread(current_item)
         dump_layout_if_enabled(root, reason="main-window-setup")
 
+    def _assign_semantic_identities(self) -> None:
+        identify(self._settings_button, "main.header.settings")
+        identify(self._knowledge_button, "main.header.knowledge")
+        identify(self._new_thread_button, "main.history.new-thread")
+        identify(self._history_list, "main.history.thread-list")
+
     def closeEvent(self, event) -> None:  # type: ignore[override]
         super().closeEvent(event)
         if event.isAccepted():
@@ -294,6 +302,7 @@ class MainWindow(QMainWindow):
         self._history_label.setText(self.tr("History"))
         self._new_thread_button.setText("")
         self._new_thread_button.setToolTip(self.tr("New thread"))
+        self._new_thread_button.setAccessibleName(self.tr("New thread"))
         self._thread_detail_view.retranslate_ui()
         if self._settings_dialog is not None:
             self._settings_dialog.retranslate_ui()

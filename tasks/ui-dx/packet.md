@@ -20,7 +20,7 @@ line-count-driven file splitting.
   approved SVC v14 consumer-baseline cherry-pick `f528d1f`.
 - Branch: `feat/ui-dx`.
 - Worktree: `F:\CODING\Project\Xenix_native-ui-dx`.
-- State: Phase 0 complete; product implementation has not started.
+- State: Phases 0–1 complete; Phase 2 structured evidence is next.
 - Authority: the user has authorized continuation and task-scoped commits without
   further per-phase approval.
 
@@ -76,6 +76,11 @@ line-count-driven file splitting.
 - The migrated SVC docs route workflow/taste lookup through `svc`, but that CLI
   is unavailable on this machine. Repository evidence and authoritative public
   sources remain usable; no unknown global tool was installed implicitly.
+- Phase 1 locked pytest-qt 4.5.0, moved all direct Widget tests under the scoped
+  `tests/ui` QPA boundary, removed manual event pumping/sleeps, introduced typed
+  semantic identity, and admitted the first Main/chat/Settings static controls.
+  Focused UI is 18 passed in 4.00s (6.998s through the repository runner); the
+  generated-catalog full suite is 163 passed.
 
 Detailed evidence is in [preflight.md](preflight.md); source research is in
 [research.md](research.md).
