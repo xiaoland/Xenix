@@ -435,15 +435,20 @@ class KnowledgeDerivationService:
 
 def _knowledge_units(document: Any) -> list[KnowledgeUnitInput]:
     units: list[KnowledgeUnitInput] = []
+    headings: dict[int, str] = {}
     for item, level in document.iterate_items():
-        text = str(getattr(item, "text", "") or "").strip()
-        label = str(getattr(getattr(item, "label", None), "value", getattr(item, "label", ""))).casefold()
-        if not text and label != "picture" and hasattr(item, "export_to_markdown"):
-            try:
-                text = str(item.export_to_markdown(doc=document)).strip()
-            except Exception:
-                text = ""
+        label = _docling_item_label(item)
+        text = _docling_item_text(item, document=document, label=label)
         if not text:
+            continue
+        if label in {"title", "section_header"}:
+            heading_level = (
+                0
+                if label == "title"
+                else max(1, _heading_level(item, fallback=int(level)))
+            )
+            headings = {key: value for key, value in headings.items() if key < heading_level}
+            headings[heading_level] = text
             continue
         locator: dict[str, Any] = {"level": int(level)}
         provenance = list(getattr(item, "prov", ()) or ())
@@ -453,9 +458,36 @@ def _knowledge_units(document: Any) -> list[KnowledgeUnitInput]:
                 locator["page"] = int(page_no)
         if "page" not in locator:
             locator["passage"] = len(units) + 1
+        heading_path = tuple(headings[key] for key in sorted(headings))
+        if heading_path:
+            locator["heading_path"] = list(heading_path)
+            text = f"{' > '.join(heading_path)}\n\n{text}"
         units.append(KnowledgeUnitInput(text=text, locator=locator))
     if not units:
         fallback = str(document.export_to_text()).strip()
         if fallback:
             units.append(KnowledgeUnitInput(text=fallback, locator={"document": True}))
     return bound_knowledge_units(units)
+
+
+def _docling_item_label(item: Any) -> str:
+    label = getattr(item, "label", "")
+    return str(getattr(label, "value", label)).casefold()
+
+
+def _docling_item_text(item: Any, *, document: Any, label: str) -> str:
+    text = str(getattr(item, "text", "") or "").strip()
+    if text or label == "picture" or not hasattr(item, "export_to_markdown"):
+        return text
+    try:
+        return str(item.export_to_markdown(doc=document)).strip()
+    except Exception:
+        return ""
+
+
+def _heading_level(item: Any, *, fallback: int) -> int:
+    raw_level = getattr(item, "level", fallback)
+    try:
+        return max(0, int(raw_level))
+    except (TypeError, ValueError):
+        return max(0, fallback)
