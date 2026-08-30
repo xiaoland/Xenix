@@ -101,8 +101,10 @@ For implementation comparisons:
 8. Runtime diagnostics default to redacted JSON/logs without pixels. Screenshots
    are permitted only for explicit synthetic-scenario policy; CI accepts only
    that policy.
-9. The pytest failure plugin must be subprocess-tested for both assertion failure
-   during call and Qt-log failure during teardown before CI relies on it.
+9. The pytest failure plugin must be subprocess-tested for assertion failure,
+   pytest-qt call-report Qt-log failure, and fixture-teardown failure. Direct
+   pytest-qt 4.5 source inspection showed that it stops Qt-log capture in the call
+   report; teardown failures instead require a pre-cleanup staged snapshot.
 
 No product implementation was made in Phase 0. The design survived rehearsal
 with the boundary/order corrections above; no foundational approach was replaced.

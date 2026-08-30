@@ -51,6 +51,11 @@ accessible user-facing names, `pdm run check`.
 
 ## Phase 2 — Structured UI evidence
 
+**Status: complete.** The typed schema/capture modules, structured
+`layout_debug` facade, explicit-root pytest plugin, privacy bounds, and three
+subprocess failure probes pass. The scoped UI portfolio is 24/24 in 8.30s.
+The generated-catalog full suite passes 169/169.
+
 - Introduce schema-versioned artifact dataclasses/TypedDicts and serializer.
 - Refactor `layout_debug.py` to project from JSON authority while preserving the
   environment-triggered log behavior.
@@ -60,8 +65,9 @@ accessible user-facing names, `pdm run check`.
 - Add tests for nested layouts, duplicate IDs, redaction, invalid/deleted widget
   handling, deterministic serialization, and bounded output.
 - Add a pytest failure hook that captures only registered roots into a known
-  `ui-artifacts/` output. Verify both ordinary call assertion failure and
-  pytest-qt Qt-log teardown failure ordering in subprocess probes.
+  `ui-artifacts/` output. Verify ordinary call assertion failure, pytest-qt
+  call-report Qt-log failure, and fixture-teardown failure in subprocess probes;
+  teardown uses a pre-cleanup staged snapshot.
 - Update observability/deployment docs for local use and artifact privacy.
 
 Verification: focused artifact tests plus a deliberately failing probe run whose

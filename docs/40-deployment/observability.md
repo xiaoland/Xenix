@@ -23,6 +23,29 @@ their retention and access control are owned by the configured telemetry backend
 
 `config/telemetry.json` stores a randomly generated persistent install id. It is not derived from machine identity, but it correlates activity across runs and therefore remains sensitive.
 
+## UI layout evidence
+
+For source diagnosis, `XENIX_LAYOUT_DEBUG=true` schedules a structured Qt UI
+snapshot after the main layout settles and writes it to the application log. The
+snapshot contains separate QObject-ownership and real `QLayout.itemAt()` trees,
+geometry, size policy, visibility/focus state, semantic identifiers, and render
+structure. Runtime capture omits widget text, combo text, message bodies, field
+values, and paths; it never takes a screenshot.
+
+Direct tests can explicitly register a synthetic root with the scoped
+`ui_artifacts` fixture. A call failure writes `manifest.json`, `tree.json`,
+`actual.png`, bounded/redacted `qt.log`, and `index.json` below
+`ui-artifacts/<test-id>/`. Passing tests leave no artifact. A fixture-teardown
+failure publishes the snapshot staged before pytest-qt closes its widgets. The
+fixture never scans all top-level windows, the pytest temp tree, a runtime home,
+or an unregistered application window.
+
+Treat even synthetic screenshots as reviewable evidence. Do not register a root
+backed by real user configuration or conversation content, and do not manually
+add line-edit values, combo text, file paths, credentials, or message bodies to
+the schema. Runtime/user screenshots require separate explicit authority and are
+not enabled by the layout-debug switch.
+
 ## OTLP Enablement
 
 Standard OpenTelemetry endpoint, protocol, and header variables configure transport. Signal-specific values take precedence over global values. Source runs read them from the developer process. Formal packaging reads them once and embeds them in the frozen release configuration; an installed client ignores ambient `XENIX_OTEL_*`, `OTEL_SDK_DISABLED`, and `OTEL_EXPORTER_*` values.

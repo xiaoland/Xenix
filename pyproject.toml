@@ -138,6 +138,10 @@ files = [
     "src/xenix/services/ml/worker_settings.py",
     "src/xenix/services/trained_model_metadata.py",
     "src/xenix/ui/semantic_identity.py",
+    "src/xenix/ui/diagnostics/capture.py",
+    "src/xenix/ui/diagnostics/schema.py",
+    "src/xenix/ui/diagnostics/snapshot.py",
+    "src/xenix/ui/layout_debug.py",
 ]
 plugins = ["pydantic.mypy"]
 follow_imports = "silent"
