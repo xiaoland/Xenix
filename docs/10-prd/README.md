@@ -22,6 +22,7 @@ supports, and what uncertainty remains.
 | Product state and canonical outputs remain locally authoritative. | Optional remote capacity must not turn Xenix into a hosted backend. | Local services retain conversation, task, dataset, model, and artifact authority when remote ML execution is used. | Storage, worker, and artifact boundary coverage. |
 | User knowledge can guide data analysis with source-linked evidence. | Business rules and operating experience often live outside datasets. | A user can import a supported document once and the Agent can retrieve a bounded, citable passage while analyzing data. | Knowledge import, lookup-tool, citation, and Agent benchmark coverage. |
 | The interface supports English and Simplified Chinese. | Business users should work in the configured interface language. | The selected language persists and also guides the conversation language for new work. | Locale persistence and UI-switch coverage. |
+| Background work is visible and controllable in one place. | Users should be able to see and stop long-running work without leaving the app. | The Jobs window lists ML and Knowledge background work with a shared status, and a queued or running job can be cancelled. | Job-layer scheduling and Job Center coverage. |
 
 ## Capabilities and Workflows
 
@@ -40,6 +41,10 @@ supports, and what uncertainty remains.
    software updates. A confirmed download reports percentage progress in a
    modeless window before the user explicitly chooses whether to restart and
    apply it.
+8. Open the Jobs window to review background work — knowledge import and index
+   builds, model training, evaluation, and apply runs — and cancel a queued or
+   running job. Knowledge work resumes after a restart; model training is not
+   automatically resumed.
 
 ## Rules and Scope
 

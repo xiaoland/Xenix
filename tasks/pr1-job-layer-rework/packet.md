@@ -49,10 +49,11 @@ MLTaskStatus.PENDING because the unified vocabulary uses "queued".
 
 All six decisions D1–D6 are resolved — see design.md §Decisions.
 D1 = B (unified job table, deep rework). D3 = ML permanent orphan (deliberate).
-Open items: none blocking; D6 (PRD vocabulary) deferred until Phase 5.
+D6 (PRD vocabulary) landed in Phase 5.
 
 ## Next Step
 
-Await user go-ahead, then execute plan.md Phase 0 (isolated pending→queued fix
-+ regression test), Phase 1 (job table + scheduler core), and onward. Do not
-commit without explicit instruction.
+Complete. Phases 0–5 landed as verified slices: Phase 0 pending→queued fix,
+Phase 1 job table + scheduler core, Phase 2 ML adapter, Phase 3 Knowledge
+adapters, Phase 4 Job Center cancel action, Phase 5 PRD vocabulary. Final
+verification: pdm run test (197 passed), pdm run check, pdm run smoke all green.
