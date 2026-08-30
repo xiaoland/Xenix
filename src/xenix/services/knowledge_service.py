@@ -15,7 +15,8 @@ from .storage.repositories.knowledge import KnowledgeRepository
 MAX_KNOWLEDGE_QUERY_CHARS = 512
 MAX_KNOWLEDGE_TOP_K = 8
 MAX_KNOWLEDGE_QUOTE_CHARS = 1600
-MAX_KNOWLEDGE_UNIT_CHARS = 8_000
+MAX_KNOWLEDGE_UNIT_CHARS = 4_000
+KNOWLEDGE_UNIT_OVERLAP_CHARS = 400
 KNOWLEDGE_LOOKUP_MODES = ("auto", "keyword", "semantic", "hybrid")
 _HYBRID_RRF_K = 60
 _MAX_RETRIEVAL_CANDIDATES = 32
@@ -435,42 +436,73 @@ def _split_knowledge_unit_text(value: str) -> list[str]:
         return []
 
     parts: list[str] = []
-    remaining = prepared
-    while remaining:
-        raw_limit = _raw_prefix_with_normalized_budget(
-            remaining,
-            MAX_KNOWLEDGE_UNIT_CHARS,
+    start = 0
+    while start < len(prepared):
+        raw_end = _raw_end_with_normalized_budget(
+            prepared,
+            start=start,
+            budget=MAX_KNOWLEDGE_UNIT_CHARS,
         )
-        if raw_limit >= len(remaining):
-            parts.append(remaining)
+        if raw_end >= len(prepared):
+            parts.append(prepared[start:])
             break
-        boundary = _preferred_split_boundary(remaining, raw_limit)
-        part = remaining[:boundary].strip()
+        window = prepared[start:raw_end]
+        relative_boundary = _preferred_split_boundary(window)
+        boundary = start + relative_boundary
+        part = prepared[start:boundary].strip()
         if part:
             parts.append(part)
-        remaining = remaining[boundary:].strip()
+        overlap_start = _overlap_start(
+            prepared,
+            chunk_start=start,
+            chunk_end=boundary,
+        )
+        start = max(start + 1, overlap_start)
+        while start < len(prepared) and prepared[start].isspace():
+            start += 1
     return parts
 
 
-def _raw_prefix_with_normalized_budget(value: str, budget: int) -> int:
-    """Conservatively bound the NFKC text sent by every embedding adapter."""
+def _raw_end_with_normalized_budget(
+    value: str,
+    *,
+    start: int,
+    budget: int,
+) -> int:
+    """Find one bounded raw end without copying the unconsumed document tail."""
 
     normalized_characters = 0
-    for index, character in enumerate(value):
+    for index in range(start, len(value)):
+        character = value[index]
         normalized_characters += len(unicodedata.normalize("NFKC", character))
         if normalized_characters > budget:
-            return max(1, index)
+            return max(start + 1, index)
     return len(value)
 
 
-def _preferred_split_boundary(value: str, limit: int) -> int:
+def _preferred_split_boundary(value: str) -> int:
+    limit = len(value)
     lower_bound = max(1, limit // 2)
-    window = value[:limit]
     for delimiter in ("\n\n", "\n", "。", "！", "？", ". ", "! ", "? ", "；", "; ", "，", ", ", " "):
-        position = window.rfind(delimiter, lower_bound)
+        position = value.rfind(delimiter, lower_bound)
         if position >= 0:
             return min(limit, position + len(delimiter))
     return limit
+
+
+def _overlap_start(value: str, *, chunk_start: int, chunk_end: int) -> int:
+    """Retain a bounded, sentence-aligned suffix for the next projection unit."""
+
+    desired = max(chunk_start + 1, chunk_end - KNOWLEDGE_UNIT_OVERLAP_CHARS)
+    window = value[desired:chunk_end]
+    candidates: list[int] = []
+    for delimiter in ("\n\n", "\n", "。", "！", "？", ". ", "! ", "? ", "；", "; "):
+        position = window.find(delimiter)
+        if position >= 0:
+            candidate = desired + position + len(delimiter)
+            if candidate < chunk_end:
+                candidates.append(candidate)
+    return min(candidates, default=desired)
 
 
 def _fts_query(value: str) -> str:
