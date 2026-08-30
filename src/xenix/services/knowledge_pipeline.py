@@ -277,7 +277,7 @@ class _ZipMimetypeProbeProvider:
     provider_id = "mimetype-zip"
 
     def probe(self, source, *, header, size, capability) -> FormatProbeFacts:
-        if not header.startswith(b"PK\\x03\\x04"):
+        if not header.startswith(b"PK\x03\x04"):
             raise _format_mismatch()
         facts = _verify_mimetype_zip_package(
             source,
@@ -1062,50 +1062,6 @@ class _ImageParserProvider:
             ocr_succeeded_count=1,
             ocr_payload_hashes=((1, payload_hash),),
         )
-
-
-def _wait_for_process(
-    process: Any,
-    *,
-    timeout_seconds: float,
-    timeout_error: Exception,
-) -> int:
-    try:
-        return int(process.wait(timeout=timeout_seconds))
-    except subprocess.TimeoutExpired:
-        _terminate_process(process)
-        raise timeout_error from None
-    except BaseException:
-        _terminate_process(process)
-        raise
-
-
-def _terminate_process(process: Any) -> None:
-    if process.poll() is not None:
-        return
-    try:
-        process.terminate()
-    except OSError:
-        pass
-    try:
-        process.wait(timeout=_PROCESS_TERMINATE_GRACE_SECONDS)
-        return
-    except (OSError, subprocess.TimeoutExpired):
-        pass
-    try:
-        process.kill()
-    except OSError:
-        pass
-    try:
-        process.wait(timeout=_PROCESS_TERMINATE_GRACE_SECONDS)
-    except (OSError, subprocess.TimeoutExpired):
-        pass
-
-
-def _no_console_process_kwargs() -> dict[str, int]:
-    if sys.platform != "win32":
-        return {}
-    return {"creationflags": int(getattr(subprocess, "CREATE_NO_WINDOW", 0))}
 
 
 def _read_bytes(path: Path) -> bytes:
