@@ -6,7 +6,7 @@ Applies to the entire `src/xenix/ui/` subtree. `widgets/AGENTS.md` adds narrower
 
 ## Tripwires
 
-- Keep UI service-driven: do not parse datasets, invent storage paths, or reconstruct domain state. Cross-unit authority is owned by [Product TDD](../../../docs/20-product-tdd/README.md).
+- Keep UI service-driven: do not parse datasets, invent storage paths, or reconstruct domain state. Cross-unit authority is owned by [Product TDD](../../../docs/20-prd-tdd/README.md).
 - Route changed user-visible text through Qt translation, preserve internal identity separately, and handle `QEvent.LanguageChange`. Run extract, complete the affected catalog entries, compile, and verify the changed surface.
 - A dialog that starts a `QTimer` owns shutdown in `closeEvent()`; background refresh must not survive window closure.
 - Prefer focused composition over cross-dialog inheritance when presentation is shared.
