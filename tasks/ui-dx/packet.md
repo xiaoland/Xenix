@@ -20,7 +20,7 @@ line-count-driven file splitting.
   approved SVC v14 consumer-baseline cherry-pick `f528d1f`.
 - Branch: `feat/ui-dx`.
 - Worktree: `F:\CODING\Project\Xenix_native-ui-dx`.
-- State: Phases 0–2 complete; Phase 3 Widget Lab kernel is next.
+- State: Phases 0–3 complete; Phase 4 CI evidence is next.
 - Authority: the user has authorized continuation and task-scoped commits without
   further per-phase approval.
 
@@ -86,6 +86,11 @@ line-count-driven file splitting.
   and explicit-root pytest failure capture. Assertion, pytest-qt call-log, and
   fixture-teardown failure paths are subprocess-proven; focused UI is 24 passed
   and the generated-catalog full suite is 169 passed.
+- Phase 3 adds a dev-only scenario registry, gallery, deterministic capture CLI,
+  and three zero-service chat states. The shared factories are covered as widget
+  contracts and the capture path produces synthetic structured evidence without
+  creating `XENIX_APP_HOME`. Focused UI is 29 passed in 11.25s; the full
+  generated-catalog suite is 174 passed in 136.04s and `pdm run check` passes.
 
 Detailed evidence is in [preflight.md](preflight.md); source research is in
 [research.md](research.md).

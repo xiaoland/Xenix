@@ -144,8 +144,9 @@ Rules:
 - IDs describe product meaning, not Qt class, visible text, index, or layout path.
 - Static shell/action IDs are unique within a top-level scenario/window.
 - Repeated collection items use a semantic role plus a separate stable,
-  non-sensitive authoritative item reference. Paths, labels, content hashes,
-  runtime UUIDs, and layout indexes are forbidden identity sources.
+  non-sensitive authoritative item reference. A persisted canonical event ID is
+  valid even when UUID-shaped; UI-generated ephemeral UUIDs are not. Paths,
+  labels, content hashes, and layout indexes are forbidden identity sources.
 - `accessibleName` remains user-facing/localized and is required for icon-only
   controls; it is not the automation selector.
 - Preserve existing `objectName` values because style sheets and runtime behavior

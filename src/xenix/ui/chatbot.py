@@ -44,7 +44,7 @@ from .icons import (
     tool_icon,
 )
 from .markdown_renderer import render_chat_markdown
-from .semantic_identity import identify
+from .semantic_identity import identify, identify_repeated_item
 
 USER_MESSAGE_BACKGROUND = QColor("#000000")
 USER_MESSAGE_FOREGROUND = QColor("#ffffff")
@@ -1009,6 +1009,21 @@ class ToolCallItem(QFrame):
 
     def set_event(self, event: ChatbotEvent) -> None:
         self._event = event
+        identify_repeated_item(
+            self,
+            role="chat.timeline.tool-call",
+            item_reference=event.id,
+        )
+        identify_repeated_item(
+            self._chevron_button,
+            role="chat.tool-call.toggle-details",
+            item_reference=event.id,
+        )
+        identify_repeated_item(
+            self._details_button,
+            role="chat.tool-call.open-details",
+            item_reference=event.id,
+        )
         self._icon_label.setPixmap(tool_icon(event.icon_key).pixmap(QSize(16, 16)))
         self._summary_label.setText(self._summary_text(event))
         details_action = self._action_by_type("open_tool_call_detail")
@@ -1022,9 +1037,9 @@ class ToolCallItem(QFrame):
         if not has_detail:
             self._expanded = False
         self._chevron_button.setIcon(chevron_icon(expanded=self._expanded))
-        self._chevron_button.setToolTip(
-            self.tr("Hide result") if self._expanded else self.tr("Show result")
-        )
+        toggle_label = self.tr("Hide result") if self._expanded else self.tr("Show result")
+        self._chevron_button.setToolTip(toggle_label)
+        self._chevron_button.setAccessibleName(toggle_label)
         self._detail_browser.setHtml(
             render_chat_markdown(self._detail_markdown(event), inline_artifact_images=False)
         )
@@ -1120,6 +1135,16 @@ class ConnectionRetryItem(QFrame):
 
     def set_event(self, event: ChatbotEvent) -> None:
         self._event = event
+        identify_repeated_item(
+            self,
+            role="chat.timeline.connection-retry",
+            item_reference=event.id,
+        )
+        identify_repeated_item(
+            self._chevron_button,
+            role="chat.connection-retry.toggle-details",
+            item_reference=event.id,
+        )
         self._icon_label.setPixmap(tool_icon(event.icon_key).pixmap(QSize(16, 16)))
         attempt_number, max_attempts = _connection_attempt_counts(event.detail_blocks)
         self._summary_label.setText(
@@ -1134,9 +1159,9 @@ class ConnectionRetryItem(QFrame):
         if not has_detail:
             self._expanded = False
         self._chevron_button.setIcon(chevron_icon(expanded=self._expanded))
-        self._chevron_button.setToolTip(
-            self.tr("Hide details") if self._expanded else self.tr("Show details")
-        )
+        toggle_label = self.tr("Hide details") if self._expanded else self.tr("Show details")
+        self._chevron_button.setToolTip(toggle_label)
+        self._chevron_button.setAccessibleName(toggle_label)
         self._detail_browser.setHtml(
             render_chat_markdown(
                 self._connection_detail_markdown(event.detail_blocks),

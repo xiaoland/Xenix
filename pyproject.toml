@@ -92,6 +92,8 @@ benchmark-agent-harness-evaluate = "python scripts/evaluate_agent_harness_report
 benchmark-agent-harness-calibrate-judge = "python scripts/calibrate_agent_harness_judge.py"
 check = { composite = ["agent-skills-generate", "agent-skills-check", "lint", "typecheck", "knowledge-ocr-lock-check", "python -m compileall src tests scripts"] }
 diagnostic-bundle = "python scripts/create_diagnostic_bundle.py"
+ui-lab = { cmd = "python -m scripts.ui_lab", env = { PYTHONPATH = "src" } }
+ui-capture = { cmd = "python -m scripts.ui_lab.capture_cli", env = { PYTHONPATH = "src" } }
 
 [tool.pytest.ini_options]
 pythonpath = ["src", "."]
@@ -114,12 +116,20 @@ ignore = ["E731"]
 [tool.ruff.lint.per-file-ignores]
 "scripts/package_app.py" = ["E402"]
 "scripts/run_packaged.py" = ["E402"]
+"scripts/ui_lab/capture_cli.py" = ["E402"]
 
 [tool.mypy]
 python_version = "3.14"
 platform = "win32"
 mypy_path = "src"
 files = [
+    "scripts/ui_lab/__main__.py",
+    "scripts/ui_lab/capture_cli.py",
+    "scripts/ui_lab/contracts.py",
+    "scripts/ui_lab/driver.py",
+    "scripts/ui_lab/gallery.py",
+    "scripts/ui_lab/registry.py",
+    "scripts/ui_lab/scenarios.py",
     "scripts/build_knowledge_ocr_runtime.py",
     "src/xenix/release_config.py",
     "src/xenix/trial_lock.py",

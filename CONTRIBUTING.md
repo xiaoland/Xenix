@@ -64,6 +64,28 @@
 
 Use the smallest verification set that proves the affected contract. Run `pdm run test` and `pdm run check` when the change has repository-wide or uncertain impact.
 
+## Qt Widget Lab
+
+Use the Widget Lab for the shortest deterministic feedback loop around an
+admitted Qt Widgets state:
+
+- `pdm run ui-lab -- --list --json` discovers scenario IDs without starting Qt
+  or any application service.
+- `pdm run ui-lab -- chat.empty` opens the searchable gallery at one scenario.
+- `pdm run ui-capture -- chat.mixed-timeline --output ui-artifacts/local`
+  renders a fixed synthetic state and writes `manifest.json`, `tree.json`, and
+  `actual.png`.
+- `pdm run pytest --direct tests/ui -q` runs the offscreen widget contracts.
+
+Scenarios live in `scripts/ui_lab/` and import production widgets without
+importing the application composition root. A new scenario must have a stable
+dotted ID, synthetic non-sensitive data, an explicit viewport/style/locale, a
+bounded readiness condition, and cleanup for every timer, worker, or window it
+owns. It must construct without a runtime home, database, network adapter,
+update check, OCR runtime, or ML worker. Reuse the same factory from interactive,
+capture, and test paths; do not create a second fixture language or assert pixel
+equality in ordinary widget contracts.
+
 ## Change-Specific Review
 
 - UI changes follow the nearest local UI guidance. Cross-unit interaction or authority changes are reviewed against

@@ -75,6 +75,13 @@ artifacts are inspected, then remove/disable the intentional failure.
 
 ## Phase 3 — Minimal Qt Widget Lab kernel and zero-service scenarios
 
+**Status: complete.** The dev-only registry exposes three deterministic chat
+states through one shared factory contract used by the gallery, capture CLI, and
+pytest-qt. Machine discovery does not create a `QApplication`; scenario builds
+do not create `XENIX_APP_HOME` or compose runtime services. A representative
+900×720 capture emitted a 186,702-byte tree and 24,165-byte screenshot. Focused
+UI is 29/29 in 11.25s; the full generated-catalog suite is 174/174 in 136.04s.
+
 - Add dev-only scenario contracts, registry, deterministic context, synthetic
   ports, cleanup handle, and a tiny non-pytest Qt event driver under
   `scripts/ui_lab/`.
