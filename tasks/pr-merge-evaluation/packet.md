@@ -155,3 +155,23 @@ session-level assertion in test_agent_dataset_audit.py).
 - `JobSummary.total_count` mislabel (test-only API; GUI computes its own).
 - `.replace("%1")` vs `.arg()` in job_center (roughly equivalent edge cases).
 - `JobItem.target` None: false alarm — MLTaskRow.project_id is non-nullable.
+
+---
+
+## Round 3 — PR1 small items (1,2 applied; 3 corrected)
+
+- Item 1 (_knowledge_status): now strict — explicit
+  _KNOWLEDGE_SUCCESS_STATUSES = {succeeded, canonical_ready, retrieval_ready,
+  reused}; raises ValueError on unrecognized status (consistent with ML's
+  enum-strict JobStatus(value)).
+- Item 2 (JobSummary.total_count): removed the dead summary() + JobSummary
+  (test-only API; GUI computes its own summary). Test updated to compute counts
+  from list_jobs() directly.
+- Item 3 (.replace("%N") -> .arg()): NOT applied — original premise was wrong.
+  Empirically PySide6 tr() returns Python str (no .arg(); confirmed
+  hasattr(s, 'arg') == False). .replace("%N") is the established codebase
+  pattern (settings_dialog, knowledge_workspace, knowledge_index_ui,
+  job_center). The numeric summary case has zero fragility; the string-detail
+  case has negligible, codebase-wide fragility. Recommendation: leave as-is.
+
+Verification: pdm run check = 0; test_job_service.py + dataset-audit = 3 passed.

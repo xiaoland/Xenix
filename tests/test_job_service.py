@@ -70,8 +70,8 @@ def test_job_query_projects_and_filters_domain_authorities(monkeypatch, tmp_path
     assert jobs[1].error_summary == "Unsupported table"
     assert service.list_jobs(domain=JobDomain.KNOWLEDGE, search="policy") == [jobs[1]]
     assert service.list_jobs(status=JobStatus.RUNNING) == [jobs[0]]
-    assert service.summary().active_count == 1
-    assert service.summary().failed_count == 1
+    assert sum(job.active for job in jobs) == 1
+    assert sum(job.status is JobStatus.FAILED for job in jobs) == 1
     storage.engine.dispose()
 
 

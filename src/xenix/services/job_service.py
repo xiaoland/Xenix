@@ -42,13 +42,6 @@ class JobItem:
         return self.status in {JobStatus.QUEUED, JobStatus.RUNNING}
 
 
-@dataclass(frozen=True)
-class JobSummary:
-    active_count: int
-    failed_count: int
-    total_count: int
-
-
 class JobQueryService:
     """Read-only, cross-domain job feed.
 
@@ -93,14 +86,6 @@ class JobQueryService:
             ]
         jobs.sort(key=lambda job: (job.updated_at, job.reference), reverse=True)
         return jobs[:bounded_limit]
-
-    def summary(self) -> JobSummary:
-        jobs = self.list_jobs(limit=self._MAX_LIMIT)
-        return JobSummary(
-            active_count=sum(job.active for job in jobs),
-            failed_count=sum(job.status is JobStatus.FAILED for job in jobs),
-            total_count=len(jobs),
-        )
 
     def _knowledge_jobs(self) -> list[JobItem]:
         return [
@@ -153,6 +138,11 @@ class JobQueryService:
         ]
 
 
+_KNOWLEDGE_SUCCESS_STATUSES = frozenset(
+    {"succeeded", "canonical_ready", "retrieval_ready", "reused"}
+)
+
+
 def _knowledge_status(status: str) -> JobStatus:
     if status in {"pending", "queued"}:
         return JobStatus.QUEUED
@@ -162,7 +152,9 @@ def _knowledge_status(status: str) -> JobStatus:
         return JobStatus.FAILED
     if status == "cancelled":
         return JobStatus.CANCELLED
-    return JobStatus.SUCCEEDED
+    if status in _KNOWLEDGE_SUCCESS_STATUSES:
+        return JobStatus.SUCCEEDED
+    raise ValueError(f"Unrecognized Knowledge task status: {status!r}")
 
 
-__all__ = ["JobDomain", "JobItem", "JobQueryService", "JobStatus", "JobSummary"]
+__all__ = ["JobDomain", "JobItem", "JobQueryService", "JobStatus"]
