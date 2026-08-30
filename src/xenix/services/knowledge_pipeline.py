@@ -215,7 +215,7 @@ class _CfbOfficeProbeProvider:
 
 
 class _OoxmlOfficeProbeProvider:
-    def __init__(self, *, provider_id: str, profile: _OoxmlPackageProfile) -> None:
+    def __init__(self, *, provider_id: str, profile: _ZipPackageProfile) -> None:
         self.provider_id = provider_id
         self._profile = profile
 
@@ -223,7 +223,7 @@ class _OoxmlOfficeProbeProvider:
         if header.startswith(_CFB_SIGNATURE):
             office_kind, encrypted = _inspect_office_file(source)
             if office_kind != "ooxml" or not encrypted:
-                raise _ooxml_error(self._profile, "package_invalid", "container is invalid")
+                raise _package_error(self._profile, "package_invalid", "container is invalid")
             return FormatProbeFacts(
                 self._profile.source_format,
                 encrypted=True,

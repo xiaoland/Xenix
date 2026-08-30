@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -482,7 +483,7 @@ class DataQueryTransformService:
                             "Transform SQL scripts must leave a final relation named output."
                         ) from exc
                 self._validate_transform_output(temp_output_path)
-                temp_output_path.replace(output_path)
+                shutil.move(temp_output_path, output_path)
             transform_report = {
                 "row_count": row_count,
                 "columns": columns,
