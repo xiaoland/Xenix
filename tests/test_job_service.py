@@ -75,6 +75,32 @@ def test_job_query_projects_and_filters_domain_authorities(monkeypatch, tmp_path
     storage.engine.dispose()
 
 
+def test_job_query_maps_pending_ml_status_to_queued(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
+    paths = ensure_app_dirs(get_app_paths())
+    storage = StorageBootstrapService().initialize(paths)
+    with storage.session_factory() as session:
+        session.add(ProjectRow(id="project-1", name="Forecasting"))
+        session.commit()
+        session.add(
+            MLTaskRow(
+                id="ml-pending",
+                project_id="project-1",
+                dataset_id=None,
+                task_type=MLTaskType.FIT,
+                status=MLTaskStatus.PENDING,
+            )
+        )
+        session.commit()
+
+    jobs = JobQueryService(storage.session_factory).list_jobs()
+
+    assert len(jobs) == 1
+    assert jobs[0].status is JobStatus.QUEUED
+    assert jobs[0].active
+    storage.engine.dispose()
+
+
 def test_job_query_normalizes_completed_knowledge_states(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
     paths = ensure_app_dirs(get_app_paths())

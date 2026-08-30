@@ -129,7 +129,7 @@ class JobQueryService:
                 target=(
                     datasets.get(task.dataset_id, task.dataset_id) if task.dataset_id is not None else task.project_id
                 ),
-                status=JobStatus(task.status.value),
+                status=_ml_status(task.status.value),
                 phase=task.status.value,
                 updated_at=task.updated_at,
                 error_summary=task.error_summary,
@@ -155,6 +155,14 @@ def _knowledge_status(status: str) -> JobStatus:
     if status in _KNOWLEDGE_SUCCESS_STATUSES:
         return JobStatus.SUCCEEDED
     raise ValueError(f"Unrecognized Knowledge task status: {status!r}")
+
+
+def _ml_status(status: str) -> JobStatus:
+    if status == "pending":
+        return JobStatus.QUEUED
+    if status in {"running", "succeeded", "failed", "cancelled"}:
+        return JobStatus(status)
+    raise ValueError(f"Unrecognized ML task status: {status!r}")
 
 
 __all__ = ["JobDomain", "JobItem", "JobQueryService", "JobStatus"]
