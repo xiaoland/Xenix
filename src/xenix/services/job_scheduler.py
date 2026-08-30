@@ -180,6 +180,9 @@ class JobScheduler:
                     self._lock.wait(timeout=_POLL_INTERVAL_SECONDS)
 
     def _dispatch_once(self) -> bool:
+        with self._lock:
+            if not self._armed:
+                return False
         dispatched = False
         for handler in self._handlers.values():
             limit = handler.concurrency_limit
