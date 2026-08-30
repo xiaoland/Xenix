@@ -4,6 +4,13 @@
 
 Developers and support operators use this runbook to inspect local logs, enable or verify OTLP export, or keep a failing telemetry backend from affecting the desktop application. Observability failure must not make interactive startup depend on backend availability.
 
+Agent submissions emit an `agent.harness.submit_user_turn` span across the full
+stream lifetime. It carries the OpenTelemetry GenAI operation, requested model,
+conversation correlation, and attachment counts; exceptions are recorded by the
+shared span boundary. Agent Harness benchmark reports use the same operation and
+conversation attribute vocabulary, allowing a benchmark failure to be compared
+with production traces without coupling benchmark code to an exporter.
+
 ## Local Evidence
 
 Xenix writes JSON Lines to `logs/xenix.log` under the active runtime home. The file rotates at approximately 1 MB and retains three backups. Logs may contain local paths and diagnostic context; handle them as sensitive support evidence.

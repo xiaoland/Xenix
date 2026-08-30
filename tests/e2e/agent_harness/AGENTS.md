@@ -26,9 +26,10 @@ provider adapters, or production settings.
   natural-language prose for number or word grounding; explanation-quality
   grounding is irreducible semantic judgment and belongs to the Judge, never a
   deterministic regex.
-- Judge evidence and persisted reports are bounded. Never pass or retain a
-  transcript, Tool payload, raw source row, raw Artifact/SVG, identifier, path,
-  credential, endpoint, raw provider error, or raw judge request/response.
+- Judge evidence remains bounded and excludes transcripts and raw evaluator
+  exchanges. Lifecycle trace diagnostics may retain identifiers, paths,
+  endpoints, provider errors, exception chains, and stack traces when they make
+  a failed cell reproducible; keep that evidence out of semantic verdicts.
 - Default tests stay offline. Do not add replay/mocks to the product path or a
   network call to ordinary test verification.
 - Every paid cell runs in a killable child process with at most 12 subject
