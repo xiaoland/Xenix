@@ -151,6 +151,11 @@ class KnowledgeTaskQueryService:
                     owner="derivation" if derivation_retryable else "import",
                     owner_id=latest.id if derivation_retryable and latest is not None else row.id,
                     import_id=row.id,
+                    error_summary=(
+                        latest.error_summary
+                        if latest is not None and not prior_success
+                        else row.error_summary
+                    ),
                     can_cancel=row.status in {"queued", "running"},
                     can_retry=bool(row.retryable or derivation_retryable),
                     can_view_log=True,
@@ -174,6 +179,7 @@ class KnowledgeTaskQueryService:
                     owner="derivation",
                     owner_id=latest.id,
                     import_id=latest.import_id,
+                    error_summary=latest.error_summary,
                     can_retry=bool(latest.retryable and latest.import_id),
                     can_view_log=False,
                 )

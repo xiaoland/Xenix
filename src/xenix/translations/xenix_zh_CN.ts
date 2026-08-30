@@ -343,6 +343,180 @@ This route will stay available after model selection is connected.</source>
     </message>
 </context>
 <context>
+    <name>JobCenterDialog</name>
+    <message>
+        <location filename="../ui/job_center.py" line="150"/>
+        <source>Jobs could not be loaded.</source>
+        <translation>无法加载任务。</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="181"/>
+        <source>%1 jobs · %2 active · %3 failed</source>
+        <translation>共 %1 个任务 · %2 个进行中 · %3 个失败</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="201"/>
+        <source>Reference: %1
+Domain: %2
+Type: %3
+Target: %4
+Status: %5
+Phase: %6
+Updated: %7</source>
+        <translation>引用：%1
+领域：%2
+类型：%3
+对象：%4
+状态：%5
+阶段：%6
+更新时间：%7</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="214"/>
+        <source>
+Error: %1</source>
+        <translation>
+错误：%1</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="215"/>
+        <source>Job Details</source>
+        <translation>任务详情</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="219"/>
+        <location filename="../ui/job_center.py" line="249"/>
+        <source>Knowledge</source>
+        <translation>知识库</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="220"/>
+        <location filename="../ui/job_center.py" line="250"/>
+        <source>Machine learning</source>
+        <translation>机器学习</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="225"/>
+        <source>Queued</source>
+        <translation>已排队</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="226"/>
+        <source>Running</source>
+        <translation>运行中</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="227"/>
+        <source>Succeeded</source>
+        <translation>已成功</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="228"/>
+        <source>Failed</source>
+        <translation>失败</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="229"/>
+        <source>Cancelled</source>
+        <translation>已取消</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="234"/>
+        <source>Import</source>
+        <translation>导入</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="235"/>
+        <source>Content preparation</source>
+        <translation>内容准备</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="236"/>
+        <source>Index build</source>
+        <translation>索引构建</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="237"/>
+        <source>Model training</source>
+        <translation>模型训练</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="238"/>
+        <source>Parameter tuning</source>
+        <translation>参数调优</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="239"/>
+        <source>Evaluation</source>
+        <translation>评估</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="240"/>
+        <source>Apply model</source>
+        <translation>应用模型</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="246"/>
+        <source>Jobs</source>
+        <translation>任务</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="248"/>
+        <source>All services</source>
+        <translation>全部服务</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="252"/>
+        <source>All statuses</source>
+        <translation>全部状态</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="257"/>
+        <source>Search jobs</source>
+        <translation>搜索任务</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="260"/>
+        <source>Service</source>
+        <translation>服务</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="261"/>
+        <source>Type</source>
+        <translation>类型</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="262"/>
+        <source>Target</source>
+        <translation>对象</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="263"/>
+        <source>Status</source>
+        <translation>状态</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="264"/>
+        <source>Updated</source>
+        <translation>更新时间</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="267"/>
+        <source>Details</source>
+        <translation>详情</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="268"/>
+        <source>Refresh</source>
+        <translation>刷新</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="269"/>
+        <source>Close</source>
+        <translation>关闭</translation>
+    </message>
+</context>
+<context>
     <name>KnowledgeImportLogDialog</name>
     <message>
         <location filename="../ui/knowledge_workspace.py" line="219"/>
@@ -1344,32 +1518,38 @@ Trigger: %2</source>
 <context>
     <name>MainWindow</name>
     <message>
-        <location filename="../ui/main_window.py" line="290"/>
+        <location filename="../ui/main_window.py" line="300"/>
         <source>Xenix Native</source>
         <translation>Xenix 原生版</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="291"/>
+        <location filename="../ui/main_window.py" line="301"/>
         <source>Xenix</source>
         <translation>Xenix</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="292"/>
+        <location filename="../ui/main_window.py" line="302"/>
         <source>Settings</source>
         <translation>设置</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="293"/>
+        <location filename="../ui/main_window.py" line="303"/>
         <source>Knowledge</source>
         <translation>知识库</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="294"/>
+        <location filename="../ui/main_window.py" line="304"/>
+        <location filename="../ui/main_window.py" line="429"/>
+        <source>Jobs</source>
+        <translation>任务</translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="305"/>
         <source>History</source>
         <translation>历史</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="296"/>
+        <location filename="../ui/main_window.py" line="307"/>
         <source>New thread</source>
         <translation>新建线程</translation>
     </message>
@@ -1390,18 +1570,18 @@ Trigger: %2</source>
         <translation type="vanished">无法打开产物：{path}</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="699"/>
-        <location filename="../ui/main_window.py" line="716"/>
+        <location filename="../ui/main_window.py" line="728"/>
+        <location filename="../ui/main_window.py" line="745"/>
         <source>Opening link...</source>
         <translation>正在打开链接...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="717"/>
+        <location filename="../ui/main_window.py" line="746"/>
         <source>Open Link</source>
         <translation>打开链接</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="771"/>
+        <location filename="../ui/main_window.py" line="800"/>
         <source>The submitted message is being prepared and cannot be stopped.</source>
         <translation>已提交的消息正在准备中，无法停止。</translation>
     </message>
@@ -1446,92 +1626,97 @@ Trigger: %2</source>
         <translation type="vanished">正在下载 Xenix {version}...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="385"/>
+        <location filename="../ui/main_window.py" line="398"/>
         <source>Knowledge Workspace</source>
         <translation>知识工作区</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="386"/>
+        <location filename="../ui/main_window.py" line="399"/>
         <source>Knowledge services are not available.</source>
         <translation>知识库服务当前不可用。</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="515"/>
+        <location filename="../ui/main_window.py" line="430"/>
+        <source>Job services are not available.</source>
+        <translation>任务服务当前不可用。</translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="544"/>
         <source>The selected source path is not a file.</source>
         <translation>所选源路径不是文件。</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="784"/>
+        <location filename="../ui/main_window.py" line="813"/>
         <source>Stopped.</source>
         <translation>已停止。</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="840"/>
+        <location filename="../ui/main_window.py" line="869"/>
         <source>Rename</source>
         <translation>重命名</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="841"/>
+        <location filename="../ui/main_window.py" line="870"/>
         <source>Generate title...</source>
         <translation>生成标题...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="842"/>
+        <location filename="../ui/main_window.py" line="871"/>
         <source>Copy thread ID</source>
         <translation>复制线程 ID</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="843"/>
+        <location filename="../ui/main_window.py" line="872"/>
         <source>Delete</source>
         <translation>删除</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="868"/>
+        <location filename="../ui/main_window.py" line="897"/>
         <source>Rename Thread</source>
         <translation>重命名线程</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="869"/>
-        <location filename="../ui/main_window.py" line="936"/>
+        <location filename="../ui/main_window.py" line="898"/>
+        <location filename="../ui/main_window.py" line="965"/>
         <source>Thread name</source>
         <translation>线程名称</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="885"/>
-        <location filename="../ui/main_window.py" line="916"/>
-        <location filename="../ui/main_window.py" line="946"/>
-        <location filename="../ui/main_window.py" line="956"/>
+        <location filename="../ui/main_window.py" line="914"/>
+        <location filename="../ui/main_window.py" line="945"/>
+        <location filename="../ui/main_window.py" line="975"/>
+        <location filename="../ui/main_window.py" line="985"/>
         <source>Generate Thread Title</source>
         <translation>生成线程标题</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="886"/>
+        <location filename="../ui/main_window.py" line="915"/>
         <source>Thread title model is not configured.</source>
         <translation>未配置线程标题模型。</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="909"/>
+        <location filename="../ui/main_window.py" line="938"/>
         <source>Generating thread title...</source>
         <translation>正在生成线程标题...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="935"/>
+        <location filename="../ui/main_window.py" line="964"/>
         <source>Apply Generated Title</source>
         <translation>应用生成的标题</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="971"/>
-        <location filename="../ui/main_window.py" line="979"/>
+        <location filename="../ui/main_window.py" line="1000"/>
+        <location filename="../ui/main_window.py" line="1008"/>
         <source>Delete Thread</source>
         <translation>删除线程</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="972"/>
+        <location filename="../ui/main_window.py" line="1001"/>
         <source>Stop the current run before deleting this thread.</source>
         <translation>删除此线程前请先停止当前运行。</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="980"/>
+        <location filename="../ui/main_window.py" line="1009"/>
         <source>Delete &quot;{title}&quot;? This action cannot be undone.</source>
         <translation>删除“{title}”？此操作无法撤销。</translation>
     </message>
@@ -2890,12 +3075,12 @@ Reason: {reason}</source>
         <translation>前往购买</translation>
     </message>
     <message>
-        <location filename="../app.py" line="824"/>
+        <location filename="../app.py" line="831"/>
         <source>Unable to start Xenix</source>
         <translation>无法启动 Xenix</translation>
     </message>
     <message>
-        <location filename="../app.py" line="825"/>
+        <location filename="../app.py" line="832"/>
         <source>Xenix could not finish startup.
 
 {error}</source>
