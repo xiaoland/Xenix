@@ -99,18 +99,25 @@ class JobScheduler:
         """Register a unit of domain work as a queued job and arm it for dispatch."""
         if domain not in self._handlers:
             raise ValueError(f"No job handler registered for domain {domain.value!r}.")
-        now = utc_now()
-        job = JobRow(
-            domain=domain,
-            kind=kind,
-            reference=reference,
-            status=JobStatus.QUEUED,
-            phase=phase,
-            error_summary=error_summary,
-            created_at=now,
-            updated_at=now,
-        )
         with self._session_factory() as session:
+            existing = session.exec(
+                select(JobRow).where(
+                    JobRow.domain == domain,
+                    JobRow.reference == reference,
+                )
+            ).first()
+            if existing is not None:
+                return existing.id
+            job = JobRow(
+                domain=domain,
+                kind=kind,
+                reference=reference,
+                status=JobStatus.QUEUED,
+                phase=phase,
+                error_summary=error_summary,
+                created_at=utc_now(),
+                updated_at=utc_now(),
+            )
             session.add(job)
             session.commit()
         with self._lock:

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import queue
 import shutil
 import threading
 from collections.abc import Callable, Iterable, Mapping
@@ -146,15 +145,9 @@ class MLTaskService:
         self._worker_runner = worker_runner or MLWorkerPool(
             worker_settings_service or MLWorkerSettingsService(paths)
         )
-        self._queue: queue.Queue[str] = queue.Queue()
         self._callbacks: list[Callable[[MLTaskRow], None]] = []
-        self._dispatcher_thread: threading.Thread | None = None
         self._lock = threading.Lock()
-        self._submitted_ids: set[str] = set()
         self._trace_carriers: dict[str, dict[str, str]] = {}
-        self._dispatch_semaphore = threading.BoundedSemaphore(
-            max(1, int(getattr(self._worker_runner, "max_dispatch_threads", 1)))
-        )
 
     def register_completion_listener(self, callback: Callable[[MLTaskRow], None]) -> None:
         self._callbacks.append(callback)
@@ -191,7 +184,12 @@ class MLTaskService:
             self._record_task(row)
             return row
 
-    def submit_ml_task(self, ml_task_id: str) -> None:
+    @property
+    def max_concurrent_tasks(self) -> int:
+        return max(1, int(getattr(self._worker_runner, "max_concurrent_tasks", 1)))
+
+    def prepare_ml_task(self, ml_task_id: str) -> None:
+        """Stage a pending task for dispatch: validate, write request, capture trace."""
         task = self.get_ml_task(ml_task_id)
         if task.status is not MLTaskStatus.PENDING:
             raise InvalidStateTransitionError(
@@ -207,14 +205,25 @@ class MLTaskService:
             json.dumps(task.request_payload, indent=2, ensure_ascii=True),
             encoding="utf-8",
         )
+        with self._lock:
+            self._trace_carriers[ml_task_id] = inject_context({})
+
+    def run_task(self, ml_task_id: str) -> MLTaskRow | None:
+        """Execute a queued task to completion and notify completion listeners."""
+        from .runtime_activity import activity_coordinator
 
         with self._lock:
-            if ml_task_id in self._submitted_ids:
-                return
-            self._submitted_ids.add(ml_task_id)
-            self._trace_carriers[ml_task_id] = inject_context({})
-            self._queue.put(ml_task_id)
-            self._ensure_dispatcher_locked()
+            carrier = self._trace_carriers.pop(ml_task_id, {})
+        token = otel_context.attach(extract_context(carrier)) if carrier else None
+        try:
+            with activity_coordinator.work(f"ml:{ml_task_id}"):
+                finished_task = self._run_task(ml_task_id)
+                if finished_task is not None:
+                    self._notify_callbacks(finished_task)
+                return finished_task
+        finally:
+            if token is not None:
+                otel_context.detach(token)
 
     def start_ml_task(self, input_data: StartMLTaskInput) -> MLTaskRow:
         with self._session_factory() as session:
@@ -301,45 +310,6 @@ class MLTaskService:
             for line in path.read_text(encoding="utf-8").splitlines()
             if line.strip()
         ]
-
-    def _ensure_dispatcher_locked(self) -> None:
-        if self._dispatcher_thread is not None and self._dispatcher_thread.is_alive():
-            return
-        self._dispatcher_thread = threading.Thread(
-            target=self._dispatch_loop,
-            name="xenix-ml-dispatcher",
-            daemon=True,
-        )
-        self._dispatcher_thread.start()
-
-    def _dispatch_loop(self) -> None:
-        while True:
-            ml_task_id = self._queue.get()
-            self._dispatch_semaphore.acquire()
-            threading.Thread(
-                target=self._run_queued_task,
-                args=(ml_task_id,),
-                name=f"xenix-ml-task-{ml_task_id[:8]}",
-                daemon=True,
-            ).start()
-
-    def _run_queued_task(self, ml_task_id: str) -> None:
-        from .runtime_activity import activity_coordinator
-
-        carrier = self._trace_carriers.pop(ml_task_id, {})
-        token = otel_context.attach(extract_context(carrier)) if carrier else None
-        try:
-            with activity_coordinator.work(f"ml:{ml_task_id}"):
-                finished_task = self._run_task(ml_task_id)
-                if finished_task is not None:
-                    self._notify_callbacks(finished_task)
-        finally:
-            if token is not None:
-                otel_context.detach(token)
-            with self._lock:
-                self._submitted_ids.discard(ml_task_id)
-            self._queue.task_done()
-            self._dispatch_semaphore.release()
 
     def _run_task(self, ml_task_id: str) -> MLTaskRow | None:
         task = self.get_ml_task(ml_task_id)

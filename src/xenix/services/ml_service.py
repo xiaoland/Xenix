@@ -5,7 +5,7 @@ import difflib
 import hashlib
 import json
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 import unicodedata
 
 from pydantic import Field, model_validator
@@ -43,6 +43,7 @@ from .ml_task_service import CancelMLTaskInput, CreateMLTaskInput, MLTaskService
 from .storage.models import (
     DatasetColumnBindingRow,
     DatasetRow,
+    JobDomain,
     MLTaskArtifactRow,
     MLTaskRow,
     MLTaskStatus,
@@ -52,6 +53,9 @@ from .storage.models import (
 from .storage.repositories import DatasetColumnBindingRepository, MLTaskRepository, TrainedModelRepository
 from .trained_model_metadata import parse_trained_model_metadata, with_evaluation, with_evaluation_task
 from .tabular import resolve_tabular_column_index, resolve_tabular_schema
+
+if TYPE_CHECKING:
+    from .job_scheduler import JobScheduler
 
 _COLUMN_NAME_NORMALIZATION_TRANSLATION = str.maketrans(
     {
@@ -151,15 +155,32 @@ class MLService:
         session_factory: sessionmaker,
         dataset_service: DatasetService,
         ml_task_service: MLTaskService,
+        scheduler: "JobScheduler | None" = None,
     ) -> None:
         self._paths = paths
         self._session_factory = session_factory
         self._dataset_service = dataset_service
         self._ml_task_service = ml_task_service
+        self._scheduler = scheduler or self._build_default_scheduler()
         self._trained_models = TrainedModelRepository()
         self._ml_tasks = MLTaskRepository()
         self._column_bindings = DatasetColumnBindingRepository()
         self._ml_task_service.register_completion_listener(self._handle_task_completion)
+
+    def _build_default_scheduler(self) -> "JobScheduler":
+        from .job_scheduler import JobScheduler
+        from .ml_job_handler import MLJobHandler
+
+        scheduler = JobScheduler(
+            self._session_factory,
+            [MLJobHandler(self._ml_task_service)],
+        )
+        scheduler.start()
+        return scheduler
+
+    def _submit_ml_task(self, task: MLTaskRow) -> None:
+        self._ml_task_service.prepare_ml_task(task.id)
+        self._scheduler.enqueue(JobDomain.ML, task.task_type.value, task.id)
 
     def list_models(self) -> list[Any]:
         return list_model_catalog()
@@ -440,7 +461,7 @@ class MLService:
         )
         created = self._create_task_from_request(MLTaskType.EVALUATE, evaluate_request)
         self._attach_evaluation_task_to_trained_model(trained_model_id, created.id)
-        self._ml_task_service.submit_ml_task(created.id)
+        self._submit_ml_task(created)
 
     def _update_evaluated_trained_model(self, task: MLTaskRow) -> None:
         result_payload = task.result_payload or {}
@@ -598,7 +619,7 @@ class MLService:
         request: FitTaskRequest | HyperparameterTuningTaskRequest,
     ) -> MLTaskRow:
         created = self._create_task_from_request(task_type, request)
-        self._ml_task_service.submit_ml_task(created.id)
+        self._submit_ml_task(created)
         return created
 
     def _create_task_from_request(
@@ -626,7 +647,7 @@ class MLService:
             session.commit()
             session.refresh(row)
             if auto_submit:
-                self._ml_task_service.submit_ml_task(created.id)
+                self._submit_ml_task(created)
             return row
 
     def _build_apply_context(self, input_data: ApplyWithFilesInput) -> "_ApplyContext":
