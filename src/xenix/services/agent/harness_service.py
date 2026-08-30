@@ -20,6 +20,7 @@ from uuid import uuid4
 from sqlmodel import Field, SQLModel
 
 from ...exceptions import NotFoundError, ValidationError
+from ...observability import start_span
 from ..dataset_service import DatasetService, RegisterDatasetInput
 from ..llm import (
     AppendUserMessageInput,
@@ -273,6 +274,21 @@ class AgentHarnessService:
         return final
 
     def submit_user_turn_stream(self, input_data: SubmitUserTurnInput) -> Iterator[AgentHarnessStreamEvent]:
+        """Submit one turn under the production trace boundary used by benchmarks."""
+
+        with start_span(
+            "agent.harness.submit_user_turn",
+            {
+                "gen_ai.operation.name": "invoke_agent",
+                "gen_ai.request.model": input_data.fq_model_key or "thread_default",
+                "gen_ai.conversation.id": input_data.thread_id or "new",
+                "agent.attachment.dataset.count": len(input_data.dataset_attachments),
+                "agent.attachment.source.count": len(input_data.source_attachments),
+            },
+        ):
+            yield from self._submit_user_turn_stream(input_data)
+
+    def _submit_user_turn_stream(self, input_data: SubmitUserTurnInput) -> Iterator[AgentHarnessStreamEvent]:
         self._validate_submission(input_data)
         thread_id = input_data.thread_id
         if thread_id is None:

@@ -106,6 +106,16 @@ Subject measurements include the Harness turn's latency, token usage, messages,
 Tool calls/results, retries, and derived outputs. Judge latency, usage, and
 retries are evaluation metadata and never contribute to subject performance.
 
+Each persisted cell also carries a vendor-neutral lifecycle trace correlated by
+`trace_id`. Completed phase events record span identity, relative start,
+duration, status, structured attributes, and the complete exception cause chain
+with stack traces. The standard phase vocabulary covers cell open/close, case
+preparation and assessment, subject execution, and Judge evaluation. These are
+debug evidence, not semantic pass criteria. CLI output includes both the trace
+id and absolute report path so a terminal failure can be joined directly to its
+JSON evidence. Attribute names follow OpenTelemetry GenAI conventions where a
+stable term exists; the report remains usable without an OTLP backend.
+
 ## Paid Cell Safety
 
 Every live cell runs in its own spawn child process. The parent terminates its
@@ -122,7 +132,9 @@ reservation. The current normalized response is counted atomically; no later
 request is admitted after the boundary is reached. Missing usage invalidates
 the cell. Persisted schema v5 records the installed policy, observed counts,
 budget status, effective settings hash, case/runtime identity, invocation ID,
-and Harness variant without retaining settings, provider errors, or paths. The
+Harness variant, and lifecycle trace. Trace diagnostics may retain runtime paths
+and provider exception detail needed to reproduce a failure; they remain
+separate from Judge evidence and acceptance inputs. The
 runtime identity binds Python/platform, the dependency lock, and the shared
 benchmark execution code so a changed evaluator seam cannot silently enter a
 comparison cohort.

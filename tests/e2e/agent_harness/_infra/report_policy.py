@@ -572,6 +572,7 @@ def _validate_v5_report(payload: Mapping[str, Any]) -> None:
             "report_kind", "schema_version", "case_id", "run_id", "provider_model",
             "execution_mode", "run_status", "semantic", "integrity", "judge",
             "subject_metrics", "budget", "identity", "failure_kind",
+            "trace",
         },
         "report_shape_invalid",
     )
@@ -606,6 +607,39 @@ def _validate_v5_report(payload: Mapping[str, Any]) -> None:
     )
     _validate_identity(payload["identity"])
     _optional_bounded_string(payload["failure_kind"], "failure_kind_invalid", maximum=128)
+    _validate_trace(payload["trace"])
+
+
+def _validate_trace(value: object) -> None:
+    if value is None:
+        return
+    trace = _object(value, "trace_shape_invalid")
+    _exact_keys(trace, {"trace_id", "events"}, "trace_shape_invalid")
+    _bounded_string(trace["trace_id"], "trace_id_invalid", maximum=96)
+    events = trace["events"]
+    if not isinstance(events, list) or len(events) > 128:
+        raise ReportPolicyError("trace_events_invalid")
+    for value in events:
+        event = _object(value, "trace_event_invalid")
+        _exact_keys(
+            event,
+            {
+                "name", "span_id", "parent_span_id", "started_offset_seconds",
+                "duration_seconds", "status", "attributes", "exception",
+            },
+            "trace_event_invalid",
+        )
+        _bounded_string(event["name"], "trace_event_invalid", maximum=160)
+        _bounded_string(event["span_id"], "trace_event_invalid", maximum=32)
+        _optional_bounded_string(event["parent_span_id"], "trace_event_invalid", maximum=32)
+        if not isinstance(event["started_offset_seconds"], (int, float)):
+            raise ReportPolicyError("trace_event_invalid")
+        if not isinstance(event["duration_seconds"], (int, float)):
+            raise ReportPolicyError("trace_event_invalid")
+        _enum_string(event["status"], {"ok", "error"}, "trace_event_invalid")
+        _object(event["attributes"], "trace_event_invalid")
+        if event["exception"] is not None:
+            _object(event["exception"], "trace_event_invalid")
 
 
 def _validate_outcome_channel(value: object, *, semantic: bool) -> None:
