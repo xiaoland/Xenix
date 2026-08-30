@@ -1055,10 +1055,6 @@ class KnowledgeImportService:
         needs_attention = code in {
             "knowledge_password_required",
             "knowledge_password_invalid",
-            "knowledge_doc_converter_unavailable",
-            "knowledge_doc_conversion_failed",
-            "knowledge_ppt_converter_unavailable",
-            "knowledge_ppt_conversion_failed",
             "knowledge_source_reselection_required",
         }
         with self._session_factory() as session:
@@ -1198,5 +1194,4 @@ __all__ = [
     "KnowledgeImportView",
     "ParserRouter",
     "SUPPORTED_KNOWLEDGE_SUFFIXES",
-    "_find_libreoffice",
 ]
