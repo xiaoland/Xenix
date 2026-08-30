@@ -56,8 +56,9 @@ supports, and what uncertainty remains.
   multiple-library instances, but no library-management UI is promised.
 - Knowledge import preserves the selected source and canonical content locally.
   Local OCR is installed explicitly through the Knowledge Workspace and supports
-  standalone JPEG/PNG sources and scanned PDF pages. documents and presentations use a bounded local Rust parser adapted into the
-  canonical Docling content IR. Retrieval preserves heading hierarchy and bounded
+  standalone JPEG/PNG sources and scanned PDF pages. Documents and
+  presentations use a bounded local Rust parser adapted into the canonical
+  Docling content IR. Retrieval preserves heading hierarchy and bounded
   sentence-aware overlap. VLM and Markdown imports are outside MVP.
 - Browser-first operation, an always-on Xenix server, and hosted product authority
   are out of scope.
