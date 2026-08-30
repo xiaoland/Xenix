@@ -174,6 +174,26 @@ def test_cancel_running_job_reports_cancelled(monkeypatch, tmp_path) -> None:
     storage.engine.dispose()
 
 
+def test_register_handler_after_start_recovers_and_dispatches(monkeypatch, tmp_path) -> None:
+    storage = _bootstrap(monkeypatch, tmp_path)
+    ml_handler = FakeHandler(JobDomain.ML)
+    scheduler = JobScheduler(storage.session_factory, [ml_handler])
+    scheduler.start()
+
+    with storage.session_factory() as session:
+        _seed_job(session, JobDomain.KNOWLEDGE, "kb-queued", JobStatus.QUEUED)
+
+    kb_handler = KnowledgeRecoverHandler(JobDomain.KNOWLEDGE)
+    scheduler.register_handler(kb_handler)
+    scheduler.recover_handler(kb_handler)
+
+    assert _wait_until(lambda: len(kb_handler.runs) == 1)
+    assert kb_handler.runs == ["kb-queued"]
+    assert _job_status(storage, JobDomain.KNOWLEDGE, "kb-queued") is JobStatus.SUCCEEDED
+    scheduler.shutdown()
+    storage.engine.dispose()
+
+
 def test_recovery_applies_per_domain_policy(monkeypatch, tmp_path) -> None:
     storage = _bootstrap(monkeypatch, tmp_path)
     ml_handler = FakeHandler(JobDomain.ML)

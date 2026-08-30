@@ -5,7 +5,7 @@ import threading
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy.orm import sessionmaker
 from sqlmodel import select
@@ -23,6 +23,7 @@ from .knowledge_projection import (
     retrieval_content_fingerprint,
 )
 from .storage.models import (
+    JobDomain,
     KnowledgeCanonicalGenerationRow,
     KnowledgeDerivationRow,
     KnowledgeDocumentRow,
@@ -30,6 +31,9 @@ from .storage.models import (
     utc_now,
 )
 from .storage.repositories.knowledge import KnowledgeRepository
+
+if TYPE_CHECKING:
+    from .job_scheduler import JobScheduler
 
 _STOP = object()
 LOGGER = logging.getLogger(__name__)
@@ -63,27 +67,39 @@ class KnowledgeDerivationService:
         session_factory: sessionmaker,
         retrieval_ready_notifier: Callable[[str], object] | None = None,
         start_worker: bool = True,
+        scheduler: JobScheduler | None = None,
     ) -> None:
         self._session_factory = session_factory
         self._store = KnowledgeContentStore(paths)
         self._repository = KnowledgeRepository()
         self._retrieval_ready_notifier = retrieval_ready_notifier
+        self._scheduler = scheduler
         self._queue: queue.Queue[str | object] = queue.Queue()
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
-        pending = self._recover_jobs()
-        if start_worker:
-            self._thread = threading.Thread(
-                target=self._worker_main,
-                name="xenix-knowledge-derivation",
-                daemon=True,
-            )
-            self._thread.start()
-            for job_id in pending:
-                self.notify(job_id)
+        if scheduler is None:
+            pending = self.recover_pending()
+            if start_worker:
+                self._thread = threading.Thread(
+                    target=self._worker_main,
+                    name="xenix-knowledge-derivation",
+                    daemon=True,
+                )
+                self._thread.start()
+                for job_id in pending:
+                    self.notify(job_id)
 
     def notify(self, job_id: str) -> None:
-        if not self._stop.is_set():
+        self._submit(job_id)
+
+    def _submit(self, job_id: str) -> None:
+        if self._scheduler is not None:
+            self._scheduler.enqueue(
+                JobDomain.KNOWLEDGE,
+                "content_preparation",
+                job_id,
+            )
+        elif not self._stop.is_set():
             self._queue.put(job_id)
 
     def enqueue_generation(
@@ -343,7 +359,17 @@ class KnowledgeDerivationService:
             finally:
                 self._queue.task_done()
 
-    def _recover_jobs(self) -> list[str]:
+    def run_unit(self, job_id: str) -> None:
+        self.derive_now(job_id)
+
+    def job_outcome(self, job_id: str) -> tuple[str, str | None]:
+        with self._session_factory() as session:
+            row = session.get(KnowledgeDerivationRow, job_id)
+            if row is None:
+                return ("failed", "Knowledge derivation job is missing.")
+            return (row.status, row.error_summary)
+
+    def recover_pending(self) -> list[str]:
         pending: list[str] = []
         with self._session_factory() as session:
             rows = list(

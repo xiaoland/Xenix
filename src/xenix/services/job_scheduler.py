@@ -75,6 +75,13 @@ class JobScheduler:
         self._dispatch_thread: threading.Thread | None = None
         self._worker_threads: set[threading.Thread] = set()
 
+    def register_handler(self, handler: JobHandler) -> None:
+        """Add or replace a domain handler after construction."""
+        with self._lock:
+            self._handlers[handler.domain] = handler
+            self._active_counts.setdefault(handler.domain, 0)
+            self._lock.notify()
+
     def start(self) -> None:
         """Recover persisted jobs, then begin dispatching armed queued work."""
         requeue = self._recover()
@@ -156,21 +163,33 @@ class JobScheduler:
 
     def _recover(self) -> list[str]:
         requeue: list[str] = []
+        for handler in list(self._handlers.values()):
+            requeue.extend(self._recover_handler_locked(handler))
+        return requeue
+
+    def _recover_handler_locked(self, handler: JobHandler) -> list[str]:
+        requeue: list[str] = []
         with self._session_factory() as session:
-            for handler in self._handlers.values():
-                jobs = list(
-                    session.exec(
-                        select(JobRow).where(
-                            JobRow.domain == handler.domain,
-                            JobRow.status.in_(
-                                [JobStatus.QUEUED, JobStatus.RUNNING]
-                            ),
-                        )
+            jobs = list(
+                session.exec(
+                    select(JobRow).where(
+                        JobRow.domain == handler.domain,
+                        JobRow.status.in_(
+                            [JobStatus.QUEUED, JobStatus.RUNNING]
+                        ),
                     )
                 )
-                requeue.extend(handler.recover(session, jobs))
+            )
+            requeue.extend(handler.recover(session, jobs))
             session.commit()
         return requeue
+
+    def recover_handler(self, handler: JobHandler) -> None:
+        """Run recovery for a handler registered after startup and arm its jobs."""
+        requeue = self._recover_handler_locked(handler)
+        with self._lock:
+            self._armed.update(requeue)
+            self._lock.notify()
 
     def _dispatch_loop(self) -> None:
         while not self._stop.is_set():

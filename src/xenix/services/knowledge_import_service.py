@@ -8,7 +8,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import sessionmaker
@@ -49,6 +49,7 @@ from .knowledge_task_logs import KnowledgeTaskLogEntry, KnowledgeTaskLogStore
 from .storage.models import (
     ArtifactKind,
     ArtifactRow,
+    JobDomain,
     KnowledgeCanonicalGenerationRow,
     KnowledgeDocumentRow,
     KnowledgeImportRow,
@@ -56,6 +57,9 @@ from .storage.models import (
     utc_now,
 )
 from .storage.layout import knowledge_root
+
+if TYPE_CHECKING:
+    from .job_scheduler import JobScheduler
 
 _STOP = object()
 LOGGER = logging.getLogger(__name__)
@@ -172,6 +176,7 @@ class KnowledgeImportService:
         canonical_ready_notifier: Callable[[str, str, str | None], object] | None = None,
         corpus_changed_notifier: Callable[[str], object] | None = None,
         start_worker: bool = True,
+        scheduler: JobScheduler | None = None,
     ) -> None:
         self._paths = paths
         self._session_factory = session_factory
@@ -182,6 +187,7 @@ class KnowledgeImportService:
         self._worker_runner = worker_runner or LocalKnowledgeImportWorkerRunner()
         self._canonical_ready_notifier = canonical_ready_notifier
         self._corpus_changed_notifier = corpus_changed_notifier
+        self._scheduler = scheduler
         self._queue: queue.Queue[str | object] = queue.Queue()
         self._passwords: dict[str, str] = {}
         self._password_lock = threading.Lock()
@@ -191,16 +197,17 @@ class KnowledgeImportService:
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self.cleanup_storage_orphans()
-        pending = self._recover_imports()
-        if start_worker:
-            self._thread = threading.Thread(
-                target=self._worker_main,
-                name="xenix-knowledge-import",
-                daemon=True,
-            )
-            self._thread.start()
-            for import_id in pending:
-                self._queue.put(import_id)
+        if scheduler is None:
+            pending = self.recover_pending()
+            if start_worker:
+                self._thread = threading.Thread(
+                    target=self._worker_main,
+                    name="xenix-knowledge-import",
+                    daemon=True,
+                )
+                self._thread.start()
+                for import_id in pending:
+                    self._queue.put(import_id)
 
     def preflight_import(self, source_path: Path) -> FileProbeResult:
         return self._probe.probe(source_path)
@@ -242,7 +249,7 @@ class KnowledgeImportService:
         self._remember_source_path(import_id, source)
         self._remember_password(import_id, password)
         self._log_event(import_id, phase="queued", event_code="import_queued")
-        self._queue.put(import_id)
+        self._submit(import_id)
         return KnowledgeImportReceipt(import_id, "queued", False)
 
     def import_file(
@@ -370,7 +377,7 @@ class KnowledgeImportService:
             self._remember_source_path(row.id, source_reference)
         self._remember_password(row.id, password)
         self._log_event(row.id, phase="queued", event_code="import_retry_queued")
-        self._queue.put(row.id)
+        self._submit(row.id)
         return KnowledgeImportReceipt(row.id, row.status, False)
 
     def cancel_import(self, import_id: str) -> bool:
@@ -853,7 +860,38 @@ class KnowledgeImportService:
                 reused_existing=row.reused_existing,
             )
 
-    def _recover_imports(self) -> list[str]:
+    def _submit(self, import_id: str) -> None:
+        if self._scheduler is not None:
+            self._scheduler.enqueue(JobDomain.KNOWLEDGE, "import", import_id)
+        elif not self._stop.is_set():
+            self._queue.put(import_id)
+
+    def run_import(self, import_id: str) -> None:
+        try:
+            self._process_import(import_id)
+        except Exception as exc:
+            LOGGER.exception(
+                "Knowledge import attempt failed",
+                extra={"event_name": "knowledge.import.failed", "import_id": import_id},
+            )
+            self._record_failure(import_id, exc)
+        finally:
+            self._store.discard_staged_canonical_bundle(import_id)
+
+    def run_unit(self, import_id: str) -> None:
+        self.run_import(import_id)
+
+    def job_outcome(self, import_id: str) -> tuple[str, str | None]:
+        with self._session_factory() as session:
+            row = session.get(KnowledgeImportRow, import_id)
+            if row is None:
+                return ("failed", "Knowledge import is missing.")
+            return (row.status, row.error_summary)
+
+    def cancel_unit(self, import_id: str) -> None:
+        self.cancel_import(import_id)
+
+    def recover_pending(self) -> list[str]:
         pending: list[str] = []
         with self._session_factory() as session:
             rows = list(

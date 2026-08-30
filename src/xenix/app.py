@@ -526,6 +526,7 @@ def build_main_window(
         knowledge_import_service = None
         knowledge_derivation_service = None
         knowledge_index_service = None
+        scheduler = None
         runtime_shutdown_started = False
         runtime_shutdown_connected = False
 
@@ -543,6 +544,8 @@ def build_main_window(
                 knowledge_derivation_service.shutdown()
             if knowledge_index_service is not None:
                 knowledge_index_service.shutdown()
+            if scheduler is not None:
+                scheduler.shutdown()
             context.engine.dispose()
             flush_observability()
             shutdown_logging()
@@ -565,6 +568,7 @@ def build_main_window(
                 paths.logs / LLM_USAGE_JOURNAL_FILE_NAME
             ),
         )
+        scheduler = agent_services.scheduler
         link_router = runtime.LinkRouter(
             artifact_service=agent_services.artifacts,
         )
@@ -577,11 +581,13 @@ def build_main_window(
             semantic_service=agent_services.knowledge_semantic,
             embedding_service=agent_services.embedding,
             embedding_settings_source=embedding_settings_service,
+            scheduler=scheduler,
         )
         knowledge_derivation_service = runtime.KnowledgeDerivationService(
             paths=paths,
             session_factory=context.session_factory,
             retrieval_ready_notifier=knowledge_index_service.notify_corpus_changed,
+            scheduler=scheduler,
         )
         knowledge_import_service = runtime.KnowledgeImportService(
             paths=paths,
@@ -589,7 +595,23 @@ def build_main_window(
             artifact_service=agent_services.artifacts,
             canonical_ready_notifier=knowledge_derivation_service.enqueue_generation,
             corpus_changed_notifier=knowledge_index_service.notify_corpus_changed,
+            scheduler=scheduler,
         )
+        from .services.knowledge_job_handlers import (
+            KnowledgeDerivationHandler,
+            KnowledgeImportHandler,
+            KnowledgeIndexHandler,
+        )
+
+        knowledge_handlers = [
+            KnowledgeImportHandler(knowledge_import_service),
+            KnowledgeDerivationHandler(knowledge_derivation_service),
+            KnowledgeIndexHandler(knowledge_index_service),
+        ]
+        for handler in knowledge_handlers:
+            scheduler.register_handler(handler)
+        for handler in knowledge_handlers:
+            scheduler.recover_handler(handler)
         knowledge_document_lifecycle_service = (
             runtime.KnowledgeDocumentLifecycleService(
                 session_factory=context.session_factory,
