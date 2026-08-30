@@ -21,7 +21,7 @@ recreate those authorities.
   presentation is optional post-snapshot enrichment and never canonical content.
 - Preserve causal ordering and canonical convergence across provider calls,
   tools, streaming, cancellation, and failure. Use the
-  [LLM conversation boundary](../../../../docs/20-product-tdd/llm-conversation-boundary.md)
+  [LLM conversation boundary](../../../../docs/20-prd-tdd/llm-conversation-boundary.md)
   and [Unit TDD](../../../../docs/30-unit-tdd/README.md) when changing that loop.
 
 Verify focused Harness behavior in `tests/agent/test_agent_harness_first_slice.py`

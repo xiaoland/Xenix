@@ -145,6 +145,6 @@ For migration-specific failure paths, use [Local State Evolution](local-state-ev
 
 ## Remote Workers and Support Bundles
 
-After restoring or changing worker settings, revalidate the selected SSH worker before trusting it. Clear remote staged/cache data only after confirming the remote root and that no active task depends on it. Worker authority and local finalization are owned by [Product TDD](../20-product-tdd/README.md); known setup gaps remain recorded in [ADR 0005](../20-product-tdd/adr/0005-ssh-ml-worker-pool.md).
+After restoring or changing worker settings, revalidate the selected SSH worker before trusting it. Clear remote staged/cache data only after confirming the remote root and that no active task depends on it. Worker authority and local finalization are owned by [Product TDD](../20-prd-tdd/README.md); known setup gaps remain recorded in [ADR 0005](../20-prd-tdd/adr/0005-ssh-ml-worker-pool.md).
 
 `pdm run diagnostic-bundle` creates a local support archive without the raw database. Treat it as sensitive: it contains logs, task logs, the persistent install id, and database summaries. Before manual sharing, review the archive, approve the recipient and retention period, and arrange deletion. The script and its tests own the exact manifest.

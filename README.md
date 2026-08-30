@@ -2,7 +2,7 @@
 
 PySide6 desktop application for the Xenix Native product line.
 
-Repository routing and knowledge ownership start in [AGENTS.md](AGENTS.md). Non-trivial work follows the [working protocol](docs/00-meta/working-protocol.md).
+Repository routing and knowledge ownership start in [AGENTS.md](AGENTS.md). Framework guidance (working methods, task packets, verification, and taste) is browsed with `svc lookup`.
 
 ## Quick Start
 
@@ -27,12 +27,11 @@ Contributor, test, translation, and packaging commands are owned by [CONTRIBUTIN
 
 ## Documentation Model
 
-- Working protocol: [docs/00-meta/working-protocol.md](docs/00-meta/working-protocol.md)
-- Implementation taste: [docs/00-meta/implementation-taste.md](docs/00-meta/implementation-taste.md)
 - PRD: [docs/10-prd/README.md](docs/10-prd/README.md)
-- Product TDD: [docs/20-product-tdd/README.md](docs/20-product-tdd/README.md)
+- Product TDD: [docs/20-prd-tdd/README.md](docs/20-prd-tdd/README.md)
 - Unit TDD: [docs/30-unit-tdd/README.md](docs/30-unit-tdd/README.md)
 - Deployment: [docs/40-deployment/README.md](docs/40-deployment/README.md)
 - Contributor workflow: [CONTRIBUTING.md](CONTRIBUTING.md)
+- SVC corpus baseline: [svc.json](svc.json)
 
 For packaged delivery, see [Packaging](docs/40-deployment/packaging.md). For resolved application paths, persisted state, and recovery, see [Runtime State](docs/40-deployment/runtime-state.md).

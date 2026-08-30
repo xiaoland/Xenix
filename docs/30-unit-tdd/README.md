@@ -2,7 +2,7 @@
 
 ## Admission
 
-The [LLM conversation boundary](../20-product-tdd/llm-conversation-boundary.md)
+The [LLM conversation boundary](../20-prd-tdd/llm-conversation-boundary.md)
 is the sole cross-unit authority for topology, ownership, and primary
 sequences. This document records only local seams that are expensive to
 reconstruct while changing the LLM Conversation / Harness implementation; it
