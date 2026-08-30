@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import codecs
 import hashlib
+import io
 import json
+import re
 import shutil
 import stat
 import subprocess
@@ -40,18 +42,18 @@ MAX_OCR_RESULT_BYTES = MAX_PROTOCOL_MESSAGE_BYTES
 MAX_SOURCE_BYTES = 512 * 1024 * 1024
 MAX_TEXT_LINE_CHARS = 1_000_000
 MAX_IMAGE_PIXELS = 100_000_000
-MAX_OOXML_PACKAGE_ENTRIES = 20_000
-MAX_OOXML_ENTRY_BYTES = 128 * 1024 * 1024
-MAX_OOXML_EXPANDED_BYTES = 512 * 1024 * 1024
-MAX_OOXML_COMPRESSION_RATIO = 200
-MAX_OOXML_MEMBER_NAME_BYTES = 512
-MAX_OOXML_MEMBER_DEPTH = 32
+MAX_PACKAGE_ENTRIES = 20_000
+MAX_PACKAGE_ENTRY_BYTES = 128 * 1024 * 1024
+MAX_PACKAGE_EXPANDED_BYTES = 512 * 1024 * 1024
+MAX_PACKAGE_COMPRESSION_RATIO = 200
+MAX_PACKAGE_MEMBER_NAME_BYTES = 512
+MAX_PACKAGE_MEMBER_DEPTH = 32
 MAX_HASHABLE_IR_BYTES = 256 * 1024 * 1024
+MAX_ANYDOC_MARKDOWN_BYTES = 64 * 1024 * 1024
+MAX_ANYDOC_BLOCKS = 100_000
 _CFB_SIGNATURE = bytes.fromhex("D0CF11E0A1B11AE1")
 _IO_CHUNK_BYTES = 1024 * 1024
-_PROCESS_TERMINATE_GRACE_SECONDS = 2.0
-_LIBREOFFICE_TIMEOUT_SECONDS = 120
-_OOXML_RATIO_CHECK_MIN_BYTES = 1024 * 1024
+_PACKAGE_RATIO_CHECK_MIN_BYTES = 1024 * 1024
 _TEXT_ENCODING_ALLOWLIST = frozenset(
     {"utf-8", "utf-16-le", "utf-16-be", "gb18030"}
 )
@@ -73,40 +75,30 @@ _ProviderT = TypeVar("_ProviderT")
 
 
 @dataclass(frozen=True)
-class _OoxmlPackageProfile:
+class _ZipPackageProfile:
     source_format: str
     display_name: str
     main_part: str
 
 
-@dataclass(frozen=True)
-class _OfficeConversionProfile:
-    provider_id: str
-    source_format: str
-    source_display_name: str
-    target_format: str
-    libreoffice_filter: str
-    target_package: _OoxmlPackageProfile
-
-
-_DOCX_PACKAGE = _OoxmlPackageProfile("docx", "DOCX", "word/document.xml")
-_PPTX_PACKAGE = _OoxmlPackageProfile("pptx", "PPTX", "ppt/presentation.xml")
-_DOC_TO_DOCX = _OfficeConversionProfile(
-    "doc-to-docx",
-    "doc",
-    "DOC",
-    "docx",
-    "docx:Office Open XML Text",
-    _DOCX_PACKAGE,
-)
-_PPT_TO_PPTX = _OfficeConversionProfile(
-    "ppt-to-pptx",
-    "ppt",
-    "PPT",
-    "pptx",
-    "pptx:Impress MS PowerPoint 2007 XML",
-    _PPTX_PACKAGE,
-)
+_DOCX_PACKAGE = _ZipPackageProfile("docx", "DOCX", "word/document.xml")
+_PPTX_PACKAGE = _ZipPackageProfile("pptx", "PPTX", "ppt/presentation.xml")
+_ANYDOC_PROVIDER_ID = "anydoc"
+_ANYDOC_DISTRIBUTION = "firecrawl-anydoc"
+_OOXML_PACKAGE_PROFILES = {
+    "docx": _DOCX_PACKAGE,
+    "pptx": _PPTX_PACKAGE,
+}
+_ANYDOC_ERROR_CODES = {
+    "EncryptedError": "knowledge_password_required",
+    "MalformedError": "knowledge_anydoc_malformed",
+    "MissingPartError": "knowledge_anydoc_malformed",
+    "ResourceLimitError": "knowledge_anydoc_resource_limit",
+    "UnsupportedError": "knowledge_anydoc_unsupported",
+}
+_MARKDOWN_HEADING = re.compile(r"^ {0,3}(#{1,6})[\t ]+(.+?)[\t ]*#*[\t ]*$")
+_MARKDOWN_LIST_ITEM = re.compile(r"^ {0,12}([-+*]|\d+[.)])[\t ]+(.+)$")
+_MARKDOWN_FENCE = re.compile(r"^ {0,3}(`{3,}|~{3,})([^`]*)$")
 
 
 @dataclass(frozen=True)
@@ -272,6 +264,32 @@ class _ImageProbeProvider:
         )
 
 
+class _RtfProbeProvider:
+    provider_id = "rtf"
+
+    def probe(self, source, *, header, size, capability) -> FormatProbeFacts:
+        if not header.lstrip().startswith(b"{\\rtf"):
+            raise _format_mismatch()
+        return FormatProbeFacts("rtf", facts={"container": "rtf"})
+
+
+class _ZipMimetypeProbeProvider:
+    provider_id = "mimetype-zip"
+
+    def probe(self, source, *, header, size, capability) -> FormatProbeFacts:
+        if not header.startswith(b"PK\x03\x04"):
+            raise _format_mismatch()
+        facts = _verify_mimetype_zip_package(
+            source,
+            source_format=capability.source_format,
+            expected_mimetype=capability.media_type,
+        )
+        return FormatProbeFacts(
+            capability.source_format,
+            facts={"container": "zip", **facts},
+        )
+
+
 class FileProbe:
     """Return authoritative byte/container facts without mutating the source."""
 
@@ -305,6 +323,8 @@ class FileProbe:
             ),
             _PdfProbeProvider(),
             _ImageProbeProvider(),
+            _RtfProbeProvider(),
+            _ZipMimetypeProbeProvider(),
         )
         self._providers = _provider_map(
             providers,
@@ -412,72 +432,37 @@ class _TextNormalizerProvider:
         )
 
 
-class _LegacyOfficeNormalizerProvider:
-    def __init__(
-        self,
-        profile: _OfficeConversionProfile,
-        executable: Path | None,
-    ) -> None:
-        self.provider_id = profile.provider_id
-        self._profile = profile
-        self._executable = executable
+class _DocumentNormalizerProvider:
+    provider_id = "document"
 
     def normalize(self, request: NormalizationRequest) -> NormalizedSource:
-        source = _office_source(request)
-        normalized = _convert_legacy_office_source(
-            source,
-            profile=self._profile,
-            executable=self._executable,
-            work_dir=request.work_dir,
-        )
-        return NormalizedSource(
-            normalized,
-            request.capability.source_format,
-            request.capability.parser_format,
-            _normalization_descriptor(
-                operation="decrypt_and_convert" if request.probe.encrypted else "convert",
-                backend=self.provider_id,
-                package=_runtime_package("libreoffice", "runtime-resolved"),
-                options={
-                    "encrypted_input": request.probe.encrypted,
-                    "headless": True,
-                    "isolated_profile": True,
-                    "source_format": self._profile.source_format,
-                    "target_format": self._profile.target_format,
-                },
-                input_sha256=request.input_sha256,
-                output_path=normalized,
-            ),
-        )
-
-
-class _OoxmlNormalizerProvider:
-    def __init__(self, *, provider_id: str, profile: _OoxmlPackageProfile) -> None:
-        self.provider_id = provider_id
-        self._profile = profile
-
-    def normalize(self, request: NormalizationRequest) -> NormalizedSource:
-        source = _office_source(request)
-        package_facts = _verify_ooxml_package(
-            source,
-            self._profile,
-        )
+        source = request.probe.source_path
+        if request.probe.encrypted:
+            source = _office_source(request)
+        profile = _OOXML_PACKAGE_PROFILES.get(request.capability.parser_format)
+        if profile is not None:
+            _verify_ooxml_package(source, profile)
+        if request.probe.encrypted:
+            backend = "msoffcrypto"
+            package = _installed_package("msoffcrypto-tool")
+        elif profile is not None:
+            backend = "zip-package-identity"
+            package = _runtime_package("python-zipfile", sys.version.split()[0])
+        else:
+            backend = "document-identity"
+            package = _runtime_package("python", sys.version.split()[0])
         return NormalizedSource(
             source,
             request.capability.source_format,
             request.capability.parser_format,
             _normalization_descriptor(
                 operation="decrypt" if request.probe.encrypted else "identity",
-                backend="msoffcrypto" if request.probe.encrypted else "ooxml-identity",
-                package=(
-                    _installed_package("msoffcrypto-tool")
-                    if request.probe.encrypted
-                    else _runtime_package("python-zipfile", sys.version.split()[0])
-                ),
+                backend=backend,
+                package=package,
                 options={
                     "encrypted_input": request.probe.encrypted,
-                    "package_safety_verified": True,
-                    "entry_count": package_facts["container_entry_count"],
+                    "parser_format": request.capability.parser_format,
+                    "source_safety_verified": True,
                 },
                 input_sha256=request.input_sha256,
                 output_path=source,
@@ -549,7 +534,6 @@ class FormatNormalizer:
 
     def __init__(
         self,
-        executable: Path | None = None,
         *,
         registry: KnowledgeFormatRegistry = KNOWLEDGE_FORMAT_REGISTRY,
         providers: tuple[FormatNormalizerProvider, ...] | None = None,
@@ -557,10 +541,7 @@ class FormatNormalizer:
         self._registry = registry
         providers = providers or (
             _TextNormalizerProvider(),
-            _LegacyOfficeNormalizerProvider(_DOC_TO_DOCX, executable),
-            _OoxmlNormalizerProvider(provider_id="docx", profile=_DOCX_PACKAGE),
-            _LegacyOfficeNormalizerProvider(_PPT_TO_PPTX, executable),
-            _OoxmlNormalizerProvider(provider_id="pptx", profile=_PPTX_PACKAGE),
+            _DocumentNormalizerProvider(),
             _PdfNormalizerProvider(),
             _ImageNormalizerProvider(),
         )
@@ -638,75 +619,6 @@ def _decrypt_pdf(
     return target
 
 
-def _convert_legacy_office_source(
-    source: Path,
-    *,
-    profile: _OfficeConversionProfile,
-    executable: Path | None,
-    work_dir: Path,
-) -> Path:
-    executable = executable or _find_libreoffice()
-    if executable is None:
-        raise ValidationError(
-            f"Importing legacy {profile.source_display_name} requires LibreOffice.",
-            error_code=f"knowledge_{profile.source_format}_converter_unavailable",
-            retryable=True,
-        )
-    libreoffice_profile = work_dir / "libreoffice-profile"
-    local_source = work_dir / f"source.{profile.source_format}"
-    if source.resolve() != local_source.resolve():
-        shutil.copyfile(source, local_source)
-    command = [
-        str(executable),
-        "--headless",
-        f"-env:UserInstallation={libreoffice_profile.resolve().as_uri()}",
-        "--convert-to",
-        profile.libreoffice_filter,
-        "--outdir",
-        str(work_dir),
-        str(local_source),
-    ]
-    try:
-        process = subprocess.Popen(
-            command,
-            cwd=str(work_dir),
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            **_no_console_process_kwargs(),
-        )
-    except OSError:
-        raise ValidationError(
-            "LibreOffice could not normalize the legacy "
-            f"{profile.source_display_name} document.",
-            error_code=f"knowledge_{profile.source_format}_conversion_failed",
-            retryable=True,
-        ) from None
-    returncode = _wait_for_process(
-        process,
-        timeout_seconds=_LIBREOFFICE_TIMEOUT_SECONDS,
-        timeout_error=ValidationError(
-            "LibreOffice could not normalize the legacy "
-            f"{profile.source_display_name} document.",
-            error_code=f"knowledge_{profile.source_format}_conversion_failed",
-            retryable=True,
-        ),
-    )
-    output = work_dir / f"source.{profile.target_format}"
-    if returncode != 0 or not output.is_file():
-        raise ValidationError(
-            "LibreOffice could not normalize the legacy "
-            f"{profile.source_display_name} document.",
-            error_code=f"knowledge_{profile.source_format}_conversion_failed",
-            retryable=True,
-        )
-    _verify_ooxml_package(
-        output,
-        profile.target_package,
-    )
-    return output
-
-
 class ParserRouteProvider(Protocol):
     provider_id: str
 
@@ -725,16 +637,7 @@ class ParserRouter:
         self._registry = registry
         providers = providers or (
             _TextRouteProvider(),
-            _DoclingOfficeRouteProvider(
-                provider_id="docx",
-                parser_format="docx",
-                route_id="docling-docx",
-            ),
-            _DoclingOfficeRouteProvider(
-                provider_id="pptx",
-                parser_format="pptx",
-                route_id="docling-pptx",
-            ),
+            _AnyDocRouteProvider(),
             _PdfRouteProvider(),
             _ImageRouteProvider(),
         )
@@ -778,8 +681,8 @@ class ParsedContent:
 
 class DocumentParserProvider(Protocol):
     provider_id: str
-    uses_docling: bool
     backend: str
+    package_distribution: str
 
     def parse(self, context: ParserExecutionContext) -> ParsedContent: ...
 
@@ -796,14 +699,7 @@ class ParseExecutor:
         self._registry = registry
         providers = providers or (
             _TextParserProvider(),
-            _DoclingOfficeParserProvider(
-                provider_id="docx",
-                source_format="docx",
-            ),
-            _DoclingOfficeParserProvider(
-                provider_id="pptx",
-                source_format="pptx",
-            ),
+            _AnyDocParserProvider(),
             _PdfParserProvider(),
             _ImageParserProvider(),
         )
@@ -892,9 +788,7 @@ class ParseExecutor:
                 "parser": {
                     "content_ir": "DoclingDocument",
                     "version": 2,
-                    "package": _installed_package(
-                        "docling" if provider.uses_docling else "docling-core"
-                    ),
+                    "package": _installed_package(provider.package_distribution),
                     "backend": provider.backend,
                     "options": {
                         "merge_strategy": plan.merge_strategy,
@@ -956,23 +850,20 @@ class _TextRouteProvider:
         )
 
 
-class _DoclingOfficeRouteProvider:
-    def __init__(
-        self,
-        *,
-        provider_id: str,
-        parser_format: str,
-        route_id: str,
-    ) -> None:
-        self.provider_id = provider_id
-        self._parser_format = parser_format
-        self._route_id = route_id
+class _AnyDocRouteProvider:
+    provider_id = _ANYDOC_PROVIDER_ID
 
     def plan(self, normalized: NormalizedSource, *, ocr_ready: bool) -> ParsePlan:
         return ParsePlan(
             normalized.source_format,
-            self._parser_format,
-            (ParsePlanUnit("document", self._route_id, "validated_ooxml"),),
+            normalized.parser_format,
+            (
+                ParsePlanUnit(
+                    "document",
+                    f"anydoc-{normalized.parser_format}",
+                    "validated_local_document",
+                ),
+            ),
             "document",
             ocr_ready=ocr_ready,
         )
@@ -1032,8 +923,8 @@ class _ImageRouteProvider:
 
 class _TextParserProvider:
     provider_id = "text"
-    uses_docling = False
     backend = "xenix-txt-adapter"
+    package_distribution = "docling-core"
 
     def parse(self, context: ParserExecutionContext) -> ParsedContent:
         return ParsedContent(
@@ -1041,28 +932,24 @@ class _TextParserProvider:
         )
 
 
-class _DoclingOfficeParserProvider:
-    uses_docling = True
-    backend = "docling"
-
-    def __init__(self, *, provider_id: str, source_format: str) -> None:
-        self.provider_id = provider_id
-        self._source_format = source_format
+class _AnyDocParserProvider:
+    provider_id = _ANYDOC_PROVIDER_ID
+    backend = "anydoc-rust-markdown"
+    package_distribution = _ANYDOC_DISTRIBUTION
 
     def parse(self, context: ParserExecutionContext) -> ParsedContent:
         return ParsedContent(
-            _docling_convert(
+            _anydoc_convert(
                 context.normalized.path,
-                source_format=self._source_format,
-                work_dir=context.work_dir,
+                source_format=context.normalized.parser_format,
             )
         )
 
 
 class _PdfParserProvider:
     provider_id = "pdf"
-    uses_docling = True
     backend = "docling"
+    package_distribution = "docling"
 
     def parse(self, context: ParserExecutionContext) -> ParsedContent:
         document = _docling_convert(
@@ -1130,8 +1017,8 @@ class _PdfParserProvider:
 
 class _ImageParserProvider:
     provider_id = "image"
-    uses_docling = False
     backend = "xenix-image-adapter"
+    package_distribution = "docling-core"
 
     def parse(self, context: ParserExecutionContext) -> ParsedContent:
         document = _image_docling_document(context.normalized.path)
@@ -1175,50 +1062,6 @@ class _ImageParserProvider:
             ocr_succeeded_count=1,
             ocr_payload_hashes=((1, payload_hash),),
         )
-
-
-def _wait_for_process(
-    process: Any,
-    *,
-    timeout_seconds: float,
-    timeout_error: Exception,
-) -> int:
-    try:
-        return int(process.wait(timeout=timeout_seconds))
-    except subprocess.TimeoutExpired:
-        _terminate_process(process)
-        raise timeout_error from None
-    except BaseException:
-        _terminate_process(process)
-        raise
-
-
-def _terminate_process(process: Any) -> None:
-    if process.poll() is not None:
-        return
-    try:
-        process.terminate()
-    except OSError:
-        pass
-    try:
-        process.wait(timeout=_PROCESS_TERMINATE_GRACE_SECONDS)
-        return
-    except (OSError, subprocess.TimeoutExpired):
-        pass
-    try:
-        process.kill()
-    except OSError:
-        pass
-    try:
-        process.wait(timeout=_PROCESS_TERMINATE_GRACE_SECONDS)
-    except (OSError, subprocess.TimeoutExpired):
-        pass
-
-
-def _no_console_process_kwargs() -> dict[str, int]:
-    if sys.platform != "win32":
-        return {}
-    return {"creationflags": int(getattr(subprocess, "CREATE_NO_WINDOW", 0))}
 
 
 def _read_bytes(path: Path) -> bytes:
@@ -1741,104 +1584,76 @@ def _inspect_office_file(path: Path) -> tuple[str | None, bool]:
         return None, False
 
 
-def _ooxml_error(
-    profile: _OoxmlPackageProfile,
+def _package_error(
+    profile: _ZipPackageProfile,
     category: str,
     detail: str,
 ) -> ValidationError:
+    error_code = (
+        "knowledge_package_invalid"
+        if profile.source_format == "package" and category == "package_invalid"
+        else f"knowledge_{profile.source_format}_{category}"
+    )
     return ValidationError(
         f"The selected {profile.display_name} {detail}.",
-        error_code=f"knowledge_{profile.source_format}_{category}",
+        error_code=error_code,
     )
+
+
+def _verify_mimetype_zip_package(
+    path: Path,
+    *,
+    source_format: str,
+    expected_mimetype: str,
+) -> dict[str, int]:
+    profile = _ZipPackageProfile(
+        source_format="package",
+        display_name=source_format.upper(),
+        main_part="mimetype",
+    )
+    try:
+        with ZipFile(path) as package:
+            entries, names, expanded_bytes, maximum_ratio = _verify_zip_package_entries(
+                package,
+                profile=profile,
+            )
+            if "mimetype" not in names:
+                raise _package_error(profile, "package_invalid", "has no package media type")
+            mimetype_entry = package.getinfo("mimetype")
+            if mimetype_entry.file_size > 256:
+                raise _package_error(profile, "package_invalid", "has an invalid package media type")
+            actual_mimetype = package.read(mimetype_entry).decode("ascii", errors="strict")
+            if actual_mimetype != expected_mimetype:
+                raise _format_mismatch()
+    except ValidationError:
+        raise
+    except (BadZipFile, OSError, UnicodeError, KeyError) as exc:
+        raise _package_error(profile, "package_invalid", "is not a valid package") from exc
+    return {
+        "container_entry_count": len(entries),
+        "container_expanded_bytes": expanded_bytes,
+        "container_max_compression_ratio": maximum_ratio,
+    }
 
 
 def _verify_ooxml_package(
     path: Path,
-    profile: _OoxmlPackageProfile,
+    profile: _ZipPackageProfile,
 ) -> dict[str, int]:
     try:
         with ZipFile(path) as package:
-            entries = package.infolist()
-            if len(entries) > MAX_OOXML_PACKAGE_ENTRIES:
-                raise _ooxml_error(
-                    profile,
-                    "entry_limit",
-                    "contains too many package entries",
-                )
-            names: set[str] = set()
-            casefold_names: set[str] = set()
-            expanded_bytes = 0
-            maximum_ratio = 1
-            for entry in entries:
-                _validate_ooxml_member_path(
-                    entry.filename,
-                    profile=profile,
-                    is_directory=entry.is_dir(),
-                )
-                folded = entry.filename.casefold()
-                if entry.filename in names or folded in casefold_names:
-                    raise _ooxml_error(
-                        profile,
-                        "entries_ambiguous",
-                        "contains ambiguous package entries",
-                    )
-                names.add(entry.filename)
-                casefold_names.add(folded)
-                if entry.flag_bits & 0x1:
-                    raise _ooxml_error(
-                        profile,
-                        "entry_encrypted",
-                        "contains encrypted package entries",
-                    )
-                mode = (entry.external_attr >> 16) & 0xFFFF
-                if mode and stat.S_ISLNK(mode):
-                    raise _ooxml_error(
-                        profile,
-                        "entry_unsafe",
-                        "contains an unsafe package entry",
-                    )
-                if entry.file_size < 0 or entry.compress_size < 0:
-                    raise _ooxml_error(
-                        profile,
-                        "size_invalid",
-                        "has invalid package sizes",
-                    )
-                if entry.file_size > MAX_OOXML_ENTRY_BYTES:
-                    raise _ooxml_error(
-                        profile,
-                        "entry_too_large",
-                        "package entry is too large",
-                    )
-                expanded_bytes += entry.file_size
-                if expanded_bytes > MAX_OOXML_EXPANDED_BYTES:
-                    raise _ooxml_error(
-                        profile,
-                        "expansion_limit",
-                        "expands beyond the supported limit",
-                    )
-                ratio = (
-                    entry.file_size
-                    if entry.compress_size == 0
-                    else (entry.file_size + entry.compress_size - 1) // entry.compress_size
-                )
-                maximum_ratio = max(maximum_ratio, ratio)
-                if (
-                    entry.file_size >= _OOXML_RATIO_CHECK_MIN_BYTES
-                    and ratio > MAX_OOXML_COMPRESSION_RATIO
-                ):
-                    raise _ooxml_error(
-                        profile,
-                        "compression_ratio",
-                        "compression ratio is unsafe",
-                    )
+            entries, names, expanded_bytes, maximum_ratio = _verify_zip_package_entries(
+                package,
+                profile=profile,
+            )
             if profile.main_part not in names or "[Content_Types].xml" not in names:
-                raise _ooxml_error(
+                raise _package_error(
                     profile,
                     "package_invalid",
                     "has the wrong Office package type",
                 )
     except (BadZipFile, OSError) as exc:
-        raise _ooxml_error(
+        raise _package_error(
             profile,
             "package_invalid",
             "is not a valid Office package",
@@ -1850,19 +1665,65 @@ def _verify_ooxml_package(
     }
 
 
-def _validate_ooxml_member_path(
+def _verify_zip_package_entries(
+    package: ZipFile,
+    *,
+    profile: _ZipPackageProfile,
+) -> tuple[list[Any], set[str], int, int]:
+    entries = package.infolist()
+    if len(entries) > MAX_PACKAGE_ENTRIES:
+        raise _package_error(profile, "entry_limit", "contains too many package entries")
+    names: set[str] = set()
+    casefold_names: set[str] = set()
+    expanded_bytes = 0
+    maximum_ratio = 1
+    for entry in entries:
+        _validate_package_member_path(
+            entry.filename,
+            profile=profile,
+            is_directory=entry.is_dir(),
+        )
+        folded = entry.filename.casefold()
+        if entry.filename in names or folded in casefold_names:
+            raise _package_error(profile, "entries_ambiguous", "contains ambiguous package entries")
+        names.add(entry.filename)
+        casefold_names.add(folded)
+        if entry.flag_bits & 0x1:
+            raise _package_error(profile, "entry_encrypted", "contains encrypted package entries")
+        mode = (entry.external_attr >> 16) & 0xFFFF
+        if mode and stat.S_ISLNK(mode):
+            raise _package_error(profile, "entry_unsafe", "contains an unsafe package entry")
+        if entry.file_size < 0 or entry.compress_size < 0:
+            raise _package_error(profile, "size_invalid", "has invalid package sizes")
+        if entry.file_size > MAX_PACKAGE_ENTRY_BYTES:
+            raise _package_error(profile, "entry_too_large", "package entry is too large")
+        expanded_bytes += entry.file_size
+        if expanded_bytes > MAX_PACKAGE_EXPANDED_BYTES:
+            raise _package_error(profile, "expansion_limit", "expands beyond the supported limit")
+        ratio = (
+            entry.file_size
+            if entry.compress_size == 0
+            else (entry.file_size + entry.compress_size - 1) // entry.compress_size
+        )
+        maximum_ratio = max(maximum_ratio, ratio)
+        if entry.file_size >= _PACKAGE_RATIO_CHECK_MIN_BYTES and ratio > MAX_PACKAGE_COMPRESSION_RATIO:
+            raise _package_error(profile, "compression_ratio", "compression ratio is unsafe")
+    return entries, names, expanded_bytes, maximum_ratio
+
+
+def _validate_package_member_path(
     name: str,
     *,
-    profile: _OoxmlPackageProfile,
+    profile: _ZipPackageProfile,
     is_directory: bool,
 ) -> None:
     if (
         not name
         or "\x00" in name
         or "\\" in name
-        or len(name.encode("utf-8")) > MAX_OOXML_MEMBER_NAME_BYTES
+        or len(name.encode("utf-8")) > MAX_PACKAGE_MEMBER_NAME_BYTES
     ):
-        raise _ooxml_error(
+        raise _package_error(
             profile,
             "path_unsafe",
             "contains an unsafe package path",
@@ -1874,10 +1735,10 @@ def _validate_ooxml_member_path(
         not normalized
         or normalized.startswith("/")
         or relative.is_absolute()
-        or len(raw_parts) > MAX_OOXML_MEMBER_DEPTH
+        or len(raw_parts) > MAX_PACKAGE_MEMBER_DEPTH
         or any(part in {"", ".", ".."} or ":" in part for part in raw_parts)
     ):
-        raise _ooxml_error(
+        raise _package_error(
             profile,
             "path_unsafe",
             "contains an unsafe package path",
@@ -1889,16 +1750,6 @@ def _read_prefix(path: Path, size: int) -> bytes:
         return stream.read(size)
 
 
-def _find_libreoffice() -> Path | None:
-    command = shutil.which("soffice") or shutil.which("libreoffice")
-    candidates = (
-        Path(command) if command else None,
-        Path("C:/Program Files/LibreOffice/program/soffice.exe"),
-        Path("C:/Program Files (x86)/LibreOffice/program/soffice.exe"),
-    )
-    return next((candidate for candidate in candidates if candidate is not None and candidate.is_file()), None)
-
-
 def _plain_text_docling_document(path: Path):
     from docling_core.types.doc import DocItemLabel, DoclingDocument
 
@@ -1908,6 +1759,157 @@ def _plain_text_docling_document(path: Path):
         if paragraph:
             document.add_text(DocItemLabel.TEXT, paragraph)
     return document
+
+
+def _anydoc_convert(path: Path, *, source_format: str):
+    try:
+        import anydoc
+
+        detected = anydoc.format_from_path(str(path))
+        if detected != source_format:
+            raise _format_mismatch()
+        markdown = anydoc.to_markdown(str(path))
+    except ValidationError:
+        raise
+    except (ImportError, ModuleNotFoundError) as exc:
+        raise ValidationError(
+            "The local AnyDoc parser is unavailable.",
+            error_code="knowledge_anydoc_dependency_failed",
+            error_details={"diagnostic_code": "anydoc_dependency_error"},
+            retryable=True,
+        ) from exc
+    except Exception as exc:
+        error_name = type(exc).__name__
+        error_code = _ANYDOC_ERROR_CODES.get(
+            error_name,
+            "knowledge_anydoc_conversion_failed",
+        )
+        raise ValidationError(
+            "AnyDoc could not parse the document.",
+            error_code=error_code,
+            error_details={"diagnostic_code": _anydoc_diagnostic_code(error_name)},
+            retryable=error_code in {
+                "knowledge_password_required",
+                "knowledge_anydoc_conversion_failed",
+            },
+        ) from exc
+    if not isinstance(markdown, str):
+        raise ValidationError(
+            "AnyDoc returned an invalid document.",
+            error_code="knowledge_anydoc_conversion_failed",
+            error_details={"diagnostic_code": "anydoc_output_invalid"},
+            retryable=True,
+        )
+    return _markdown_to_docling_document(markdown, name=path.stem)
+
+
+def _anydoc_diagnostic_code(error_name: str) -> str:
+    token = re.sub(r"(?<!^)(?=[A-Z])", "_", error_name).casefold()
+    token = re.sub(r"[^a-z0-9_.-]+", "_", token).strip("_")
+    return f"anydoc_{token or 'conversion_error'}"[:80]
+
+
+def _markdown_to_docling_document(markdown: str, *, name: str):
+    from docling_core.types.doc import DocItemLabel, DoclingDocument, GroupLabel
+
+    encoded_size = len(markdown.encode("utf-8"))
+    if encoded_size < 1 or encoded_size > MAX_ANYDOC_MARKDOWN_BYTES:
+        raise ValidationError(
+            "AnyDoc output exceeds the supported size.",
+            error_code="knowledge_anydoc_output_limit",
+        )
+    _reject_unsafe_text_controls(markdown)
+    document = DoclingDocument(name=name or "document")
+    paragraph_lines: list[str] = []
+    code_lines: list[str] = []
+    fence_marker: str | None = None
+    list_group: Any = None
+    block_count = 0
+
+    def add_block() -> None:
+        nonlocal block_count
+        block_count += 1
+        if block_count > MAX_ANYDOC_BLOCKS:
+            raise ValidationError(
+                "AnyDoc output contains too many content blocks.",
+                error_code="knowledge_anydoc_output_limit",
+            )
+
+    def flush_paragraph() -> None:
+        if not paragraph_lines:
+            return
+        text = "\n".join(paragraph_lines).strip()
+        paragraph_lines.clear()
+        if text:
+            add_block()
+            document.add_text(DocItemLabel.PARAGRAPH, text)
+
+    for raw_line in _bounded_markdown_lines(markdown):
+        line = raw_line.rstrip()
+        fence = _MARKDOWN_FENCE.match(line)
+        if fence_marker is not None:
+            if fence and fence.group(1).startswith(fence_marker[0]) and len(fence.group(1)) >= len(fence_marker):
+                add_block()
+                document.add_code("\n".join(code_lines).rstrip())
+                code_lines.clear()
+                fence_marker = None
+            else:
+                code_lines.append(raw_line)
+            continue
+        if fence:
+            flush_paragraph()
+            list_group = None
+            fence_marker = fence.group(1)
+            continue
+        if not line.strip():
+            flush_paragraph()
+            list_group = None
+            continue
+        heading = _MARKDOWN_HEADING.match(line)
+        if heading:
+            flush_paragraph()
+            list_group = None
+            add_block()
+            document.add_heading(heading.group(2).strip(), level=len(heading.group(1)))
+            continue
+        list_item = _MARKDOWN_LIST_ITEM.match(line)
+        if list_item:
+            flush_paragraph()
+            marker, text = list_item.groups()
+            if list_group is None:
+                list_group = document.add_group(label=GroupLabel.LIST, name="list")
+            add_block()
+            document.add_list_item(
+                text.strip(),
+                enumerated=marker[0].isdigit(),
+                marker=marker,
+                parent=list_group,
+            )
+            continue
+        list_group = None
+        paragraph_lines.append(line)
+
+    if fence_marker is not None:
+        paragraph_lines.extend((fence_marker, *code_lines))
+    flush_paragraph()
+    if block_count == 0:
+        raise ValidationError(
+            "AnyDoc returned no usable content.",
+            error_code="knowledge_anydoc_malformed",
+        )
+    return document
+
+
+def _bounded_markdown_lines(markdown: str) -> Iterable[str]:
+    with io.StringIO(markdown, newline=None) as stream:
+        while buffered_line := stream.readline(MAX_TEXT_LINE_CHARS + 2):
+            raw_line = buffered_line.rstrip("\r\n")
+            if len(raw_line) > MAX_TEXT_LINE_CHARS:
+                raise ValidationError(
+                    "AnyDoc output contains a line that is too long.",
+                    error_code="knowledge_anydoc_output_limit",
+                )
+            yield raw_line
 
 
 def _image_docling_document(path: Path):

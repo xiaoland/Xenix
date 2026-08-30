@@ -18,6 +18,7 @@ _SENSITIVE_ENVIRONMENT_FRAGMENTS = (
     "TOKEN",
 )
 _KNOWLEDGE_MARKER_FIELDS = (
+    "anydoc_rust_parser",
     "canonical_zstd",
     "document_removal",
     "docling_ir",
@@ -191,6 +192,8 @@ def main() -> int:
             joined = ", ".join(str(path) for path in missing)
             raise RuntimeError(f"Packaged smoke test did not create expected runtime artifacts: {joined}")
         marker = json.loads((runtime_root / "state" / "knowledge-smoke.json").read_text())
+        if marker.get("anydoc_rust_parser") is not True:
+            raise RuntimeError("Packaged smoke did not execute the AnyDoc Rust parser.")
         if marker.get("spawned_docx_import") is not True:
             raise RuntimeError(
                 "Packaged smoke did not import DOCX through the spawned Knowledge worker."

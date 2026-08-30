@@ -20,7 +20,7 @@ canonical-ready generation
 
 ## Import Contract
 
-- Accepted MVP inputs are TXT, DOC/DOCX, PPT/PPTX, PDF, JPEG, and PNG. Image sources
+- Accepted MVP inputs are TXT, DOC/DOCX, PPT/PPTX, RTF, EPUB, ODT/ODP, PDF, JPEG, and PNG. Image sources
   use OCR; they do not imply VLM support. Markdown remains outside the committed MVP.
 - `DoclingDocument` JSON is the common content IR. Xenix wraps it in an immutable
   envelope that binds document/import/generation identity, source and IR hashes,
@@ -30,9 +30,11 @@ canonical-ready generation
   normalizer, route-planner, and parser providers. The four pipeline stages dispatch
   through validated provider maps; extending the format set does not add a new
   central format branch. OOXML Word and PowerPoint packages share one
-  format-parameterized safety verifier. Legacy DOC and PPT are configurations of one
-  bounded LibreOffice normalization boundary, targeting DOCX and PPTX respectively,
-  before the matching Docling Office parser.
+  format-parameterized safety verifier. ZIP-based EPUB/OpenDocument packages use the
+  same bounded entry/path/expansion policy plus authoritative package media-type
+  checks. Supported documents and presentations are parsed locally by AnyDoc's Rust
+  backend and adapted into the common Docling IR; no external office process is
+  spawned.
 - PDF routing consumes bounded page evidence rather than one document-wide choice.
   Native text is classified as `credible`, `suspect`, or `absent` from extracted
   text, suspicious Unicode, image coverage, and font evidence. Credible pages use
@@ -67,8 +69,8 @@ canonical-ready generation
   validates its envelope, and alone publishes application state. Crash, timeout, or
   cancellation leaves at most disposable private staging and cannot make a partial
   document current. On Windows the import worker owns a kill-on-close Job Object.
-  Parent cancellation terminates that one managed boundary and its LibreOffice or
-  native OCR descendants; cancellation callbacks do not propagate through pipeline,
+  Parent cancellation terminates that one managed boundary and its native OCR
+  descendants; cancellation callbacks do not propagate through pipeline,
   file, or OCR APIs.
 - Default application and service composition always selects the spawned runner.
   Inline execution is an explicit test seam; injecting a normalizer or OCR double
@@ -87,8 +89,9 @@ canonical-ready generation
   envelopes. `ArtifactService` registers user-openable app-owned files; raw paths do
   not become Agent-facing identity.
 - A Knowledge Unit is the current retrievable authority for a bounded passage.
-  Derivation preserves page or passage anchors and splits oversized Docling items
-  before any embedding call. FTS tokens, ranking values, query-centered excerpts,
+  Derivation preserves page or passage anchors, carries heading hierarchy into each
+  searchable unit, and splits oversized Docling items with bounded sentence-aware
+  overlap before any embedding call. FTS tokens, ranking values, query-centered excerpts,
   embeddings, and vector indexes are derived access paths and may not become a
   second content authority.
 - Retrieval compatibility is published with each logical document as a projection

@@ -38,6 +38,7 @@ def run_knowledge_packaged_smoke(paths: AppPaths) -> None:
     # Keep heavy document runtimes operation-scoped. Importing Docling mutates the
     # process-wide ElementTree namespace registry, which must not affect unrelated
     # SVG generation merely because this smoke module was discovered.
+    import anydoc
     from docling_core.types.doc import DocItemLabel, DoclingDocument
     from docx import Document
     from pptx import Presentation
@@ -86,6 +87,17 @@ def run_knowledge_packaged_smoke(paths: AppPaths) -> None:
         docling_document = seed_document
         if "Knowledge packaged smoke" not in docling_document.export_to_text():
             raise RuntimeError("Docling packaged Knowledge IR parse failed.")
+
+        anydoc_rtf = root / "knowledge-anydoc-smoke.rtf"
+        anydoc_rtf.write_bytes(
+            b"{\\rtf1\\ansi Knowledge packaged AnyDoc Rust parser smoke}"
+        )
+        if (
+            anydoc.format_from_path(str(anydoc_rtf)) != "rtf"
+            or "AnyDoc Rust parser smoke"
+            not in anydoc.to_markdown(str(anydoc_rtf))
+        ):
+            raise RuntimeError("AnyDoc packaged Knowledge parser failed.")
 
         worker_docx = root / "knowledge-worker-smoke.docx"
         worker_document = Document()
@@ -299,6 +311,7 @@ def run_knowledge_packaged_smoke(paths: AppPaths) -> None:
         json.dumps(
             {
                 "schema_version": 1,
+                "anydoc_rust_parser": True,
                 "docling_ir": True,
                 "pdfium_render": True,
                 "pikepdf": True,
