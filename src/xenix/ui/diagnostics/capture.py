@@ -9,11 +9,13 @@ from pathlib import Path
 
 import PySide6
 from PySide6.QtCore import QLocale, qVersion
+from PySide6.QtGui import QFont
 from PySide6.QtWidgets import QApplication, QWidget
 from shiboken6 import isValid
 
 from .schema import (
     ArtifactFile,
+    FontRenderIdentity,
     RectSnapshot,
     RenderEnvironment,
     UI_ARTIFACT_SCHEMA_VERSION,
@@ -89,6 +91,7 @@ def capture_ui_artifacts(
 def _render_environment(root: QWidget) -> RenderEnvironment:
     app = QApplication.instance()
     screen = root.screen()
+    font = app.font() if isinstance(app, QApplication) else root.font()
     return {
         "python": platform.python_version(),
         "pyside": PySide6.__version__,
@@ -96,9 +99,21 @@ def _render_environment(root: QWidget) -> RenderEnvironment:
         "os": platform.platform(),
         "qpa": QApplication.platformName() if app is not None else "",
         "style": app.style().objectName() if isinstance(app, QApplication) else "",
+        "font": _font_render_identity(font),
         "locale": QLocale().name(),
         "logical_dpi": screen.logicalDotsPerInch() if screen is not None else None,
         "device_pixel_ratio": root.devicePixelRatioF(),
+    }
+
+
+def _font_render_identity(font: QFont) -> FontRenderIdentity:
+    return {
+        "family": font.family(),
+        "style_name": font.styleName(),
+        "point_size": font.pointSizeF(),
+        "pixel_size": font.pixelSize(),
+        "weight": int(font.weight()),
+        "italic": font.italic(),
     }
 
 

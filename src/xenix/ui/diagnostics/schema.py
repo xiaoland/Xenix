@@ -85,6 +85,15 @@ class UiTreeArtifact(TypedDict):
     layout: LayoutTreeNode | None
 
 
+class FontRenderIdentity(TypedDict):
+    family: str
+    style_name: str
+    point_size: float
+    pixel_size: int
+    weight: int
+    italic: bool
+
+
 class RenderEnvironment(TypedDict):
     python: str
     pyside: str
@@ -92,6 +101,7 @@ class RenderEnvironment(TypedDict):
     os: str
     qpa: str
     style: str
+    font: FontRenderIdentity
     locale: str
     logical_dpi: float | None
     device_pixel_ratio: float

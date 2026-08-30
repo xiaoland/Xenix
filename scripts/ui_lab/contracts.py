@@ -38,6 +38,8 @@ class ScenarioSpec:
     build: ScenarioBuilder
     style_name: str = "Fusion"
     locale_name: str = "en_US"
+    font_family: str = "Segoe UI"
+    font_point_size: int = 9
 
     def metadata(self) -> dict[str, object]:
         return {
@@ -51,6 +53,8 @@ class ScenarioSpec:
             "render": {
                 "style": self.style_name,
                 "locale": self.locale_name,
+                "font_family": self.font_family,
+                "font_point_size": self.font_point_size,
             },
         }
 

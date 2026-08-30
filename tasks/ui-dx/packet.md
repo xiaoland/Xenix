@@ -20,7 +20,8 @@ line-count-driven file splitting.
   approved SVC v14 consumer-baseline cherry-pick `f528d1f`.
 - Branch: `feat/ui-dx`.
 - Worktree: `F:\CODING\Project\Xenix_native-ui-dx`.
-- State: Phases 0–3 complete; Phase 4 CI evidence is next.
+- State: Phases 0–3 complete; Phase 4 is locally implemented and awaits its
+  first main-targeting PR artifact inspection before final acceptance.
 - Authority: the user has authorized continuation and task-scoped commits without
   further per-phase approval.
 
@@ -91,6 +92,11 @@ line-count-driven file splitting.
   contracts and the capture path produces synthetic structured evidence without
   creating `XENIX_APP_HOME`. Focused UI is 29 passed in 11.25s; the full
   generated-catalog suite is 174 passed in 136.04s and `pdm run check` passes.
+- Phase 4 wires all three capture-only scenarios, an agent-readable artifact
+  inventory, allowlisted always-upload CI evidence, and an independently invoked
+  Windows-native behavior/custom-paint smoke. Local UI contracts are 30/30,
+  native smoke is 1/1, and the full suite is 175/175; no pixel baseline is
+  admitted yet.
 
 Detailed evidence is in [preflight.md](preflight.md); source research is in
 [research.md](research.md).

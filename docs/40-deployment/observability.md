@@ -46,6 +46,20 @@ add line-edit values, combo text, file paths, credentials, or message bodies to
 the schema. Runtime/user screenshots require separate explicit authority and are
 not enabled by the layout-debug switch.
 
+Native CI captures the three admitted Widget Lab scenarios under
+`ui-artifacts/scenarios/`, runs the native-window smoke in a separate `windows`
+QPA pytest process, and rebuilds `ui-artifacts/index.json`. The index contains
+only manifest metadata, relative artifact paths, render identity, geometry, and
+file sizes; it does not add widget text or user values. GitHub uploads only this
+allowlisted directory with `if: always()` and retains it for 14 days.
+
+The scenario images are capture-only evidence. No expected image or pixel diff
+is authoritative yet. Promote a baseline only after repeated Native CI runs have
+the same Windows runner, Python/PySide/Qt, Fusion style, Segoe UI font, locale,
+DPI/DPR, and viewport identity and a reviewer has accepted the state. At that
+point the baseline-update and comparison command must be added explicitly; do
+not copy a local image into source and silently make it blocking.
+
 ## OTLP Enablement
 
 Standard OpenTelemetry endpoint, protocol, and header variables configure transport. Signal-specific values take precedence over global values. Source runs read them from the developer process. Formal packaging reads them once and embeds them in the frozen release configuration; an installed client ignores ambient `XENIX_OTEL_*`, `OTEL_SDK_DISABLED`, and `OTEL_EXPORTER_*` values.

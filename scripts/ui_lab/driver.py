@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from PySide6.QtCore import QEventLoop, QLocale, QTimer
+from PySide6.QtGui import QFont
 from PySide6.QtWidgets import QApplication, QWidget
 from shiboken6 import isValid
 
@@ -12,6 +13,7 @@ from .contracts import ScenarioSpec
 def configure_scenario_application(app: QApplication, scenario: ScenarioSpec) -> None:
     """Apply the render identity declared by a scenario before construction."""
     app.setStyle(scenario.style_name)
+    app.setFont(QFont(scenario.font_family, scenario.font_point_size))
     QLocale.setDefault(QLocale(scenario.locale_name))
 
 

@@ -11,6 +11,7 @@ from pytestqt.qtbot import QtBot
 from scripts.ui_lab.contracts import ScenarioContext
 from scripts.ui_lab.driver import configure_scenario_application
 from scripts.ui_lab.registry import get_scenario, list_scenarios
+from tests.ui.pytest_plugin import UiArtifactRegistry
 from xenix.ui.chatbot import ThreadDetailView
 from xenix.ui.diagnostics import CapturePolicy, capture_ui_artifacts
 from xenix.ui.semantic_identity import item_reference
@@ -77,8 +78,10 @@ def test_all_scenarios_build_without_runtime_services_or_state(
 def test_mixed_timeline_repeated_controls_have_authoritative_item_references(
     qapp: QApplication,
     qtbot: QtBot,
+    ui_artifacts: UiArtifactRegistry,
 ) -> None:
     _scenario, handle = _build_scenario(qapp, qtbot, "chat.mixed-timeline")
+    ui_artifacts.register(handle.root, name="chat-mixed-timeline")
 
     tool_toggles = _widgets_with_role(handle.root, "chat.tool-call.toggle-details")
     retry_toggles = _widgets_with_role(handle.root, "chat.connection-retry.toggle-details")

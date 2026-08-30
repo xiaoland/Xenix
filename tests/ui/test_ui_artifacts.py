@@ -7,6 +7,7 @@ from PySide6.QtCore import QCoreApplication, QEvent
 from PySide6.QtWidgets import QComboBox, QHBoxLayout, QLineEdit, QPushButton, QVBoxLayout, QWidget
 from pytestqt.qtbot import QtBot
 
+from scripts.ui_lab.artifact_index import build_artifact_index
 from xenix.ui.diagnostics import CapturePolicy, capture_ui_artifacts, capture_ui_snapshot
 from xenix.ui.semantic_identity import identify
 
@@ -95,6 +96,7 @@ def test_capture_policy_controls_pixels_and_bounds_redacted_logs(qtbot: QtBot, t
     assert "person" not in log
     assert "secret-value" not in log
     assert runtime_manifest["redaction"]["widget_text"] == "omitted"
+    assert synthetic_manifest["render_environment"]["font"]["family"]
     screenshot = next(file for file in synthetic_manifest["files"] if file["name"] == "actual.png")
     assert screenshot["pixel_width"] > 0
     assert screenshot["pixel_height"] > 0
@@ -108,3 +110,24 @@ def test_deleted_widget_is_rejected_without_touching_cpp_state(qapp, qtbot: QtBo
 
     with pytest.raises(ValueError, match="deleted"):
         capture_ui_snapshot(widget)
+
+
+def test_artifact_index_projects_only_bounded_manifest_metadata(qtbot: QtBot, tmp_path) -> None:
+    root = _artifact_widget(qtbot)
+    root.show()
+    qtbot.waitUntil(root.isVisible)
+    artifact_root = tmp_path / "ui-artifacts"
+    capture_ui_artifacts(
+        root,
+        artifact_root / "scenario" / "sample",
+        reason="capture-only",
+        scenario_id="sample.visual",
+        policy=CapturePolicy.SYNTHETIC,
+    )
+
+    index = build_artifact_index(artifact_root)
+
+    assert index["artifact_count"] == 1
+    assert index["artifacts"][0]["path"] == "scenario/sample"
+    assert index["artifacts"][0]["scenario_id"] == "sample.visual"
+    assert "super-secret-value" not in json.dumps(index)

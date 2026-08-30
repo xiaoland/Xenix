@@ -24,11 +24,29 @@ jobs:
         run: pdm run check
       - name: Run high-value acceptance portfolio
         run: pdm run test -vv --junitxml pytest.xml
+      - name: Capture deterministic UI scenarios
+        run: |
+          pdm run ui-capture -- chat.empty --output ui-artifacts/scenarios
+          pdm run ui-capture -- chat.mixed-timeline --output ui-artifacts/scenarios
+          pdm run ui-capture -- chat.running-with-attachments --output ui-artifacts/scenarios
+      - name: Run Windows native UI smoke
+        run: pdm run ui-native-smoke
+      - name: Build UI artifact index
+        if: always()
+        run: python -m scripts.ui_lab.artifact_index --root ui-artifacts
       - name: Preserve test report
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: pytest
           path: pytest.xml
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Preserve UI evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ui-artifacts
+          path: ui-artifacts
           if-no-files-found: warn
           retention-days: 14

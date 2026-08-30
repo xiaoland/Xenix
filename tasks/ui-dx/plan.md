@@ -107,12 +107,22 @@ service, OCR service, ML worker pool, or user config.
 
 ## Phase 4 — CI evidence and layered visual tests
 
+**Status: implemented locally; first main-targeting PR run remains external
+acceptance.** Native CI now captures all three fixed Fusion/en_US/Segoe UI
+scenarios, builds a bounded root index, and always uploads only `ui-artifacts/`.
+The separately invoked Windows QPA smoke covers expose/activate/focus/dialog and
+the custom-painted black user bubble across two resize widths. Visuals remain
+capture-only: no expected/diff authority is fabricated before runner stability
+is observed. Local UI contracts pass 30/30, native smoke passes 1/1, the full
+suite passes 175/175 in 134.59s, and `pdm run check` passes.
+
 - Make Native CI upload the allowlisted `ui-artifacts/` directory with
   `if: always()` alongside JUnit.
 - Add environment metadata and a short artifact index suitable for agents.
 - Establish a tiny Windows/Fusion visual set with fixed viewport, locale, fonts,
   DPR, and Qt version identity.
-- Keep the first visual runs capture-only; generate expected/actual/diff evidence.
+- Keep the first visual runs capture-only; generate `expected.png`/`diff.png`
+  only after a render-identity-specific baseline is explicitly admitted.
 - Add one Windows-native `qwindows` smoke for expose/activate/focus/dialog behavior
   with semantic assertions, not a native pixel baseline.
 - Run the native smoke in a distinct pytest process from offscreen contracts and
