@@ -2,26 +2,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from enum import StrEnum
 
 from sqlalchemy.orm import sessionmaker
 from sqlmodel import Session, col, select
 
 from .knowledge_task_query import KnowledgeTaskQueryService
-from .storage.models import DatasetRow, MLTaskRow
-
-
-class JobDomain(StrEnum):
-    KNOWLEDGE = "knowledge"
-    ML = "ml"
-
-
-class JobStatus(StrEnum):
-    QUEUED = "queued"
-    RUNNING = "running"
-    SUCCEEDED = "succeeded"
-    FAILED = "failed"
-    CANCELLED = "cancelled"
+from .storage.models import DatasetRow, JobDomain, JobStatus, MLTaskRow
 
 
 @dataclass(frozen=True)

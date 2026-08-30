@@ -66,6 +66,19 @@ class MLTaskStatus(StrEnum):
     CANCELLED = "cancelled"
 
 
+class JobDomain(StrEnum):
+    KNOWLEDGE = "knowledge"
+    ML = "ml"
+
+
+class JobStatus(StrEnum):
+    QUEUED = "queued"
+    RUNNING = "running"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
 class DatasetSourceFormat(StrEnum):
     CSV = "csv"
     PARQUET = "parquet"
@@ -273,6 +286,45 @@ class MLTaskRow(SQLModel, table=True):
     started_at: datetime | None = None
     finished_at: datetime | None = None
     updated_at: datetime = Field(default_factory=utc_now)
+
+
+class JobRow(SQLModel, table=True):
+    """Unified scheduling record owned by the Job layer."""
+
+    __tablename__ = "job"
+    __table_args__ = (
+        UniqueConstraint("domain", "reference", name="uq_job_domain_reference"),
+    )
+
+    id: str = Field(default_factory=generate_id, primary_key=True)
+    domain: JobDomain = Field(
+        sa_column=Column(
+            SQLAlchemyEnum(
+                JobDomain,
+                values_callable=lambda enum_class: [member.value for member in enum_class],
+            ),
+            nullable=False,
+            index=True,
+        ),
+    )
+    kind: str = Field(index=True)
+    reference: str = Field(index=True)
+    status: JobStatus = Field(
+        sa_column=Column(
+            SQLAlchemyEnum(
+                JobStatus,
+                values_callable=lambda enum_class: [member.value for member in enum_class],
+            ),
+            nullable=False,
+            index=True,
+        ),
+    )
+    phase: str = Field(default="queued")
+    error_summary: str | None = None
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
 
 
 class MLTaskArtifactRow(SQLModel, table=True):
