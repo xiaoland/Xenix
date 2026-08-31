@@ -203,14 +203,25 @@ class ProviderSettingsEditor(QWidget):
             return
         try:
             self._store_current_provider_fields()
-        except Exception:
-            pass
+        except Exception as exc:
+            self._revert_provider_selection()
+            QMessageBox.warning(
+                self,
+                QCoreApplication.translate("SettingsDialog", "Settings"),
+                str(exc),
+            )
+            return
         self._load_provider_fields(index)
-        self._refresh_model_selectors(
-            default_key=self._llm_default_model_selector.currentData(),
-            guard_key=self._llm_guard_model_selector.currentData(),
-            title_key=self._llm_thread_title_model_selector.currentData(),
-        )
+        self._refresh_model_selectors_preserving_selection()
+
+    def _revert_provider_selection(self) -> None:
+        """Return the selector to the currently loaded provider after a failed switch."""
+
+        self._loading_provider = True
+        try:
+            self._provider_selector.setCurrentIndex(self._active_provider_index)
+        finally:
+            self._loading_provider = False
 
     def _add_provider(self) -> None:
         try:
@@ -231,7 +242,7 @@ class ProviderSettingsEditor(QWidget):
         )
         self._reload_provider_selector(len(self._provider_configs) - 1)
         self._load_provider_fields(len(self._provider_configs) - 1)
-        self._refresh_model_selectors()
+        self._refresh_model_selectors_preserving_selection()
 
     def _remove_provider(self) -> None:
         if len(self._provider_configs) <= 1:
@@ -241,7 +252,7 @@ class ProviderSettingsEditor(QWidget):
         next_index = min(index, len(self._provider_configs) - 1)
         self._reload_provider_selector(next_index)
         self._load_provider_fields(next_index)
-        self._refresh_model_selectors()
+        self._refresh_model_selectors_preserving_selection()
 
     def _reload_provider_selector(self, selected_index: int) -> None:
         self._loading_provider = True
@@ -335,6 +346,20 @@ class ProviderSettingsEditor(QWidget):
         )
         self._replace_model_selector_items(
             self._llm_thread_title_model_selector, options, selected_key=str(title_key or ""), include_blank=True
+        )
+
+    def _refresh_model_selectors_preserving_selection(self) -> None:
+        """Refresh model options without resetting the user's global choices.
+
+        Adding or removing a provider changes the available model set; the three
+        global selectors must keep their current selections when those keys still
+        exist, instead of silently resetting to the first option.
+        """
+
+        self._refresh_model_selectors(
+            default_key=self._llm_default_model_selector.currentData(),
+            guard_key=self._llm_guard_model_selector.currentData(),
+            title_key=self._llm_thread_title_model_selector.currentData(),
         )
 
     def _replace_model_selector_items(

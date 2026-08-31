@@ -29,6 +29,52 @@ def test_provider_editor_round_trips_provider_and_global_choices(qapp: QApplicat
     assert editor._provider_selector.count() == 2
 
 
+def test_add_provider_preserves_global_model_choices(qapp: QApplication, qtbot: QtBot) -> None:
+    editor = ProviderSettingsEditor(
+        LLMSettings(
+            providers=[LLMProviderConfig(key="one", display_name="One", models=["a", "b"])],
+            default_fq_model_key="one/b",
+            turn_completion_guard_fq_model_key="one/b",
+            thread_title_fq_model_key="one/b",
+        )
+    )
+    qtbot.addWidget(editor)
+    assert editor._llm_default_model_selector.currentData() == "one/b"
+    assert editor._llm_guard_model_selector.currentData() == "one/b"
+    assert editor._llm_thread_title_model_selector.currentData() == "one/b"
+
+    editor._add_provider()
+
+    assert editor._llm_default_model_selector.currentData() == "one/b"
+    assert editor._llm_guard_model_selector.currentData() == "one/b"
+    assert editor._llm_thread_title_model_selector.currentData() == "one/b"
+
+
+def test_provider_switch_with_invalid_draft_warns_and_preserves_input(
+    qapp: QApplication,
+    qtbot: QtBot,
+    monkeypatch,
+) -> None:
+    editor = ProviderSettingsEditor(
+        LLMSettings(
+            providers=[
+                LLMProviderConfig(key="one", display_name="One", models=["a"]),
+                LLMProviderConfig(key="two", display_name="Two", models=["b"]),
+            ]
+        )
+    )
+    qtbot.addWidget(editor)
+    editor._provider_key_input.setText("")
+    warnings: list[tuple[object, ...]] = []
+    monkeypatch.setattr(QMessageBox, "warning", lambda *args: warnings.append(args))
+
+    editor._provider_selector.setCurrentIndex(1)
+
+    assert warnings
+    assert editor._provider_selector.currentIndex() == 0
+    assert editor._provider_key_input.text() == ""
+
+
 def test_provider_editor_masks_packaged_trial_secret_and_rejects_invalid_draft(
     qapp: QApplication,
     qtbot: QtBot,
