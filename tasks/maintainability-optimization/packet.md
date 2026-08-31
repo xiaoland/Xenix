@@ -42,8 +42,25 @@ behavior except where a small, verifiable correction is clearly warranted.
 - Slice 4 (correct stale docs) landed: marked the Job-layer feed-source wording as
   superseded in `pr1-job-layer-rework/plan.md` and `general-job-layer.md`.
   Durable docs were audited and found consistent — no `docs/` correction needed.
+- Slice 5 (approved "later" deep splitting) landed:
+  - `text_analysis.py` (104 KB → ~88 KB): extracted 38 module-level helper
+    functions into `ml/models/_text_helpers.py`.
+  - `tools.py` (106 KB → ~93 KB): extracted model-key normalization into an
+    `agent/_model_keys.py` mixin. A full split of the remaining registry was not
+    attempted — the class is a tightly-coupled god object where further
+    extraction has low value and high regression risk.
 
 ## Next Step
 
-Task complete. The optional "later" deep splitting of `tools.py` /
-`text_analysis.py` remains unapproved and was not attempted.
+Task complete. All in-scope slices landed and verified (`pdm run test` 197 passed
+after each code change).
+
+## Open follow-up (not this packet)
+
+- `pyproject.toml` ruff `extend-exclude = ["ml"]` unintentionally excludes the
+  whole `src/xenix/services/ml/` subtree from `pdm run lint`/`pdm run check`
+  (the glob `"ml"` matches that directory name, not just the legacy root `ml/`).
+  The native ML subtree is therefore not lint-covered; the two files split here
+  were verified with a direct `ruff check` instead. Root-anchoring the exclude
+  (e.g. `/ml` or `ml/`) would re-enable coverage but may surface pre-existing
+  lint debt in the ML subtree.

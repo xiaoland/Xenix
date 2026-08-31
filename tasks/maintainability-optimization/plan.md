@@ -41,7 +41,13 @@ called out in the slice and covered by a test.
   consistent. No `docs/30-unit-tdd/` admission was warranted — the extracted
   builders are source/test truth, not a new local seam.
 
-## Later (only if approved)
+## Slice 5 — Deep splitting of `tools.py` and `text_analysis.py` (approved, complete)
 
-- Re-measure size/complexity after Slices 1–4 and decide whether deeper file
-  splitting (e.g. `tools.py`, `text_analysis.py`) is warranted.
+- `text_analysis.py`: extracted 38 module-level helper functions into
+  `ml/models/_text_helpers.py`; `text_analysis.py` re-imports them. Behavior
+  equivalent; direct `ruff check` on the ML subtree is clean.
+- `tools.py`: extracted the model-key normalization block into an
+  `agent/_model_keys.py` mixin and made `AgentToolRegistry` inherit it. A full
+  split of the remaining registry was not attempted (tightly-coupled god object;
+  low value / high regression risk).
+- Verify: `pdm run check` + `pdm run test` (197 passed) after each split.
