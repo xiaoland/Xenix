@@ -942,6 +942,19 @@ class LLMConversationService:
 
     def _final_message_rows(self, exchange: _PendingExchange, sequence: int) -> list[ConversationMessageRow]:
         rows: list[ConversationMessageRow] = []
+        sequence = self._append_assistant_rows(rows, exchange, sequence)
+        sequence = self._append_tool_call_rows(rows, exchange, sequence)
+        sequence = self._append_tool_result_rows(rows, exchange, sequence)
+        if not rows:
+            raise ValidationError("LLM output produced no final Message.")
+        return rows
+
+    @staticmethod
+    def _append_assistant_rows(
+        rows: list[ConversationMessageRow],
+        exchange: _PendingExchange,
+        sequence: int,
+    ) -> int:
         for item in exchange.output_items:
             if isinstance(item, AssistantOutputItem):
                 rows.append(
@@ -956,6 +969,14 @@ class LLMConversationService:
                     )
                 )
                 sequence += 1
+        return sequence
+
+    @staticmethod
+    def _append_tool_call_rows(
+        rows: list[ConversationMessageRow],
+        exchange: _PendingExchange,
+        sequence: int,
+    ) -> int:
         for call in exchange.calls.values():
             rows.append(
                 ConversationMessageRow(
@@ -979,6 +1000,14 @@ class LLMConversationService:
                 )
             )
             sequence += 1
+        return sequence
+
+    @staticmethod
+    def _append_tool_result_rows(
+        rows: list[ConversationMessageRow],
+        exchange: _PendingExchange,
+        sequence: int,
+    ) -> int:
         for call in exchange.calls.values():
             result = exchange.results[call.staged_call_id]
             rows.append(
@@ -998,9 +1027,7 @@ class LLMConversationService:
                 )
             )
             sequence += 1
-        if not rows:
-            raise ValidationError("LLM output produced no final Message.")
-        return rows
+        return sequence
 
     def _complete(
         self,
@@ -1201,76 +1228,81 @@ class LLMConversationService:
         while index < len(messages):
             row = messages[index]
             if row.kind is ConversationMessageKind.USER:
-                blocks = blocks_from_payload(row.content_payload)
-                rows.append(
-                    ProviderMessage(
-                        role="user",
-                        content="",
-                        content_blocks=list(blocks),
-                        source_message_id=row.id,
-                    )
-                )
+                rows.append(self._user_provider_message(row))
             elif row.kind is ConversationMessageKind.CLIENT_CONTROL:
-                blocks = blocks_from_payload(row.content_payload)
-                rows.append(
-                    ProviderMessage(
-                        role="user",
-                        content="",
-                        content_blocks=list(blocks),
-                        source_message_id=row.id,
-                    )
-                )
+                rows.append(self._user_provider_message(row))
             elif row.kind is ConversationMessageKind.ASSISTANT:
                 calls: list[ConversationMessageRow] = []
                 index += 1
                 while index < len(messages) and messages[index].kind is ConversationMessageKind.TOOL_CALL:
                     calls.append(messages[index])
                     index += 1
-                payload: dict[str, Any] = {}
-                if row.reasoning:
-                    payload["reasoning_content"] = row.reasoning
-                if row.refusal:
-                    payload["refusal"] = row.refusal
-                if calls:
-                    payload["tool_calls"] = [self._provider_call_payload(call) for call in calls]
-                blocks = blocks_from_payload(row.content_payload)
-                rows.append(
-                    ProviderMessage(
-                        role="assistant",
-                        content=row.text or "",
-                        content_blocks=list(blocks),
-                        provider_payload=payload,
-                        source_message_id=row.id,
-                    )
-                )
+                rows.append(self._assistant_provider_message(row, calls))
                 continue
             elif row.kind is ConversationMessageKind.TOOL_CALL:
                 calls = []
                 while index < len(messages) and messages[index].kind is ConversationMessageKind.TOOL_CALL:
                     calls.append(messages[index])
                     index += 1
-                rows.append(
-                    ProviderMessage(
-                        role="assistant",
-                        content="",
-                        provider_payload={"tool_calls": [self._provider_call_payload(call) for call in calls]},
-                        source_message_id=calls[0].id,
-                    )
-                )
+                rows.append(self._tool_call_provider_message(calls))
                 continue
             elif row.kind is ConversationMessageKind.TOOL_RESULT:
                 call = next((candidate for candidate in messages if candidate.id == row.tool_call_message_id), None)
                 if call is not None:
-                    rows.append(
-                        ProviderMessage(
-                            role="tool",
-                            tool_result_value=self._canonical_tool_result_value(row),
-                            provider_payload={"tool_call_id": call.provider_call_id or ""},
-                            source_message_id=row.id,
-                        )
-                    )
+                    rows.append(self._tool_result_provider_message(row, call))
             index += 1
         return rows
+
+    @staticmethod
+    def _user_provider_message(row: ConversationMessageRow) -> ProviderMessage:
+        blocks = blocks_from_payload(row.content_payload)
+        return ProviderMessage(
+            role="user",
+            content="",
+            content_blocks=list(blocks),
+            source_message_id=row.id,
+        )
+
+    def _assistant_provider_message(
+        self,
+        row: ConversationMessageRow,
+        calls: list[ConversationMessageRow],
+    ) -> ProviderMessage:
+        payload: dict[str, Any] = {}
+        if row.reasoning:
+            payload["reasoning_content"] = row.reasoning
+        if row.refusal:
+            payload["refusal"] = row.refusal
+        if calls:
+            payload["tool_calls"] = [self._provider_call_payload(call) for call in calls]
+        blocks = blocks_from_payload(row.content_payload)
+        return ProviderMessage(
+            role="assistant",
+            content=row.text or "",
+            content_blocks=list(blocks),
+            provider_payload=payload,
+            source_message_id=row.id,
+        )
+
+    def _tool_call_provider_message(self, calls: list[ConversationMessageRow]) -> ProviderMessage:
+        return ProviderMessage(
+            role="assistant",
+            content="",
+            provider_payload={"tool_calls": [self._provider_call_payload(call) for call in calls]},
+            source_message_id=calls[0].id,
+        )
+
+    def _tool_result_provider_message(
+        self,
+        row: ConversationMessageRow,
+        call: ConversationMessageRow,
+    ) -> ProviderMessage:
+        return ProviderMessage(
+            role="tool",
+            tool_result_value=self._canonical_tool_result_value(row),
+            provider_payload={"tool_call_id": call.provider_call_id or ""},
+            source_message_id=row.id,
+        )
 
     def _primary_usage_observation(
         self,
