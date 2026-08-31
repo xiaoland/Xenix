@@ -107,8 +107,10 @@ service, OCR service, ML worker pool, or user config.
 
 ## Phase 4 — CI evidence and layered visual tests
 
-**Status: implemented locally; first main-targeting PR run remains external
-acceptance.** Native CI now captures all three fixed Fusion/en_US/Segoe UI
+**Status: real positive-path acceptance passed; whole-job failure upload still
+pending.** Draft PR #124 run 33351291911 passed 208 tests and the native smoke;
+five downloaded scene sets and their index were inspected. See
+[ci-acceptance.md](ci-acceptance.md). Native CI initially captured three fixed Fusion/en_US/Segoe UI
 scenarios, builds a bounded root index, and always uploads only `ui-artifacts/`.
 The separately invoked Windows QPA smoke covers expose/activate/focus/dialog and
 the custom-painted black user bubble across two resize widths. Visuals remain

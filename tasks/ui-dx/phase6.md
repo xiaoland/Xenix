@@ -128,8 +128,10 @@ The font policy follows Qt's distinction between a requested
   `ui-artifacts/phase6-final/`, all resolve to Segoe UI Regular, exact match.
 - Independent integration review: no functional blockers; its remaining private
   history-refresh call was replaced with the public shell `refresh_history` seam.
-- Actual GitHub artifact inspection: pending the task-specific PR-route exception;
-  no main/develop mutation or remote publication has occurred.
+- Actual GitHub positive-path artifact inspection: passed on draft PR #124,
+  run 33351291911. The user approved the route exception and only feat/ui-dx was
+  pushed. Main/develop remain unchanged. Whole-job negative-path acceptance is
+  still pending; see [ci-acceptance.md](ci-acceptance.md).
 
 ### Remaining task boundaries
 
