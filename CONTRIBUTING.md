@@ -76,6 +76,8 @@ admitted Qt Widgets state:
   renders a fixed synthetic state and writes `manifest.json`, `tree.json`, and
   `actual.png`.
 - `pdm run pytest --direct tests/ui -q` runs the offscreen widget contracts.
+- `pdm run pytest --direct tests/ui_models -q` exercises the pure conversation
+  state and injected execution boundary without constructing a widget.
 - `pdm run ui-native-smoke` starts a separate `windows` QPA process for the
   small exposed/active/focus/dialog and custom-paint tripwire.
 - `pdm run ui-artifacts-index` rebuilds the bounded agent-readable inventory for

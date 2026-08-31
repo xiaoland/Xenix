@@ -14,6 +14,14 @@ Chatbot events, UI code, and integration tests.
 
 ## Local Seams
 
+- **UI turn presentation:** A pure UI-local controller gates callbacks by the
+  active submission generation, tracks append acknowledgement, and admits the
+  final snapshot after Stop. It does not own canonical Message state. The
+  injected execution adapter carries the originating generation on failures as
+  well as events; selecting a Thread or closing the window invalidates old UI
+  work. A closed gate suppresses UI delivery, not service I/O already in flight.
+  Before append, a failure preserves Composer input; after append it reloads the
+  canonical snapshot and never restores that input for resend.
 - **Submission:** Harness validates UI input, coordinates source import through
   DatasetService, then asks `LLMConversationService` to append the User
   Message. Dataset blocks are canonical context; source attachments are

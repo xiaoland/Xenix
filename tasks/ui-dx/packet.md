@@ -20,8 +20,9 @@ line-count-driven file splitting.
   approved SVC v14 consumer-baseline cherry-pick `f528d1f`.
 - Branch: `feat/ui-dx`.
 - Worktree: `F:\CODING\Project\Xenix_native-ui-dx`.
-- State: Phases 0–3 complete; Phase 4 is locally implemented and awaits its
-  first main-targeting PR artifact inspection before final acceptance.
+- State: Phases 0–3 and 5 complete; Phase 6 auxiliary/history boundaries are next.
+  Phase 4 is locally implemented and awaits its first main-targeting PR artifact
+  inspection before final acceptance.
 - Authority: the user has authorized continuation and task-scoped commits without
   further per-phase approval.
 
@@ -97,6 +98,11 @@ line-count-driven file splitting.
   Windows-native behavior/custom-paint smoke. Local UI contracts are 30/30,
   native smoke is 1/1, and the full suite is 175/175; no pixel baseline is
   admitted yet.
+- Phase 5 extracted pure turn state and injected execution, preserved the
+  Harness/Qt adapter boundary, and replaced headed private settlement fields
+  with public observations. The focused seam passes 14/14; full tests pass
+  189/189, with static, native, isolated production smoke, and benchmark offline
+  gates passing. Design rehearsal and evidence are in [phase5.md](phase5.md).
 
 Detailed evidence is in [preflight.md](preflight.md); source research is in
 [research.md](research.md).

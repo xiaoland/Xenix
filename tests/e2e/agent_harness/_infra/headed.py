@@ -184,11 +184,11 @@ class HeadedBenchmarkCell:
             Qt.MouseButton.LeftButton,
         )
         self.wait_until(
-            lambda: self.window._agent_thread_id is not None,  # noqa: SLF001
+            lambda: self.window.conversation_thread_id is not None,
             timeout=10.0,
             error_code="headed_thread_creation_failed",
         )
-        thread_id = str(self.window._agent_thread_id)  # noqa: SLF001
+        thread_id = str(self.window.conversation_thread_id)
         snapshot = self.harness.rename_thread(thread_id, title)
         self.window._refresh_history_sidebar(selected_thread_id=thread_id)  # noqa: SLF001
         self._select_model(fq_model_key)
@@ -263,7 +263,7 @@ class HeadedBenchmarkCell:
         services: BenchmarkCaseServices,
     ) -> None:
         thread_id = str(getattr(submission, "thread_id", "") or "")
-        if thread_id != self.window._agent_thread_id:  # noqa: SLF001
+        if thread_id != self.window.conversation_thread_id:
             raise HeadedBenchmarkError("headed_submission_thread_mismatch")
         fq_model_key = str(getattr(submission, "fq_model_key", "") or "")
         self._select_model(fq_model_key)
@@ -323,8 +323,7 @@ class HeadedBenchmarkCell:
             self.wait_until(
                 lambda: (
                     not view._running  # noqa: SLF001
-                    and self.window._pending_composer_submission is None  # noqa: SLF001
-                    and self.window._active_pending_message_id is None  # noqa: SLF001
+                    and self.window.conversation_idle
                 ),
                 timeout=10.0,
                 error_code="headed_ui_did_not_settle",
@@ -412,7 +411,7 @@ class HeadedBenchmarkCell:
             raise HeadedBenchmarkError("headed_model_not_available")
         picker.setCurrentIndex(index)
         self.pump_events()
-        thread_id = self.window._agent_thread_id  # noqa: SLF001
+        thread_id = self.window.conversation_thread_id
         if thread_id is None:
             raise HeadedBenchmarkError("headed_thread_not_selected")
         selected = self.harness.get_thread_snapshot(thread_id).thread.selected_fq_model_key

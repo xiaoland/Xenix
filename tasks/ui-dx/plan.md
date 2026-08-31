@@ -134,6 +134,13 @@ run inspected for success and intentional-failure artifact behavior.
 
 ## Phase 5 — MainWindow conversation seam
 
+**Status: complete.** The pure turn controller, injected stream executor, and
+MainWindow adapter are integrated. Four boundary defects are covered: stuck
+preparing state on navigation, untagged stale failures, queued updates after
+close, and final-without-live Composer unlock. The focused seam passes 14/14;
+full tests pass 189/189, native smoke and isolated production smoke pass, and
+benchmark offline checks/discovery remain green. See [phase5.md](phase5.md).
+
 - Characterize stale stream rejection, append acknowledgement, failure recovery,
   stop/pause, attachment state, final snapshot, and shutdown behavior.
 - Extract the conversation turn state/controller with injected execution and

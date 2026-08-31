@@ -606,12 +606,17 @@ def build_main_window(
         _emit_startup_timing("services.construct", step_start)
 
         step_start = time.perf_counter()
+        from .ui.conversation.execution import ThreadedSubmissionExecutor
+
         window = MainWindow(
             paths=paths,
             log_path=log_path,
             db_path=runtime.database_path(paths),
             translation_manager=translation_manager,
             agent_harness_service=agent_services.harness,
+            conversation_executor=ThreadedSubmissionExecutor(
+                agent_services.harness.submit_user_turn_stream
+            ),
             llm_service=llm_service,
             llm_settings_service=llm_settings_service,
             embedding_settings_service=embedding_settings_service,
