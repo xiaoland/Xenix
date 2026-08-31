@@ -1,5 +1,9 @@
 # General Job Layer
 
+> Superseded by `tasks/pr1-job-layer-rework/` (the generic scheduler rework that
+> made `JobRow`/`JobScheduler` the actual scheduling authority). Kept for history;
+> its "read-only projection" wording no longer describes the landed design.
+
 ## Objective
 
 Provide one service-owned job projection and one global GUI surface for observing

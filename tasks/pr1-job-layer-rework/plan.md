@@ -61,6 +61,9 @@ Each phase lands as one verified slice. No commit without explicit instruction.
 - job_service.py: JobQueryService feeds from JobRow (single source); JobItem
   gains capability flags (can_cancel/can_retry/can_view_log) and domain
   reference; drop _knowledge_status/_ml_status normalizers once feed is JobRow.
+  (Superseded: the landed feed stays a read-only projection over domain rows
+  with the normalizers; JobRow owns scheduling only — see the packet Acceptance
+  note and `docs/20-prd-tdd/job-feed-contract.md`.)
 - job_center.py: action buttons wired to scheduler/domain services; refresh
   after action; i18n extract/complete/compile both catalogs.
 - tests/runtime/test_job_center.py: offscreen dialog tests (pattern from
