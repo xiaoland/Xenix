@@ -341,47 +341,6 @@ def _load_runtime_imports(
     )
 
 
-def _register_agent_skill_tools(
-    registry,
-    catalog,
-    *,
-    activated_skill_names_provider: Callable[[str], set[str]] | None = None,
-) -> None:
-    """Compatibility forwarding for historical desktop/test imports."""
-
-    from .services.agent.composition import register_agent_skill_tools
-
-    register_agent_skill_tools(
-        registry,
-        catalog,
-        activated_skill_names_provider=activated_skill_names_provider,
-    )
-
-
-def _agent_skill_activated_skill_names(snapshot) -> set[str]:
-    """Compatibility forwarding for historical desktop/test imports."""
-
-    from .services.agent.composition import agent_skill_activated_skill_names
-
-    return agent_skill_activated_skill_names(snapshot)
-
-
-def _agent_skill_context_messages(catalog, snapshot) -> list:
-    """Compatibility forwarding for historical desktop/test imports."""
-
-    from .services.agent.composition import agent_skill_context_messages
-
-    return agent_skill_context_messages(catalog, snapshot)
-
-
-def _agent_skill_tool_scope_names(snapshot) -> tuple[str, ...] | None:
-    """Compatibility forwarding for historical desktop/test imports."""
-
-    from .services.agent.composition import agent_skill_tool_scope_names
-
-    return agent_skill_tool_scope_names(snapshot)
-
-
 def _load_runtime_imports_with_events(
     app: QApplication,
     splash: StartupSplash | None,
