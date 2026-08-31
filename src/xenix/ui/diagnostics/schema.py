@@ -53,6 +53,7 @@ class OwnershipNode(TypedDict):
     class_name: str
     object_name: str
     semantic_id: str
+    item_reference: NotRequired[str]
     widget: NotRequired[WidgetSnapshot]
     layout: NotRequired[LayoutSnapshot]
     truncated: NotRequired[bool]

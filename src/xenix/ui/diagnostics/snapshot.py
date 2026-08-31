@@ -6,6 +6,7 @@ from PySide6.QtCore import QObject, QRect, QSize
 from PySide6.QtWidgets import QAbstractButton, QComboBox, QLayout, QWidget
 from shiboken6 import isValid
 
+from ..semantic_identity import item_reference
 from .schema import (
     LayoutItemNode,
     LayoutSnapshot,
@@ -61,6 +62,9 @@ def _capture_ownership(
         "children": [],
     }
     if isinstance(obj, QWidget):
+        reference = item_reference(obj)
+        if reference is not None:
+            node["item_reference"] = reference
         node["widget"] = _capture_widget(obj)
     if isinstance(obj, QLayout):
         node["layout"] = _capture_layout_properties(obj)

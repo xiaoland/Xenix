@@ -11,7 +11,7 @@ from scripts.ui_lab import artifact_index as artifact_index_module
 from scripts.ui_lab.artifact_index import build_artifact_index
 from xenix.ui.diagnostics import CapturePolicy, capture_ui_artifacts, capture_ui_snapshot
 from xenix.ui.diagnostics import snapshot as snapshot_module
-from xenix.ui.semantic_identity import identify
+from xenix.ui.semantic_identity import identify, identify_repeated_item
 
 
 def _artifact_widget(qtbot: QtBot) -> QWidget:
@@ -63,6 +63,25 @@ def test_snapshot_keeps_ownership_and_layout_relations_without_widget_text(qtbot
     assert sum(node["semantic_id"] == "test.action.duplicate" for node in nodes) == 2
     assert snapshot["layout"] is not None
     assert {"layout", "widget", "spacer"} <= set(_layout_kinds(snapshot["layout"]))
+
+
+def test_snapshot_outputs_item_reference_for_repeated_controls(qtbot: QtBot) -> None:
+    root = QWidget()
+    qtbot.addWidget(root)
+    layout = QVBoxLayout(root)
+    chip = identify_repeated_item(
+        QPushButton("remove"),
+        role="chat.composer.attachment",
+        item_reference="attachment:01J8A",
+    )
+    layout.addWidget(chip)
+
+    snapshot = capture_ui_snapshot(root)
+    nodes = list(_ownership_nodes(snapshot["ownership"]))
+
+    repeated = [node for node in nodes if node.get("item_reference") == "attachment:01J8A"]
+    assert len(repeated) == 1
+    assert repeated[0]["semantic_id"] == "chat.composer.attachment"
 
 
 def test_capture_policy_controls_pixels_and_bounds_redacted_logs(qtbot: QtBot, tmp_path) -> None:
