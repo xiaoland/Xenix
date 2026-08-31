@@ -51,9 +51,26 @@ All six decisions D1–D6 are resolved — see design.md §Decisions.
 D1 = B (unified job table, deep rework). D3 = ML permanent orphan (deliberate).
 D6 (PRD vocabulary) landed in Phase 5.
 
-## Next Step
+## Acceptance
 
-Complete. Phases 0–5 landed as verified slices: Phase 0 pending→queued fix,
+Accepted. Phases 0–5 landed as verified slices: Phase 0 pending→queued fix,
 Phase 1 job table + scheduler core, Phase 2 ML adapter, Phase 3 Knowledge
-adapters, Phase 4 Job Center cancel action, Phase 5 PRD vocabulary. Final
-verification: pdm run test (197 passed), pdm run check, pdm run smoke all green.
+adapters, Phase 4 Job Center cancel action, Phase 5 PRD vocabulary.
+
+Final verification (re-run 2026-08-31, Windows):
+
+- `pdm run check` — green (Ruff, Mypy, Agent Skills, OCR lock, compile).
+- `pdm run test` — 197 passed.
+- `pdm run smoke` — exit 0.
+- i18n compile — 446/446 finished in both locales.
+- Focused job suite — 13 passed
+  (`test_job_scheduler.py`, `test_job_service.py`,
+  `test_knowledge_job_handlers.py`, `runtime/test_job_center.py`).
+
+Durable contract admitted at `docs/20-prd-tdd/job-feed-contract.md`.
+
+Note: plan.md Phase 4 worded the feed as reading from `JobRow` (single source);
+the landed design instead keeps `JobQueryService` as a read-only projection over
+domain rows (with `_knowledge_status`/`_ml_status` normalizers) while `JobRow`
+owns scheduling only. The contract codifies the landed shape; treat the Phase 4
+"feed from JobRow" wording as superseded.
