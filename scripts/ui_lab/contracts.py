@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from PySide6.QtWidgets import QApplication, QWidget
 from shiboken6 import isValid
@@ -14,15 +14,38 @@ class ScenarioContext:
 
 @dataclass
 class ScenarioHandle:
+    """A built scenario with an explicit lifecycle ownership contract.
+
+    - stop: the scenario stops its own tasks, timers, and connections.
+    - cleanup: the idempotent public wrapper around stop.
+    - close: stops tasks and closes the root window.
+    - The host owns deleting the root QWidget; close never calls deleteLater,
+      so pytest-qt can own deletion without a double free and the gallery can
+      delete the root on scenario switch.
+    """
+
     root: QWidget
     readiness: Callable[[], bool]
-    cleanup: Callable[[], None]
+    stop: Callable[[], None]
+    _stopped: bool = field(default=False, init=False, repr=False)
+
+    def cleanup(self) -> None:
+        """Idempotently stop the scenario's own tasks/timers/connections."""
+        if self._stopped:
+            return
+        self._stopped = True
+        self.stop()
 
     def close(self) -> None:
+        """Stop scenario tasks and close the root window.
+
+        The host owns deleting the root; this never calls deleteLater.
+        Repeated calls are safe: cleanup is idempotent and QWidget.close is a
+        no-op after the first close.
+        """
         self.cleanup()
         if isValid(self.root):
             self.root.close()
-            self.root.deleteLater()
 
 
 ScenarioBuilder = Callable[[ScenarioContext], ScenarioHandle]

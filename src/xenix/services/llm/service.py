@@ -226,8 +226,17 @@ class LLMSettingsService:
 
 
 class LLMService:
-    def __init__(self, settings_service: LLMSettingsSource) -> None:
+    def __init__(self, settings_service: LLMSettingsSource, *, allow_live: bool = True) -> None:
         self._settings_service = settings_service
+        self._allow_live = allow_live
+
+    def _deny_live_call(self) -> None:
+        if not self._allow_live:
+            raise ValidationError(
+                "Live LLM provider calls are disabled in this profile.",
+                error_code="live_llm_denied",
+                retryable=False,
+            )
 
     @property
     def settings_service(self) -> LLMSettingsSource:
@@ -254,6 +263,7 @@ class LLMService:
         retry_callback: Callable[[LLMRetryEvent], None] | None = None,
         before_provider_request: Callable[[], None] | None = None,
     ) -> ProviderResponse:
+        self._deny_live_call()
         settings = self.load_settings()
         provider = self._build_provider_from_settings(settings, fq_model_key)
         return self._complete_with_retry(
@@ -273,6 +283,7 @@ class LLMService:
         tools: list[AgentToolSpec],
         before_provider_request: Callable[[], None] | None = None,
     ) -> Iterator[ProviderStreamEvent | LLMRetryEvent]:
+        self._deny_live_call()
         settings = self.load_settings()
         provider = self._build_provider_from_settings(settings, fq_model_key)
         max_attempts = self._max_attempts(settings.retry_attempts)
@@ -320,10 +331,14 @@ class LLMService:
         return LLMRequestMetadata(provider_name=provider_config.key, model=ref.model_key)
 
     def turn_completion_guard_fq_model_key(self) -> str | None:
+        if not self._allow_live:
+            return None
         value = self.load_settings().turn_completion_guard_fq_model_key.strip()
         return value or None
 
     def thread_title_fq_model_key(self) -> str | None:
+        if not self._allow_live:
+            return None
         value = self.load_settings().thread_title_fq_model_key.strip()
         return value or None
 
@@ -422,12 +437,16 @@ class LLMService:
         return max(1, min(int(value), 20))
 
     def build_turn_completion_guard_provider(self) -> "OpenAICompatibleChatProvider | None":
+        if not self._allow_live:
+            return None
         fq_model_key = self.load_settings().turn_completion_guard_fq_model_key
         if not fq_model_key:
             return None
         return self.build_provider(fq_model_key)
 
     def build_thread_title_provider(self) -> "OpenAICompatibleChatProvider | None":
+        if not self._allow_live:
+            return None
         fq_model_key = self.load_settings().thread_title_fq_model_key
         if not fq_model_key:
             return None

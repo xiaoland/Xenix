@@ -36,6 +36,7 @@ def _build_dialog(
     monkeypatch,
     tmp_path: Path,
     index_service,
+    ssh_worker_setup: bool = True,
 ) -> SettingsDialog:
     monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
     paths = ensure_app_dirs(get_app_paths())
@@ -50,6 +51,7 @@ def _build_dialog(
         MLWorkerSettingsService(paths),
         EmbeddingSettingsService(paths),
         knowledge_index_service=index_service,
+        ssh_worker_setup=ssh_worker_setup,
     )
     return dialog
 
@@ -288,5 +290,31 @@ def test_settings_dialog_shutdown_does_not_wait_for_running_index_status(
         fallback.cancel()
         if not indexes.future.done():
             indexes.future.set_result(_overview("ready", unit_count=67))
+        dialog.close()
+        dialog.shutdown()
+
+
+def test_ssh_worker_setup_is_denied_in_agent_safe_profile(
+    monkeypatch,
+    tmp_path: Path,
+    qapp: QApplication,
+    qtbot: QtBot,
+) -> None:
+    dialog = _build_dialog(
+        qapp=qapp,
+        monkeypatch=monkeypatch,
+        tmp_path=tmp_path,
+        index_service=None,
+        ssh_worker_setup=False,
+    )
+    qtbot.addWidget(dialog)
+    try:
+        assert not dialog._ml_workers_setup_button.isEnabled()
+        assert dialog._ssh_worker_wizard is None
+
+        dialog._open_ssh_worker_wizard()
+
+        assert dialog._ssh_worker_wizard is None
+    finally:
         dialog.close()
         dialog.shutdown()

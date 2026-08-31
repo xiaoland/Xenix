@@ -98,4 +98,5 @@ class ScenarioGallery(QMainWindow):
             return
         self._host_layout.removeWidget(self._active.root)
         self._active.close()
+        self._active.root.deleteLater()
         self._active = None

@@ -49,11 +49,14 @@ class UiArtifactRegistry:
         return bool(self._roots)
 
     def publish_call_failure(self) -> None:
-        self._capture(self._published_dir(), reason="pytest-call-failure")
+        self._capture(self._published_dir(), reason="pytest-call-failure", capture_phase="call")
+
+    def publish_setup_failure(self) -> None:
+        self._capture(self._published_dir(), reason="pytest-setup-failure", capture_phase="setup")
 
     def stage_before_teardown(self) -> None:
         self._staging_dir = self._basetemp() / "ui-artifact-staging" / _safe_test_id(self._item.nodeid)
-        self._capture(self._staging_dir, reason="pytest-pre-teardown")
+        self._capture(self._staging_dir, reason="pytest-pre-teardown", capture_phase="pre-teardown")
 
     def publish_teardown_failure(self) -> None:
         if self._staging_dir is None or not self._staging_dir.exists():
@@ -68,6 +71,8 @@ class UiArtifactRegistry:
         for manifest_path in destination.glob("*/manifest.json"):
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
             manifest["reason"] = "pytest-teardown-failure"
+            # capture_phase remains 'pre-teardown': the snapshot was staged
+            # before cleanup, so it must not be misread as the teardown scene.
             _write_json(manifest_path, manifest)
         self._roots.clear()
 
@@ -76,7 +81,7 @@ class UiArtifactRegistry:
             shutil.rmtree(self._staging_dir)
         self._roots.clear()
 
-    def _capture(self, destination: Path, *, reason: str) -> None:
+    def _capture(self, destination: Path, *, reason: str, capture_phase: str) -> None:
         destination.mkdir(parents=True, exist_ok=True)
         captured_names: list[str] = []
         messages = tuple(record.message for record in self._qtlog.records)
@@ -91,6 +96,7 @@ class UiArtifactRegistry:
                 scenario_id=None,
                 policy=CapturePolicy.SYNTHETIC,
                 qt_messages=messages,
+                capture_phase=capture_phase,
             )
             captured_names.append(registered.name)
         _write_json(
@@ -99,6 +105,7 @@ class UiArtifactRegistry:
                 "schema_version": 1,
                 "test_id": self._item.nodeid,
                 "reason": reason,
+                "capture_phase": capture_phase,
                 "roots": captured_names,
             },
         )
@@ -126,7 +133,10 @@ def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo[None]):
     if registry is None or not registry.has_roots:
         return report
     try:
-        if report.when == "call":
+        if report.when == "setup":
+            if report.failed:
+                registry.publish_setup_failure()
+        elif report.when == "call":
             if report.failed:
                 registry.publish_call_failure()
             else:

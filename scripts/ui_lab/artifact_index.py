@@ -20,12 +20,27 @@ class ArtifactIndex(TypedDict):
     schema_version: int
     artifact_count: int
     artifacts: list[ArtifactIndexEntry]
+    truncated: bool
+
+
+MAX_INDEX_ARTIFACTS = 500
+MAX_INDEX_MANIFEST_BYTES = 4 * 1024 * 1024
 
 
 def build_artifact_index(root: Path) -> ArtifactIndex:
     root.mkdir(parents=True, exist_ok=True)
     artifacts: list[ArtifactIndexEntry] = []
+    total_manifest_bytes = 0
+    truncated = False
     for manifest_path in sorted(root.rglob("manifest.json")):
+        if len(artifacts) >= MAX_INDEX_ARTIFACTS:
+            truncated = True
+            break
+        manifest_bytes = manifest_path.stat().st_size
+        if total_manifest_bytes + manifest_bytes > MAX_INDEX_MANIFEST_BYTES:
+            truncated = True
+            break
+        total_manifest_bytes += manifest_bytes
         manifest = _read_object(manifest_path)
         artifacts.append(
             {
@@ -42,6 +57,7 @@ def build_artifact_index(root: Path) -> ArtifactIndex:
         "schema_version": 1,
         "artifact_count": len(artifacts),
         "artifacts": artifacts,
+        "truncated": truncated,
     }
     (root / "index.json").write_text(
         json.dumps(index, ensure_ascii=False, indent=2, sort_keys=True) + "\n",

@@ -108,9 +108,9 @@ def _submit(view, text: str, attachment: Path | None = None) -> None:
     paths: list[str] = []
     if attachment is not None:
         attachment.write_text("a,b\n1,2\n", encoding="utf-8")
-        view._add_local_files([str(attachment)])
+        view.composer.add_local_files([str(attachment)])
         paths = [str(attachment.resolve())]
-    view._editor.setPlainText(text)
+    view.composer.editor.setPlainText(text)
     view.message_submitted.emit(text, paths, "")
 
 
@@ -130,10 +130,10 @@ def test_pre_ack_failure_preserves_composer_for_retry(qtbot: QtBot, ui_artifacts
     )
     recorded.on_failure(recorded.submission.client_submission_id, RuntimeError("import failed"))
 
-    assert view._editor.toPlainText() == "Retry this"
-    assert view._attached_files == [str(attachment.resolve())]
-    assert view._attachment_states[str(attachment.resolve())].status is ComposerAttachmentStatus.FAILED
-    assert view._editor.isEnabled()
+    assert view.composer.editor.toPlainText() == "Retry this"
+    assert view.composer.attached_files == [str(attachment.resolve())]
+    assert view.composer.attachment_states[str(attachment.resolve())].status is ComposerAttachmentStatus.FAILED
+    assert view.composer.editor.isEnabled()
     assert window.conversation_idle
 
 
@@ -154,11 +154,11 @@ def test_acknowledged_failure_reloads_canonical_without_restoring_input(qtbot: Q
     )
     recorded.on_failure(recorded.submission.client_submission_id, RuntimeError("sampling failed"))
 
-    assert view._editor.toPlainText() == ""
-    assert view._attached_files == []
+    assert view.composer.editor.toPlainText() == ""
+    assert view.composer.attached_files == []
     assert harness.get_thread_snapshot.call_args.args == ("thread-a",)
-    assert "thread-a:stable" in view._message_bubbles_by_id
-    assert "append" not in view._message_bubbles_by_id
+    assert "thread-a:stable" in view.timeline.message_bubbles_by_id
+    assert "append" not in view.timeline.message_bubbles_by_id
     assert window.conversation_idle
 
 
@@ -173,7 +173,7 @@ def test_history_switch_clears_preparing_turn_and_old_callbacks_cannot_mutate_ne
     window._history_panel.open_thread("thread-b")
     assert window.conversation_thread_id == "thread-b"
     assert window.conversation_idle
-    assert view._editor.isEnabled()
+    assert view.composer.editor.isEnabled()
 
     _submit(view, "New turn")
     new = executor.submissions[1]
@@ -192,7 +192,7 @@ def test_history_switch_clears_preparing_turn_and_old_callbacks_cannot_mutate_ne
     assert window.conversation_thread_id == "thread-b"
     assert len(executor.submissions) == 2
     assert not window.conversation_idle
-    assert view._editor.toPlainText() == "New turn"
+    assert view.composer.editor.toPlainText() == "New turn"
     assert new.submission.thread_id == "thread-b"
     assert harness.get_thread_snapshot.call_count == 0
 
@@ -238,7 +238,7 @@ def test_stop_ignores_live_callbacks_but_final_snapshot_unlocks_composer(qtbot: 
             ),
         )
     )
-    assert not view._running
+    assert not view.composer.running
 
     recorded.on_event(
         AgentHarnessStreamEvent(
@@ -250,9 +250,9 @@ def test_stop_ignores_live_callbacks_but_final_snapshot_unlocks_composer(qtbot: 
         )
     )
     assert window.conversation_idle
-    assert view._editor.isEnabled()
-    assert not view._running
-    assert "final" in view._message_bubbles_by_id
+    assert view.composer.editor.isEnabled()
+    assert not view.composer.running
+    assert "final" in view.timeline.message_bubbles_by_id
 
 
 def test_ack_then_direct_final_snapshot_unlocks_composer(qtbot: QtBot, ui_artifacts, tmp_path) -> None:
@@ -280,8 +280,8 @@ def test_ack_then_direct_final_snapshot_unlocks_composer(qtbot: QtBot, ui_artifa
     )
 
     assert window.conversation_idle
-    assert view._editor.isEnabled()
-    assert not view._running
+    assert view.composer.editor.isEnabled()
+    assert not view.composer.running
 
 
 def test_close_shuts_executor_and_late_callbacks_do_not_change_view(qtbot: QtBot, ui_artifacts, tmp_path) -> None:
@@ -289,7 +289,7 @@ def test_close_shuts_executor_and_late_callbacks_do_not_change_view(qtbot: QtBot
     view = window._thread_detail_view
     _submit(view, "Closing")
     recorded = executor.submissions[0]
-    rendered_ids = set(view._message_bubbles_by_id)
+    rendered_ids = set(view.timeline.message_bubbles_by_id)
     window.close()
     recorded.on_event(
         AgentHarnessStreamEvent(
@@ -303,6 +303,6 @@ def test_close_shuts_executor_and_late_callbacks_do_not_change_view(qtbot: QtBot
     recorded.on_failure(recorded.submission.client_submission_id, RuntimeError("late failure"))
 
     assert executor.shutdown_calls == 1
-    assert view._editor.toPlainText() == "Closing"
-    assert set(view._message_bubbles_by_id) == rendered_ids
+    assert view.composer.editor.toPlainText() == "Closing"
+    assert set(view.timeline.message_bubbles_by_id) == rendered_ids
     assert window.conversation_idle

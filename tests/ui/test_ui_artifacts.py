@@ -7,8 +7,10 @@ from PySide6.QtCore import QCoreApplication, QEvent
 from PySide6.QtWidgets import QComboBox, QHBoxLayout, QLineEdit, QPushButton, QVBoxLayout, QWidget
 from pytestqt.qtbot import QtBot
 
+from scripts.ui_lab import artifact_index as artifact_index_module
 from scripts.ui_lab.artifact_index import build_artifact_index
 from xenix.ui.diagnostics import CapturePolicy, capture_ui_artifacts, capture_ui_snapshot
+from xenix.ui.diagnostics import snapshot as snapshot_module
 from xenix.ui.semantic_identity import identify
 
 
@@ -131,3 +133,62 @@ def test_artifact_index_projects_only_bounded_manifest_metadata(qtbot: QtBot, tm
     assert index["artifacts"][0]["path"] == "scenario/sample"
     assert index["artifacts"][0]["scenario_id"] == "sample.visual"
     assert "super-secret-value" not in json.dumps(index)
+
+
+def test_capture_removes_stale_artifacts_from_reused_directory(qtbot: QtBot, tmp_path) -> None:
+    root = _artifact_widget(qtbot)
+    root.show()
+    qtbot.waitUntil(root.isVisible)
+    destination = tmp_path / "reused"
+
+    capture_ui_artifacts(
+        root, destination, reason="synthetic", scenario_id="test.reuse", policy=CapturePolicy.SYNTHETIC
+    )
+    assert (destination / "actual.png").exists()
+
+    capture_ui_artifacts(
+        root,
+        destination,
+        reason="runtime",
+        policy=CapturePolicy.RUNTIME_REDACTED,
+        qt_messages=("api_key=secret",),
+    )
+    assert not (destination / "actual.png").exists()
+    manifest = json.loads((destination / "manifest.json").read_text(encoding="utf-8"))
+    assert {file["name"] for file in manifest["files"]} == {"tree.json", "qt.log"}
+
+
+def test_snapshot_counts_layout_items_toward_node_budget(qtbot: QtBot, monkeypatch) -> None:
+    root = QWidget()
+    qtbot.addWidget(root)
+    layout = QVBoxLayout(root)
+    for _ in range(20):
+        layout.addSpacing(4)
+
+    monkeypatch.setattr(snapshot_module, "MAX_UI_SNAPSHOT_NODES", 5)
+    snapshot = capture_ui_snapshot(root)
+
+    assert snapshot["layout"] is not None
+    assert snapshot["layout"]["truncated"] is True
+    assert len(snapshot["layout"]["items"]) < 20
+
+
+def test_artifact_index_is_bounded_by_count(qtbot: QtBot, tmp_path, monkeypatch) -> None:
+    root = _artifact_widget(qtbot)
+    root.show()
+    qtbot.waitUntil(root.isVisible)
+    artifact_root = tmp_path / "ui-artifacts"
+    for index in (1, 2):
+        capture_ui_artifacts(
+            root,
+            artifact_root / f"case{index}",
+            reason="capture-only",
+            scenario_id=f"sample.{index}",
+            policy=CapturePolicy.SYNTHETIC,
+        )
+
+    monkeypatch.setattr(artifact_index_module, "MAX_INDEX_ARTIFACTS", 1)
+    index = build_artifact_index(artifact_root)
+
+    assert index["artifact_count"] == 1
+    assert index["truncated"] is True

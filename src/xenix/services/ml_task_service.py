@@ -135,6 +135,8 @@ class MLTaskService:
         paths: AppPaths,
         worker_runner: MLWorkerRunner | None = None,
         worker_settings_service: MLWorkerSettingsService | None = None,
+        *,
+        allow_remote_workers: bool = True,
     ) -> None:
         self._session_factory = session_factory
         self._paths = paths
@@ -144,7 +146,8 @@ class MLTaskService:
         self._trained_models = TrainedModelRepository()
         self._artifact_service = ArtifactService(session_factory)
         self._worker_runner = worker_runner or MLWorkerPool(
-            worker_settings_service or MLWorkerSettingsService(paths)
+            worker_settings_service or MLWorkerSettingsService(paths),
+            allow_remote_workers=allow_remote_workers,
         )
         self._queue: queue.Queue[str] = queue.Queue()
         self._callbacks: list[Callable[[MLTaskRow], None]] = []

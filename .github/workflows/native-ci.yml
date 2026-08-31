@@ -25,12 +25,10 @@ jobs:
       - name: Run high-value acceptance portfolio
         run: pdm run test -vv --junitxml pytest.xml
       - name: Capture deterministic UI scenarios
-        run: |
-          pdm run ui-capture -- chat.empty --output ui-artifacts/scenarios
-          pdm run ui-capture -- chat.mixed-timeline --output ui-artifacts/scenarios
-          pdm run ui-capture -- chat.running-with-attachments --output ui-artifacts/scenarios
-          pdm run ui-capture -- main.history-populated --output ui-artifacts/scenarios
-          pdm run ui-capture -- settings.provider-and-ocr --output ui-artifacts/scenarios
+        # Registry-driven batch: every admitted scenario is captured once, each
+        # gets an independent result, failures are aggregated into a non-zero
+        # exit code, and the batch verifies expected vs captured scenario sets.
+        run: pdm run ui-capture-all --output ui-artifacts
       - name: Run Windows native UI smoke
         run: pdm run ui-native-smoke
       - name: Build UI artifact index

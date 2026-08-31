@@ -161,6 +161,10 @@ def _capture_layout(
         item = layout.itemAt(index)
         if item is None:
             continue
+        # Every layout item (including spacers) counts toward the node budget;
+        # without this a layout of thousands of spacers can exceed the declared
+        # bound while reporting no truncation.
+        emitted[0] += 1
         entry: LayoutItemNode = {
             "kind": "spacer",
             "alignment": int(item.alignment()),

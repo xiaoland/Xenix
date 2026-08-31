@@ -10,10 +10,8 @@ from PySide6.QtGui import QColor
 from PySide6.QtWidgets import QApplication, QDialog, QLineEdit, QVBoxLayout
 from pytestqt.qtbot import QtBot
 
-from scripts.ui_lab.contracts import ScenarioContext
-from scripts.ui_lab.driver import configure_scenario_application
-from scripts.ui_lab.registry import get_scenario
 from tests.ui.pytest_plugin import UiArtifactRegistry
+from tests.ui.scenario_adapter import attach_scenario
 from xenix.ui.chatbot import ChatMessageBubble, ThreadDetailView
 
 
@@ -23,12 +21,9 @@ def test_native_chat_window_expose_focus_dialog_and_user_bubble(
     ui_artifacts: UiArtifactRegistry,
 ) -> None:
     assert QApplication.platformName() == "windows"
-    scenario = get_scenario("chat.mixed-timeline")
-    configure_scenario_application(qapp, scenario)
-    handle = scenario.build(ScenarioContext(qapp))
+    scenario, handle = attach_scenario(qapp, qtbot, "chat.mixed-timeline")
     view = handle.root
     assert isinstance(view, ThreadDetailView)
-    qtbot.addWidget(view)
     ui_artifacts.register(view, name="chat-native-window")
     view.resize(scenario.viewport_width, scenario.viewport_height)
 
@@ -37,8 +32,8 @@ def test_native_chat_window_expose_focus_dialog_and_user_bubble(
     with qtbot.waitActive(view, timeout=5_000):
         view.raise_()
         view.activateWindow()
-    view._editor.setFocus(Qt.FocusReason.OtherFocusReason)
-    qtbot.waitUntil(lambda: qapp.focusWidget() is view._editor, timeout=5_000)
+    view.composer.editor.setFocus(Qt.FocusReason.OtherFocusReason)
+    qtbot.waitUntil(lambda: qapp.focusWidget() is view.composer.editor, timeout=5_000)
 
     user_bubble = next(
         bubble
@@ -72,7 +67,6 @@ def test_native_chat_window_expose_focus_dialog_and_user_bubble(
     dialog_editor.setFocus(Qt.FocusReason.OtherFocusReason)
     qtbot.waitUntil(lambda: qapp.focusWidget() is dialog_editor, timeout=5_000)
     dialog.accept()
-    handle.close()
 
 
 def _is_black(color: QColor) -> bool:

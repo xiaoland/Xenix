@@ -55,9 +55,14 @@ def settle_scenario(
     poll = QTimer()
     poll.setInterval(10)
     timed_out = False
+    root_deleted = False
 
     def inspect() -> None:
-        if not isValid(root) or (root.isVisible() and readiness()):
+        nonlocal root_deleted
+        if not isValid(root):
+            root_deleted = True
+            loop.quit()
+        elif root.isVisible() and readiness():
             loop.quit()
 
     def timeout() -> None:
@@ -71,5 +76,7 @@ def settle_scenario(
     inspect()
     loop.exec()
     poll.stop()
+    if root_deleted:
+        raise RuntimeError("UI scenario root was deleted before it became ready")
     if timed_out:
         raise TimeoutError("UI scenario did not become ready before timeout")

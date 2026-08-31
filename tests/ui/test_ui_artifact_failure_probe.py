@@ -44,6 +44,7 @@ def test_failure(qtbot, ui_artifacts):
     manifest_path = _artifact_manifests(output)[0]
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     assert manifest["reason"] == "pytest-call-failure"
+    assert manifest["capture_phase"] == "call"
     assert (manifest_path.parent / "actual.png").stat().st_size > 0
 
 
@@ -102,4 +103,5 @@ def test_teardown_failure(qtbot, ui_artifacts, fail_after_test):
     manifest_path = _artifact_manifests(output)[0]
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     assert manifest["reason"] == "pytest-teardown-failure"
+    assert manifest["capture_phase"] == "pre-teardown"
     assert (manifest_path.parent / "tree.json").stat().st_size > 0

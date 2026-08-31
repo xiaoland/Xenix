@@ -185,6 +185,7 @@ class SettingsDialog(QDialog):
         update_service: UpdateService | None = None,
         paddle_ocr_deployment: PaddleOcrDeploymentService | None = None,
         knowledge_index_service: KnowledgeIndexService | None = None,
+        ssh_worker_setup: bool = True,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
@@ -196,6 +197,7 @@ class SettingsDialog(QDialog):
         self._llm_settings_service = llm_settings_service
         self._embedding_settings_service = embedding_settings_service
         self._ml_worker_settings_service = ml_worker_settings_service
+        self._ssh_worker_setup_allowed = ssh_worker_setup
         self._software_updates_available = update_service is not None
         self._update_operation_active = False
         self._paddle_ocr_deployment = paddle_ocr_deployment
@@ -280,6 +282,8 @@ class SettingsDialog(QDialog):
         self.resize(760, 760)
         self._build_ui()
         self._wire_events()
+        if not self._ssh_worker_setup_allowed:
+            self._ml_workers_setup_button.setEnabled(False)
         self._load_agent_settings()
         self._load_embedding_settings()
         self.retranslate_ui()
@@ -763,6 +767,12 @@ class SettingsDialog(QDialog):
         )
 
     def _open_ssh_worker_wizard(self) -> None:
+        # An agent-safe profile denies SSH worker setup at the composition seam:
+        # constructing the wizard (and its SshWorkerSetupService) would let it
+        # write ~/.ssh/config and run ssh/scp. Refuse here rather than hiding the
+        # side-effect entry in a lower layer.
+        if not self._ssh_worker_setup_allowed:
+            return
         wizard = SshWorkerSetupWizard(
             self._ml_worker_settings_service,
             parent=self,

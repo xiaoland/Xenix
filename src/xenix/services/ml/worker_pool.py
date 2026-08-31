@@ -26,9 +26,11 @@ class MLWorkerPool:
         settings_service: MLWorkerSettingsService,
         *,
         local_runner: LocalMLWorkerRunner | None = None,
+        allow_remote_workers: bool = True,
     ) -> None:
         self._settings_service = settings_service
         self._local_runner = local_runner or LocalMLWorkerRunner()
+        self._allow_remote_workers = allow_remote_workers
         self._active_counts: dict[str, int] = {}
         self._lock = threading.Lock()
 
@@ -115,7 +117,11 @@ class MLWorkerPool:
         )[0]
 
     def _enabled_workers(self, settings: MLWorkerSettings) -> list[MLWorkerConfig]:
-        if not settings.pool.enabled:
+        # A disabled pool collapses to local-only execution, ignoring per-worker
+        # enabled flags, so Xenix always keeps a local execution fallback.
+        # Agent-safe profiles additionally deny remote (SSH) worker admission at
+        # this seam, independent of what the persisted settings declare.
+        if not settings.pool.enabled or not self._allow_remote_workers:
             return [worker for worker in settings.workers if worker.kind is MLWorkerKind.LOCAL]
         workers: list[MLWorkerConfig] = []
         for worker in settings.workers:

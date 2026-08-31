@@ -11,10 +11,10 @@ import pytest
 from PySide6.QtWidgets import QApplication, QWidget
 from pytestqt.qtbot import QtBot
 
-from scripts.ui_lab.contracts import ScenarioContext
 from scripts.ui_lab.driver import configure_scenario_application
 from scripts.ui_lab.registry import get_scenario, list_scenarios
 from tests.ui.pytest_plugin import UiArtifactRegistry
+from tests.ui.scenario_adapter import attach_scenario
 from xenix.ui.chatbot import ThreadDetailView
 from xenix.ui.diagnostics import CapturePolicy, capture_ui_artifacts
 from xenix.ui.semantic_identity import item_reference
@@ -30,10 +30,7 @@ EXPECTED_SCENARIO_IDS = (
 
 
 def _build_scenario(qapp: QApplication, qtbot: QtBot, scenario_id: str):
-    scenario = get_scenario(scenario_id)
-    configure_scenario_application(qapp, scenario)
-    handle = scenario.build(ScenarioContext(qapp))
-    qtbot.addWidget(handle.root, before_close_func=lambda _root: handle.cleanup())
+    scenario, handle = attach_scenario(qapp, qtbot, scenario_id)
     handle.root.resize(scenario.viewport_width, scenario.viewport_height)
     handle.root.show()
     qtbot.waitUntil(lambda: handle.root.isVisible() and handle.readiness())
@@ -134,9 +131,9 @@ def test_running_scenario_exposes_stop_contract(qapp: QApplication, qtbot: QtBot
     view = handle.root
     assert isinstance(view, ThreadDetailView)
 
-    assert view._send_button.accessibleIdentifier() == "chat.composer.send-or-stop"
-    assert view._send_button.accessibleName() == view.tr("Stop")
-    assert not view._editor.isEnabled()
+    assert view.composer.send_button.accessibleIdentifier() == "chat.composer.send-or-stop"
+    assert view.composer.send_button.accessibleName() == view.tr("Stop")
+    assert not view.composer.editor.isEnabled()
     handle.cleanup()
     handle.root.close()
 
@@ -168,3 +165,57 @@ def test_synthetic_scenario_capture_emits_structured_artifacts(
     assert (destination / "actual.png").stat().st_size > 0
     handle.cleanup()
     handle.root.close()
+
+
+def test_batch_capture_cli_reconciles_registry_scenarios(tmp_path) -> None:
+    output = tmp_path / "artifacts"
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "scripts.ui_lab.capture_all",
+            "--output",
+            str(output),
+            "--scenario",
+            "chat.empty",
+            "--scenario",
+            "chat.mixed-timeline",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "PYTHONPATH": "src"},
+    )
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["reconciled"] is True
+    assert set(payload["captured_scenarios"]) == {"chat.empty", "chat.mixed-timeline"}
+    run_dir = output / payload["run_id"]
+    assert (run_dir / "chat.empty" / "manifest.json").is_file()
+    assert (run_dir / "chat.mixed-timeline" / "actual.png").is_file()
+    assert (run_dir / "batch.json").is_file()
+
+
+def test_batch_capture_aggregates_build_failure_with_stage_manifest(qapp, tmp_path, monkeypatch) -> None:
+    from scripts.ui_lab import capture_all as capture_all_module
+
+    def broken(_context):
+        raise RuntimeError("synthetic build failure")
+
+    broken_spec = replace(list_scenarios()[0], build=broken)
+    monkeypatch.setattr(capture_all_module, "list_scenarios", lambda: (broken_spec,))
+
+    batch = capture_all_module.capture_all_scenarios(tmp_path / "artifacts", [broken_spec.id])
+
+    assert batch["reconciled"] is False
+    assert batch["failures"] == [
+        {
+            "scenario_id": broken_spec.id,
+            "stage": "build",
+            "error": "RuntimeError: synthetic build failure",
+        }
+    ]
+    run_dir = tmp_path / "artifacts" / batch["run_id"]
+    manifest = json.loads((run_dir / broken_spec.id / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["reason"] == "scenario-capture-failure"
+    assert manifest["stage"] == "build"

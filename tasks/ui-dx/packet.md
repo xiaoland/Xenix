@@ -20,9 +20,14 @@ line-count-driven file splitting.
   approved SVC v14 consumer-baseline cherry-pick `f528d1f`.
 - Branch: `feat/ui-dx`.
 - Worktree: `F:\CODING\Project\Xenix_native-ui-dx`.
-- State: Phases 0–3, 5 and 6 complete; Phase 7 runtime profiles are next.
-  Phase 4 has passed real positive-path CI/artifact inspection on draft PR #124;
-  whole-job failure/always-upload negative acceptance remains pending.
+- State: Phases 0–3, 5 and 6 complete; Phase 7 runtime profiles are implemented
+  and locally verified (remote ML worker, SSH worker setup, live LLM/embedding,
+  and update/OTLP denials are wired; isolated home is cleaned on success and
+  bounded redacted evidence is preserved on failure). Two Phase 7 acceptance
+  probes remain: end-to-end subprocess network denial and a real failure-bundle
+  inspection. Phase 4 has passed real positive-path CI/artifact inspection on
+  draft PR #124; whole-job failure/always-upload negative acceptance remains
+  pending.
 - Authority: the user has authorized continuation and task-scoped commits without
   further per-phase approval.
 
@@ -107,6 +112,23 @@ line-count-driven file splitting.
   and OCR lifecycle. MainWindow has 8 inputs/591 lines; SettingsDialog has 778
   lines. Five scenes are admitted, resolved font identity prevents icon fallback,
   and full tests pass 208/208. See [phase6.md](phase6.md).
+- Phase 7 implements agent-safe runtime profiles: `RuntimeProfile`,
+  `Capabilities`, home-scoped mutex, `--agent-dev`/`--ephemeral` launcher flags,
+  a run manifest, and composition-based denial of update auto-check, remote OTLP,
+  remote ML worker admission, SSH worker setup, and live LLM/embedding. The
+  launcher cleans an isolated home on success and preserves bounded redacted
+  `failure.json` on failure. Focused UI is 61/61 and an isolated `--agent-dev
+  --smoke-test` run completes with no leftover home. See [phase7.md](phase7.md).
+- Chatbot split (handoff #8, recommended order #3): `ThreadDetailView` is now a
+  155-line composition root that forwards signals; the pure event→display-data
+  projection lives in `conversation/presentation.py`, the presentation widgets in
+  `conversation/widgets.py`, `ChatTimeline` (entry maintenance, scroll, display)
+  in `conversation/timeline.py`, and `ChatComposer` (input, attachments, submit
+  intent) in `conversation/composer.py`. `chatbot.py` re-exports
+  `ThreadDetailView`/`ComposerAttachmentStatus`/`ChatMessageBubble` for existing
+  importers. The Windows black user-bubble self-paint path is preserved and the
+  native smoke still passes; full suite is 227/227 and the UI contracts now use
+  public `view.timeline`/`view.composer` seams.
 
 Detailed evidence is in [preflight.md](preflight.md); source research is in
 [research.md](research.md).

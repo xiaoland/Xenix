@@ -46,6 +46,7 @@ def main() -> int:
         return 0
     finally:
         handle.close()
+        handle.root.deleteLater()
 
 
 if __name__ == "__main__":

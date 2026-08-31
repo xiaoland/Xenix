@@ -29,6 +29,7 @@ from .observability import (
     start_span,
 )
 from .resources import package_resource_path
+from .runtime_profile import Capabilities
 from .trial_lock import TrialLockCheck, check_trial_lock, trial_purchase_url
 from .ui.startup_splash import StartupSplash, StartupStage
 
@@ -409,8 +410,10 @@ def build_main_window(
     splash_hold_ms: int = 0,
     flush_startup_observability: bool = False,
     on_services_ready: Callable[[ApplicationServices], None] | None = None,
+    capabilities: Capabilities | None = None,
 ) -> tuple[QApplication, MainWindow]:
     build_start = time.perf_counter()
+    caps = capabilities or Capabilities()
     _emit_startup_timing("build_main_window.start")
     step_start = time.perf_counter()
     app = create_application()
@@ -472,7 +475,7 @@ def build_main_window(
         step_start = time.perf_counter()
         log_path = setup_logging(paths)
         logging_initialized = True
-        observability = setup_observability(paths)
+        observability = setup_observability(paths, allow_remote_export=caps.remote_otlp)
         startup_scope = start_span("app.startup")
         startup_scope.__enter__()
         startup_span_active = True
@@ -554,7 +557,7 @@ def build_main_window(
         ml_worker_settings_service = runtime.MLWorkerSettingsService(paths)
         llm_settings_service = runtime.LLMSettingsService(paths)
         embedding_settings_service = runtime.EmbeddingSettingsService(paths)
-        llm_service = runtime.LLMService(llm_settings_service)
+        llm_service = runtime.LLMService(llm_settings_service, allow_live=caps.live_llm)
         agent_services = runtime.build_headless_agent_services(
             paths=paths,
             session_factory=context.session_factory,
@@ -564,13 +567,17 @@ def build_main_window(
             usage_observability=LocalLLMUsageObservability(
                 paths.logs / LLM_USAGE_JOURNAL_FILE_NAME
             ),
+            remote_ml_workers=caps.remote_ml_workers,
+            live_llm=caps.live_llm,
         )
         link_router = runtime.LinkRouter(
             artifact_service=agent_services.artifacts,
         )
         from .services.update_service import UpdateService
 
-        update_service = UpdateService(paths, runtime.database_path(paths))
+        update_service = (
+            UpdateService(paths, runtime.database_path(paths)) if caps.update else None
+        )
         paddle_ocr_deployment = runtime.PaddleOcrDeploymentService(paths)
         knowledge_index_service = runtime.KnowledgeIndexService(
             session_factory=context.session_factory,
@@ -629,6 +636,7 @@ def build_main_window(
                 update_service=update_service,
                 paddle_ocr_deployment=paddle_ocr_deployment,
                 knowledge_index_service=knowledge_index_service,
+                ssh_worker_setup=caps.ssh_worker_setup,
                 parent=owner,
             )
 
@@ -855,13 +863,14 @@ def _run_smoke_checks(paths) -> None:
     run_knowledge_packaged_smoke(paths)
 
 
-def run(*, smoke_test: bool = False) -> int:
+def run(*, smoke_test: bool = False, capabilities: Capabilities | None = None) -> int:
     try:
         app, window = build_main_window(
             show=not smoke_test,
             show_splash=not smoke_test,
             splash_hold_ms=0 if smoke_test else STARTUP_SPLASH_HOLD_MS,
             flush_startup_observability=smoke_test,
+            capabilities=capabilities,
         )
     except TrialLockStartupExit:
         return 1

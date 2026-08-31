@@ -35,6 +35,14 @@ QT_LOG_MAX_LINE_CHARS = 2_000
 _WINDOWS_PATH = re.compile(r"(?i)\b[A-Z]:[\\/][^\s\"']+")
 
 
+# The only files a capture may publish. Anything else left behind by an earlier
+# capture in the same directory is stale and is removed so the manifest's file
+# list stays authoritative.
+_CAPTURE_ARTIFACT_FILENAMES = frozenset(
+    {"tree.json", "qt.log", "actual.png", "expected.png", "diff.png", "manifest.json"}
+)
+
+
 def capture_ui_artifacts(
     root: QWidget,
     output_dir: Path,
@@ -43,10 +51,12 @@ def capture_ui_artifacts(
     policy: CapturePolicy,
     scenario_id: str | None = None,
     qt_messages: tuple[str, ...] = (),
+    capture_phase: str | None = None,
 ) -> UiArtifactManifest:
     if not isValid(root):
         raise ValueError("Cannot capture a deleted widget")
     output_dir.mkdir(parents=True, exist_ok=True)
+    _remove_stale_artifacts(output_dir)
 
     files: list[ArtifactFile] = []
     tree_path = output_dir / "tree.json"
@@ -84,8 +94,16 @@ def capture_ui_artifacts(
         "root_geometry": _root_geometry(root),
         "files": files,
     }
+    if capture_phase is not None:
+        manifest["capture_phase"] = capture_phase
     _write_json(output_dir / "manifest.json", manifest)
     return manifest
+
+
+def _remove_stale_artifacts(output_dir: Path) -> None:
+    for existing in output_dir.iterdir():
+        if existing.is_file() and existing.name in _CAPTURE_ARTIFACT_FILENAMES:
+            existing.unlink()
 
 
 def _render_environment(root: QWidget) -> RenderEnvironment:

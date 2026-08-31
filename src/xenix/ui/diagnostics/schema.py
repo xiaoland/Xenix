@@ -132,6 +132,7 @@ class UiArtifactManifest(TypedDict):
     scenario_id: str | None
     captured_at_utc: str
     policy: str
+    capture_phase: NotRequired[str]
     redaction: RedactionManifest
     render_environment: RenderEnvironment
     root_geometry: RectSnapshot | None

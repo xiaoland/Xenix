@@ -348,14 +348,14 @@ def load_or_create_install_id(paths: AppPaths) -> str:
     return install_id
 
 
-def setup_observability(paths: AppPaths) -> ObservabilityContext:
+def setup_observability(paths: AppPaths, *, allow_remote_export: bool = True) -> ObservabilityContext:
     global _configured, _logging_instrumented, _meter_provider, _tracer_provider
 
     apply_frozen_otel_environment()
     install_id = load_or_create_install_id(paths)
-    trace_export_enabled = _trace_export_enabled()
-    metric_export_enabled = _metric_export_enabled()
-    log_export_enabled = _log_export_enabled()
+    trace_export_enabled = _trace_export_enabled() and allow_remote_export
+    metric_export_enabled = _metric_export_enabled() and allow_remote_export
+    log_export_enabled = _log_export_enabled() and allow_remote_export
     otlp_enabled = trace_export_enabled or metric_export_enabled or log_export_enabled
 
     if _configured or _env_truthy("OTEL_SDK_DISABLED", default=False):
