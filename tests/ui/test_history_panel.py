@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 
 from PySide6.QtCore import QEvent, Qt
-from PySide6.QtWidgets import QApplication, QMessageBox
+from PySide6.QtWidgets import QApplication, QInputDialog, QMessageBox
 from pytestqt.qtbot import QtBot
 from shiboken6 import isValid
 
@@ -145,3 +145,42 @@ def test_running_thread_delete_is_guarded_before_confirmation(qtbot: QtBot, monk
     panel._delete("thread-a")
     assert messages == ["blocked"]
     assert port.deleted == []
+
+
+def test_delete_port_exception_shows_warning_and_keeps_thread(qtbot: QtBot, monkeypatch) -> None:
+    class RaisingPort(_Port):
+        def delete_thread(self, thread_id: str) -> None:
+            raise RuntimeError("thread is still running")
+
+    port = RaisingPort()
+    panel = HistoryPanel(port, is_thread_running=lambda _id: False)
+    qtbot.addWidget(panel)
+    panel.refresh()
+    warnings: list[str] = []
+    monkeypatch.setattr(QMessageBox, "warning", lambda *_args: warnings.append("warned"))
+    monkeypatch.setattr(QMessageBox, "question", lambda *_args: QMessageBox.StandardButton.Yes)
+
+    panel._delete("thread-a")
+
+    assert warnings == ["warned"]
+    assert "thread-a" in panel._threads
+    assert port.deleted == []
+
+
+def test_rename_port_exception_shows_warning(qtbot: QtBot, monkeypatch) -> None:
+    class RaisingPort(_Port):
+        def rename_thread(self, thread_id: str, title: str | None) -> HistoryThreadSummary:
+            raise RuntimeError("rename failed")
+
+    port = RaisingPort()
+    panel = HistoryPanel(port, is_thread_running=lambda _id: False)
+    qtbot.addWidget(panel)
+    panel.refresh()
+    warnings: list[str] = []
+    monkeypatch.setattr(QMessageBox, "warning", lambda *_args: warnings.append("warned"))
+    monkeypatch.setattr(QInputDialog, "getText", lambda *_args, **kwargs: ("New title", True))
+
+    panel._rename("thread-a")
+
+    assert warnings == ["warned"]
+    assert port.renamed == []

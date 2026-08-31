@@ -278,7 +278,15 @@ class HistoryPanel(QFrame):
         )
         if not accepted:
             return
-        renamed = self._port.rename_thread(thread_id, title.strip() or None)
+        try:
+            renamed = self._port.rename_thread(thread_id, title.strip() or None)
+        except Exception as exc:
+            QMessageBox.warning(
+                self,
+                QCoreApplication.translate("MainWindow", "Rename Thread"),
+                str(exc),
+            )
+            return
         self.refresh(renamed.id)
 
     def _delete(self, thread_id: str) -> None:
@@ -305,7 +313,15 @@ class HistoryPanel(QFrame):
         )
         if response != QMessageBox.StandardButton.Yes:
             return
-        self._port.delete_thread(thread_id)
+        try:
+            self._port.delete_thread(thread_id)
+        except Exception as exc:
+            QMessageBox.warning(
+                self,
+                QCoreApplication.translate("MainWindow", "Delete Thread"),
+                str(exc),
+            )
+            return
         if self._active_title is not None and self._active_title[1] == thread_id:
             self._invalidate_title()
         was_selected = self._selected_thread_id == thread_id
