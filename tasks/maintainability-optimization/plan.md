@@ -8,7 +8,7 @@ called out in the slice and covered by a test.
 
 - `preflight.md` records the dead-code, size, and function-length findings.
 
-## Slice 1 — Delete confirmed dead code + add missing guides (low risk)
+## Slice 1 — Delete confirmed dead code + add missing guides (complete)
 
 - Delete the four unused "compatibility forwarding" functions in `app.py`
   (`_register_agent_skill_tools`, `_agent_skill_activated_skill_names`,
@@ -18,26 +18,28 @@ called out in the slice and covered by a test.
   not product truth).
 - Verify: `pdm run check` + `pdm run test`.
 
-## Slice 2 — Structural simplification (conversation.py first)
+## Slice 2 — Structural simplification (conversation.py first) (complete)
 
-- Start with `services/llm/conversation.py` (67 KB) as the reference seam: extract
-  cohesive responsibilities (staged tool invocation, message row projection,
-  provider message assembly) into smaller functions/helpers without changing
-  behavior.
-- Verify: `pdm run check` + focused `tests/` covering the LLM conversation seam.
+- Extracted `_final_message_rows` into three pure row-builders and
+  `_provider_messages` into four pure provider-message builders in
+  `services/llm/conversation.py`, behavior-equivalent.
+- Verify: `pdm run check` + `pdm run test` (197 passed).
 
-## Slice 3 — Largest UI/init hot spots
+## Slice 3 — Largest UI/init hot spots (delegated elsewhere)
 
 - Simplify `app.py::build_main_window` (294 lines) and the oversized widget
   `__init__`/`_build_ui` methods (`settings_dialog`, `main_window`, `chatbot`) by
   extracting construction helpers. Keep translations and signal wiring intact.
 - Verify: `pdm run check` + `pdm run test` + `pdm run smoke`.
 
-## Slice 4 — Correct stale docs and comments
+## Slice 4 — Correct stale docs and comments (complete)
 
-- Reconcile doc/comments that diverged from landed behavior (e.g. the Job layer
-  feed-source wording already noted in `pr1-job-layer-rework/packet.md`).
-- Admit any unit-design docs to `docs/30-unit-tdd/` where a seam was clarified.
+- Marked the Job-layer feed-source wording as superseded in
+  `pr1-job-layer-rework/plan.md` and `general-job-layer.md`.
+- Audited durable `docs/` for divergence: none found; `job-feed-contract.md`
+  already codifies the landed feed design, and the index/unit-design docs are
+  consistent. No `docs/30-unit-tdd/` admission was warranted — the extracted
+  builders are source/test truth, not a new local seam.
 
 ## Later (only if approved)
 

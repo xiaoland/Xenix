@@ -33,9 +33,17 @@ behavior except where a small, verifiable correction is clearly warranted.
 
 ## Current Truth
 
-Slice 0 (audit) is the entry point; findings live in `preflight.md`. The plan in
-`plan.md` sequences the cleanup into small verified slices.
+- Slice 0 (audit) recorded in `preflight.md`.
+- Slice 1 (dead-code deletion + `services/AGENTS.md` and `services/llm/AGENTS.md`)
+  landed and committed.
+- Slice 2 (`conversation.py` message-row / provider-message builder extraction)
+  landed and committed; `pdm run test` 197 passed.
+- Slice 3 (UI/init hot spots) is delegated to another session and out of scope here.
+- Slice 4 (correct stale docs) landed: marked the Job-layer feed-source wording as
+  superseded in `pr1-job-layer-rework/plan.md` and `general-job-layer.md`.
+  Durable docs were audited and found consistent — no `docs/` correction needed.
 
 ## Next Step
 
-Review `preflight.md`, then approve Slice 1.
+Task complete. The optional "later" deep splitting of `tools.py` /
+`text_analysis.py` remains unapproved and was not attempted.
