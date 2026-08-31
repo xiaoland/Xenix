@@ -119,6 +119,9 @@ class KnowledgeTaskQueryService:
                 key=lambda item: (item.attempt_number, item.updated_at),
             )
             latest = attempts[-1] if attempts else None
+            # Fold derivation attempts into their import row only when the latest
+            # attempt failed and no earlier attempt succeeded; a prior success keeps
+            # attempts visible so a successful import is never re-attributed.
             prior_success = any(item.status == "succeeded" for item in attempts[:-1])
             if latest is not None and not prior_success:
                 folded_derivation_ids.update(item.id for item in attempts)

@@ -135,6 +135,12 @@ class KnowledgeRepository:
         document: KnowledgeDocumentRow,
         units: Sequence[KnowledgeUnitRow],
     ) -> None:
+        """Replace a document's units and their FTS rows in one operation.
+
+        knowledge_unit_fts is a manually-maintained FTS5 shadow table with no
+        triggers and no external-content binding: every unit insert/delete must be
+        mirrored here or keyword search silently returns stale/missing hits.
+        """
         old_ids = list(
             session.exec(
                 select(KnowledgeUnitRow.id).where(KnowledgeUnitRow.document_id == document.id)

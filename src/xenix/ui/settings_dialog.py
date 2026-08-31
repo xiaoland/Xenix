@@ -1112,6 +1112,9 @@ class SettingsDialog(QDialog):
         if index < 0 or index >= len(self._provider_configs):
             return
         current = self._provider_configs[index]
+        # The packaged trial provider's secret is embedded in the shipped build
+        # and must never be copied into persisted settings. Preserve its stored
+        # base URL and force api_key="" on save.
         packaged_trial = self._is_packaged_trial_provider(current)
         self._provider_configs[index] = LLMProviderConfig(
             key=self._provider_key_input.text().strip(),

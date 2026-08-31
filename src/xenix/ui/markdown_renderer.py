@@ -9,6 +9,13 @@ from marko.helpers import MarkoExtension
 
 
 def render_chat_markdown(markdown: str, *, inline_artifact_images: bool) -> str:
+    """Render a Chatbot markdown string into display HTML.
+
+    Returns HTML with a fixed pre-wrap code-block style. Raw HTML in the input is
+    escaped (never rendered) because the input is untrusted model output. When
+    inline_artifact_images is true, artifact:// image links render inline;
+    otherwise they degrade to link text.
+    """
     renderer = _InlineArtifactRenderer if inline_artifact_images else _LinkOnlyArtifactRenderer
     html = Markdown(renderer=renderer, extensions=[_SAFE_GFM_EXTENSION]).convert(markdown).rstrip()
     return _wrap_code_blocks(html)
@@ -38,6 +45,8 @@ def _wrap_code_blocks(html: str) -> str:
 class _BaseChatRenderer(HTMLRenderer):
     inline_artifact_images = False
 
+    # Chat Markdown comes from untrusted model output: escape raw HTML so the
+    # model can only inject text/styling, never HTML structure, into the surface.
     def render_html_block(self, element) -> str:  # type: ignore[override]
         return self.escape_html(element.body)
 

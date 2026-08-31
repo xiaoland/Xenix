@@ -675,6 +675,10 @@ class AutoHeightTextBrowser(QTextBrowser):
         )
 
 
+# The black user bubble uses custom-painted UserMessageCard + UserMessageBody,
+# not a QFrame.StyledPanel/QTextBrowser stack: on Windows those widgets'
+# independent repaint paths can cover the black card or its text during updates.
+# Keep card/body backgrounds transparent and re-verify the bubble after changes.
 class UserMessageCard(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)

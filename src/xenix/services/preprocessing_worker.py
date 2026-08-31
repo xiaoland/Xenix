@@ -36,6 +36,9 @@ class LocalPreprocessingWorkerRunner:
             encoding="utf-8",
         )
 
+        # spawn (not fork) so this path is identical on Windows and inside frozen
+        # PyInstaller builds; the child re-imports this module and must reach
+        # run_preprocessing_worker_task as a module-level entrypoint.
         context = get_context("spawn")
         process = context.Process(target=run_preprocessing_worker_task, args=(str(task_dir),))
         process.start()

@@ -221,6 +221,9 @@ class SoftwareUpdateController(QObject):
                 )
 
     def _apply_update(self) -> UpdateStatus:
+        # apply() may return control from the update service's own thread; passing
+        # the signal's emit as the callback marshals the final quit onto the GUI
+        # thread. Calling app.quit() directly here would touch Qt off the GUI thread.
         self._update_service.apply(self._quit_for_update.emit)
         return self._update_service.status
 

@@ -9,7 +9,13 @@ def configure_windows_frozen_process_environment(
     environment: MutableMapping[str, str] | None = None,
     logical_cpu_count: int | None = None,
 ) -> None:
-    """Install packaged-process defaults before importing worker-heavy modules."""
+    """Pin the process-wide joblib/loky worker cap before any worker-heavy import.
+
+    loky reads LOKY_MAX_CPU_COUNT when its backend is imported, so this must run
+    before loky/joblib is imported by ML/text modules or the setting is ignored.
+    An already-set value (a caller override) wins, and the detected CPU count is
+    clamped to at least 1.
+    """
 
     target = os.environ if environment is None else environment
     if "LOKY_MAX_CPU_COUNT" in target:

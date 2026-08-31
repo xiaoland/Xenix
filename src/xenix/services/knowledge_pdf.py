@@ -57,7 +57,12 @@ def classify_pdf_page_text(
     image_coverage: float,
     unembedded_nonstandard_fonts: int,
 ) -> tuple[PdfPageTextState, tuple[str, ...]]:
-    """Classify text evidence without pretending to solve layout semantics."""
+    """Classify text evidence without pretending to solve layout semantics.
+
+    Thresholds are OCR-routing calibration: fewer than 8 alphanumeric characters
+    means no usable text layer; a useful-char ratio under 0.35 or image-dominant
+    sparse text marks the native layer untrustworthy, routing the page to OCR.
+    """
 
     if alphanumeric_characters < 8:
         return PdfPageTextState.ABSENT, ("useful_text_absent",)

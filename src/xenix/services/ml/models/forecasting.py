@@ -693,6 +693,10 @@ def _fit_selected_sarima(
 
 
 def _fit_statsmodels_sarima(values: np.ndarray, order: SarimaOrderSpec) -> SarimaFitOutcome:
+    # Non-default SARIMAX construction: trend="n" (the differencing orders carry
+    # the level), and stationarity/invertibility enforcement is left off so the
+    # bounded order search is not pre-rejected at initialization. Convergence is
+    # judged from mle_retvals["converged"] below, not the parameter transform.
     caught: list[warnings.WarningMessage]
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")

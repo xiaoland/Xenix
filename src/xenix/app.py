@@ -40,9 +40,8 @@ STARTUP_TIMING_ENV = "XENIX_STARTUP_TIMING"
 _STARTUP_TIMING_T0 = time.perf_counter()
 StorageRecoveryAction = Literal["quarantine", "open", "exit"]
 
-# This is an advertisement policy, not a second tool registry.  The LLM
-# boundary remains the authority for registered definitions and validates the
-# frozen scope before accepting or invoking any provider Tool Call.
+# Raised when the packaged trial lock blocks entry; run() catches it and
+# returns exit code 1 instead of surfacing a crash dialog.
 class TrialLockStartupExit(Exception):
     pass
 

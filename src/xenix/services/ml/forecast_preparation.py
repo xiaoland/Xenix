@@ -393,6 +393,9 @@ def _monthly_anchor(times: pd.DatetimeIndex) -> str | None:
     if bool(np.all(times.is_month_end)):
         return "month_end"
     days = {timestamp.day for timestamp in times}
+    # Restrict the fixed-day anchor to day <= 28 so future_times() can generate
+    # it with pd.DateOffset(months=..., day=day) without rolling into the next
+    # month for short months (e.g. February).
     if len(days) == 1 and next(iter(days)) <= 28:
         return f"day:{next(iter(days))}"
     return None

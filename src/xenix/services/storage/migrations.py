@@ -1142,6 +1142,14 @@ def _ensure_v15_triggers(engine: Engine) -> None:
 
 
 def _copy_v14_rows(connection) -> None:
+    """Rebuild conversation_message rows from legacy agent_message / agent_tool_call.
+
+    A tool_call is carried over only when its agent_tool_call and its matching
+    terminal tool_call_result both exist; otherwise the remainder of the turn is
+    discarded (cut_until_user) up to the next user message, because an incomplete
+    tool-call chain cannot be reconstructed into the append-only v15 contract
+    without inventing state.
+    """
     connection.exec_driver_sql(
         """
         INSERT INTO artifact_v15 (

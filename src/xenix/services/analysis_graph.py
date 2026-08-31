@@ -546,6 +546,8 @@ class AnalysisGraphService:
             for index, child in enumerate(value):
                 self._drop_user_data_declarations(child, f"{path}[{index}]")
 
+    # LLM-authored specs must stay local-only: reject every "url" key so rendering
+    # cannot fetch remote data (SSRF / exfiltration via Vega-Lite url loading).
     def _validate_no_external_urls(self, value: Any, path: str = "spec") -> None:
         if isinstance(value, dict):
             for key, child in value.items():
@@ -1191,6 +1193,11 @@ class AnalysisGraphService:
         )
 
     def _allocate_hidden_console_for_packaged_windows(self):
+        """Give vl_convert a hidden console on windowed frozen builds.
+
+        A GUI (no-console) frozen process can fail when the native vl_convert
+        binary touches the console, so allocate a hidden one and free it after.
+        """
         if sys.platform != "win32" or not getattr(sys, "frozen", False):
             return None
         try:

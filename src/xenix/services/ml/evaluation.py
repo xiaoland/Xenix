@@ -310,6 +310,9 @@ def _compare_metric(direction: MetricDirection, left: float | None, right: float
 
 
 def _direction_for_metric(metric_name: str) -> MetricDirection:
+    # Single authority for "lower is better" (MIN) tie-breaker metrics. Every
+    # MIN-direction metric listed in any policy's tie_breaker_metrics must be
+    # enumerated here, or it is mis-ranked as higher-is-better.
     if metric_name in {"rmse", "mae", "mse", "mape", "log_loss"}:
         return MetricDirection.MIN
     return MetricDirection.MAX

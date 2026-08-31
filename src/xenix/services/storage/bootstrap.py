@@ -14,6 +14,12 @@ from .migrations import run_migrations
 
 @dataclass(frozen=True)
 class StorageContext:
+    """Storage runtime returned by StorageBootstrapService.initialize.
+
+    schema_version is the post-migration applied version; engine and
+    session_factory are caller-owned after a successful initialize.
+    """
+
     paths: AppPaths
     engine: Engine
     session_factory: sessionmaker
@@ -22,6 +28,13 @@ class StorageContext:
 
 class StorageBootstrapService:
     def initialize(self, paths: AppPaths) -> StorageContext:
+        """Create the storage runtime for the given app paths.
+
+        Creates the on-disk layout, opens (and owns) the SQLite engine, runs
+        pending schema migrations, and returns a StorageContext whose
+        schema_version is the resulting applied version. On failure the engine is
+        disposed and StorageBootstrapError is raised.
+        """
         engine: Engine | None = None
         try:
             ensure_storage_layout(paths)

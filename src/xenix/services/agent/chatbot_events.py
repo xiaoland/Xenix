@@ -425,6 +425,12 @@ def project_tool_chatbot_event(
 
 
 def should_project_agent_skill_tools() -> bool:
+    """Hide internal agent.skill.* orchestration from the production Chatbot.
+
+    Skill activation/read tools are prompt-only scaffolding for the Agent, not
+    user-meaningful actions, so their tool events are omitted from the Chatbot
+    projection unless the development environment flag is set for inspection.
+    """
     return os.environ.get("XENIX_ENV", "").strip().lower() in {"development", "dev"}
 
 

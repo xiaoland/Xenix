@@ -104,6 +104,10 @@ class MLWorkerPool:
         ]
         if not candidates:
             return None
+        # Deterministic least-busy dispatch: lowest load ratio first, then higher
+        # weight (a preference, not capacity), then SSH before local so remote
+        # capacity absorbs work first, then stable id. The pool's selection_policy
+        # setting is not consulted here — this ordering is the only implemented policy.
         return sorted(
             candidates,
             key=lambda worker: (
@@ -115,6 +119,8 @@ class MLWorkerPool:
         )[0]
 
     def _enabled_workers(self, settings: MLWorkerSettings) -> list[MLWorkerConfig]:
+        # A disabled pool collapses to local-only execution, ignoring per-worker
+        # enabled flags, so Xenix always keeps a local execution fallback.
         if not settings.pool.enabled:
             return [worker for worker in settings.workers if worker.kind is MLWorkerKind.LOCAL]
         workers: list[MLWorkerConfig] = []

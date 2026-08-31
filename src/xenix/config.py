@@ -11,6 +11,14 @@ APP_ORGANIZATION = "xiaoland"
 
 @dataclass(frozen=True)
 class AppPaths:
+    """Resolved filesystem roots for a running instance.
+
+    home is the user-writable runtime home (XENIX_APP_HOME override or the per-OS
+    default). config/logs/cache/state/temp/artifacts are writable directories under
+    it. resources is read-only packaged content (resolved from the bundle in frozen
+    builds); callers must not write to it.
+    """
+
     home: Path
     config: Path
     logs: Path

@@ -30,6 +30,10 @@ class DatasetRepository:
         statement = select(DatasetRow).order_by(DatasetRow.created_at)
         return list(session.exec(statement))
 
+    # Source datasets carry no provenance marker (copied_from,
+    # derived_from_dataset_id, and ml_task_id all NULL, and no derivation row);
+    # copies carry copied_from; generated datasets carry derived_from_dataset_id,
+    # ml_task_id, or a derivation row. The list families must partition rows.
     def list_source_by_project(self, session: Session, project_id: str) -> list[DatasetRow]:
         statement = (
             select(DatasetRow)

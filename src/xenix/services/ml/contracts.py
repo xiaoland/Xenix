@@ -174,6 +174,13 @@ class ApplyModelPayload(BaseModel):
 
 
 class ApplyTaskRequest(BaseModel):
+    """Apply a retained model.
+
+    Exactly one input mode must be supplied: input_files (row-based apply) or
+    forecast_horizon (future-period forecast for forecasting models) — never both
+    and never neither; the validator raises ValueError otherwise.
+    """
+
     task_id: str
     project_id: str
     dataset_id: str

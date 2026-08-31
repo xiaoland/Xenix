@@ -167,6 +167,12 @@ class DatasetService:
         self._datasets = DatasetRepository()
 
     def register_dataset(self, input_data: RegisterDatasetInput) -> DatasetRow:
+        """Register a source file by materializing an app-owned Parquet copy.
+
+        The returned DatasetRow's source_path and source_format describe the
+        app-owned Parquet copy, not the caller's original file; the original
+        provenance is preserved on the paired DatasetImportRow.
+        """
         return self._register_materialized_datasets(input_data)[0].row
 
     def _register_materialized_datasets(self, input_data: RegisterDatasetInput) -> list[_MaterializedDataset]:

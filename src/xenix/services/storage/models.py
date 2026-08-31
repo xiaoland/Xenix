@@ -360,6 +360,16 @@ class ConversationThreadRow(SQLModel, table=True):
 
 
 class ConversationMessageRow(SQLModel, table=True):
+    """Conversation message row.
+
+    Messages are append-only: once a row's kind leaves PENDING_LLM_SAMPLING it is
+    immutable (enforced by the conversation_message_final_immutable trigger). The
+    single PENDING_LLM_SAMPLING placeholder per thread (partial unique index
+    ux_conversation_message_pending_thread) is the only row updated in place; the
+    Conversation writer finalizes it together with its Tool Call/Result siblings.
+    Callers must not mutate committed rows directly.
+    """
+
     __tablename__ = "conversation_message"
     __table_args__ = (
         UniqueConstraint("thread_id", "sequence_index", name="uq_conversation_message_thread_sequence"),

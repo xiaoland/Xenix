@@ -20,7 +20,13 @@ class NotFoundError(XenixError):
 
 
 class ValidationError(XenixError):
-    """Raised when user-provided input is invalid."""
+    """Raised when a validated request is invalid.
+
+    Carries a machine-readable repair contract for the LLM tool boundary:
+    error_code is a stable code (blank normalizes to None), error_details is a
+    JSON-safe mapping, repair_hints is a list of non-empty strings (blank entries
+    dropped), and retryable is True/False/None (non-bool normalizes to None).
+    """
 
     def __init__(
         self,

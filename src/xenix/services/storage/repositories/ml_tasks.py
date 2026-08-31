@@ -34,6 +34,13 @@ class MLTaskRepository:
         to_status: MLTaskStatus,
         now: datetime,
     ) -> MLTaskRow | None:
+        """Transition a task from from_status to to_status (compare-and-swap).
+
+        Returns the refreshed row, or None when the task is missing OR its current
+        status is no longer from_status (callers must re-read when the distinction
+        matters). started_at is set only on first entry into RUNNING; finished_at is
+        set on SUCCEEDED/FAILED/CANCELLED.
+        """
         row = self.get(session, ml_task_id)
         if row is None or row.status != from_status:
             return None

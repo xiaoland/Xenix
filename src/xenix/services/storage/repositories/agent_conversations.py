@@ -118,6 +118,9 @@ class ConversationRepository:
         if row is None:
             return None
 
+        # Delete tool_result rows before the tool_call rows they reference: the
+        # self-referential FK on tool_call_message_id has no ON DELETE action, so
+        # children must go first.
         dependent_results = session.exec(
             select(ConversationMessageRow).where(
                 ConversationMessageRow.thread_id == thread_id,

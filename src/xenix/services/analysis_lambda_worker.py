@@ -1,3 +1,11 @@
+"""Sandboxed subprocess that executes an LLM-authored analyze(ctx, inputs, params) function.
+
+This boundary runs untrusted code. Imports are restricted to ALLOWED_IMPORT_ROOTS
+and builtins to SAFE_BUILTINS. The allowlist is enforced twice — _validate_imports
+(AST scan) blocks literal import statements, and the replaced __import__
+(_safe_import) blocks dynamically constructed imports such as __import__("os") —
+because either form alone can be bypassed by the other.
+"""
 from __future__ import annotations
 
 import ast

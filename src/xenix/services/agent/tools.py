@@ -115,6 +115,11 @@ _MODEL_KEY_ALIAS_OVERRIDES = {
     "k_neighbors_regressor": "regression.knn",
     "kneighborsregressor": "regression.knn",
 }
+# Synchronous wait window before a model tool returns a running_background
+# receipt. ML fit/tune/apply can outlive one conversation turn: wait up to this
+# window so fast tasks return results inline, otherwise hand back a receipt with
+# async_state="running_background" and let the Agent poll model.task.query
+# instead of blocking the turn for the task's full duration.
 MODEL_APPLY_GRACE_SECONDS = 30.0
 MODEL_TRAIN_GRACE_SECONDS = 60.0
 MAX_CLEANING_REPORT_OPERATION_ENTRIES = 12

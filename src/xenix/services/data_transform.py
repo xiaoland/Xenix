@@ -78,6 +78,10 @@ _DISALLOWED_KEYWORDS = {
     "update",
     "vacuum",
 }
+# Transform permits CREATE TEMP/INSERT/UPDATE/DELETE because it executes in an
+# ephemeral in-memory DuckDB holding only registered bindings and the required
+# `output` relation, so write statements cannot reach any source file. The query
+# validator (above) forbids them outright for a read-only projection.
 _TRANSFORM_DISALLOWED_KEYWORDS = {
     "alter",
     "attach",
