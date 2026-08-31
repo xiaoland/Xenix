@@ -154,6 +154,14 @@ Harness provider-free checks, `pdm run test`, `pdm run check`.
 
 ## Phase 6 — Auxiliary windows and history boundaries
 
+**Status: complete.** Full portfolio passes 208/208; scoped UI passes 55/55,
+strict checks, native/isolated production smoke and benchmark offline gates pass.
+MainWindow has
+eight actual feature inputs and 591 lines; SettingsDialog is 778 lines with
+independent provider draft/OCR lifecycle widgets. The two deferred scenarios are
+admitted. Offscreen font fallback discovered by inspection is fixed and resolved
+font metadata is recorded. See [phase6.md](phase6.md) for contracts and evidence.
+
 - Move Settings/Knowledge/detail window construction and lifecycle behind narrow
   factories/coordinator composed in `app.py`.
 - Extract history panel/controller and remove cross-widget private-state access.

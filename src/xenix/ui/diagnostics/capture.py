@@ -9,7 +9,7 @@ from pathlib import Path
 
 import PySide6
 from PySide6.QtCore import QLocale, qVersion
-from PySide6.QtGui import QFont
+from PySide6.QtGui import QFont, QFontInfo
 from PySide6.QtWidgets import QApplication, QWidget
 from shiboken6 import isValid
 
@@ -91,7 +91,7 @@ def capture_ui_artifacts(
 def _render_environment(root: QWidget) -> RenderEnvironment:
     app = QApplication.instance()
     screen = root.screen()
-    font = app.font() if isinstance(app, QApplication) else root.font()
+    font = root.font()
     return {
         "python": platform.python_version(),
         "pyside": PySide6.__version__,
@@ -107,6 +107,7 @@ def _render_environment(root: QWidget) -> RenderEnvironment:
 
 
 def _font_render_identity(font: QFont) -> FontRenderIdentity:
+    resolved = QFontInfo(font)
     return {
         "family": font.family(),
         "style_name": font.styleName(),
@@ -114,6 +115,11 @@ def _font_render_identity(font: QFont) -> FontRenderIdentity:
         "pixel_size": font.pixelSize(),
         "weight": int(font.weight()),
         "italic": font.italic(),
+        "resolved_family": resolved.family(),
+        "resolved_style_name": resolved.styleName(),
+        "resolved_point_size": resolved.pointSizeF(),
+        "resolved_weight": int(resolved.weight()),
+        "exact_match": resolved.exactMatch(),
     }
 
 

@@ -75,6 +75,9 @@ admitted Qt Widgets state:
 - `pdm run ui-capture -- chat.mixed-timeline --output ui-artifacts/local`
   renders a fixed synthetic state and writes `manifest.json`, `tree.json`, and
   `actual.png`.
+- `main.history-populated` renders the production history panel (not the full
+  application). `settings.provider-and-ocr` composes the production provider
+  editor and OCR card with in-memory draft/status ports.
 - `pdm run pytest --direct tests/ui -q` runs the offscreen widget contracts.
 - `pdm run pytest --direct tests/ui_models -q` exercises the pure conversation
   state and injected execution boundary without constructing a widget.
@@ -91,6 +94,17 @@ owns. It must construct without a runtime home, database, network adapter,
 update check, OCR runtime, or ML worker. Reuse the same factory from interactive,
 capture, and test paths; do not create a second fixture language or assert pixel
 equality in ordinary widget contracts.
+
+On Windows/offscreen the lab registers the installed Segoe UI faces into the
+current Qt process when necessary; it never installs or downloads fonts. A
+missing/mismatched text font rejects capture. Manifests record both the requested
+font and `QFontInfo`'s resolved font, so icon-font fallback cannot masquerade as a
+stable render environment. Keep screenshot baselines capture-only until this
+resolved identity is stable on CI.
+
+When adapting a scenario to pytest-qt, let `qtbot` own widget deletion and use
+`before_close_func` for the scenario's cleanup. Do not also call the handle's
+`close()` (which schedules deletion) on a registered widget.
 
 ## Change-Specific Review
 

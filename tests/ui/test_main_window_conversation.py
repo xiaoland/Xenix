@@ -24,6 +24,8 @@ from xenix.services.agent.chatbot_events import (
     build_thinking_chatbot_event,
 )
 from xenix.ui.main_window import MainWindow
+from xenix.ui.history import HarnessHistoryAdapter
+from xenix.ui.windows.auxiliary import AuxiliaryWindowCoordinator
 
 
 @dataclass
@@ -85,19 +87,15 @@ def _window(qtbot: QtBot, ui_artifacts: UiArtifactRegistry, tmp_path):
     harness = _Harness()
     llm = SimpleNamespace(model_options=lambda: [], default_fq_model_key=lambda: None)
     window = MainWindow(
-        paths=SimpleNamespace(),
-        log_path=tmp_path / "xenix.log",
-        db_path=tmp_path / "xenix.db",
-        translation_manager=SimpleNamespace(current_locale=lambda: "en_US"),
+        current_locale=lambda: "en_US",
         agent_harness_service=harness,
         llm_service=llm,
-        llm_settings_service=Mock(),
-        embedding_settings_service=Mock(),
-        ml_worker_settings_service=Mock(),
         artifact_service=SimpleNamespace(resolve_uri=lambda _uri: None),
         link_router=Mock(),
-        dataset_service=Mock(),
-        ml_service=Mock(),
+        history_port=HarnessHistoryAdapter(harness),
+        auxiliary_factory=lambda owner: AuxiliaryWindowCoordinator(
+            owner, settings_factory=Mock(), knowledge_factory=None, detail_factory=Mock(),
+        ),
         conversation_executor=executor,
     )
     qtbot.addWidget(window)
@@ -172,8 +170,7 @@ def test_history_switch_clears_preparing_turn_and_old_callbacks_cannot_mutate_ne
     _submit(view, "Old turn")
     old = executor.submissions[0]
 
-    window._history_list.item(1).setSelected(True)
-    window._open_history_thread(window._history_list.item(1))
+    window._history_panel.open_thread("thread-b")
     assert window.conversation_thread_id == "thread-b"
     assert window.conversation_idle
     assert view._editor.isEnabled()

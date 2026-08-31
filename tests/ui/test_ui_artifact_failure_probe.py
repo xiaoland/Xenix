@@ -13,6 +13,7 @@ sys.path.insert(0, {str(repository_root)!r})
 sys.path.insert(0, {str(repository_root / "src")!r})
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 pytest_plugins = ["tests.ui.pytest_plugin"]
+from tests.ui.conftest import ui_render_environment
 """
 
 

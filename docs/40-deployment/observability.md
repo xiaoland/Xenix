@@ -46,7 +46,7 @@ add line-edit values, combo text, file paths, credentials, or message bodies to
 the schema. Runtime/user screenshots require separate explicit authority and are
 not enabled by the layout-debug switch.
 
-Native CI captures the three admitted Widget Lab scenarios under
+Native CI captures the five admitted Widget Lab scenarios under
 `ui-artifacts/scenarios/`, runs the native-window smoke in a separate `windows`
 QPA pytest process, and rebuilds `ui-artifacts/index.json`. The index contains
 only manifest metadata, relative artifact paths, render identity, geometry, and

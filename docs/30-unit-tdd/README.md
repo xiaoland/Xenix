@@ -14,6 +14,14 @@ Chatbot events, UI code, and integration tests.
 
 ## Local Seams
 
+- **UI feature ownership:** MainWindow owns conversation navigation/rendering,
+  not Settings/Knowledge service composition. The auxiliary-window coordinator
+  receives feature factories from the application and shuts update/dialog work
+  down before application services. History receives summaries and action ports;
+  opening a thread remains a shell command. Provider editing owns an in-memory
+  draft, while SettingsDialog owns persistence; OCR owns its own generation and
+  shutdown. Runtime/benchmark observers obtain application service handles from
+  the composition callback, never through widget storage or service fields.
 - **UI turn presentation:** A pure UI-local controller gates callbacks by the
   active submission generation, tracks append acknowledgement, and admits the
   final snapshot after Stop. It does not own canonical Message state. The

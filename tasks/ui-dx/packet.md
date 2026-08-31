@@ -20,7 +20,7 @@ line-count-driven file splitting.
   approved SVC v14 consumer-baseline cherry-pick `f528d1f`.
 - Branch: `feat/ui-dx`.
 - Worktree: `F:\CODING\Project\Xenix_native-ui-dx`.
-- State: Phases 0–3 and 5 complete; Phase 6 auxiliary/history boundaries are next.
+- State: Phases 0–3, 5 and 6 complete; Phase 7 runtime profiles are next.
   Phase 4 is locally implemented and awaits its first main-targeting PR artifact
   inspection before final acceptance.
 - Authority: the user has authorized continuation and task-scoped commits without
@@ -103,6 +103,10 @@ line-count-driven file splitting.
   with public observations. The focused seam passes 14/14; full tests pass
   189/189, with static, native, isolated production smoke, and benchmark offline
   gates passing. Design rehearsal and evidence are in [phase5.md](phase5.md).
+- Phase 6 isolates auxiliary-window composition, history actions, provider drafts
+  and OCR lifecycle. MainWindow has 8 inputs/591 lines; SettingsDialog has 778
+  lines. Five scenes are admitted, resolved font identity prevents icon fallback,
+  and full tests pass 208/208. See [phase6.md](phase6.md).
 
 Detailed evidence is in [preflight.md](preflight.md); source research is in
 [research.md](research.md).

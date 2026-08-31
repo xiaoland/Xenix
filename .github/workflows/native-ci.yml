@@ -29,6 +29,8 @@ jobs:
           pdm run ui-capture -- chat.empty --output ui-artifacts/scenarios
           pdm run ui-capture -- chat.mixed-timeline --output ui-artifacts/scenarios
           pdm run ui-capture -- chat.running-with-attachments --output ui-artifacts/scenarios
+          pdm run ui-capture -- main.history-populated --output ui-artifacts/scenarios
+          pdm run ui-capture -- settings.provider-and-ocr --output ui-artifacts/scenarios
       - name: Run Windows native UI smoke
         run: pdm run ui-native-smoke
       - name: Build UI artifact index

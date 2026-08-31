@@ -92,6 +92,11 @@ class FontRenderIdentity(TypedDict):
     pixel_size: int
     weight: int
     italic: bool
+    resolved_family: str
+    resolved_style_name: str
+    resolved_point_size: float
+    resolved_weight: int
+    exact_match: bool
 
 
 class RenderEnvironment(TypedDict):

@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from enum import StrEnum
 from pathlib import Path
 
-from PySide6.QtCore import QEvent, QThreadPool, QTimer, Qt, QUrl, Signal
+from PySide6.QtCore import QEvent, QTimer, Qt, QUrl, Signal
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -15,7 +14,6 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QMessageBox,
-    QPlainTextEdit,
     QPushButton,
     QScrollArea,
     QSpinBox,
@@ -29,12 +27,9 @@ from ..config import AppPaths
 from ..i18n import TranslationManager
 from ..services.embedding_service import EmbeddingSettings, EmbeddingSettingsService
 from ..services.llm import (
-    LLMDialect,
-    LLMProviderConfig,
     LLMService,
     LLMSettings,
     LLMSettingsService,
-    PACKAGED_TRIAL_SECRET_SOURCE,
 )
 from ..services.ml.worker_settings import MLWorkerKind, MLWorkerSettingsService
 from ..services.knowledge_index_service import (
@@ -44,21 +39,15 @@ from ..services.knowledge_index_service import (
 )
 from ..services.paddle_ocr_service import (
     PaddleOcrDeploymentService,
-    PaddleOcrState,
-    PaddleOcrStatus,
 )
 from ..services.update_service import UpdateService
 from .knowledge_index_status import KnowledgeIndexStatusRequest
 from .knowledge_index_ui import KnowledgeIndexRebuildDialog
-from .ocr_deployment_tasks import OcrInstallTask, OcrStatusTask
 from .semantic_identity import identify
+from .settings.contracts import SettingsTab
+from .settings.ocr import OcrSettingsCard
+from .settings.provider import ProviderSettingsEditor
 from .ssh_worker_setup_wizard import SshWorkerSetupWizard
-
-
-class SettingsTab(StrEnum):
-    AI = "ai"
-    KNOWLEDGE_BASE = "knowledge_base"
-    ML_WORKERS = "ml_workers"
 
 
 class AboutDialog(QDialog):
@@ -211,19 +200,12 @@ class SettingsDialog(QDialog):
         self._update_operation_active = False
         self._paddle_ocr_deployment = paddle_ocr_deployment
         self._knowledge_index_service = knowledge_index_service
-        self._provider_configs: list[LLMProviderConfig] = []
-        self._loading_provider = False
-        self._active_provider_index = 0
         self._embedding_settings_snapshot = EmbeddingSettings()
         self._ssh_worker_wizard: SshWorkerSetupWizard | None = None
         self._about_dialog: AboutDialog | None = None
-        self._thread_pool = QThreadPool(self)
         self._shutdown = False
         self._lifecycle_generation = 0
         self._active = False
-        self._cached_ocr_status: PaddleOcrStatus | None = None
-        self._ocr_status_task: OcrStatusTask | None = None
-        self._ocr_install_task: OcrInstallTask | None = None
         self._cached_index_status: KnowledgeIndexOverview | None = None
         self._index_status_request: KnowledgeIndexStatusRequest | None = None
         self._index_status_failed = False
@@ -240,51 +222,20 @@ class SettingsDialog(QDialog):
         self._save_button = QPushButton()
 
         self._tabs = QTabWidget()
-        self._llm_card = QFrame()
-        self._llm_card.setFrameShape(QFrame.StyledPanel)
-        self._llm_card_layout = QFormLayout(self._llm_card)
-        self._llm_card_layout.setContentsMargins(12, 12, 12, 12)
-
         self._embedding_card = QFrame()
         self._embedding_card.setFrameShape(QFrame.StyledPanel)
         self._embedding_card_layout = QFormLayout(self._embedding_card)
         self._embedding_card_layout.setContentsMargins(12, 12, 12, 12)
-
-        self._ocr_card = QFrame()
-        self._ocr_card.setFrameShape(QFrame.StyledPanel)
-        self._ocr_card_layout = QFormLayout(self._ocr_card)
-        self._ocr_card_layout.setContentsMargins(12, 12, 12, 12)
 
         self._index_card = QFrame()
         self._index_card.setFrameShape(QFrame.StyledPanel)
         self._index_card_layout = QFormLayout(self._index_card)
         self._index_card_layout.setContentsMargins(12, 12, 12, 12)
 
-        self._global_models_card = QFrame()
-        self._global_models_card.setFrameShape(QFrame.StyledPanel)
-        self._global_models_card_layout = QFormLayout(self._global_models_card)
-        self._global_models_card_layout.setContentsMargins(12, 12, 12, 12)
-
         self._ml_workers_card = QFrame()
         self._ml_workers_card.setFrameShape(QFrame.StyledPanel)
         self._ml_workers_card_layout = QFormLayout(self._ml_workers_card)
         self._ml_workers_card_layout.setContentsMargins(12, 12, 12, 12)
-
-        self._global_models_title_label = QLabel()
-        self._llm_title_label = QLabel()
-        self._provider_selector_label = QLabel()
-        self._provider_key_label = QLabel()
-        self._provider_name_label = QLabel()
-        self._provider_dialect_label = QLabel()
-        self._provider_base_url_label = QLabel()
-        self._provider_api_key_label = QLabel()
-        self._provider_models_label = QLabel()
-        self._provider_timeout_label = QLabel()
-        self._provider_streaming_label = QLabel()
-        self._llm_default_model_label = QLabel()
-        self._llm_guard_model_label = QLabel()
-        self._llm_thread_title_model_label = QLabel()
-        self._llm_retry_attempts_label = QLabel()
 
         self._embedding_title_label = QLabel()
         self._embedding_enabled_label = QLabel()
@@ -295,10 +246,6 @@ class SettingsDialog(QDialog):
         self._embedding_batch_size_label = QLabel()
         self._embedding_timeout_label = QLabel()
 
-        self._ocr_title_label = QLabel()
-        self._ocr_status_label = QLabel()
-        self._ocr_setup_button = QPushButton()
-
         self._index_title_label = QLabel()
         self._index_status_label = QLabel()
         self._index_status_label.setWordWrap(True)
@@ -308,26 +255,12 @@ class SettingsDialog(QDialog):
         self._ml_workers_summary_label = QLabel()
         self._ml_workers_setup_button = QPushButton()
 
-        self._provider_selector = QComboBox()
-        self._add_provider_button = QPushButton()
-        self._remove_provider_button = QPushButton()
-        self._provider_key_input = QLineEdit()
-        self._provider_name_input = QLineEdit()
-        self._provider_dialect_selector = QComboBox()
-        self._provider_base_url_input = QLineEdit()
-        self._provider_api_key_input = QLineEdit()
-        self._provider_api_key_input.setEchoMode(QLineEdit.Password)
-        self._provider_models_input = QPlainTextEdit()
-        self._provider_models_input.setFixedHeight(82)
-        self._provider_timeout_input = QSpinBox()
-        self._provider_timeout_input.setRange(1, 3600)
-        self._provider_timeout_input.setSuffix(" s")
-        self._provider_streaming_checkbox = QCheckBox()
-        self._llm_default_model_selector = QComboBox()
-        self._llm_guard_model_selector = QComboBox()
-        self._llm_thread_title_model_selector = QComboBox()
-        self._llm_retry_attempts_input = QSpinBox()
-        self._llm_retry_attempts_input.setRange(1, 20)
+        self._provider_editor = ProviderSettingsEditor(
+            LLMSettings(), parent=self
+        )
+        self._ocr_settings_card = OcrSettingsCard(
+            self._paddle_ocr_deployment, parent=self
+        )
 
         self._embedding_enabled_checkbox = QCheckBox()
         self._embedding_base_url_input = QLineEdit()
@@ -356,24 +289,8 @@ class SettingsDialog(QDialog):
             (self._language_selector, "settings.general.language"),
             (self._about_button, "settings.about.open"),
             (self._save_button, "settings.save"),
-            (self._ocr_setup_button, "settings.knowledge.ocr.setup"),
             (self._index_rebuild_button, "settings.knowledge.indexes.rebuild"),
             (self._ml_workers_setup_button, "settings.ml-workers.add-ssh"),
-            (self._provider_selector, "settings.llm.provider.selector"),
-            (self._add_provider_button, "settings.llm.provider.add"),
-            (self._remove_provider_button, "settings.llm.provider.remove"),
-            (self._provider_key_input, "settings.llm.provider.key"),
-            (self._provider_name_input, "settings.llm.provider.name"),
-            (self._provider_dialect_selector, "settings.llm.provider.dialect"),
-            (self._provider_base_url_input, "settings.llm.provider.base-url"),
-            (self._provider_api_key_input, "settings.llm.provider.api-key"),
-            (self._provider_models_input, "settings.llm.provider.models"),
-            (self._provider_timeout_input, "settings.llm.provider.timeout"),
-            (self._provider_streaming_checkbox, "settings.llm.provider.streaming"),
-            (self._llm_default_model_selector, "settings.llm.default-model"),
-            (self._llm_guard_model_selector, "settings.llm.turn-guard-model"),
-            (self._llm_thread_title_model_selector, "settings.llm.thread-title-model"),
-            (self._llm_retry_attempts_input, "settings.llm.retry-attempts"),
             (self._embedding_enabled_checkbox, "settings.embedding.enabled"),
             (self._embedding_base_url_input, "settings.embedding.base-url"),
             (self._embedding_api_key_input, "settings.embedding.api-key"),
@@ -406,33 +323,6 @@ class SettingsDialog(QDialog):
         scroll_layout.setSpacing(16)
         scroll.setWidget(scroll_content)
 
-        provider_selector_row = QHBoxLayout()
-        provider_selector_row.setSpacing(8)
-        provider_selector_row.addWidget(self._provider_selector, 1)
-        provider_selector_row.addWidget(self._add_provider_button)
-        provider_selector_row.addWidget(self._remove_provider_button)
-
-        self._provider_dialect_selector.addItem("OpenAI-compatible", LLMDialect.OPENAI_COMPATIBLE.value)
-        self._global_models_card_layout.addRow(self._global_models_title_label)
-        self._global_models_card_layout.addRow(self._llm_default_model_label, self._llm_default_model_selector)
-        self._global_models_card_layout.addRow(self._llm_guard_model_label, self._llm_guard_model_selector)
-        self._global_models_card_layout.addRow(
-            self._llm_thread_title_model_label,
-            self._llm_thread_title_model_selector,
-        )
-        self._global_models_card_layout.addRow(self._llm_retry_attempts_label, self._llm_retry_attempts_input)
-
-        self._llm_card_layout.addRow(self._llm_title_label)
-        self._llm_card_layout.addRow(self._provider_selector_label, provider_selector_row)
-        self._llm_card_layout.addRow(self._provider_key_label, self._provider_key_input)
-        self._llm_card_layout.addRow(self._provider_name_label, self._provider_name_input)
-        self._llm_card_layout.addRow(self._provider_dialect_label, self._provider_dialect_selector)
-        self._llm_card_layout.addRow(self._provider_base_url_label, self._provider_base_url_input)
-        self._llm_card_layout.addRow(self._provider_api_key_label, self._provider_api_key_input)
-        self._llm_card_layout.addRow(self._provider_models_label, self._provider_models_input)
-        self._llm_card_layout.addRow(self._provider_timeout_label, self._provider_timeout_input)
-        self._llm_card_layout.addRow(self._provider_streaming_label, self._provider_streaming_checkbox)
-
         self._embedding_card_layout.addRow(self._embedding_title_label)
         self._embedding_card_layout.addRow(self._embedding_enabled_label, self._embedding_enabled_checkbox)
         self._embedding_card_layout.addRow(self._embedding_base_url_label, self._embedding_base_url_input)
@@ -441,11 +331,6 @@ class SettingsDialog(QDialog):
         self._embedding_card_layout.addRow(self._embedding_dimensions_label, self._embedding_dimensions_input)
         self._embedding_card_layout.addRow(self._embedding_batch_size_label, self._embedding_batch_size_input)
         self._embedding_card_layout.addRow(self._embedding_timeout_label, self._embedding_timeout_input)
-
-        self._ocr_status_label.setWordWrap(True)
-        self._ocr_card_layout.addRow(self._ocr_title_label)
-        self._ocr_card_layout.addRow(self._ocr_status_label)
-        self._ocr_card_layout.addRow(self._ocr_setup_button)
 
         self._index_card_layout.addRow(self._index_title_label)
         self._index_card_layout.addRow(self._index_status_label)
@@ -460,8 +345,7 @@ class SettingsDialog(QDialog):
         ai_layout = QVBoxLayout(ai_tab)
         ai_layout.setContentsMargins(12, 12, 12, 12)
         ai_layout.setSpacing(16)
-        ai_layout.addWidget(self._global_models_card)
-        ai_layout.addWidget(self._llm_card)
+        ai_layout.addWidget(self._provider_editor)
         ai_layout.addStretch(1)
 
         knowledge_tab = QWidget()
@@ -469,7 +353,7 @@ class SettingsDialog(QDialog):
         knowledge_layout.setContentsMargins(12, 12, 12, 12)
         knowledge_layout.setSpacing(16)
         knowledge_layout.addWidget(self._embedding_card)
-        knowledge_layout.addWidget(self._ocr_card)
+        knowledge_layout.addWidget(self._ocr_settings_card)
         knowledge_layout.addWidget(self._index_card)
         knowledge_layout.addStretch(1)
 
@@ -499,11 +383,7 @@ class SettingsDialog(QDialog):
         self._about_button.clicked.connect(self._open_about_dialog)
         self._language_selector.currentIndexChanged.connect(self._on_language_changed)
         self._save_button.clicked.connect(self._save_agent_settings)
-        self._provider_selector.currentIndexChanged.connect(self._on_provider_changed)
-        self._add_provider_button.clicked.connect(self._add_provider)
-        self._remove_provider_button.clicked.connect(self._remove_provider)
         self._ml_workers_setup_button.clicked.connect(self._open_ssh_worker_wizard)
-        self._ocr_setup_button.clicked.connect(self._install_ocr)
         self._index_rebuild_button.clicked.connect(self._open_index_rebuild)
 
     def retranslate_ui(self) -> None:
@@ -518,21 +398,6 @@ class SettingsDialog(QDialog):
             self._tab_indexes[SettingsTab.ML_WORKERS],
             self.tr("ML Workers"),
         )
-        self._global_models_title_label.setText(self.tr("Global models"))
-        self._llm_title_label.setText(self.tr("LLM providers"))
-        self._provider_selector_label.setText(self.tr("Provider"))
-        self._provider_key_label.setText(self.tr("Provider key"))
-        self._provider_name_label.setText(self.tr("Provider name"))
-        self._provider_dialect_label.setText(self.tr("Dialect"))
-        self._provider_base_url_label.setText(self.tr("Base URL"))
-        self._provider_api_key_label.setText(self.tr("API key"))
-        self._provider_models_label.setText(self.tr("Models"))
-        self._provider_timeout_label.setText(self.tr("Timeout"))
-        self._provider_streaming_label.setText(self.tr("Streaming"))
-        self._llm_default_model_label.setText(self.tr("Default model"))
-        self._llm_guard_model_label.setText(self.tr("Turn guard model"))
-        self._llm_thread_title_model_label.setText(self.tr("Thread title model"))
-        self._llm_retry_attempts_label.setText(self.tr("LLM retry attempts"))
         self._embedding_title_label.setText(self.tr("Embedding provider"))
         self._embedding_enabled_label.setText(self.tr("Enabled"))
         self._embedding_base_url_label.setText(self.tr("Base URL"))
@@ -542,26 +407,16 @@ class SettingsDialog(QDialog):
         self._embedding_dimensions_input.setSpecialValueText(self.tr("Provider default (0)"))
         self._embedding_batch_size_label.setText(self.tr("Batch size"))
         self._embedding_timeout_label.setText(self.tr("Timeout"))
-        self._ocr_title_label.setText(self.tr("OCR"))
-        self._ocr_setup_button.setText(self.tr("Set up local PaddleOCR"))
         self._index_title_label.setText(self.tr("Indexes"))
         self._index_rebuild_button.setText(self.tr("Rebuild indexes..."))
-        self._add_provider_button.setText(self.tr("Add"))
-        self._remove_provider_button.setText(self.tr("Remove"))
-        self._provider_dialect_selector.setItemText(0, self.tr("OpenAI-compatible"))
-        self._refresh_provider_field_state()
+        self._provider_editor.retranslate_ui()
         self._ml_workers_title_label.setText(self.tr("ML workers"))
         self._ml_workers_setup_button.setText(self.tr("Add SSH worker..."))
         self._about_button.setText(self.tr("About"))
         self._save_button.setText(self.tr("Save"))
         self._reload_language_options()
-        self._refresh_model_selectors(
-            default_key=self._llm_default_model_selector.currentData(),
-            guard_key=self._llm_guard_model_selector.currentData(),
-            title_key=self._llm_thread_title_model_selector.currentData(),
-        )
         self._refresh_ml_worker_summary()
-        self._render_ocr_status()
+        self._ocr_settings_card.retranslate_ui()
         self._render_index_status()
 
     def changeEvent(self, event: QEvent) -> None:
@@ -572,135 +427,6 @@ class SettingsDialog(QDialog):
     def show_tab(self, tab: SettingsTab) -> None:
         self._tabs.setCurrentIndex(self._tab_indexes[SettingsTab(tab)])
 
-    def _install_ocr(self) -> None:
-        if (
-            self._shutdown
-            or self._paddle_ocr_deployment is None
-            or self._ocr_install_task is not None
-        ):
-            return
-        self._ocr_setup_button.setEnabled(False)
-        generation = self._lifecycle_generation
-        task = OcrInstallTask(self._paddle_ocr_deployment, generation)
-        task.signals.phase.connect(self._on_ocr_phase)
-        task.signals.finished.connect(self._on_ocr_setup_finished)
-        self._ocr_install_task = task
-        self._thread_pool.start(task)
-
-    def _on_ocr_phase(self, generation: int, phase: str) -> None:
-        if generation != self._lifecycle_generation or not self._active:
-            return
-        translations = {
-            "downloading_bundle": self.tr("Downloading OCR component"),
-            "extracting_bundle": self.tr("Unpacking OCR component"),
-            "verifying_bundle": self.tr("Verifying OCR component"),
-            "self_testing": self.tr("Testing OCR component"),
-            "activating_bundle": self.tr("Activating OCR component"),
-            "ready": self.tr("Ready"),
-        }
-        translated = translations.get(phase, self.tr("Preparing local OCR"))
-        self._ocr_status_label.setText(
-            self.tr("Local OCR setup: %1").replace("%1", translated)
-        )
-
-    def _on_ocr_setup_finished(
-        self,
-        generation: int,
-        status: PaddleOcrStatus,
-    ) -> None:
-        self._ocr_install_task = None
-        self._cached_ocr_status = status
-        if generation != self._lifecycle_generation or not self._active:
-            if self._active:
-                self._schedule_ocr_status_probe()
-            return
-        self._ocr_setup_button.setEnabled(self._paddle_ocr_deployment is not None)
-        self._render_ocr_status()
-        if status.state is PaddleOcrState.FAILED:
-            QMessageBox.warning(
-                self,
-                self.tr("Local OCR Setup Failed"),
-                self._ocr_setup_failure_message(status.reason_code),
-            )
-
-    def _ocr_setup_failure_message(self, reason_code: str | None) -> str:
-        if reason_code == "knowledge_ocr_catalog_unavailable":
-            return self.tr("Local OCR is unavailable in this build.")
-        if reason_code == "knowledge_ocr_download_unavailable":
-            return self.tr("Local OCR download source is unavailable.")
-        if reason_code == "knowledge_ocr_download_failed":
-            return self.tr("Local OCR component could not be downloaded.")
-        if reason_code == "knowledge_ocr_bundle_source_unavailable":
-            return self.tr("Local OCR bundle source is unavailable.")
-        if reason_code in {
-            "knowledge_ocr_bundle_source_mismatch",
-            "knowledge_ocr_bundle_integrity_failed",
-            "knowledge_ocr_bundle_invalid",
-        }:
-            return self.tr("Local OCR component failed integrity verification.")
-        if reason_code in {
-            "knowledge_ocr_self_test_failed",
-            "knowledge_ocr_initialize_failed",
-            "knowledge_ocr_worker_incompatible",
-        }:
-            return self.tr("Local OCR component failed its self-test.")
-        return self.tr("Local OCR setup could not be completed.")
-
-    def _schedule_ocr_status_probe(self) -> None:
-        if (
-            self._shutdown
-            or not self._active
-            or self._paddle_ocr_deployment is None
-            or self._ocr_status_task is not None
-            or self._ocr_install_task is not None
-        ):
-            return
-        generation = self._lifecycle_generation
-        task = OcrStatusTask(self._paddle_ocr_deployment, generation)
-        task.signals.finished.connect(self._on_ocr_status_finished)
-        self._ocr_status_task = task
-        self._thread_pool.start(task)
-
-    def _on_ocr_status_finished(self, generation: int, status: PaddleOcrStatus) -> None:
-        self._ocr_status_task = None
-        if generation != self._lifecycle_generation or not self._active:
-            if self._active:
-                self._schedule_ocr_status_probe()
-            return
-        self._cached_ocr_status = status
-        self._render_ocr_status()
-
-    def _render_ocr_status(self) -> None:
-        status = self._cached_ocr_status
-        if self._paddle_ocr_deployment is None:
-            text = self.tr("Local PaddleOCR service is unavailable")
-            enabled = False
-        elif status is None:
-            text = self.tr("Checking local PaddleOCR status")
-            enabled = self._ocr_install_task is None
-        elif status.state is PaddleOcrState.READY:
-            text = self.tr("Local PaddleOCR is ready")
-            enabled = self._ocr_install_task is None
-            self._ocr_setup_button.setText(self.tr("Reinstall local PaddleOCR"))
-        elif status.state is PaddleOcrState.REPAIR_REQUIRED:
-            text = self.tr("Local PaddleOCR requires repair")
-            enabled = self._ocr_install_task is None
-            self._ocr_setup_button.setText(self.tr("Repair local PaddleOCR"))
-        elif status.state in {PaddleOcrState.INSTALLING, PaddleOcrState.CHECKING}:
-            text = self.tr("Preparing local PaddleOCR")
-            enabled = False
-            self._ocr_setup_button.setText(self.tr("Preparing local PaddleOCR"))
-        elif status.state is PaddleOcrState.FAILED:
-            text = self.tr("Local PaddleOCR setup needs attention")
-            enabled = self._ocr_install_task is None
-            self._ocr_setup_button.setText(self.tr("Try local PaddleOCR setup again"))
-        else:
-            text = self.tr("Local PaddleOCR is not installed")
-            enabled = self._ocr_install_task is None
-            self._ocr_setup_button.setText(self.tr("Set up local PaddleOCR"))
-        self._ocr_status_label.setText(text)
-        self._ocr_setup_button.setEnabled(enabled)
-
     def showEvent(self, event) -> None:
         if self._shutdown:
             super().showEvent(event)
@@ -708,11 +434,10 @@ class SettingsDialog(QDialog):
             return
         self._active = True
         self._lifecycle_generation += 1
-        self._render_ocr_status()
+        self._ocr_settings_card.activate()
         self._render_index_status()
         super().showEvent(event)
         self._request_index_status_refresh(delay_ms=0)
-        self._schedule_ocr_status_probe()
 
     def hideEvent(self, event) -> None:
         self._deactivate()
@@ -726,6 +451,7 @@ class SettingsDialog(QDialog):
         if self._active:
             self._lifecycle_generation += 1
         self._active = False
+        self._ocr_settings_card.deactivate()
         self._index_refresh_timer.stop()
         self._index_status_refresh_pending = False
         if self._index_status_request is not None:
@@ -739,7 +465,7 @@ class SettingsDialog(QDialog):
             return
         self._shutdown = True
         self._deactivate()
-        self._thread_pool.waitForDone()
+        self._ocr_settings_card.shutdown()
 
     def _reload_language_options(self) -> None:
         current_locale = self._translation_manager.current_locale()
@@ -798,16 +524,7 @@ class SettingsDialog(QDialog):
             self._about_dialog.set_update_operation_active(active)
 
     def _load_agent_settings(self) -> None:
-        settings = self._llm_settings_service.load()
-        self._provider_configs = [provider.model_copy(deep=True) for provider in settings.providers]
-        self._reload_provider_selector(0)
-        self._load_provider_fields(0)
-        self._refresh_model_selectors(
-            default_key=settings.default_fq_model_key,
-            guard_key=settings.turn_completion_guard_fq_model_key,
-            title_key=settings.thread_title_fq_model_key,
-        )
-        self._llm_retry_attempts_input.setValue(settings.retry_attempts)
+        self._provider_editor.load_settings(self._llm_settings_service.load())
 
     def _load_embedding_settings(self) -> None:
         settings = self._embedding_settings_service.load()
@@ -823,14 +540,7 @@ class SettingsDialog(QDialog):
     def _save_agent_settings(self) -> None:
         rebuild_choice = "none"
         try:
-            self._store_current_provider_fields()
-            llm_settings = LLMSettings(
-                providers=self._provider_configs,
-                default_fq_model_key=str(self._llm_default_model_selector.currentData() or ""),
-                turn_completion_guard_fq_model_key=str(self._llm_guard_model_selector.currentData() or ""),
-                thread_title_fq_model_key=str(self._llm_thread_title_model_selector.currentData() or ""),
-                retry_attempts=self._llm_retry_attempts_input.value(),
-            )
+            llm_settings = self._provider_editor.current_settings()
             embedding_settings = self._embedding_settings_from_fields()
         except Exception as exc:
             QMessageBox.warning(self, self.tr("Settings"), str(exc))
@@ -1064,183 +774,5 @@ class SettingsDialog(QDialog):
         wizard.raise_()
         wizard.activateWindow()
 
-    def _on_provider_changed(self, index: int) -> None:
-        if self._loading_provider:
-            return
-        try:
-            self._store_current_provider_fields()
-        except Exception:
-            pass
-        self._load_provider_fields(index)
-        self._refresh_model_selectors(
-            default_key=self._llm_default_model_selector.currentData(),
-            guard_key=self._llm_guard_model_selector.currentData(),
-            title_key=self._llm_thread_title_model_selector.currentData(),
-        )
 
-    def _add_provider(self) -> None:
-        try:
-            self._store_current_provider_fields()
-        except Exception as exc:
-            QMessageBox.warning(self, self.tr("Settings"), str(exc))
-            return
-        existing = {provider.key for provider in self._provider_configs}
-        index = 2
-        key = "provider2"
-        while key in existing:
-            index += 1
-            key = f"provider{index}"
-        self._provider_configs.append(
-            LLMProviderConfig(
-                key=key,
-                display_name=f"Provider {index}",
-                models=["gpt-4o-mini"],
-            )
-        )
-        self._reload_provider_selector(len(self._provider_configs) - 1)
-        self._load_provider_fields(len(self._provider_configs) - 1)
-        self._refresh_model_selectors()
-
-    def _remove_provider(self) -> None:
-        if len(self._provider_configs) <= 1:
-            return
-        index = max(0, self._provider_selector.currentIndex())
-        self._provider_configs.pop(index)
-        next_index = min(index, len(self._provider_configs) - 1)
-        self._reload_provider_selector(next_index)
-        self._load_provider_fields(next_index)
-        self._refresh_model_selectors()
-
-    def _reload_provider_selector(self, selected_index: int) -> None:
-        self._loading_provider = True
-        self._provider_selector.clear()
-        for provider in self._provider_configs:
-            label = provider.display_name or provider.key
-            self._provider_selector.addItem(label, provider.key)
-        if self._provider_configs:
-            self._provider_selector.setCurrentIndex(max(0, min(selected_index, len(self._provider_configs) - 1)))
-        self._loading_provider = False
-
-    def _load_provider_fields(self, index: int) -> None:
-        if not self._provider_configs:
-            return
-        provider_index = max(0, min(index, len(self._provider_configs) - 1))
-        provider = self._provider_configs[provider_index]
-        self._loading_provider = True
-        self._provider_key_input.setText(provider.key)
-        self._provider_name_input.setText(provider.display_name)
-        dialect_index = self._provider_dialect_selector.findData(provider.dialect.value)
-        if dialect_index >= 0:
-            self._provider_dialect_selector.setCurrentIndex(dialect_index)
-        self._provider_base_url_input.setText(provider.base_url)
-        self._provider_api_key_input.setText(provider.api_key)
-        self._provider_models_input.setPlainText("\n".join(provider.models))
-        self._provider_timeout_input.setValue(provider.timeout_seconds)
-        self._provider_streaming_checkbox.setChecked(provider.streaming_enabled)
-        self._apply_provider_field_state(provider)
-        self._active_provider_index = provider_index
-        self._loading_provider = False
-
-    def _store_current_provider_fields(self) -> None:
-        if self._loading_provider or not self._provider_configs:
-            return
-        index = self._active_provider_index
-        if index < 0 or index >= len(self._provider_configs):
-            return
-        current = self._provider_configs[index]
-        packaged_trial = self._is_packaged_trial_provider(current)
-        self._provider_configs[index] = LLMProviderConfig(
-            key=self._provider_key_input.text().strip(),
-            display_name=self._provider_name_input.text().strip(),
-            dialect=LLMDialect(str(self._provider_dialect_selector.currentData())),
-            base_url=current.base_url if packaged_trial else self._provider_base_url_input.text().strip(),
-            api_key="" if packaged_trial else self._provider_api_key_input.text(),
-            models=self._model_lines(),
-            timeout_seconds=self._provider_timeout_input.value(),
-            streaming_enabled=self._provider_streaming_checkbox.isChecked(),
-            dialect_config=current.dialect_config,
-        )
-        self._update_provider_selector_item(index)
-        if index == self._provider_selector.currentIndex():
-            self._apply_provider_field_state(self._provider_configs[index])
-
-    def _update_provider_selector_item(self, index: int) -> None:
-        if index < 0 or index >= len(self._provider_configs) or index >= self._provider_selector.count():
-            return
-        provider = self._provider_configs[index]
-        self._provider_selector.setItemText(index, provider.display_name or provider.key)
-        self._provider_selector.setItemData(index, provider.key)
-
-    def _refresh_provider_field_state(self) -> None:
-        index = self._provider_selector.currentIndex()
-        if 0 <= index < len(self._provider_configs):
-            self._apply_provider_field_state(self._provider_configs[index])
-
-    def _apply_provider_field_state(self, provider: LLMProviderConfig) -> None:
-        packaged_trial = self._is_packaged_trial_provider(provider)
-        self._provider_base_url_input.setReadOnly(packaged_trial)
-        self._provider_api_key_input.setReadOnly(packaged_trial)
-        if packaged_trial:
-            self._provider_api_key_input.setPlaceholderText(self.tr("Built into packaged app"))
-        else:
-            self._provider_api_key_input.setPlaceholderText("")
-
-    def _is_packaged_trial_provider(self, provider: LLMProviderConfig) -> bool:
-        return provider.dialect_config.get("secret_source") == PACKAGED_TRIAL_SECRET_SOURCE
-
-    def _refresh_model_selectors(
-        self,
-        *,
-        default_key: object | None = None,
-        guard_key: object | None = None,
-        title_key: object | None = None,
-    ) -> None:
-        if not self._provider_configs:
-            return
-        try:
-            settings = LLMSettings(providers=self._provider_configs)
-        except Exception:
-            return
-        options = LLMService.model_options_from_settings(settings)
-        self._replace_model_selector_items(
-            self._llm_default_model_selector,
-            options,
-            selected_key=str(default_key or settings.default_fq_model_key),
-            include_blank=False,
-        )
-        self._replace_model_selector_items(
-            self._llm_guard_model_selector,
-            options,
-            selected_key=str(guard_key or ""),
-            include_blank=True,
-        )
-        self._replace_model_selector_items(
-            self._llm_thread_title_model_selector,
-            options,
-            selected_key=str(title_key or ""),
-            include_blank=True,
-        )
-
-    def _replace_model_selector_items(
-        self,
-        selector: QComboBox,
-        options,
-        *,
-        selected_key: str,
-        include_blank: bool,
-    ) -> None:
-        selector.blockSignals(True)
-        selector.clear()
-        if include_blank:
-            selector.addItem(self.tr("None"), "")
-        for option in options:
-            selector.addItem(option.label, option.fq_model_key)
-        index = selector.findData(selected_key)
-        if index < 0:
-            index = 0
-        selector.setCurrentIndex(index)
-        selector.blockSignals(False)
-
-    def _model_lines(self) -> list[str]:
-        text = self._provider_models_input.toPlainText().replace(",", "\n")
-        return [line.strip() for line in text.splitlines() if line.strip()]
+__all__ = ["AboutDialog", "SettingsDialog", "SettingsTab"]

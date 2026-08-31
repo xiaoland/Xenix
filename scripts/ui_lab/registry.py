@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from .contracts import ScenarioSpec
+from .feature_scenarios import build_history_populated, build_settings_provider_and_ocr
 from .scenarios import (
     build_chat_empty,
     build_chat_mixed_timeline,
@@ -9,6 +10,22 @@ from .scenarios import (
 
 
 _SCENARIOS = (
+    ScenarioSpec(
+        id="main.history-populated",
+        title="Populated history panel",
+        description="Production history panel with synthetic summaries; not a full app shell.",
+        viewport_width=248,
+        viewport_height=680,
+        build=build_history_populated,
+    ),
+    ScenarioSpec(
+        id="settings.provider-and-ocr",
+        title="Provider editor and OCR status",
+        description="Production settings components with synthetic provider draft and ready OCR port.",
+        viewport_width=1050,
+        viewport_height=760,
+        build=build_settings_provider_and_ocr,
+    ),
     ScenarioSpec(
         id="chat.empty",
         title="Empty chat",

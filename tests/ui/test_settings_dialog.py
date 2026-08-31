@@ -71,13 +71,13 @@ def test_settings_controls_have_stable_unique_semantic_identities(
         dialog._language_selector,
         dialog._about_button,
         dialog._save_button,
-        dialog._ocr_setup_button,
+        dialog._ocr_settings_card._setup_button,
         dialog._index_rebuild_button,
         dialog._ml_workers_setup_button,
-        dialog._provider_selector,
-        dialog._add_provider_button,
-        dialog._remove_provider_button,
-        dialog._provider_api_key_input,
+        dialog._provider_editor._provider_selector,
+        dialog._provider_editor._add_provider_button,
+        dialog._provider_editor._remove_provider_button,
+        dialog._provider_editor._provider_api_key_input,
         dialog._embedding_api_key_input,
     )
 

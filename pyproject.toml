@@ -125,6 +125,13 @@ python_version = "3.14"
 platform = "win32"
 mypy_path = "src"
 files = [
+    "src/xenix/application_services.py",
+    "src/xenix/ui/history/panel.py",
+    "src/xenix/ui/windows/auxiliary.py",
+    "src/xenix/ui/settings/contracts.py",
+    "src/xenix/ui/settings/provider.py",
+    "src/xenix/ui/settings/ocr.py",
+    "src/xenix/ui/ocr_deployment_tasks.py",
     "src/xenix/ui/conversation/turn_controller.py",
     "src/xenix/ui/conversation/execution.py",
     "scripts/ui_lab/__main__.py",
@@ -132,6 +139,7 @@ files = [
     "scripts/ui_lab/capture_cli.py",
     "scripts/ui_lab/contracts.py",
     "scripts/ui_lab/driver.py",
+    "scripts/ui_lab/feature_scenarios.py",
     "scripts/ui_lab/gallery.py",
     "scripts/ui_lab/registry.py",
     "scripts/ui_lab/scenarios.py",
