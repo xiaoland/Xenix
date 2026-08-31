@@ -9,6 +9,7 @@ adapters are composed; they are not ambient environment-variable conventions.
 from __future__ import annotations
 
 import hashlib
+import re
 import tempfile
 from dataclasses import dataclass
 from enum import StrEnum
@@ -17,6 +18,11 @@ from typing import Any
 from uuid import uuid4
 
 from .config import default_app_home
+
+# The exact directory name Xenix mints for an isolated run.  Cleanup refuses to
+# remove anything that does not match this, so a stray ``home`` value can never
+# expand deletion to the user profile or an arbitrary directory.
+_ISOLATED_HOME_NAME_PATTERN = re.compile(r"^xenix-(agent-dev|ephemeral)-[0-9a-f]{12}$")
 
 
 class RuntimeProfile(StrEnum):
@@ -84,6 +90,17 @@ class RuntimeProfileContext:
                 "live_llm": self.capabilities.live_llm,
             },
         }
+
+
+def is_isolated_home_path(path: Path) -> bool:
+    """Whether ``path`` is a directory name Xenix itself minted for an isolated run.
+
+    This is the single source of truth used by cleanup before any recursive
+    removal.  It is intentionally strict: the name must be exactly
+    ``xenix-<agent-dev|ephemeral>-<12 lowercase hex digits>``.
+    """
+
+    return _ISOLATED_HOME_NAME_PATTERN.fullmatch(path.name) is not None
 
 
 def resolve_runtime_profile(

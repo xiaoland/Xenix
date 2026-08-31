@@ -6,6 +6,7 @@ from xenix.runtime_profile import (
     Capabilities,
     RuntimeProfile,
     RuntimeProfileContext,
+    is_isolated_home_path,
     resolve_runtime_profile,
 )
 
@@ -63,3 +64,13 @@ def test_run_manifest_exposes_home_and_capabilities(tmp_path) -> None:
     assert manifest["isolated_home"] is True
     assert manifest["capabilities"]["update"] is False
     assert manifest["capabilities"]["ssh_worker_setup"] is False
+
+
+def test_is_isolated_home_path_accepts_only_xenix_minted_names(tmp_path) -> None:
+    assert is_isolated_home_path(tmp_path / "xenix-agent-dev-0123456789ab")
+    assert is_isolated_home_path(tmp_path / "xenix-ephemeral-ffffffffffff")
+    assert not is_isolated_home_path(tmp_path / "home")
+    assert not is_isolated_home_path(Path.home())
+    assert not is_isolated_home_path(tmp_path)
+    assert not is_isolated_home_path(tmp_path / "xenix-agent-dev-TOO-LONG-NAME")
+    assert not is_isolated_home_path(tmp_path / "xenix-production-0123456789ab")

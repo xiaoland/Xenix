@@ -13,7 +13,11 @@ from pathlib import Path
 from typing import Sequence
 
 from .app import run
-from .runtime_profile import RuntimeProfileContext, resolve_runtime_profile
+from .runtime_profile import (
+    RuntimeProfileContext,
+    is_isolated_home_path,
+    resolve_runtime_profile,
+)
 from .single_instance import SingleInstanceGuard
 
 
@@ -86,7 +90,16 @@ def _print_run_manifest(profile: RuntimeProfileContext) -> None:
 def _remove_isolated_home(home: Path) -> None:
     # A successful isolated run leaves no fresh home behind. Failure keeps the
     # home for diagnosis and instead publishes bounded evidence outside it.
-    shutil.rmtree(home, ignore_errors=True)
+    #
+    # This is a hard safety boundary: refuse to recursively remove anything
+    # Xenix did not mint itself (never the user home, a drive root, or an
+    # arbitrary directory), and fail loudly instead of silently ignoring errors.
+    resolved = home.resolve()
+    if not is_isolated_home_path(resolved):
+        raise RuntimeError(
+            f"Refusing to remove non-isolated runtime home: {resolved}"
+        )
+    shutil.rmtree(resolved)
 
 
 def _preserve_failure_evidence(profile: RuntimeProfileContext, exc_type, exc_value) -> None:
