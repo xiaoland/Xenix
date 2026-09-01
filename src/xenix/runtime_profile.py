@@ -60,7 +60,7 @@ class Capabilities:
 @dataclass(frozen=True)
 class RuntimeProfileContext:
     profile: RuntimeProfile
-    home: Path
+    runtime_home: Path
     capabilities: Capabilities
     run_id: str
     isolated_home: bool
@@ -73,14 +73,14 @@ class RuntimeProfileContext:
         alike, so a smoke run against the real home can never bypass the
         production instance's lock.
         """
-        fingerprint = hashlib.sha256(str(self.home).encode("utf-8")).hexdigest()[:24]
+        fingerprint = hashlib.sha256(str(self.runtime_home).encode("utf-8")).hexdigest()[:24]
         return f"Local\\dev.lanzhijiang.xenix.{fingerprint}"
 
     def run_manifest(self) -> dict[str, Any]:
         return {
             "profile": self.profile.value,
             "run_id": self.run_id,
-            "home": str(self.home),
+            "runtime_home": str(self.runtime_home),
             "isolated_home": self.isolated_home,
             "capabilities": {
                 "update": self.capabilities.update,
@@ -128,16 +128,16 @@ def resolve_runtime_profile(
         profile = RuntimeProfile.EPHEMERAL if ephemeral else RuntimeProfile.AGENT_DEV
         root = temp_root or Path(tempfile.gettempdir())
         run_id = uuid4().hex
-        home = (root / f"xenix-{profile.value}-{run_id[:12]}").resolve()
+        runtime_home = (root / f"xenix-{profile.value}-{run_id[:12]}").resolve()
         capabilities = Capabilities.agent_safe()
     else:
         profile = RuntimeProfile.PRODUCTION
         run_id = uuid4().hex
-        home = default_app_home().resolve()
+        runtime_home = default_app_home().resolve()
         capabilities = Capabilities()
     return RuntimeProfileContext(
         profile=profile,
-        home=home,
+        runtime_home=runtime_home,
         capabilities=capabilities,
         run_id=run_id,
         isolated_home=isolated,

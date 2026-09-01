@@ -58,7 +58,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         smoke_test=args.smoke_test,
     )
     if profile.isolated_home:
-        os.environ["XENIX_APP_HOME"] = str(profile.home)
+        os.environ["XENIX_APP_HOME"] = str(profile.runtime_home)
     _print_run_manifest(profile)
     guard = SingleInstanceGuard(profile.mutex_name())
     try:
@@ -71,7 +71,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     else:
         if profile.isolated_home:
             if exit_code == 0:
-                _remove_isolated_home(profile.home)
+                _remove_isolated_home(profile.runtime_home)
             else:
                 _preserve_failure_evidence(
                     profile,
@@ -87,14 +87,14 @@ def _print_run_manifest(profile: RuntimeProfileContext) -> None:
     print(json.dumps(profile.run_manifest(), ensure_ascii=False, sort_keys=True), file=sys.stderr)
 
 
-def _remove_isolated_home(home: Path) -> None:
+def _remove_isolated_home(runtime_home: Path) -> None:
     # A successful isolated run leaves no fresh home behind. Failure keeps the
     # home for diagnosis and instead publishes bounded evidence outside it.
     #
     # This is a hard safety boundary: refuse to recursively remove anything
     # Xenix did not mint itself (never the user home, a drive root, or an
     # arbitrary directory), and fail loudly instead of silently ignoring errors.
-    resolved = home.resolve()
+    resolved = runtime_home.resolve()
     if not is_isolated_home_path(resolved):
         raise RuntimeError(
             f"Refusing to remove non-isolated runtime home: {resolved}"
@@ -111,7 +111,7 @@ def _preserve_failure_evidence(profile: RuntimeProfileContext, exc_type, exc_val
         "schema_version": 1,
         "profile": profile.profile.value,
         "run_id": profile.run_id,
-        "home": str(profile.home),
+        "runtime_home": str(profile.runtime_home),
         "captured_at_utc": datetime.now(UTC).isoformat(),
         "error": _redact_error(summary),
     }

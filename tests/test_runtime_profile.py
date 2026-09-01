@@ -11,14 +11,14 @@ from xenix.runtime_profile import (
 )
 
 
-def _context(home: Path, *, run_id: str = "run") -> RuntimeProfileContext:
-    return RuntimeProfileContext(RuntimeProfile.PRODUCTION, home, Capabilities(), run_id, False)
+def _context(runtime_home: Path, *, run_id: str = "run") -> RuntimeProfileContext:
+    return RuntimeProfileContext(RuntimeProfile.PRODUCTION, runtime_home, Capabilities(), run_id, False)
 
 
 def test_mutex_is_scoped_to_normalized_home(tmp_path) -> None:
-    home = tmp_path / "home"
-    same_home_a = _context(home).mutex_name()
-    same_home_b = _context(home, run_id="other-run").mutex_name()
+    runtime_home = tmp_path / "home"
+    same_home_a = _context(runtime_home).mutex_name()
+    same_home_b = _context(runtime_home, run_id="other-run").mutex_name()
     other_home = _context(tmp_path / "other").mutex_name()
 
     assert same_home_a == same_home_b
@@ -31,7 +31,7 @@ def test_production_profile_uses_resolved_home_with_all_capabilities(monkeypatch
 
     assert profile.profile is RuntimeProfile.PRODUCTION
     assert profile.isolated_home is False
-    assert profile.home == (tmp_path / "prod-home").resolve()
+    assert profile.runtime_home == (tmp_path / "prod-home").resolve()
     assert profile.capabilities == Capabilities()
 
 
@@ -40,8 +40,8 @@ def test_agent_dev_isolates_home_and_denies_remote(tmp_path) -> None:
 
     assert profile.profile is RuntimeProfile.AGENT_DEV
     assert profile.isolated_home is True
-    assert profile.home.parent == tmp_path.resolve()
-    assert profile.home.name.startswith("xenix-agent-dev-")
+    assert profile.runtime_home.parent == tmp_path.resolve()
+    assert profile.runtime_home.name.startswith("xenix-agent-dev-")
     assert profile.capabilities == Capabilities.agent_safe()
 
 
@@ -60,7 +60,7 @@ def test_run_manifest_exposes_home_and_capabilities(tmp_path) -> None:
     manifest = profile.run_manifest()
 
     assert manifest["profile"] == "agent-dev"
-    assert manifest["home"] == str(profile.home)
+    assert manifest["runtime_home"] == str(profile.runtime_home)
     assert manifest["isolated_home"] is True
     assert manifest["capabilities"]["update"] is False
     assert manifest["capabilities"]["ssh_worker_setup"] is False
