@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import re
-import time
 from pathlib import Path
 from typing import Any, cast
 
@@ -29,7 +28,6 @@ from ..ml_service import (
 from ..storage.models import (
     MLTaskArtifactKind,
     MLTaskRow,
-    MLTaskStatus,
     MLTaskType,
     TrainedModelRow,
 )
@@ -187,9 +185,9 @@ class ModelTools:
                 )
             )
             created_task_ids.append(created.id)
-        training_result = self._wait_for_training_models_or_none(
+        training_result = self._ml_service.wait_for_training_models(
             created_task_ids,
-            context=context,
+            cancel_requested=context.cancel_requested,
             timeout_seconds=MODEL_TRAIN_GRACE_SECONDS,
         )
         if training_result is None:
@@ -235,9 +233,9 @@ class ModelTools:
                 )
             )
             created_task_ids.append(created.id)
-        training_result = self._wait_for_training_models_or_none(
+        training_result = self._ml_service.wait_for_training_models(
             created_task_ids,
-            context=context,
+            cancel_requested=context.cancel_requested,
             timeout_seconds=MODEL_HYPER_TRAIN_GRACE_SECONDS,
         )
         if training_result is None:
@@ -276,9 +274,9 @@ class ModelTools:
             horizon=input_data.horizon,
         )
         task = self._ml_service.apply(apply_input)
-        completed_task = self._wait_for_task_or_none(
+        completed_task = self._ml_service.wait_for_task(
             task.id,
-            context=context,
+            cancel_requested=context.cancel_requested,
             timeout_seconds=MODEL_APPLY_GRACE_SECONDS,
         )
         if completed_task is None:
@@ -389,124 +387,13 @@ class ModelTools:
             dataset_id=dataset.id,
         )
 
-    def _wait_for_training_models_or_none(
-        self,
-        root_task_ids: list[str],
-        *,
-        context: ToolExecutionContext,
-        timeout_seconds: float,
-    ) -> tuple[list[MLTaskRow], list[TrainedModelRow]] | None:
-        deadline = time.time() + timeout_seconds
-        while time.time() < deadline:
-            root_tasks = [self._ml_service.get_task_details(task_id).task for task_id in root_task_ids]
-            trained_models = self._trained_models_for_root_tasks(root_task_ids)
-            related_tasks = self._related_training_tasks(root_tasks, trained_models)
-            _raise_if_cancelled(self._ml_service, 
-                context,
-                ml_task_ids=[task.id for task in related_tasks] or root_task_ids,
-            )
 
-            failed = [
-                task
-                for task in related_tasks
-                if task.status in {MLTaskStatus.FAILED, MLTaskStatus.CANCELLED}
-            ]
-            if failed:
-                raise ValidationError(f"ML task '{failed[0].id}' finished with status '{failed[0].status.value}'.")
 
-            root_tasks_succeeded = all(task.status is MLTaskStatus.SUCCEEDED for task in root_tasks)
-            if root_tasks_succeeded and len(trained_models) == len(root_task_ids):
-                pending_evaluation = False
-                models_by_root_task = {model.ml_task_id: model for model in trained_models}
-                for root_task in root_tasks:
-                    model = models_by_root_task.get(root_task.id)
-                    if model is None:
-                        pending_evaluation = True
-                        break
-                    if self._training_task_requires_follow_up_evaluation(root_task):
-                        evaluation_task_id = self._evaluation_task_id_for_model(model)
-                        if not evaluation_task_id:
-                            pending_evaluation = True
-                            break
-                        evaluation_task = self._ml_service.get_task_details(evaluation_task_id).task
-                        if evaluation_task.status is not MLTaskStatus.SUCCEEDED:
-                            pending_evaluation = True
-                            break
-                if not pending_evaluation:
-                    return self._related_training_tasks(root_tasks, trained_models), trained_models
 
-            time.sleep(0.1)
-        return None
 
-    def _wait_for_task(
-        self,
-        task_id: str,
-        *,
-        context: ToolExecutionContext,
-        timeout_seconds: float = 120.0,
-    ) -> MLTaskRow:
-        task = self._wait_for_task_or_none(task_id, context=context, timeout_seconds=timeout_seconds)
-        if task is None:
-            raise ValidationError(f"Timed out waiting for ML task '{task_id}'.")
-        return task
 
-    def _wait_for_task_or_none(
-        self,
-        task_id: str,
-        *,
-        context: ToolExecutionContext,
-        timeout_seconds: float,
-    ) -> MLTaskRow | None:
-        deadline = time.time() + timeout_seconds
-        while time.time() < deadline:
-            _raise_if_cancelled(self._ml_service, context, ml_task_ids=[task_id])
-            task = self._ml_service.get_task_details(task_id).task
-            if task.status in self._terminal_statuses():
-                if task.status is not MLTaskStatus.SUCCEEDED:
-                    raise ValidationError(f"ML task '{task.id}' finished with status '{task.status.value}'.")
-                return task
-            time.sleep(0.1)
-        return None
 
-    def _terminal_statuses(self) -> set[MLTaskStatus]:
-        return {MLTaskStatus.SUCCEEDED, MLTaskStatus.FAILED, MLTaskStatus.CANCELLED}
 
-    def _trained_models_for_root_tasks(self, root_task_ids: list[str]) -> list[TrainedModelRow]:
-        models_by_task_id: dict[str, TrainedModelRow] = {}
-        for task_id in root_task_ids:
-            model = self._ml_service.get_trained_model_by_ml_task(task_id)
-            if model is not None:
-                models_by_task_id[task_id] = model
-        return [models_by_task_id[task_id] for task_id in root_task_ids if task_id in models_by_task_id]
-
-    def _related_training_tasks(
-        self,
-        root_tasks: list[MLTaskRow],
-        trained_models: list[TrainedModelRow],
-    ) -> list[MLTaskRow]:
-        tasks: list[MLTaskRow] = []
-        seen_task_ids: set[str] = set()
-        for task in root_tasks:
-            tasks.append(task)
-            seen_task_ids.add(task.id)
-        for model in trained_models:
-            evaluation_task_id = self._evaluation_task_id_for_model(model)
-            if not evaluation_task_id or evaluation_task_id in seen_task_ids:
-                continue
-            task = self._ml_service.get_task_details(evaluation_task_id).task
-            tasks.append(task)
-            seen_task_ids.add(task.id)
-        return tasks
-
-    def _evaluation_task_id_for_model(self, model: TrainedModelRow) -> str | None:
-        task_id = model.metadata_payload.get("evaluation_ml_task_id")
-        if isinstance(task_id, str) and task_id.strip():
-            return task_id
-        return None
-
-    def _training_task_requires_follow_up_evaluation(self, task: MLTaskRow) -> bool:
-        continuation = task.request_payload.get("continuation_plan")
-        return isinstance(continuation, dict) and continuation.get("next_operation") == "evaluate"
 
     def _training_task_receipt(
         self,
@@ -516,8 +403,8 @@ class ModelTools:
         operation: str,
     ) -> ToolSuccess:
         root_tasks = [self._ml_service.get_task_details(task_id).task for task_id in root_task_ids]
-        trained_models = self._trained_models_for_root_tasks(root_task_ids)
-        tasks = self._related_training_tasks(root_tasks, trained_models)
+        trained_models = self._ml_service.trained_models_for_root_tasks(root_task_ids)
+        tasks = self._ml_service.related_training_tasks(root_tasks, trained_models)
         task_ids = [task.id for task in tasks] or list(root_task_ids)
         payload = {
             "async_state": "running_background",
@@ -1080,7 +967,7 @@ class ModelTools:
         model = self._ml_service.get_trained_model_by_ml_task(task.id)
         if model is None:
             return []
-        evaluation_task_id = self._evaluation_task_id_for_model(model)
+        evaluation_task_id = self._ml_service.evaluation_task_id_for_model(model)
         return [evaluation_task_id] if evaluation_task_id else []
 
     def _trained_model_payload(self, model: TrainedModelRow) -> dict[str, Any]:
