@@ -294,7 +294,7 @@ class HeadedBenchmarkCell:
                 lambda: (
                     expected_paths.issubset(set(view._attached_files))  # noqa: SLF001
                     and expected_paths.issubset(
-                        set(self.window._composer_attachments)  # noqa: SLF001
+                        set(self.window._chat_workspace.composer_attachments)  # noqa: SLF001
                     )
                 ),
                 timeout=10.0,
@@ -318,8 +318,8 @@ class HeadedBenchmarkCell:
         def record_failure(failure: object) -> None:
             harness_failure.append(failure)
 
-        self.window._harness_stream_event.connect(observe)  # noqa: SLF001
-        self.window._harness_failed.connect(record_failure)  # noqa: SLF001
+        self.window._chat_workspace.harness_stream_event.connect(observe)  # noqa: SLF001
+        self.window._chat_workspace.harness_failed.connect(record_failure)  # noqa: SLF001
         try:
             QTest.mouseClick(view._send_button, Qt.MouseButton.LeftButton)  # noqa: SLF001
             self.wait_until(
@@ -343,8 +343,8 @@ class HeadedBenchmarkCell:
                 error_code="headed_ui_did_not_settle",
             )
         finally:
-            self.window._harness_stream_event.disconnect(observe)  # noqa: SLF001
-            self.window._harness_failed.disconnect(record_failure)  # noqa: SLF001
+            self.window._chat_workspace.harness_stream_event.disconnect(observe)  # noqa: SLF001
+            self.window._chat_workspace.harness_failed.disconnect(record_failure)  # noqa: SLF001
 
         snapshot = measurements.snapshot
         messages = list(getattr(snapshot, "messages", ())) if snapshot is not None else []
