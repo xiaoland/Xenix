@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from PySide6.QtWidgets import QToolButton
 from pytestqt.qtbot import QtBot
 
-from xenix.ui.chatbot import ComposerAttachmentStatus, ThreadDetailView
+from xenix.ui.chatbot import AttachmentChip, ComposerAttachmentStatus, ThreadDetailView
+from xenix.ui.semantic_identity import item_reference
 
 
 def test_chat_shell_has_stable_unique_semantic_identities(qtbot: QtBot) -> None:
@@ -40,3 +42,21 @@ def test_send_action_accessible_name_tracks_visual_state(qtbot: QtBot, tmp_path)
     view.set_running(True)
     assert view.composer.send_button.text() == view.tr("Stop")
     assert view.composer.send_button.accessibleName() == view.tr("Stop")
+
+
+def test_composer_attachment_chip_is_addressable_by_path(qtbot: QtBot, tmp_path) -> None:
+    view = ThreadDetailView()
+    qtbot.addWidget(view)
+    attachment = tmp_path / "sample.csv"
+    view.restore_composer("", [str(attachment)])
+
+    chips = view.composer.findChildren(AttachmentChip)
+    assert len(chips) == 1
+    chip = chips[0]
+    assert chip.accessibleIdentifier() == "chat.composer.attachment"
+    assert item_reference(chip) == str(attachment.resolve())
+
+    remove = chip.findChild(QToolButton, "attachmentChipRemoveButton")
+    assert remove is not None
+    assert remove.accessibleIdentifier() == "chat.composer.attachment.remove"
+    assert item_reference(remove) == str(attachment.resolve())

@@ -52,11 +52,21 @@ def test_semantic_identity_rejects_structural_or_unstable_names(qtbot, invalid: 
         identify(button, invalid)
 
 
-@pytest.mark.parametrize(
-    "invalid",
-    [r"C:\\Users\\person\\report.csv", "report final.csv", "", "../attachment"],
-)
-def test_repeated_item_reference_rejects_paths_and_display_content(qtbot, invalid: str) -> None:
+def test_repeated_item_reference_accepts_local_paths(qtbot) -> None:
+    button = QPushButton()
+    qtbot.addWidget(button)
+
+    identify_repeated_item(
+        button,
+        role="chat.attachment.remove",
+        item_reference=r"C:\Users\person\report final.csv",
+    )
+
+    assert item_reference(button) == r"C:\Users\person\report final.csv"
+
+
+@pytest.mark.parametrize("invalid", ["", "\nreport", "x" * 1025])
+def test_repeated_item_reference_rejects_empty_control_or_unbounded(qtbot, invalid: str) -> None:
     button = QPushButton()
     qtbot.addWidget(button)
 

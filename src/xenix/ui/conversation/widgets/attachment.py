@@ -9,6 +9,7 @@ from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QToolButton, QWidget
 
 from ...icons import remove_icon, spinner_icon, status_error_icon
+from ...semantic_identity import identify_repeated_item
 from ..presentation import ComposerAttachmentState, ComposerAttachmentStatus
 
 
@@ -40,6 +41,16 @@ class AttachmentChip(QFrame):
         layout.addWidget(name_label)
         layout.addWidget(status_label)
         layout.addWidget(remove_button)
+        identify_repeated_item(
+            self,
+            role="chat.composer.attachment",
+            item_reference=state.path,
+        )
+        identify_repeated_item(
+            remove_button,
+            role="chat.composer.attachment.remove",
+            item_reference=state.path,
+        )
         self.set_state(state)
 
     def set_state(self, state: ComposerAttachmentState) -> None:
