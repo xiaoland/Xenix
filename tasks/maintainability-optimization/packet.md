@@ -39,28 +39,44 @@ behavior except where a small, verifiable correction is clearly warranted.
 - Slice 2 (`conversation.py` message-row / provider-message builder extraction)
   landed and committed; `pdm run test` 197 passed.
 - Slice 3 (UI/init hot spots) is delegated to another session and out of scope here.
-- Slice 4 (correct stale docs) landed: marked the Job-layer feed-source wording as
-  superseded in `pr1-job-layer-rework/plan.md` and `general-job-layer.md`.
-  Durable docs were audited and found consistent — no `docs/` correction needed.
-- Slice 5 (approved "later" deep splitting) landed:
-  - `text_analysis.py` (104 KB → ~88 KB): extracted 38 module-level helper
-    functions into `ml/models/_text_helpers.py`.
-  - `tools.py` (106 KB → ~93 KB): extracted model-key normalization into an
-    `agent/_model_keys.py` mixin. A full split of the remaining registry was not
-    attempted — the class is a tightly-coupled god object where further
-    extraction has low value and high regression risk.
+- Slice 4 (correct stale docs) landed.
+- Slice 5 (deep splitting) landed.
+- Slice 6 (ruff `extend-exclude` root-anchoring) landed; native ML subtree now linted.
+- Slice 7 (bold decomposition of `AgentToolRegistry` into domain handlers) landed;
+  `tools.py` 2386 → 512 lines + `_data_tools.py` / `_analysis_tools.py` /
+  `_model_tools.py`.
+- Slice 8 (ML waiting moved from agent layer to `MLService`) landed.
+
+## Refined direction (KISS / minimal)
+
+The earlier work only relocated code. The real debt is **over-implementation**:
+
+- Agent tool layer should be a **thin adapter**: validate input → call the domain
+  service → return the domain result. No projection, no compaction, no
+  sanitization.
+- Domain results already carry bounded summaries (`FitTaskResult.result_summary`,
+  `ApplyTaskResult.summary`, `EvaluateTaskResult.evaluation`). The agent-side
+  summary projection (~570 lines) and cleaning-report compaction (~190 lines)
+  re-assemble what the domain already returns and must be **deleted**.
+- **No sanitization** (no local-path/credential desensitization in the agent layer).
+- **Async ML** (grace-period wait + `running_background` receipt + `model.task.query`
+  polling) is low ROI and complicates lifecycle + harness; **consider deleting it**.
+- **Truncation** is the one real concern. Replace truncation with: persist the full
+  tool output and let the LLM query it later via a dedicated tool (pagination /
+  row reading).
+- **Delete low-value tests**: tests that assert old projection/data-model shapes,
+  or re-assert static-check responsibilities (types/schema/enums), are removed.
 
 ## Next Step
 
-Task complete. All in-scope slices landed and verified (`pdm run test` 197 passed
-after each code change).
+Execute the refined direction:
 
-## Open follow-up (not this packet)
+1. Delete ML summary projection + cleaning compaction; return domain results.
+2. Delete projection-shape tests and other shape/static-check tests.
+3. Evaluate/delete async ML (`running_background` + `model.task.query` polling).
+4. Introduce a full-result + paginated query path for over-long outputs instead of truncation.
 
-- `pyproject.toml` ruff `extend-exclude = ["ml"]` unintentionally excludes the
-  whole `src/xenix/services/ml/` subtree from `pdm run lint`/`pdm run check`
-  (the glob `"ml"` matches that directory name, not just the legacy root `ml/`).
-  The native ML subtree is therefore not lint-covered; the two files split here
-  were verified with a direct `ruff check` instead. Root-anchoring the exclude
-  (e.g. `/ml` or `ml/`) would re-enable coverage but may surface pre-existing
-  lint debt in the ML subtree.
+## Open follow-up
+
+- `_compact_table` (data.query result) still needs a decision once truncation is
+  replaced by the full-result query path.

@@ -51,3 +51,38 @@ called out in the slice and covered by a test.
   split of the remaining registry was not attempted (tightly-coupled god object;
   low value / high regression risk).
 - Verify: `pdm run check` + `pdm run test` (197 passed) after each split.
+
+## Slice 6 — Root-anchor ruff exclude (complete)
+
+- `extend-exclude = ["ml", "tasks"]` → `["/ml", "/tasks"]`; native ML subtree now linted.
+
+## Slice 7 — Decompose AgentToolRegistry into domain handlers (complete)
+
+- `tools.py` (2386 → 512) + `_data_tools.py` / `_analysis_tools.py` / `_model_tools.py`.
+- Model-key helpers exposed as pure functions in `_model_keys.py`.
+
+## Slice 8 — Move ML waiting into MLService (complete)
+
+- `MLService.wait_for_task` / `wait_for_training_models` own polling + follow-up tracking;
+  agent layer no longer waits.
+
+## Slice 9 — Remove agent-side projection (KISS)
+
+- Delete ML summary projection in `_model_tools.py` (~570 lines) and cleaning
+  compaction in `_data_tools.py` (~190 lines); return domain results directly.
+- No sanitization/desensitization.
+
+## Slice 10 — Delete low-value tests
+
+- Remove projection-shape tests and any test that re-asserts data-model shapes or
+  static-check responsibilities (types/schema/enums).
+
+## Slice 11 — Evaluate/remove async ML
+
+- Remove the grace-period wait + `running_background` receipt + `model.task.query`
+  polling if ROI confirms low value; make ML tools synchronous.
+
+## Slice 12 — Full-result + paginated query (replace truncation)
+
+- Persist over-long tool output; expose a dedicated query tool (pagination / row
+  reading) instead of truncating.
