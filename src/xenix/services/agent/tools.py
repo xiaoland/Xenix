@@ -98,7 +98,13 @@ from .tool_inputs import (
     ModelTrainInput,
 )
 from .tool_presentations import DEFAULT_TOOL_PRESENTATION, ToolPresentation, tool_presentation_for_name
-from ._model_keys import _ModelKeyMixin
+from ._model_keys import (
+    build_model_key_aliases,
+    model_catalog_payload,
+    normalize_model_keys,
+    normalize_model_mapping,
+    slug,
+)
 
 
 # Synchronous wait window before a model tool returns a running_background
@@ -181,7 +187,7 @@ def _tool_input_error_message(exc: PydanticValidationError) -> str:
     return f"{field_name}: {message}"
 
 
-class AgentToolRegistry(_ModelKeyMixin):
+class AgentToolRegistry:
     def __init__(
         self,
         *,
@@ -210,7 +216,7 @@ class AgentToolRegistry(_ModelKeyMixin):
         self._artifact_service = artifact_service
         _ = dataset_export_service
         self._preprocessing_worker_runner = preprocessing_worker_runner or LocalPreprocessingWorkerRunner()
-        self._model_key_aliases = self._build_model_key_aliases()
+        self._model_key_aliases = build_model_key_aliases()
         self._tools = _index_agent_tools(
             (
                 self._build_data_integrate_tool(),
@@ -540,7 +546,7 @@ class AgentToolRegistry(_ModelKeyMixin):
         output_dir = self._paths.artifacts / "datasets" / "integrated"
         output_dir.mkdir(parents=True, exist_ok=True)
         name = input_data.name or "Integrated dataset"
-        output_path = output_dir / f"{self._slug(name)}-{int(time.time())}.csv"
+        output_path = output_dir / f"{slug(name)}-{int(time.time())}.csv"
         pd.concat(frames, ignore_index=True).to_csv(output_path, index=False)
         input_dataset_ids = [dataset.id for dataset in datasets]
         payload = self._register_generated_dataset_result(
@@ -1023,8 +1029,9 @@ class AgentToolRegistry(_ModelKeyMixin):
         self._raise_if_cancelled(context)
         detail_model_key: str | None = None
         if input_data.model_key is not None:
-            detail_model_key = self._normalize_model_keys(
+            detail_model_key = normalize_model_keys(
                 [input_data.model_key],
+                self._model_key_aliases,
                 field_name="model_key",
             )[0]
 
@@ -1063,7 +1070,7 @@ class AgentToolRegistry(_ModelKeyMixin):
             include_param_schema = False
             include_param_grid_schema = False
         models = [
-            self._model_catalog_payload(
+            model_catalog_payload(
                 entry,
                 detail_query=detail_query,
                 include_param_schema=include_param_schema,
@@ -1084,12 +1091,14 @@ class AgentToolRegistry(_ModelKeyMixin):
     ) -> ToolSuccess:
         self._raise_if_cancelled(context)
         binding_id = input_data.binding_id
-        models = self._normalize_model_keys(
+        models = normalize_model_keys(
             input_data.models,
+            self._model_key_aliases,
             field_name="models",
         )
-        params_by_model = self._normalize_model_mapping(
+        params_by_model = normalize_model_mapping(
             input_data.params_by_model,
+            self._model_key_aliases,
             field_name="params_by_model",
         )
         binding = self._ml_service.get_column_binding(binding_id)
@@ -1134,8 +1143,9 @@ class AgentToolRegistry(_ModelKeyMixin):
     ) -> ToolSuccess:
         self._raise_if_cancelled(context)
         binding_id = input_data.binding_id
-        normalized_grids = self._normalize_model_mapping(
+        normalized_grids = normalize_model_mapping(
             input_data.param_grids_by_model,
+            self._model_key_aliases,
             field_name="param_grids_by_model",
             require_hyperparameter_tuning=True,
         )
