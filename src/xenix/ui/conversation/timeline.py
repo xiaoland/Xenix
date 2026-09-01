@@ -8,7 +8,6 @@ and re-emits link/tool actions; it never reaches into the composer.
 from __future__ import annotations
 
 from types import SimpleNamespace
-from typing import Any
 
 from PySide6.QtCore import QEvent, QSize, QTimer, Signal
 from PySide6.QtWidgets import (
@@ -30,7 +29,7 @@ from ...services.agent import (
 )
 from ..icons import scroll_to_bottom_icon
 from ..semantic_identity import identify
-from .presentation import ArtifactResolver, event_display_blocks
+from .presentation import ArtifactResolver, ChatbotBlock, coerce_blocks, event_display_blocks
 from .widgets import ChatMessageBubble, ConnectionRetryItem, ToolCallItem, UsageOverviewItem
 
 _SCROLL_FOLLOW_THRESHOLD = 24
@@ -144,7 +143,7 @@ class ChatTimeline(QWidget):
     def add_message(
         self,
         author: str,
-        blocks: list[dict[str, Any]],
+        blocks: list[ChatbotBlock],
         *,
         message_id: str | None = None,
         event_id: str | None = None,
@@ -169,11 +168,11 @@ class ChatTimeline(QWidget):
             self._scroll_to_latest()
         return bubble
 
-    def add_user_message(self, blocks: list[dict[str, Any]], *, auto_scroll: bool = True) -> None:
+    def add_user_message(self, blocks: list[ChatbotBlock], *, auto_scroll: bool = True) -> None:
         self.add_message("You", blocks, auto_scroll=auto_scroll)
 
     def show_error(self, message: str) -> None:
-        self.add_message("System", [{"type": "ui_error", "message": message}])
+        self.add_message("System", [ChatbotBlock(type="ui_error", message=message)])
 
     def add_event(self, event: ChatbotEvent, *, auto_scroll: bool = True) -> QWidget | None:
         if event.kind is ChatbotEventKind.ACTIVITY:
@@ -235,10 +234,10 @@ class ChatTimeline(QWidget):
     def add_activity_event(self, event: ChatbotEvent, *, auto_scroll: bool = True) -> ChatMessageBubble:
         return self._add_activity_indicator(event, auto_scroll=auto_scroll)
 
-    def _activity_blocks(self, event: ChatbotEvent) -> list[dict[str, Any]]:
+    def _activity_blocks(self, event: ChatbotEvent) -> list[ChatbotBlock]:
         if event.content_blocks:
-            return list(event.content_blocks)
-        return [{"type": "thinking", "text": "Thinking..."}]
+            return coerce_blocks(event.content_blocks)
+        return [ChatbotBlock(type="thinking", text="Thinking...")]
 
     def _add_activity_indicator(self, event: ChatbotEvent, *, auto_scroll: bool = True) -> ChatMessageBubble:
         bubble = ChatMessageBubble(

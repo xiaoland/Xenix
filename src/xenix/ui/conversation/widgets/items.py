@@ -23,10 +23,11 @@ from ...markdown_renderer import render_chat_markdown
 from ...semantic_identity import identify_repeated_item
 from ..presentation import (
     ArtifactResolver,
+    ChatbotBlock,
     UsagePayload,
+    coerce_blocks,
     connection_attempt_counts,
     connection_retry_events,
-    payload_int,
     render_content_blocks,
     translate_tool_summary,
     usage_overview_text,
@@ -172,7 +173,7 @@ class ToolCallItem(QFrame):
         return translate_tool_summary(event.summary or "")
 
     def _detail_markdown(self, event: ChatbotEvent) -> str:
-        return render_content_blocks(event.detail_blocks)
+        return render_content_blocks(coerce_blocks(event.detail_blocks))
 
 
 class ConnectionRetryItem(QFrame):
@@ -242,14 +243,15 @@ class ConnectionRetryItem(QFrame):
             item_reference=event.id,
         )
         self._icon_label.setPixmap(tool_icon(event.icon_key).pixmap(QSize(16, 16)))
-        attempt_number, max_attempts = connection_attempt_counts(event.detail_blocks)
+        detail_blocks = coerce_blocks(event.detail_blocks)
+        attempt_number, max_attempts = connection_attempt_counts(detail_blocks)
         self._summary_label.setText(
             self.tr("Connecting ({attempt}/{max})").format(
                 attempt=attempt_number,
                 max=max_attempts,
             )
         )
-        has_detail = bool(event.detail_blocks)
+        has_detail = bool(detail_blocks)
         self._chevron_button.setVisible(has_detail)
         self._chevron_button.setEnabled(has_detail)
         if not has_detail:
@@ -260,7 +262,7 @@ class ConnectionRetryItem(QFrame):
         self._chevron_button.setAccessibleName(toggle_label)
         self._detail_browser.setHtml(
             render_chat_markdown(
-                self._connection_detail_markdown(event.detail_blocks),
+                self._connection_detail_markdown(detail_blocks),
                 inline_artifact_images=False,
             )
         )
@@ -279,14 +281,14 @@ class ConnectionRetryItem(QFrame):
         self._expanded = not self._expanded
         self.set_event(self._event)
 
-    def _connection_detail_markdown(self, detail_blocks: list[dict[str, Any]]) -> str:
+    def _connection_detail_markdown(self, detail_blocks: list[ChatbotBlock]) -> str:
         retry_events = connection_retry_events(detail_blocks)
         if not retry_events:
             return ""
         lines = ["### " + self.tr("LLM connection retry"), ""]
         for retry_event in retry_events:
-            attempt_number = payload_int(retry_event, "attempt_number")
-            max_attempts = payload_int(retry_event, "max_attempts")
+            attempt_number = retry_event.attempt_number
+            max_attempts = retry_event.max_attempts
             if attempt_number and max_attempts:
                 lines.append(
                     "#### "
@@ -297,12 +299,12 @@ class ConnectionRetryItem(QFrame):
                 )
             else:
                 lines.append("#### " + self.tr("Attempt"))
-            error_code = str(retry_event.get("error_code") or "").strip()
+            error_code = retry_event.error_code.strip()
             if error_code:
                 lines.append(
                     self.tr("Error code: `{code}`").format(code=error_code)
                 )
-            error_summary = str(retry_event.get("error_summary") or "").strip()
+            error_summary = retry_event.error_summary.strip()
             if error_summary:
                 lines.append(error_summary)
             lines.append("")

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import secrets
-from typing import Any
 
 from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtGui import QColor, QFont, QPainter, QPixmap, QTextDocument, QTextOption
@@ -17,7 +16,7 @@ from PySide6.QtWidgets import (
 )
 
 from ...markdown_renderer import render_chat_markdown
-from ..presentation import ArtifactResolver, render_content_blocks
+from ..presentation import ArtifactResolver, ChatbotBlock, render_content_blocks
 from .artifacts import _load_artifact_preview_pixmap
 from .common import _propagate_geometry_change
 from .text import AutoHeightTextBrowser
@@ -149,7 +148,7 @@ class ChatMessageBubble(QFrame):
         self,
         *,
         author: str,
-        blocks: list[dict[str, Any]],
+        blocks: list[ChatbotBlock],
         artifact_resolver: ArtifactResolver | None = None,
         parent: QWidget | None = None,
     ) -> None:
@@ -213,14 +212,14 @@ class ChatMessageBubble(QFrame):
             row_layout.addWidget(card, 1)
             row_layout.addStretch(0)
 
-    def _card_object_name(self, author: str, blocks: list[dict[str, Any]]) -> str:
+    def _card_object_name(self, author: str, blocks: list[ChatbotBlock]) -> str:
         if author == "You":
             return "chatMessageUser"
         if author == "System":
             return "chatMessageSystem"
         return "chatMessageAssistant"
 
-    def _shows_author(self, author: str, blocks: list[dict[str, Any]]) -> bool:
+    def _shows_author(self, author: str, blocks: list[ChatbotBlock]) -> bool:
         return author not in {"You", "Xenix"}
 
     def _display_author(self) -> str:
@@ -232,7 +231,7 @@ class ChatMessageBubble(QFrame):
             return self.tr("System")
         return self._author
 
-    def _render_blocks(self, blocks: list[dict[str, Any]]) -> str:
+    def _render_blocks(self, blocks: list[ChatbotBlock]) -> str:
         self._source_attachment_targets.clear()
         return render_chat_markdown(
             render_content_blocks(
@@ -249,7 +248,7 @@ class ChatMessageBubble(QFrame):
         elif self._card.objectName() == "chatMessageSystem":
             self._card.setMaximumWidth(max(320, int(width * 0.78)))
 
-    def set_blocks(self, blocks: list[dict[str, Any]]) -> None:
+    def set_blocks(self, blocks: list[ChatbotBlock]) -> None:
         self._blocks = list(blocks)
         self._browser.setHtml(self._render_blocks(self._blocks))
 
@@ -258,11 +257,11 @@ class ChatMessageBubble(QFrame):
             self._author_label.setText(self._display_author())
         self._browser.setHtml(self._render_blocks(self._blocks))
 
-    def _source_attachment_target(self, block: dict[str, Any]) -> str | None:
-        if not bool(block.get("is_openable")):
+    def _source_attachment_target(self, block: ChatbotBlock) -> str | None:
+        if not block.is_openable:
             return None
-        file_path = block.get("file_path")
-        if not isinstance(file_path, str) or not file_path.strip():
+        file_path = block.file_path
+        if not file_path.strip():
             return None
         token = f"xenix-source://{secrets.token_urlsafe(18)}"
         self._source_attachment_targets[token] = file_path
