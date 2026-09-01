@@ -54,7 +54,6 @@ from .tool_inputs import (
     ModelMetadataInput,
     ModelTaskQueryInput,
     ModelTaskStopInput,
-    ModelTaskWaitInput,
     ModelTrainInput,
 )
 from .tool_presentations import DEFAULT_TOOL_PRESENTATION, ToolPresentation, tool_presentation_for_name
@@ -193,7 +192,6 @@ class AgentToolRegistry:
                 self._build_model_hyper_train_tool(),
                 self._build_model_apply_tool(),
                 self._build_model_task_query_tool(),
-                self._build_model_task_wait_tool(),
                 self._build_model_task_stop_tool(),
             )
         )
@@ -489,21 +487,6 @@ class AgentToolRegistry:
             description="Query ML task status, metadata, artifacts, errors, and logs by explicit task ids.",
             input_model=ModelTaskQueryInput,
             handler=self._model_tools._model_task_query,
-        )
-
-    def _build_model_task_wait_tool(
-        self,
-    ) -> ConcreteAgentTool[ModelTaskWaitInput]:
-        return self._tool(
-            name="model.task.wait",
-            provider_name="model_task_wait",
-            description=(
-                "Keep waiting on already running ML tasks by explicit task ids. Blocks up to "
-                "the same wait window as model.train/model.hyper_train/model.apply and returns "
-                "the completed result, or a timed_out status/log summary to decide again."
-            ),
-            input_model=ModelTaskWaitInput,
-            handler=self._model_tools._model_task_wait,
         )
 
     def _build_model_task_stop_tool(
