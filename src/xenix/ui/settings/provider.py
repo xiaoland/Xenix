@@ -25,7 +25,7 @@ from ...services.llm import (
     PACKAGED_TRIAL_SECRET_SOURCE,
 )
 from ..semantic_identity import identify
-from ..widgets.card import Card
+from ._card import Card
 
 
 class ProviderSettingsEditor(QWidget):

@@ -36,7 +36,7 @@ from ...services.paddle_ocr_service import PaddleOcrDeploymentService
 from ...services.update_service import UpdateService
 from ..about_dialog import AboutDialog
 from ..semantic_identity import identify
-from ..widgets.card import Card
+from ._card import Card
 from .contracts import SettingsTab
 from .embedding import EmbeddingSettings
 from .index_status import KnowledgeIndexStatus

@@ -1,4 +1,4 @@
-"""Reusable styled panel container for composing content widgets."""
+"""Private styled-panel container for assembling settings content widgets."""
 
 from __future__ import annotations
 

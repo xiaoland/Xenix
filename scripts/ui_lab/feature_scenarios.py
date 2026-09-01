@@ -4,14 +4,13 @@ from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 
-from PySide6.QtWidgets import QHBoxLayout, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QFrame, QHBoxLayout, QVBoxLayout, QWidget
 
 from xenix.services.llm import LLMProviderConfig, LLMSettings
 from xenix.services.paddle_ocr_service import PaddleOcrState, PaddleOcrStatus
 from xenix.ui.history import HistoryPanel, HistoryThreadSummary
 from xenix.ui.settings.ocr import OcrSettings
 from xenix.ui.settings.provider import ProviderSettingsEditor
-from xenix.ui.widgets.card import Card
 
 from .contracts import ScenarioContext, ScenarioHandle, ready_immediately
 
@@ -76,9 +75,12 @@ def build_settings_provider_and_ocr(_context: ScenarioContext) -> ScenarioHandle
         default_fq_model_key="synthetic/fast",
     )
     editor = ProviderSettingsEditor(settings, root)
-    ocr_card = Card()
     ocr = OcrSettings(_SyntheticOcr())
-    ocr_card.set_content(ocr)
+    ocr_card = QFrame()
+    ocr_card.setFrameShape(QFrame.Shape.StyledPanel)
+    ocr_card_layout = QVBoxLayout(ocr_card)
+    ocr_card_layout.setContentsMargins(12, 12, 12, 12)
+    ocr_card_layout.addWidget(ocr)
     layout.addWidget(editor, 2)
     status_column = QVBoxLayout()
     status_column.addWidget(ocr_card)
