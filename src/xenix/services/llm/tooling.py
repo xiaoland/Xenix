@@ -8,20 +8,30 @@ import json
 import re
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Generic, TypeAlias, TypeVar, cast, overload
 
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import SchemaError
-from pydantic import BaseModel, Field, ValidationError as PydanticValidationError, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationError as PydanticValidationError,
+    field_validator,
+)
 from sqlmodel import SQLModel
 
 from ...exceptions import ValidationError
+from .tool_result_page_store import ToolResultPageStore
 
 
 MAX_TOOL_CALLS = 16
 MAX_TOOL_PAYLOAD_BYTES = 64 * 1024
 MAX_EXCHANGE_RESULT_BYTES = 1024 * 1024
 MAX_TOOL_FAILURE_MESSAGE_CHARS = 16 * 1024
+TOOL_RESULT_PAGE_SIZE_CHARS = 1024
+TOOL_RESULT_PAGE_LIMIT_CHARS = 4096
 
 _PUBLIC_ERROR_CODE_PATTERN = re.compile(r"^[a-z][a-z0-9_]{0,127}$")
 _SENSITIVE_DIAGNOSTIC_MARKERS = (
@@ -148,7 +158,14 @@ class ToolSuccess:
     value: ToolResultValue
 
     def __post_init__(self) -> None:
-        ensure_bounded_tool_result_value(self.value, label="Tool success value")
+        # A concrete Tool may return up to the exchange-level bound. The invoke
+        # boundary re-pages anything above the inline Tool payload bound, so a
+        # large raw value never crosses the LLM boundary un-paged.
+        ensure_bounded_tool_result_value(
+            self.value,
+            label="Tool success value",
+            max_bytes=MAX_EXCHANGE_RESULT_BYTES,
+        )
 
 
 @dataclass(frozen=True)
@@ -194,6 +211,16 @@ class ToolFailure:
         if self.retryable is not None:
             value["retryable"] = self.retryable
         return value
+
+
+class ResultPageInput(BaseModel):
+    """Input for the generic paged-result reader."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    result_id: str = Field(min_length=1, max_length=64)
+    offset: int = Field(default=0, ge=0)
+    limit: int = Field(default=TOOL_RESULT_PAGE_SIZE_CHARS, ge=1, le=TOOL_RESULT_PAGE_LIMIT_CHARS)
 
 
 ToolInvocationOutcome: TypeAlias = ToolSuccess | ToolFailure
@@ -544,10 +571,15 @@ class AgentToolRegistry:
     def __init__(
         self,
         tools: Mapping[str, RegisteredTool] | Iterable[RegisteredTool] | None = None,
+        *,
+        paged_results_dir: Path | None = None,
     ) -> None:
         self._tools: dict[str, RegisteredTool] = {}
         self._provider_names: dict[str, str] = {}
         self._validators: dict[str, Draft202012Validator] = {}
+        self._page_store = (
+            ToolResultPageStore(paged_results_dir) if paged_results_dir is not None else None
+        )
         values = (tools or {}).values() if isinstance(tools, Mapping) else (tools or ())
         for tool in values:
             self._register(
@@ -555,6 +587,8 @@ class AgentToolRegistry:
                 tool.implementation,
                 input_model=tool.input_model,
             )
+        if self._page_store is not None:
+            self._register_builtin_result_page_tool()
 
     @overload
     def register(self, tool: AgentTool[ModelInputT], implementation: None = None) -> None: ...
@@ -608,6 +642,52 @@ class AgentToolRegistry:
         self._validators[registered_spec.name] = validator
 
     register_tool = register
+
+    def _register_builtin_result_page_tool(self) -> None:
+        spec = AgentToolSpec(
+            name="result.page",
+            provider_name="result_page",
+            description=(
+                "Read one page of a large paged tool result by character range. "
+                "Use it when a tool returns a paged result with result_id, total_chars, "
+                "and has_more=true; pass result_id plus offset to read subsequent pages."
+            ),
+            parameters_schema=project_provider_tool_schema(ResultPageInput),
+        )
+        self._register(spec, self._page_result, input_model=ResultPageInput)
+
+    def _page_result(
+        self,
+        input_data: ResultPageInput,
+        _context: ToolExecutionContext,
+    ) -> ToolSuccess:
+        if self._page_store is None:
+            raise ValidationError("Paged results are unavailable.")
+        page = self._page_store.read_page(
+            input_data.result_id,
+            offset=input_data.offset,
+            limit=input_data.limit,
+        )
+        return ToolSuccess(
+            value={
+                "result_id": input_data.result_id,
+                "offset": input_data.offset,
+                "limit": input_data.limit,
+                "total_chars": page.total_chars,
+                "text": page.text,
+                "has_more": page.has_more,
+            }
+        )
+
+    def delete_thread_results(self, thread_id: str) -> int:
+        if self._page_store is None:
+            return 0
+        return self._page_store.delete_for_thread(thread_id)
+
+    def collect_garbage(self, *, max_age_seconds: int) -> int:
+        if self._page_store is None:
+            return 0
+        return self._page_store.collect_garbage(max_age_seconds=max_age_seconds)
 
     def list_specs(self, scope: ToolScope | None = None) -> list[AgentToolSpec]:
         names = set(scope.tool_names) if scope is not None and scope.tool_names else None
@@ -703,12 +783,43 @@ class AgentToolRegistry:
         )
         tool = self.get(tool_name)
         outcome = tool.implementation(validated_arguments, context)
-        if isinstance(outcome, (ToolSuccess, ToolFailure)):
+        if isinstance(outcome, ToolFailure):
             return outcome
-        # Existing injected integrations may still return a direct JSON value.
-        # It is normalized once at the LLM-owned Tool interface, never wrapped
-        # into a second raw-payload representation.
-        return ToolSuccess(value=outcome)
+        value = outcome.value if isinstance(outcome, ToolSuccess) else outcome
+        return self._bound_success(value, context)
+
+    def _bound_success(
+        self,
+        value: ToolResultValue,
+        context: ToolExecutionContext,
+    ) -> ToolSuccess:
+        text = tool_result_text(value)
+        text_bytes = len(text.encode("utf-8"))
+        if text_bytes <= MAX_TOOL_PAYLOAD_BYTES:
+            return ToolSuccess(value=value)
+        if text_bytes > MAX_EXCHANGE_RESULT_BYTES:
+            raise ValidationError("Tool result exceeds the paged result size limit.")
+        if self._page_store is None:
+            raise ValidationError(
+                "Tool result exceeds the inline payload bound and paged results are unavailable."
+            )
+        result_id = self._page_store.save(
+            thread_id=context.thread_id,
+            tool_call_message_id=context.tool_call_message_id,
+            text=text,
+        )
+        total_chars = len(text)
+        has_more = total_chars > TOOL_RESULT_PAGE_SIZE_CHARS
+        return ToolSuccess(
+            value={
+                "result_id": result_id,
+                "total_chars": total_chars,
+                "page_size": TOOL_RESULT_PAGE_SIZE_CHARS,
+                "offset": 0,
+                "text": text[:TOOL_RESULT_PAGE_SIZE_CHARS],
+                "has_more": has_more,
+            }
+        )
 
 
 def _pydantic_error_schema_keyword(exc: PydanticValidationError) -> str:
@@ -745,6 +856,27 @@ def canonical_json_bytes(value: Any) -> bytes:
         raise ValidationError("Tool payload is not JSON serializable.") from exc
 
 
+def tool_result_text(value: ToolResultValue) -> str:
+    """Return the canonical string form of a Tool result for paging.
+
+    A string result (for example XTT) is paged as-is; any structured value is
+    paged as its compact JSON representation with non-ASCII text preserved.
+    """
+
+    if isinstance(value, str):
+        return value
+    try:
+        return json.dumps(
+            value,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        )
+    except (TypeError, ValueError) as exc:
+        raise ValidationError("Tool payload is not JSON serializable.") from exc
+
+
 def ensure_bounded_json(value: Any, *, label: str) -> None:
     if not isinstance(value, dict):
         raise ValidationError(f"{label} must be a JSON object.")
@@ -756,13 +888,18 @@ def ensure_bounded_json(value: Any, *, label: str) -> None:
         )
 
 
-def ensure_bounded_tool_result_value(value: ToolResultValue, *, label: str) -> None:
+def ensure_bounded_tool_result_value(
+    value: ToolResultValue,
+    *,
+    label: str,
+    max_bytes: int = MAX_TOOL_PAYLOAD_BYTES,
+) -> None:
     """Validate one direct JSON ToolResult value without changing its shape."""
 
     payload = canonical_json_bytes(value)
-    if len(payload) > MAX_TOOL_PAYLOAD_BYTES:
+    if len(payload) > max_bytes:
         raise ValidationError(
-            f"{label} exceeds the {MAX_TOOL_PAYLOAD_BYTES}-byte limit.",
+            f"{label} exceeds the {max_bytes}-byte limit.",
             error_code="llm_tool_payload_too_large",
         )
 

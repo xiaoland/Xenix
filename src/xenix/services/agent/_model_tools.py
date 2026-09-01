@@ -309,7 +309,7 @@ class ModelTools:
                     "task": details.task.model_dump(mode="json"),
                     "artifacts": [artifact.model_dump(mode="json") for artifact in details.artifacts],
                     "logs": (
-                        [log.model_dump(mode="json") for log in details.logs[: input_data.max_log_entries]]
+                        [log.model_dump(mode="json") for log in details.logs]
                         if input_data.include_logs
                         else []
                     ),

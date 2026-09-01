@@ -401,6 +401,7 @@ class LLMConversationService:
                         raise NotFoundError(f"Conversation Thread '{thread_id}' was not found.")
                     session.commit()
                 self._thread_controls.pop(thread_id, None)
+                self._tool_registry.delete_thread_results(thread_id)
 
     def pause_thread(self, thread_id: str) -> None:
         """Pause new LLM provider sends for one Thread in this process only."""

@@ -189,7 +189,10 @@ def test_register_handler_after_start_recovers_and_dispatches(monkeypatch, tmp_p
 
     assert _wait_until(lambda: len(kb_handler.runs) == 1)
     assert kb_handler.runs == ["kb-queued"]
-    assert _job_status(storage, JobDomain.KNOWLEDGE, "kb-queued") is JobStatus.SUCCEEDED
+    assert _wait_until(
+        lambda: _job_status(storage, JobDomain.KNOWLEDGE, "kb-queued")
+        is JobStatus.SUCCEEDED
+    )
     scheduler.shutdown()
     storage.engine.dispose()
 

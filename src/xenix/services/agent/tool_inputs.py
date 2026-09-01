@@ -595,13 +595,7 @@ class ModelTaskQueryInput(AgentToolInput):
     )
     include_logs: bool = Field(
         default=False,
-        description="Set true to include bounded task logs in the response.",
-    )
-    max_log_entries: Annotated[int, Field(ge=0, le=50)] = Field(
-        default=20,
-        description=(
-            "Maximum number of log entries to return per task when include_logs is true."
-        ),
+        description="Set true to include task logs in the response.",
     )
 
 

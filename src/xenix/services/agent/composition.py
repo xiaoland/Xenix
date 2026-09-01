@@ -183,9 +183,12 @@ def build_headless_agent_services(
         ml_service=ml,
         artifact_service=artifacts,
     )
-    llm_tools = LLMToolRegistry()
+    llm_tools = LLMToolRegistry(
+        paged_results_dir=paths.state / "paged_results",
+    )
     concrete_tools.register_with_llm(llm_tools)
     register_knowledge_lookup_tool(llm_tools, knowledge)
+    llm_tools.collect_garbage(max_age_seconds=7 * 24 * 60 * 60)
 
     skill_catalog = AgentSkillCatalog.from_default_catalog()
     conversation = LLMConversationService(
