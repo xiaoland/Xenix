@@ -1,16 +1,16 @@
-"""ML workers tab: summary and SSH worker setup entry."""
+"""ML workers tab content widget: summary and SSH worker setup entry."""
 
 from __future__ import annotations
 
 from PySide6.QtCore import QCoreApplication, QEvent, Signal
-from PySide6.QtWidgets import QFormLayout, QFrame, QLabel, QPushButton, QWidget
+from PySide6.QtWidgets import QFormLayout, QLabel, QPushButton, QWidget
 
 from ...services.ml.worker_settings import MLWorkerKind, MLWorkerSettingsService
 from ..semantic_identity import identify
 from ..ssh_worker_setup_wizard import SshWorkerSetupWizard
 
 
-class MLWorkersCard(QFrame):
+class MLWorkers(QWidget):
     """ML worker summary plus the guarded SSH worker setup entry."""
 
     worker_saved = Signal()
@@ -23,7 +23,6 @@ class MLWorkersCard(QFrame):
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
-        self.setFrameShape(QFrame.Shape.StyledPanel)
         self._service = ml_worker_settings_service
         self._ssh_worker_setup_allowed = ssh_worker_setup_allowed
         self._wizard: SshWorkerSetupWizard | None = None
@@ -35,7 +34,7 @@ class MLWorkersCard(QFrame):
         identify(self._setup_button, "settings.ml-workers.add-ssh")
 
         layout = QFormLayout(self)
-        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setContentsMargins(0, 0, 0, 0)
         layout.addRow(self._title_label)
         layout.addRow(self._summary_label)
         layout.addRow(self._setup_button)

@@ -10,7 +10,7 @@ from xenix.services.llm import (
     PACKAGED_TRIAL_SECRET_SOURCE,
 )
 from xenix.services.paddle_ocr_service import PaddleOcrState, PaddleOcrStatus
-from xenix.ui.settings.ocr import OcrSettingsCard
+from xenix.ui.settings.ocr import OcrSettings
 from xenix.ui.settings.provider import ProviderSettingsEditor
 
 
@@ -166,7 +166,7 @@ def test_ocr_card_ignores_status_completion_after_deactivate(qapp: QApplication,
         def install(self, progress=None) -> PaddleOcrStatus:
             return PaddleOcrStatus(PaddleOcrState.READY)
 
-    card = OcrSettingsCard(Deployment())
+    card = OcrSettings(Deployment())
     qtbot.addWidget(card)
     card.activate()
     generation = card._generation
@@ -177,7 +177,7 @@ def test_ocr_card_ignores_status_completion_after_deactivate(qapp: QApplication,
 
 
 def test_ocr_card_ignores_late_generation_phase_and_status(qapp: QApplication, qtbot: QtBot) -> None:
-    card = OcrSettingsCard(None)
+    card = OcrSettings(None)
     qtbot.addWidget(card)
     card.activate()
     old_generation = card._generation

@@ -70,7 +70,7 @@ def test_embedding_model_change_requires_user_confirmation_before_rebuild(
             "_confirm_embedding_compatibility_change",
             lambda: "rebuild",
         )
-        dialog._embedding_card._model_input.setText("meaning-v2")
+        dialog._embedding_settings._model_input.setText("meaning-v2")
         dialog._save_agent_settings()
 
         assert embeddings.load().model == "meaning-v2"
@@ -81,7 +81,7 @@ def test_embedding_model_change_requires_user_confirmation_before_rebuild(
             "_confirm_embedding_compatibility_change",
             lambda: "cancel",
         )
-        dialog._embedding_card._model_input.setText("meaning-v3")
+        dialog._embedding_settings._model_input.setText("meaning-v3")
         dialog._save_agent_settings()
 
         assert embeddings.load().model == "meaning-v2"

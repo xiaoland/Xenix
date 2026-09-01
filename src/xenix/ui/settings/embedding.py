@@ -1,4 +1,4 @@
-"""Knowledge-tab embedding provider card."""
+"""Knowledge-tab embedding provider content widget."""
 
 from __future__ import annotations
 
@@ -6,24 +6,22 @@ from PySide6.QtCore import QCoreApplication, QEvent
 from PySide6.QtWidgets import (
     QCheckBox,
     QFormLayout,
-    QFrame,
     QLabel,
     QLineEdit,
     QSpinBox,
     QWidget,
 )
 
-from ...services.embedding_service import EmbeddingSettings
+from ...services.embedding_service import EmbeddingSettings as EmbeddingSettingsModel
 from ..semantic_identity import identify
 
 
-class EmbeddingSettingsCard(QFrame):
+class EmbeddingSettings(QWidget):
     """Draft editor for the embedding provider, isolated from the save flow."""
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.setFrameShape(QFrame.Shape.StyledPanel)
-        self._snapshot = EmbeddingSettings()
+        self._snapshot = EmbeddingSettingsModel()
 
         self._title_label = QLabel()
         self._enabled_label = QLabel()
@@ -56,7 +54,7 @@ class EmbeddingSettingsCard(QFrame):
         identify(self._timeout_input, "settings.embedding.timeout")
 
         layout = QFormLayout(self)
-        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setContentsMargins(0, 0, 0, 0)
         layout.addRow(self._title_label)
         layout.addRow(self._enabled_label, self._enabled_checkbox)
         layout.addRow(self._base_url_label, self._base_url_input)
@@ -68,10 +66,10 @@ class EmbeddingSettingsCard(QFrame):
         self.retranslate_ui()
 
     @property
-    def snapshot(self) -> EmbeddingSettings:
+    def snapshot(self) -> EmbeddingSettingsModel:
         return self._snapshot
 
-    def load_settings(self, settings: EmbeddingSettings) -> None:
+    def load_settings(self, settings: EmbeddingSettingsModel) -> None:
         self._snapshot = settings.model_copy(deep=True)
         self._enabled_checkbox.setChecked(settings.enabled)
         self._base_url_input.setText(settings.base_url)
@@ -81,10 +79,10 @@ class EmbeddingSettingsCard(QFrame):
         self._batch_size_input.setValue(settings.batch_size)
         self._timeout_input.setValue(settings.timeout_seconds)
 
-    def current_settings(self) -> EmbeddingSettings:
+    def current_settings(self) -> EmbeddingSettingsModel:
         dimensions = self._dimensions_input.value()
         current = self._snapshot
-        return EmbeddingSettings(
+        return EmbeddingSettingsModel(
             schema_version=current.schema_version,
             enabled=self._enabled_checkbox.isChecked(),
             provider_key=current.provider_key,

@@ -1,20 +1,21 @@
+"""Knowledge-tab OCR content widget plus its short-lived asynchronous work."""
+
 from __future__ import annotations
 
 from PySide6.QtCore import QCoreApplication, QEvent, QThreadPool
 from PySide6.QtGui import QCloseEvent
-from PySide6.QtWidgets import QFormLayout, QFrame, QLabel, QMessageBox, QPushButton, QWidget
+from PySide6.QtWidgets import QFormLayout, QLabel, QMessageBox, QPushButton, QWidget
 
 from ...services.paddle_ocr_service import PaddleOcrState, PaddleOcrStatus
 from ..ocr_deployment_tasks import OcrInstallTask, OcrStatusTask, PaddleOcrDeploymentPort
 from ..semantic_identity import identify
 
 
-class OcrSettingsCard(QFrame):
+class OcrSettings(QWidget):
     """Knowledge-tab OCR presentation plus its short-lived asynchronous work."""
 
     def __init__(self, deployment: PaddleOcrDeploymentPort | None, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.setFrameShape(QFrame.Shape.StyledPanel)
         self._deployment = deployment
         self._thread_pool = QThreadPool(self)
         self._shutdown = False
@@ -29,7 +30,7 @@ class OcrSettingsCard(QFrame):
         self._setup_button = QPushButton()
         identify(self._setup_button, "settings.knowledge.ocr.setup")
         layout = QFormLayout(self)
-        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setContentsMargins(0, 0, 0, 0)
         layout.addRow(self._title_label)
         layout.addRow(self._status_label)
         layout.addRow(self._setup_button)

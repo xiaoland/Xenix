@@ -5,7 +5,6 @@ from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QFormLayout,
-    QFrame,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -26,6 +25,7 @@ from ...services.llm import (
     PACKAGED_TRIAL_SECRET_SOURCE,
 )
 from ..semantic_identity import identify
+from ..widgets.card import Card
 
 
 class ProviderSettingsEditor(QWidget):
@@ -37,8 +37,8 @@ class ProviderSettingsEditor(QWidget):
         self._loading_provider = False
         self._active_provider_index = 0
 
-        self._global_models_card = self._card()
-        self._llm_card = self._card()
+        self._global_models_card = Card()
+        self._llm_card = Card()
         self._global_models_title_label = QLabel()
         self._llm_title_label = QLabel()
         self._provider_selector_label = QLabel()
@@ -80,12 +80,6 @@ class ProviderSettingsEditor(QWidget):
         self.load_settings(settings)
         self.retranslate_ui()
 
-    @staticmethod
-    def _card() -> QFrame:
-        card = QFrame()
-        card.setFrameShape(QFrame.Shape.StyledPanel)
-        return card
-
     def _assign_semantic_identities(self) -> None:
         for widget, semantic_id in (
             (self._provider_selector, "settings.llm.provider.selector"),
@@ -110,15 +104,20 @@ class ProviderSettingsEditor(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(16)
-        global_layout = QFormLayout(self._global_models_card)
-        global_layout.setContentsMargins(12, 12, 12, 12)
+
+        global_content = QWidget()
+        global_layout = QFormLayout(global_content)
+        global_layout.setContentsMargins(0, 0, 0, 0)
         global_layout.addRow(self._global_models_title_label)
         global_layout.addRow(self._llm_default_model_label, self._llm_default_model_selector)
         global_layout.addRow(self._llm_guard_model_label, self._llm_guard_model_selector)
         global_layout.addRow(self._llm_thread_title_model_label, self._llm_thread_title_model_selector)
         global_layout.addRow(self._llm_retry_attempts_label, self._llm_retry_attempts_input)
-        provider_layout = QFormLayout(self._llm_card)
-        provider_layout.setContentsMargins(12, 12, 12, 12)
+        self._global_models_card.set_content(global_content)
+
+        provider_content = QWidget()
+        provider_layout = QFormLayout(provider_content)
+        provider_layout.setContentsMargins(0, 0, 0, 0)
         selector_row = QHBoxLayout()
         selector_row.setSpacing(8)
         selector_row.addWidget(self._provider_selector, 1)
@@ -135,6 +134,8 @@ class ProviderSettingsEditor(QWidget):
         provider_layout.addRow(self._provider_models_label, self._provider_models_input)
         provider_layout.addRow(self._provider_timeout_label, self._provider_timeout_input)
         provider_layout.addRow(self._provider_streaming_label, self._provider_streaming_checkbox)
+        self._llm_card.set_content(provider_content)
+
         layout.addWidget(self._global_models_card)
         layout.addWidget(self._llm_card)
         layout.addStretch(1)

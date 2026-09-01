@@ -36,11 +36,12 @@ from ...services.paddle_ocr_service import PaddleOcrDeploymentService
 from ...services.update_service import UpdateService
 from ..about_dialog import AboutDialog
 from ..semantic_identity import identify
+from ..widgets.card import Card
 from .contracts import SettingsTab
-from .embedding import EmbeddingSettingsCard
-from .index_status import KnowledgeIndexStatusCard
-from .ml_workers import MLWorkersCard
-from .ocr import OcrSettingsCard
+from .embedding import EmbeddingSettings
+from .index_status import KnowledgeIndexStatus
+from .ml_workers import MLWorkers
+from .ocr import OcrSettings
 from .provider import ProviderSettingsEditor
 
 
@@ -86,14 +87,26 @@ class SettingsDialog(QDialog):
 
         self._tabs = QTabWidget()
         self._provider_editor = ProviderSettingsEditor(LLMSettings(), parent=self)
-        self._embedding_card = EmbeddingSettingsCard(parent=self)
-        self._ocr_settings_card = OcrSettingsCard(paddle_ocr_deployment, parent=self)
-        self._index_card = KnowledgeIndexStatusCard(knowledge_index_service, parent=self)
-        self._ml_workers_card = MLWorkersCard(
+
+        self._embedding_card = Card()
+        self._embedding_settings = EmbeddingSettings()
+        self._embedding_card.set_content(self._embedding_settings)
+
+        self._ocr_card = Card()
+        self._ocr_settings = OcrSettings(paddle_ocr_deployment)
+        self._ocr_card.set_content(self._ocr_settings)
+
+        self._index_card = Card()
+        self._index_status = KnowledgeIndexStatus(knowledge_index_service)
+        self._index_card.set_content(self._index_status)
+
+        self._ml_workers_card = Card()
+        self._ml_workers = MLWorkers(
             ml_worker_settings_service,
             ssh_worker_setup_allowed=ssh_worker_setup,
-            parent=self,
         )
+        self._ml_workers_card.set_content(self._ml_workers)
+
         self._tab_indexes: dict[SettingsTab, int] = {}
         self._assign_semantic_identities()
 
@@ -142,7 +155,7 @@ class SettingsDialog(QDialog):
         knowledge_layout.setContentsMargins(12, 12, 12, 12)
         knowledge_layout.setSpacing(16)
         knowledge_layout.addWidget(self._embedding_card)
-        knowledge_layout.addWidget(self._ocr_settings_card)
+        knowledge_layout.addWidget(self._ocr_card)
         knowledge_layout.addWidget(self._index_card)
         knowledge_layout.addStretch(1)
 
@@ -172,7 +185,7 @@ class SettingsDialog(QDialog):
         self._about_button.clicked.connect(self._open_about_dialog)
         self._language_selector.currentIndexChanged.connect(self._on_language_changed)
         self._save_button.clicked.connect(self._save_agent_settings)
-        self._ml_workers_card.worker_saved.connect(self.ml_worker_settings_saved.emit)
+        self._ml_workers.worker_saved.connect(self.ml_worker_settings_saved.emit)
 
     def retranslate_ui(self) -> None:
         self.setWindowTitle(self.tr("Settings"))
@@ -187,10 +200,10 @@ class SettingsDialog(QDialog):
             self.tr("ML Workers"),
         )
         self._provider_editor.retranslate_ui()
-        self._embedding_card.retranslate_ui()
-        self._ocr_settings_card.retranslate_ui()
-        self._index_card.retranslate_ui()
-        self._ml_workers_card.retranslate_ui()
+        self._embedding_settings.retranslate_ui()
+        self._ocr_settings.retranslate_ui()
+        self._index_status.retranslate_ui()
+        self._ml_workers.retranslate_ui()
         self._about_button.setText(self.tr("About"))
         self._save_button.setText(self.tr("Save"))
         self._reload_language_options()
@@ -208,8 +221,8 @@ class SettingsDialog(QDialog):
             super().showEvent(event)
             self.hide()
             return
-        self._ocr_settings_card.activate()
-        self._index_card.activate()
+        self._ocr_settings.activate()
+        self._index_status.activate()
         super().showEvent(event)
 
     def hideEvent(self, event) -> None:
@@ -221,8 +234,8 @@ class SettingsDialog(QDialog):
         super().closeEvent(event)
 
     def _deactivate(self) -> None:
-        self._ocr_settings_card.deactivate()
-        self._index_card.deactivate()
+        self._ocr_settings.deactivate()
+        self._index_status.deactivate()
 
     def shutdown(self) -> None:
         """Quiesce UI-owned OCR tasks before their application services close."""
@@ -230,8 +243,8 @@ class SettingsDialog(QDialog):
             return
         self._shutdown = True
         self._deactivate()
-        self._ocr_settings_card.shutdown()
-        self._index_card.shutdown()
+        self._ocr_settings.shutdown()
+        self._index_status.shutdown()
 
     def _reload_language_options(self) -> None:
         current_locale = self._translation_manager.current_locale()
@@ -293,13 +306,13 @@ class SettingsDialog(QDialog):
         self._provider_editor.load_settings(self._llm_settings_service.load())
 
     def _load_embedding_settings(self) -> None:
-        self._embedding_card.load_settings(self._embedding_settings_service.load())
+        self._embedding_settings.load_settings(self._embedding_settings_service.load())
 
     def _save_agent_settings(self) -> None:
         rebuild_choice = "none"
         try:
             llm_settings = self._provider_editor.current_settings()
-            embedding_settings = self._embedding_card.current_settings()
+            embedding_settings = self._embedding_settings.current_settings()
         except Exception as exc:
             QMessageBox.warning(self, self.tr("Settings"), str(exc))
             return
@@ -307,7 +320,7 @@ class SettingsDialog(QDialog):
             confirmation_required = (
                 self._knowledge_index_service is not None
                 and self._knowledge_index_service.embedding_change_requires_confirmation(
-                    self._embedding_card.snapshot,
+                    self._embedding_settings.snapshot,
                     embedding_settings,
                 )
             )
@@ -328,7 +341,7 @@ class SettingsDialog(QDialog):
         except Exception as exc:
             QMessageBox.warning(self, self.tr("Settings"), str(exc))
             return
-        self._embedding_card.load_settings(embedding_settings)
+        self._embedding_settings.load_settings(embedding_settings)
         self.agent_settings_saved.emit()
         self.embedding_settings_saved.emit()
         if rebuild_choice == "rebuild" and self._knowledge_index_service is not None:
@@ -346,7 +359,7 @@ class SettingsDialog(QDialog):
                         "could not be queued."
                     ),
                 )
-        self._index_card.refresh()
+        self._index_status.refresh()
 
     def _confirm_embedding_compatibility_change(self) -> str:
         message = QMessageBox(self)

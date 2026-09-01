@@ -1,18 +1,18 @@
-"""Settings tab cards and the composition dialog."""
+"""Settings tab content widgets and the composition dialog."""
 
 from .contracts import SettingsTab
 from .dialog import SettingsDialog
-from .embedding import EmbeddingSettingsCard
-from .index_status import KnowledgeIndexStatusCard
-from .ml_workers import MLWorkersCard
-from .ocr import OcrSettingsCard
+from .embedding import EmbeddingSettings
+from .index_status import KnowledgeIndexStatus
+from .ml_workers import MLWorkers
+from .ocr import OcrSettings
 from .provider import ProviderSettingsEditor
 
 __all__ = (
-    "EmbeddingSettingsCard",
-    "KnowledgeIndexStatusCard",
-    "MLWorkersCard",
-    "OcrSettingsCard",
+    "EmbeddingSettings",
+    "KnowledgeIndexStatus",
+    "MLWorkers",
+    "OcrSettings",
     "ProviderSettingsEditor",
     "SettingsDialog",
     "SettingsTab",

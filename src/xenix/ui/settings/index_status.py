@@ -1,9 +1,9 @@
-"""Knowledge-tab index status and rebuild card."""
+"""Knowledge-tab index status and rebuild content widget."""
 
 from __future__ import annotations
 
 from PySide6.QtCore import QCoreApplication, QEvent, Qt, QTimer
-from PySide6.QtWidgets import QFormLayout, QFrame, QLabel, QPushButton, QWidget
+from PySide6.QtWidgets import QFormLayout, QLabel, QPushButton, QWidget
 
 from ...services.knowledge_index_service import (
     KnowledgeIndexOverview,
@@ -14,7 +14,7 @@ from ..knowledge_index_ui import KnowledgeIndexRebuildDialog
 from ..semantic_identity import identify
 
 
-class KnowledgeIndexStatusCard(QFrame):
+class KnowledgeIndexStatus(QWidget):
     """Knowledge index status presentation plus its status polling and rebuild."""
 
     def __init__(
@@ -23,7 +23,6 @@ class KnowledgeIndexStatusCard(QFrame):
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
-        self.setFrameShape(QFrame.Shape.StyledPanel)
         self._service = knowledge_index_service
         self._shutdown = False
         self._active = False
@@ -45,7 +44,7 @@ class KnowledgeIndexStatusCard(QFrame):
         identify(self._rebuild_button, "settings.knowledge.indexes.rebuild")
 
         layout = QFormLayout(self)
-        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setContentsMargins(0, 0, 0, 0)
         layout.addRow(self._title_label)
         layout.addRow(self._status_label)
         layout.addRow(self._rebuild_button)

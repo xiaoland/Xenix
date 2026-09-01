@@ -1564,16 +1564,16 @@ Trigger: %2</source>
 <context>
     <name>SettingsDialog</name>
     <message>
-        <location filename="../ui/settings/dialog.py" line="178"/>
-        <location filename="../ui/settings/dialog.py" line="304"/>
-        <location filename="../ui/settings/dialog.py" line="329"/>
-        <location filename="../ui/settings/provider.py" line="210"/>
-        <location filename="../ui/settings/provider.py" line="232"/>
+        <location filename="../ui/settings/dialog.py" line="191"/>
+        <location filename="../ui/settings/dialog.py" line="317"/>
+        <location filename="../ui/settings/dialog.py" line="342"/>
+        <location filename="../ui/settings/provider.py" line="211"/>
+        <location filename="../ui/settings/provider.py" line="233"/>
         <source>Settings</source>
         <translation>设置</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="179"/>
+        <location filename="../ui/settings/dialog.py" line="192"/>
         <source>Language</source>
         <translation>语言</translation>
     </message>
@@ -1582,161 +1582,161 @@ Trigger: %2</source>
         <translation type="vanished">LLM 提供商</translation>
     </message>
     <message>
-        <location filename="../ui/settings/embedding.py" line="103"/>
-        <location filename="../ui/settings/provider.py" line="154"/>
+        <location filename="../ui/settings/embedding.py" line="101"/>
+        <location filename="../ui/settings/provider.py" line="155"/>
         <source>Base URL</source>
         <translation>基础 URL</translation>
     </message>
     <message>
-        <location filename="../ui/settings/embedding.py" line="104"/>
-        <location filename="../ui/settings/provider.py" line="155"/>
+        <location filename="../ui/settings/embedding.py" line="102"/>
+        <location filename="../ui/settings/provider.py" line="156"/>
         <source>API key</source>
         <translation>API 密钥</translation>
     </message>
     <message>
-        <location filename="../ui/settings/embedding.py" line="105"/>
+        <location filename="../ui/settings/embedding.py" line="103"/>
         <source>Model</source>
         <translation>模型</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="160"/>
+        <location filename="../ui/settings/provider.py" line="161"/>
         <source>Turn guard model</source>
         <translation>轮次守卫模型</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="161"/>
+        <location filename="../ui/settings/provider.py" line="162"/>
         <source>Thread title model</source>
         <translation>线程标题模型</translation>
     </message>
     <message>
-        <location filename="../ui/settings/embedding.py" line="111"/>
-        <location filename="../ui/settings/provider.py" line="157"/>
+        <location filename="../ui/settings/embedding.py" line="109"/>
+        <location filename="../ui/settings/provider.py" line="158"/>
         <source>Timeout</source>
         <translation>超时</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="180"/>
+        <location filename="../ui/settings/dialog.py" line="193"/>
         <source>AI</source>
         <translation>AI</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="183"/>
+        <location filename="../ui/settings/dialog.py" line="196"/>
         <source>Knowledge Base</source>
         <translation>知识库</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="187"/>
+        <location filename="../ui/settings/dialog.py" line="200"/>
         <source>ML Workers</source>
         <translation>ML 工作器</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="148"/>
+        <location filename="../ui/settings/provider.py" line="149"/>
         <source>Global models</source>
         <translation>全局模型</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="149"/>
+        <location filename="../ui/settings/provider.py" line="150"/>
         <source>LLM providers</source>
         <translation>LLM 提供商</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="150"/>
+        <location filename="../ui/settings/provider.py" line="151"/>
         <source>Provider</source>
         <translation>提供商</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="151"/>
+        <location filename="../ui/settings/provider.py" line="152"/>
         <source>Provider key</source>
         <translation>提供商键</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="152"/>
+        <location filename="../ui/settings/provider.py" line="153"/>
         <source>Provider name</source>
         <translation>提供商名称</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="153"/>
+        <location filename="../ui/settings/provider.py" line="154"/>
         <source>Dialect</source>
         <translation>方言</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="156"/>
+        <location filename="../ui/settings/provider.py" line="157"/>
         <source>Models</source>
         <translation>模型</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="158"/>
+        <location filename="../ui/settings/provider.py" line="159"/>
         <source>Streaming</source>
         <translation>流式输出</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="159"/>
+        <location filename="../ui/settings/provider.py" line="160"/>
         <source>Default model</source>
         <translation>默认模型</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="162"/>
+        <location filename="../ui/settings/provider.py" line="163"/>
         <source>LLM retry attempts</source>
         <translation>LLM 重试次数</translation>
     </message>
     <message>
-        <location filename="../ui/settings/embedding.py" line="101"/>
+        <location filename="../ui/settings/embedding.py" line="99"/>
         <source>Embedding provider</source>
         <translation>嵌入模型提供商</translation>
     </message>
     <message>
-        <location filename="../ui/settings/embedding.py" line="102"/>
+        <location filename="../ui/settings/embedding.py" line="100"/>
         <source>Enabled</source>
         <translation>启用</translation>
     </message>
     <message>
-        <location filename="../ui/settings/embedding.py" line="106"/>
+        <location filename="../ui/settings/embedding.py" line="104"/>
         <source>Dimensions</source>
         <translation>向量维度</translation>
     </message>
     <message>
-        <location filename="../ui/settings/embedding.py" line="108"/>
+        <location filename="../ui/settings/embedding.py" line="106"/>
         <source>Provider default (0)</source>
         <translation>使用提供商默认值（0）</translation>
     </message>
     <message>
-        <location filename="../ui/settings/embedding.py" line="110"/>
+        <location filename="../ui/settings/embedding.py" line="108"/>
         <source>Batch size</source>
         <translation>批次大小</translation>
     </message>
     <message>
-        <location filename="../ui/settings/ocr.py" line="40"/>
+        <location filename="../ui/settings/ocr.py" line="41"/>
         <source>OCR</source>
         <translation>OCR</translation>
     </message>
     <message>
-        <location filename="../ui/settings/ocr.py" line="41"/>
-        <location filename="../ui/settings/ocr.py" line="180"/>
+        <location filename="../ui/settings/ocr.py" line="42"/>
+        <location filename="../ui/settings/ocr.py" line="181"/>
         <source>Set up local PaddleOCR</source>
         <translation>部署本地 PaddleOCR</translation>
     </message>
     <message>
-        <location filename="../ui/settings/index_status.py" line="93"/>
+        <location filename="../ui/settings/index_status.py" line="92"/>
         <source>Indexes</source>
         <translation>索引</translation>
     </message>
     <message>
-        <location filename="../ui/settings/index_status.py" line="94"/>
+        <location filename="../ui/settings/index_status.py" line="93"/>
         <source>Rebuild indexes...</source>
         <translation>重建索引...</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="163"/>
+        <location filename="../ui/settings/provider.py" line="164"/>
         <source>Add</source>
         <translation>添加</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="164"/>
+        <location filename="../ui/settings/provider.py" line="165"/>
         <source>Remove</source>
         <translation>移除</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="166"/>
+        <location filename="../ui/settings/provider.py" line="167"/>
         <source>OpenAI-compatible</source>
         <translation>OpenAI 兼容</translation>
     </message>
@@ -1757,17 +1757,17 @@ Trigger: %2</source>
         <translation type="vanished">AIMock API 密钥</translation>
     </message>
     <message>
-        <location filename="../ui/settings/ml_workers.py" line="65"/>
+        <location filename="../ui/settings/ml_workers.py" line="64"/>
         <source>ML workers</source>
         <translation>ML 工作器</translation>
     </message>
     <message>
-        <location filename="../ui/settings/ml_workers.py" line="66"/>
+        <location filename="../ui/settings/ml_workers.py" line="65"/>
         <source>Add SSH worker...</source>
         <translation>添加 SSH 工作器...</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="194"/>
+        <location filename="../ui/settings/dialog.py" line="207"/>
         <source>About</source>
         <translation>关于</translation>
     </message>
@@ -1800,7 +1800,7 @@ Trigger: %2</source>
         <translation type="vanished">打开日志目录</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="195"/>
+        <location filename="../ui/settings/dialog.py" line="208"/>
         <source>Save</source>
         <translation>保存</translation>
     </message>
@@ -1821,43 +1821,43 @@ Trigger: %2</source>
         <translation type="vanished">正在准备 OCR 模型</translation>
     </message>
     <message>
-        <location filename="../ui/settings/index_status.py" line="184"/>
-        <location filename="../ui/settings/ocr.py" line="110"/>
+        <location filename="../ui/settings/index_status.py" line="183"/>
+        <location filename="../ui/settings/ocr.py" line="111"/>
         <source>Ready</source>
         <translation>就绪</translation>
     </message>
     <message>
-        <location filename="../ui/settings/ocr.py" line="114"/>
+        <location filename="../ui/settings/ocr.py" line="115"/>
         <source>Preparing local OCR</source>
         <translation>正在准备本地 OCR</translation>
     </message>
     <message>
-        <location filename="../ui/settings/ocr.py" line="113"/>
+        <location filename="../ui/settings/ocr.py" line="114"/>
         <source>Local OCR setup: %1</source>
         <translation>本地 OCR 部署：%1</translation>
     </message>
     <message>
-        <location filename="../ui/settings/ocr.py" line="129"/>
+        <location filename="../ui/settings/ocr.py" line="130"/>
         <source>Local OCR Setup Failed</source>
         <translation>本地 OCR 部署失败</translation>
     </message>
     <message>
-        <location filename="../ui/settings/ocr.py" line="214"/>
+        <location filename="../ui/settings/ocr.py" line="215"/>
         <source>Local OCR setup could not be completed.</source>
         <translation>无法完成本地 OCR 部署。</translation>
     </message>
     <message>
-        <location filename="../ui/settings/ocr.py" line="146"/>
+        <location filename="../ui/settings/ocr.py" line="147"/>
         <source>Local PaddleOCR service is unavailable</source>
         <translation>本地 PaddleOCR 服务不可用</translation>
     </message>
     <message>
-        <location filename="../ui/settings/ocr.py" line="151"/>
+        <location filename="../ui/settings/ocr.py" line="152"/>
         <source>Checking local PaddleOCR status</source>
         <translation>正在检查本地 PaddleOCR 状态</translation>
     </message>
     <message>
-        <location filename="../ui/settings/ocr.py" line="156"/>
+        <location filename="../ui/settings/ocr.py" line="157"/>
         <source>Local PaddleOCR is ready</source>
         <translation>本地 PaddleOCR 已就绪</translation>
     </message>
@@ -1866,27 +1866,27 @@ Trigger: %2</source>
         <translation type="vanished">本地 PaddleOCR 运行时已安装，模型尚未就绪</translation>
     </message>
     <message>
-        <location filename="../ui/settings/ocr.py" line="177"/>
+        <location filename="../ui/settings/ocr.py" line="178"/>
         <source>Local PaddleOCR is not installed</source>
         <translation>本地 PaddleOCR 尚未安装</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="239"/>
+        <location filename="../ui/settings/dialog.py" line="252"/>
         <source>English</source>
         <translation>English</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="240"/>
+        <location filename="../ui/settings/dialog.py" line="253"/>
         <source>Simplified Chinese</source>
         <translation>简体中文</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="264"/>
+        <location filename="../ui/settings/dialog.py" line="277"/>
         <source>Language Switch Failed</source>
         <translation>语言切换失败</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="265"/>
+        <location filename="../ui/settings/dialog.py" line="278"/>
         <source>Unable to switch the application language.
 
 {details}</source>
@@ -1895,130 +1895,130 @@ Trigger: %2</source>
 {details}</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="317"/>
-        <location filename="../ui/settings/dialog.py" line="343"/>
+        <location filename="../ui/settings/dialog.py" line="330"/>
+        <location filename="../ui/settings/dialog.py" line="356"/>
         <source>Knowledge Indexes</source>
         <translation>知识库索引</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="345"/>
+        <location filename="../ui/settings/dialog.py" line="358"/>
         <source>Embedding settings were saved, but the vector rebuild could not be queued.</source>
         <translation>Embedding 设置已保存，但无法将文本向量重建加入队列。</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="354"/>
+        <location filename="../ui/settings/dialog.py" line="367"/>
         <source>Rebuild text vectors?</source>
         <translation>重建文本向量？</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="357"/>
+        <location filename="../ui/settings/dialog.py" line="370"/>
         <source>This change uses a different embedding space. Existing text vectors cannot be reused for current Knowledge content.</source>
         <translation>此更改将使用不同的 Embedding 空间。现有文本向量无法用于当前知识库内容。</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="362"/>
+        <location filename="../ui/settings/dialog.py" line="375"/>
         <source>Save and rebuild now</source>
         <translation>保存并立即重建</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="366"/>
+        <location filename="../ui/settings/dialog.py" line="379"/>
         <source>Save; rebuild later</source>
         <translation>保存；稍后重建</translation>
     </message>
     <message>
-        <location filename="../ui/settings/index_status.py" line="160"/>
+        <location filename="../ui/settings/index_status.py" line="159"/>
         <source>Knowledge index service is unavailable</source>
         <translation>知识库索引服务不可用</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="318"/>
-        <location filename="../ui/settings/index_status.py" line="167"/>
+        <location filename="../ui/settings/dialog.py" line="331"/>
+        <location filename="../ui/settings/index_status.py" line="166"/>
         <source>Knowledge index status is unavailable</source>
         <translation>无法获取知识库索引状态</translation>
     </message>
     <message>
-        <location filename="../ui/settings/ocr.py" line="105"/>
+        <location filename="../ui/settings/ocr.py" line="106"/>
         <source>Downloading OCR component</source>
         <translation>正在下载 OCR 组件</translation>
     </message>
     <message>
-        <location filename="../ui/settings/ocr.py" line="106"/>
+        <location filename="../ui/settings/ocr.py" line="107"/>
         <source>Unpacking OCR component</source>
         <translation>正在解压 OCR 组件</translation>
     </message>
     <message>
-        <location filename="../ui/settings/ocr.py" line="107"/>
+        <location filename="../ui/settings/ocr.py" line="108"/>
         <source>Verifying OCR component</source>
         <translation>正在校验 OCR 组件</translation>
     </message>
     <message>
-        <location filename="../ui/settings/ocr.py" line="108"/>
+        <location filename="../ui/settings/ocr.py" line="109"/>
         <source>Testing OCR component</source>
         <translation>正在测试 OCR 组件</translation>
     </message>
     <message>
-        <location filename="../ui/settings/ocr.py" line="109"/>
+        <location filename="../ui/settings/ocr.py" line="110"/>
         <source>Activating OCR component</source>
         <translation>正在激活 OCR 组件</translation>
     </message>
     <message>
-        <location filename="../ui/settings/ocr.py" line="187"/>
+        <location filename="../ui/settings/ocr.py" line="188"/>
         <source>Local OCR is unavailable in this build.</source>
         <translation>当前构建不提供本地 OCR。</translation>
     </message>
     <message>
-        <location filename="../ui/settings/ocr.py" line="191"/>
+        <location filename="../ui/settings/ocr.py" line="192"/>
         <source>Local OCR download source is unavailable.</source>
         <translation>本地 OCR 下载源不可用。</translation>
     </message>
     <message>
-        <location filename="../ui/settings/ocr.py" line="195"/>
+        <location filename="../ui/settings/ocr.py" line="196"/>
         <source>Local OCR component could not be downloaded.</source>
         <translation>无法下载本地 OCR 组件。</translation>
     </message>
     <message>
-        <location filename="../ui/settings/ocr.py" line="199"/>
+        <location filename="../ui/settings/ocr.py" line="200"/>
         <source>Local OCR bundle source is unavailable.</source>
         <translation>本地 OCR 组件源不可用。</translation>
     </message>
     <message>
-        <location filename="../ui/settings/ocr.py" line="207"/>
+        <location filename="../ui/settings/ocr.py" line="208"/>
         <source>Local OCR component failed integrity verification.</source>
         <translation>本地 OCR 组件未通过完整性校验。</translation>
     </message>
     <message>
-        <location filename="../ui/settings/ocr.py" line="213"/>
+        <location filename="../ui/settings/ocr.py" line="214"/>
         <source>Local OCR component failed its self-test.</source>
         <translation>本地 OCR 组件未通过自检。</translation>
     </message>
     <message>
-        <location filename="../ui/settings/ocr.py" line="159"/>
+        <location filename="../ui/settings/ocr.py" line="160"/>
         <source>Reinstall local PaddleOCR</source>
         <translation>重新安装本地 PaddleOCR</translation>
     </message>
     <message>
-        <location filename="../ui/settings/ocr.py" line="162"/>
+        <location filename="../ui/settings/ocr.py" line="163"/>
         <source>Local PaddleOCR requires repair</source>
         <translation>本地 PaddleOCR 需要修复</translation>
     </message>
     <message>
-        <location filename="../ui/settings/ocr.py" line="165"/>
+        <location filename="../ui/settings/ocr.py" line="166"/>
         <source>Repair local PaddleOCR</source>
         <translation>修复本地 PaddleOCR</translation>
     </message>
     <message>
-        <location filename="../ui/settings/ocr.py" line="167"/>
         <location filename="../ui/settings/ocr.py" line="168"/>
+        <location filename="../ui/settings/ocr.py" line="169"/>
         <source>Preparing local PaddleOCR</source>
         <translation>正在准备本地 PaddleOCR</translation>
     </message>
     <message>
-        <location filename="../ui/settings/ocr.py" line="171"/>
+        <location filename="../ui/settings/ocr.py" line="172"/>
         <source>Local PaddleOCR setup needs attention</source>
         <translation>本地 PaddleOCR 设置需要处理</translation>
     </message>
     <message>
-        <location filename="../ui/settings/ocr.py" line="174"/>
+        <location filename="../ui/settings/ocr.py" line="175"/>
         <source>Try local PaddleOCR setup again</source>
         <translation>重试设置本地 PaddleOCR</translation>
     </message>
@@ -2035,44 +2035,44 @@ Trigger: %2</source>
         <translation type="vanished">Embedding 设置已在其他位置更改。您的编辑仍显示在此处；请再次保存以重新应用。</translation>
     </message>
     <message>
-        <location filename="../ui/settings/index_status.py" line="169"/>
+        <location filename="../ui/settings/index_status.py" line="168"/>
         <source>Checking Knowledge index status</source>
         <translation>正在检查知识索引状态</translation>
     </message>
     <message>
-        <location filename="../ui/settings/index_status.py" line="175"/>
+        <location filename="../ui/settings/index_status.py" line="174"/>
         <source>Keyword: %1
 Text vectors: %2</source>
         <translation>关键词：%1
 文本向量：%2</translation>
     </message>
     <message>
-        <location filename="../ui/settings/index_status.py" line="185"/>
+        <location filename="../ui/settings/index_status.py" line="184"/>
         <source>Building</source>
         <translation>正在构建</translation>
     </message>
     <message>
-        <location filename="../ui/settings/index_status.py" line="186"/>
+        <location filename="../ui/settings/index_status.py" line="185"/>
         <source>Needs rebuild</source>
         <translation>需要重建</translation>
     </message>
     <message>
-        <location filename="../ui/settings/index_status.py" line="187"/>
+        <location filename="../ui/settings/index_status.py" line="186"/>
         <source>Unavailable</source>
         <translation>不可用</translation>
     </message>
     <message>
-        <location filename="../ui/settings/index_status.py" line="188"/>
+        <location filename="../ui/settings/index_status.py" line="187"/>
         <source>Needs attention</source>
         <translation>需要处理</translation>
     </message>
     <message>
-        <location filename="../ui/settings/index_status.py" line="190"/>
+        <location filename="../ui/settings/index_status.py" line="189"/>
         <source>Unknown status</source>
         <translation>未知状态</translation>
     </message>
     <message>
-        <location filename="../ui/settings/ml_workers.py" line="54"/>
+        <location filename="../ui/settings/ml_workers.py" line="53"/>
         <source>{local_count} local, {ssh_count} SSH, {slots} execution slot(s).</source>
         <translation>{local_count} 个本地，{ssh_count} 个 SSH，{slots} 个执行槽。</translation>
     </message>
@@ -2081,12 +2081,12 @@ Text vectors: %2</source>
         <translation type="vanished">此提供商由部署管理，无法在此处移除。</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="321"/>
+        <location filename="../ui/settings/provider.py" line="322"/>
         <source>Built into packaged app</source>
         <translation>已内置于打包应用</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="371"/>
+        <location filename="../ui/settings/provider.py" line="372"/>
         <source>None</source>
         <translation>无</translation>
     </message>

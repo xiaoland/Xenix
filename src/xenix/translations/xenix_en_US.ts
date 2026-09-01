@@ -1423,195 +1423,195 @@ Trigger: %2</translation>
 <context>
     <name>SettingsDialog</name>
     <message>
-        <location filename="../ui/settings/dialog.py" line="178"/>
-        <location filename="../ui/settings/dialog.py" line="304"/>
-        <location filename="../ui/settings/dialog.py" line="329"/>
-        <location filename="../ui/settings/provider.py" line="210"/>
-        <location filename="../ui/settings/provider.py" line="232"/>
+        <location filename="../ui/settings/dialog.py" line="191"/>
+        <location filename="../ui/settings/dialog.py" line="317"/>
+        <location filename="../ui/settings/dialog.py" line="342"/>
+        <location filename="../ui/settings/provider.py" line="211"/>
+        <location filename="../ui/settings/provider.py" line="233"/>
         <source>Settings</source>
         <translation>Settings</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="179"/>
+        <location filename="../ui/settings/dialog.py" line="192"/>
         <source>Language</source>
         <translation>Language</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="180"/>
+        <location filename="../ui/settings/dialog.py" line="193"/>
         <source>AI</source>
         <translation>AI</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="183"/>
+        <location filename="../ui/settings/dialog.py" line="196"/>
         <source>Knowledge Base</source>
         <translation>Knowledge Base</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="187"/>
+        <location filename="../ui/settings/dialog.py" line="200"/>
         <source>ML Workers</source>
         <translation>ML Workers</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="148"/>
+        <location filename="../ui/settings/provider.py" line="149"/>
         <source>Global models</source>
         <translation>Global models</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="149"/>
+        <location filename="../ui/settings/provider.py" line="150"/>
         <source>LLM providers</source>
         <translation>LLM providers</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="150"/>
+        <location filename="../ui/settings/provider.py" line="151"/>
         <source>Provider</source>
         <translation>Provider</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="151"/>
+        <location filename="../ui/settings/provider.py" line="152"/>
         <source>Provider key</source>
         <translation>Provider key</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="152"/>
+        <location filename="../ui/settings/provider.py" line="153"/>
         <source>Provider name</source>
         <translation>Provider name</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="153"/>
+        <location filename="../ui/settings/provider.py" line="154"/>
         <source>Dialect</source>
         <translation>Dialect</translation>
     </message>
     <message>
-        <location filename="../ui/settings/embedding.py" line="103"/>
-        <location filename="../ui/settings/provider.py" line="154"/>
+        <location filename="../ui/settings/embedding.py" line="101"/>
+        <location filename="../ui/settings/provider.py" line="155"/>
         <source>Base URL</source>
         <translation>Base URL</translation>
     </message>
     <message>
-        <location filename="../ui/settings/embedding.py" line="104"/>
-        <location filename="../ui/settings/provider.py" line="155"/>
+        <location filename="../ui/settings/embedding.py" line="102"/>
+        <location filename="../ui/settings/provider.py" line="156"/>
         <source>API key</source>
         <translation>API key</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="156"/>
+        <location filename="../ui/settings/provider.py" line="157"/>
         <source>Models</source>
         <translation>Models</translation>
     </message>
     <message>
-        <location filename="../ui/settings/embedding.py" line="111"/>
-        <location filename="../ui/settings/provider.py" line="157"/>
+        <location filename="../ui/settings/embedding.py" line="109"/>
+        <location filename="../ui/settings/provider.py" line="158"/>
         <source>Timeout</source>
         <translation>Timeout</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="158"/>
+        <location filename="../ui/settings/provider.py" line="159"/>
         <source>Streaming</source>
         <translation>Streaming</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="159"/>
+        <location filename="../ui/settings/provider.py" line="160"/>
         <source>Default model</source>
         <translation>Default model</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="160"/>
+        <location filename="../ui/settings/provider.py" line="161"/>
         <source>Turn guard model</source>
         <translation>Turn guard model</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="161"/>
+        <location filename="../ui/settings/provider.py" line="162"/>
         <source>Thread title model</source>
         <translation>Thread title model</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="162"/>
+        <location filename="../ui/settings/provider.py" line="163"/>
         <source>LLM retry attempts</source>
         <translation>LLM retry attempts</translation>
     </message>
     <message>
-        <location filename="../ui/settings/embedding.py" line="101"/>
+        <location filename="../ui/settings/embedding.py" line="99"/>
         <source>Embedding provider</source>
         <translation>Embedding provider</translation>
     </message>
     <message>
-        <location filename="../ui/settings/embedding.py" line="102"/>
+        <location filename="../ui/settings/embedding.py" line="100"/>
         <source>Enabled</source>
         <translation>Enabled</translation>
     </message>
     <message>
-        <location filename="../ui/settings/embedding.py" line="105"/>
+        <location filename="../ui/settings/embedding.py" line="103"/>
         <source>Model</source>
         <translation>Model</translation>
     </message>
     <message>
-        <location filename="../ui/settings/embedding.py" line="106"/>
+        <location filename="../ui/settings/embedding.py" line="104"/>
         <source>Dimensions</source>
         <translation>Dimensions</translation>
     </message>
     <message>
-        <location filename="../ui/settings/embedding.py" line="108"/>
+        <location filename="../ui/settings/embedding.py" line="106"/>
         <source>Provider default (0)</source>
         <translation>Provider default (0)</translation>
     </message>
     <message>
-        <location filename="../ui/settings/embedding.py" line="110"/>
+        <location filename="../ui/settings/embedding.py" line="108"/>
         <source>Batch size</source>
         <translation>Batch size</translation>
     </message>
     <message>
-        <location filename="../ui/settings/ocr.py" line="40"/>
+        <location filename="../ui/settings/ocr.py" line="41"/>
         <source>OCR</source>
         <translation>OCR</translation>
     </message>
     <message>
-        <location filename="../ui/settings/ocr.py" line="41"/>
-        <location filename="../ui/settings/ocr.py" line="180"/>
+        <location filename="../ui/settings/ocr.py" line="42"/>
+        <location filename="../ui/settings/ocr.py" line="181"/>
         <source>Set up local PaddleOCR</source>
         <translation>Set up local PaddleOCR</translation>
     </message>
     <message>
-        <location filename="../ui/settings/index_status.py" line="93"/>
+        <location filename="../ui/settings/index_status.py" line="92"/>
         <source>Indexes</source>
         <translation>Indexes</translation>
     </message>
     <message>
-        <location filename="../ui/settings/index_status.py" line="94"/>
+        <location filename="../ui/settings/index_status.py" line="93"/>
         <source>Rebuild indexes...</source>
         <translation>Rebuild indexes...</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="163"/>
+        <location filename="../ui/settings/provider.py" line="164"/>
         <source>Add</source>
         <translation>Add</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="164"/>
+        <location filename="../ui/settings/provider.py" line="165"/>
         <source>Remove</source>
         <translation>Remove</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="166"/>
+        <location filename="../ui/settings/provider.py" line="167"/>
         <source>OpenAI-compatible</source>
         <translation>OpenAI-compatible</translation>
     </message>
     <message>
-        <location filename="../ui/settings/ml_workers.py" line="65"/>
+        <location filename="../ui/settings/ml_workers.py" line="64"/>
         <source>ML workers</source>
         <translation>ML workers</translation>
     </message>
     <message>
-        <location filename="../ui/settings/ml_workers.py" line="66"/>
+        <location filename="../ui/settings/ml_workers.py" line="65"/>
         <source>Add SSH worker...</source>
         <translation>Add SSH worker...</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="194"/>
+        <location filename="../ui/settings/dialog.py" line="207"/>
         <source>About</source>
         <translation>About</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="195"/>
+        <location filename="../ui/settings/dialog.py" line="208"/>
         <source>Save</source>
         <translation>Save</translation>
     </message>
@@ -1632,43 +1632,43 @@ Trigger: %2</translation>
         <translation type="vanished">Preparing OCR models</translation>
     </message>
     <message>
-        <location filename="../ui/settings/index_status.py" line="184"/>
-        <location filename="../ui/settings/ocr.py" line="110"/>
+        <location filename="../ui/settings/index_status.py" line="183"/>
+        <location filename="../ui/settings/ocr.py" line="111"/>
         <source>Ready</source>
         <translation>Ready</translation>
     </message>
     <message>
-        <location filename="../ui/settings/ocr.py" line="114"/>
+        <location filename="../ui/settings/ocr.py" line="115"/>
         <source>Preparing local OCR</source>
         <translation>Preparing local OCR</translation>
     </message>
     <message>
-        <location filename="../ui/settings/ocr.py" line="113"/>
+        <location filename="../ui/settings/ocr.py" line="114"/>
         <source>Local OCR setup: %1</source>
         <translation>Local OCR setup: %1</translation>
     </message>
     <message>
-        <location filename="../ui/settings/ocr.py" line="129"/>
+        <location filename="../ui/settings/ocr.py" line="130"/>
         <source>Local OCR Setup Failed</source>
         <translation>Local OCR Setup Failed</translation>
     </message>
     <message>
-        <location filename="../ui/settings/ocr.py" line="214"/>
+        <location filename="../ui/settings/ocr.py" line="215"/>
         <source>Local OCR setup could not be completed.</source>
         <translation>Local OCR setup could not be completed.</translation>
     </message>
     <message>
-        <location filename="../ui/settings/ocr.py" line="146"/>
+        <location filename="../ui/settings/ocr.py" line="147"/>
         <source>Local PaddleOCR service is unavailable</source>
         <translation>Local PaddleOCR service is unavailable</translation>
     </message>
     <message>
-        <location filename="../ui/settings/ocr.py" line="151"/>
+        <location filename="../ui/settings/ocr.py" line="152"/>
         <source>Checking local PaddleOCR status</source>
         <translation>Checking local PaddleOCR status</translation>
     </message>
     <message>
-        <location filename="../ui/settings/ocr.py" line="156"/>
+        <location filename="../ui/settings/ocr.py" line="157"/>
         <source>Local PaddleOCR is ready</source>
         <translation>Local PaddleOCR is ready</translation>
     </message>
@@ -1677,27 +1677,27 @@ Trigger: %2</translation>
         <translation type="vanished">Local PaddleOCR runtime is installed; models are not ready</translation>
     </message>
     <message>
-        <location filename="../ui/settings/ocr.py" line="177"/>
+        <location filename="../ui/settings/ocr.py" line="178"/>
         <source>Local PaddleOCR is not installed</source>
         <translation>Local PaddleOCR is not installed</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="239"/>
+        <location filename="../ui/settings/dialog.py" line="252"/>
         <source>English</source>
         <translation>English</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="240"/>
+        <location filename="../ui/settings/dialog.py" line="253"/>
         <source>Simplified Chinese</source>
         <translation>Simplified Chinese</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="264"/>
+        <location filename="../ui/settings/dialog.py" line="277"/>
         <source>Language Switch Failed</source>
         <translation>Language Switch Failed</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="265"/>
+        <location filename="../ui/settings/dialog.py" line="278"/>
         <source>Unable to switch the application language.
 
 {details}</source>
@@ -1706,130 +1706,130 @@ Trigger: %2</translation>
 {details}</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="317"/>
-        <location filename="../ui/settings/dialog.py" line="343"/>
+        <location filename="../ui/settings/dialog.py" line="330"/>
+        <location filename="../ui/settings/dialog.py" line="356"/>
         <source>Knowledge Indexes</source>
         <translation>Knowledge Indexes</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="345"/>
+        <location filename="../ui/settings/dialog.py" line="358"/>
         <source>Embedding settings were saved, but the vector rebuild could not be queued.</source>
         <translation>Embedding settings were saved, but the vector rebuild could not be queued.</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="354"/>
+        <location filename="../ui/settings/dialog.py" line="367"/>
         <source>Rebuild text vectors?</source>
         <translation>Rebuild text vectors?</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="357"/>
+        <location filename="../ui/settings/dialog.py" line="370"/>
         <source>This change uses a different embedding space. Existing text vectors cannot be reused for current Knowledge content.</source>
         <translation>This change uses a different embedding space. Existing text vectors cannot be reused for current Knowledge content.</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="362"/>
+        <location filename="../ui/settings/dialog.py" line="375"/>
         <source>Save and rebuild now</source>
         <translation>Save and rebuild now</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="366"/>
+        <location filename="../ui/settings/dialog.py" line="379"/>
         <source>Save; rebuild later</source>
         <translation>Save; rebuild later</translation>
     </message>
     <message>
-        <location filename="../ui/settings/index_status.py" line="160"/>
+        <location filename="../ui/settings/index_status.py" line="159"/>
         <source>Knowledge index service is unavailable</source>
         <translation>Knowledge index service is unavailable</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="318"/>
-        <location filename="../ui/settings/index_status.py" line="167"/>
+        <location filename="../ui/settings/dialog.py" line="331"/>
+        <location filename="../ui/settings/index_status.py" line="166"/>
         <source>Knowledge index status is unavailable</source>
         <translation>Knowledge index status is unavailable</translation>
     </message>
     <message>
-        <location filename="../ui/settings/ocr.py" line="105"/>
+        <location filename="../ui/settings/ocr.py" line="106"/>
         <source>Downloading OCR component</source>
         <translation>Downloading OCR component</translation>
     </message>
     <message>
-        <location filename="../ui/settings/ocr.py" line="106"/>
+        <location filename="../ui/settings/ocr.py" line="107"/>
         <source>Unpacking OCR component</source>
         <translation>Unpacking OCR component</translation>
     </message>
     <message>
-        <location filename="../ui/settings/ocr.py" line="107"/>
+        <location filename="../ui/settings/ocr.py" line="108"/>
         <source>Verifying OCR component</source>
         <translation>Verifying OCR component</translation>
     </message>
     <message>
-        <location filename="../ui/settings/ocr.py" line="108"/>
+        <location filename="../ui/settings/ocr.py" line="109"/>
         <source>Testing OCR component</source>
         <translation>Testing OCR component</translation>
     </message>
     <message>
-        <location filename="../ui/settings/ocr.py" line="109"/>
+        <location filename="../ui/settings/ocr.py" line="110"/>
         <source>Activating OCR component</source>
         <translation>Activating OCR component</translation>
     </message>
     <message>
-        <location filename="../ui/settings/ocr.py" line="187"/>
+        <location filename="../ui/settings/ocr.py" line="188"/>
         <source>Local OCR is unavailable in this build.</source>
         <translation>Local OCR is unavailable in this build.</translation>
     </message>
     <message>
-        <location filename="../ui/settings/ocr.py" line="191"/>
+        <location filename="../ui/settings/ocr.py" line="192"/>
         <source>Local OCR download source is unavailable.</source>
         <translation>Local OCR download source is unavailable.</translation>
     </message>
     <message>
-        <location filename="../ui/settings/ocr.py" line="195"/>
+        <location filename="../ui/settings/ocr.py" line="196"/>
         <source>Local OCR component could not be downloaded.</source>
         <translation>Local OCR component could not be downloaded.</translation>
     </message>
     <message>
-        <location filename="../ui/settings/ocr.py" line="199"/>
+        <location filename="../ui/settings/ocr.py" line="200"/>
         <source>Local OCR bundle source is unavailable.</source>
         <translation>Local OCR bundle source is unavailable.</translation>
     </message>
     <message>
-        <location filename="../ui/settings/ocr.py" line="207"/>
+        <location filename="../ui/settings/ocr.py" line="208"/>
         <source>Local OCR component failed integrity verification.</source>
         <translation>Local OCR component failed integrity verification.</translation>
     </message>
     <message>
-        <location filename="../ui/settings/ocr.py" line="213"/>
+        <location filename="../ui/settings/ocr.py" line="214"/>
         <source>Local OCR component failed its self-test.</source>
         <translation>Local OCR component failed its self-test.</translation>
     </message>
     <message>
-        <location filename="../ui/settings/ocr.py" line="159"/>
+        <location filename="../ui/settings/ocr.py" line="160"/>
         <source>Reinstall local PaddleOCR</source>
         <translation>Reinstall local PaddleOCR</translation>
     </message>
     <message>
-        <location filename="../ui/settings/ocr.py" line="162"/>
+        <location filename="../ui/settings/ocr.py" line="163"/>
         <source>Local PaddleOCR requires repair</source>
         <translation>Local PaddleOCR requires repair</translation>
     </message>
     <message>
-        <location filename="../ui/settings/ocr.py" line="165"/>
+        <location filename="../ui/settings/ocr.py" line="166"/>
         <source>Repair local PaddleOCR</source>
         <translation>Repair local PaddleOCR</translation>
     </message>
     <message>
-        <location filename="../ui/settings/ocr.py" line="167"/>
         <location filename="../ui/settings/ocr.py" line="168"/>
+        <location filename="../ui/settings/ocr.py" line="169"/>
         <source>Preparing local PaddleOCR</source>
         <translation>Preparing local PaddleOCR</translation>
     </message>
     <message>
-        <location filename="../ui/settings/ocr.py" line="171"/>
+        <location filename="../ui/settings/ocr.py" line="172"/>
         <source>Local PaddleOCR setup needs attention</source>
         <translation>Local PaddleOCR setup needs attention</translation>
     </message>
     <message>
-        <location filename="../ui/settings/ocr.py" line="174"/>
+        <location filename="../ui/settings/ocr.py" line="175"/>
         <source>Try local PaddleOCR setup again</source>
         <translation>Try local PaddleOCR setup again</translation>
     </message>
@@ -1846,44 +1846,44 @@ Trigger: %2</translation>
         <translation type="vanished">Embedding settings changed elsewhere. Your edits are still shown; save again to reapply them.</translation>
     </message>
     <message>
-        <location filename="../ui/settings/index_status.py" line="169"/>
+        <location filename="../ui/settings/index_status.py" line="168"/>
         <source>Checking Knowledge index status</source>
         <translation>Checking Knowledge index status</translation>
     </message>
     <message>
-        <location filename="../ui/settings/index_status.py" line="175"/>
+        <location filename="../ui/settings/index_status.py" line="174"/>
         <source>Keyword: %1
 Text vectors: %2</source>
         <translation>Keyword: %1
 Text vectors: %2</translation>
     </message>
     <message>
-        <location filename="../ui/settings/index_status.py" line="185"/>
+        <location filename="../ui/settings/index_status.py" line="184"/>
         <source>Building</source>
         <translation>Building</translation>
     </message>
     <message>
-        <location filename="../ui/settings/index_status.py" line="186"/>
+        <location filename="../ui/settings/index_status.py" line="185"/>
         <source>Needs rebuild</source>
         <translation>Needs rebuild</translation>
     </message>
     <message>
-        <location filename="../ui/settings/index_status.py" line="187"/>
+        <location filename="../ui/settings/index_status.py" line="186"/>
         <source>Unavailable</source>
         <translation>Unavailable</translation>
     </message>
     <message>
-        <location filename="../ui/settings/index_status.py" line="188"/>
+        <location filename="../ui/settings/index_status.py" line="187"/>
         <source>Needs attention</source>
         <translation>Needs attention</translation>
     </message>
     <message>
-        <location filename="../ui/settings/index_status.py" line="190"/>
+        <location filename="../ui/settings/index_status.py" line="189"/>
         <source>Unknown status</source>
         <translation>Unknown status</translation>
     </message>
     <message>
-        <location filename="../ui/settings/ml_workers.py" line="54"/>
+        <location filename="../ui/settings/ml_workers.py" line="53"/>
         <source>{local_count} local, {ssh_count} SSH, {slots} execution slot(s).</source>
         <translation>{local_count} local, {ssh_count} SSH, {slots} execution slot(s).</translation>
     </message>
@@ -1892,12 +1892,12 @@ Text vectors: %2</translation>
         <translation type="vanished">This provider is managed by a deployment and cannot be removed here.</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="321"/>
+        <location filename="../ui/settings/provider.py" line="322"/>
         <source>Built into packaged app</source>
         <translation>Built into packaged app</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="371"/>
+        <location filename="../ui/settings/provider.py" line="372"/>
         <source>None</source>
         <translation>None</translation>
     </message>

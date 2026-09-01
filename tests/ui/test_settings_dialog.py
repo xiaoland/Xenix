@@ -73,14 +73,14 @@ def test_settings_controls_have_stable_unique_semantic_identities(
         dialog._language_selector,
         dialog._about_button,
         dialog._save_button,
-        dialog._ocr_settings_card._setup_button,
-        dialog._index_card._rebuild_button,
-        dialog._ml_workers_card._setup_button,
+        dialog._ocr_settings._setup_button,
+        dialog._index_status._rebuild_button,
+        dialog._ml_workers._setup_button,
         dialog._provider_editor._provider_selector,
         dialog._provider_editor._add_provider_button,
         dialog._provider_editor._remove_provider_button,
         dialog._provider_editor._provider_api_key_input,
-        dialog._embedding_card._api_key_input,
+        dialog._embedding_settings._api_key_input,
     )
 
     identities = [control.accessibleIdentifier() for control in controls]
@@ -141,14 +141,14 @@ def test_settings_dialog_opens_before_index_status_finishes(
         assert dialog.isVisible()
         assert indexes.calls == 1
         assert indexes.thread_id != main_thread_id
-        assert dialog._index_card._status_label.text() == dialog.tr(
+        assert dialog._index_status._status_label.text() == dialog.tr(
             "Checking Knowledge index status"
         )
-        assert not dialog._index_card._rebuild_button.isEnabled()
+        assert not dialog._index_status._rebuild_button.isEnabled()
 
         indexes.release.set()
-        qtbot.waitUntil(dialog._index_card._rebuild_button.isEnabled, timeout=3_000)
-        assert dialog.tr("Ready") in dialog._index_card._status_label.text()
+        qtbot.waitUntil(dialog._index_status._rebuild_button.isEnabled, timeout=3_000)
+        assert dialog.tr("Ready") in dialog._index_status._status_label.text()
     finally:
         indexes.release.set()
         dialog.close()
@@ -221,14 +221,14 @@ def test_settings_dialog_discards_status_from_previous_activation(
 
         indexes.release[0].set()
         qtbot.waitUntil(indexes.entered[1].is_set, timeout=3_000)
-        assert dialog.tr("Needs attention") not in dialog._index_card._status_label.text()
-        assert not dialog._index_card._rebuild_button.isEnabled()
+        assert dialog.tr("Needs attention") not in dialog._index_status._status_label.text()
+        assert not dialog._index_status._rebuild_button.isEnabled()
 
         indexes.release[1].set()
-        qtbot.waitUntil(dialog._index_card._rebuild_button.isEnabled, timeout=3_000)
+        qtbot.waitUntil(dialog._index_status._rebuild_button.isEnabled, timeout=3_000)
         assert indexes.calls == 2
         assert indexes.max_in_flight == 1
-        assert dialog.tr("Ready") in dialog._index_card._status_label.text()
+        assert dialog.tr("Ready") in dialog._index_status._status_label.text()
     finally:
         for release in indexes.release:
             release.set()
@@ -309,12 +309,12 @@ def test_ssh_worker_setup_is_denied_in_agent_safe_profile(
     )
     qtbot.addWidget(dialog)
     try:
-        assert not dialog._ml_workers_card._setup_button.isEnabled()
-        assert dialog._ml_workers_card._wizard is None
+        assert not dialog._ml_workers._setup_button.isEnabled()
+        assert dialog._ml_workers._wizard is None
 
-        dialog._ml_workers_card._open_ssh_worker_wizard()
+        dialog._ml_workers._open_ssh_worker_wizard()
 
-        assert dialog._ml_workers_card._wizard is None
+        assert dialog._ml_workers._wizard is None
     finally:
         dialog.close()
         dialog.shutdown()
