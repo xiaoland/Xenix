@@ -23,6 +23,7 @@ from ...markdown_renderer import render_chat_markdown
 from ...semantic_identity import identify_repeated_item
 from ..presentation import (
     ArtifactResolver,
+    UsagePayload,
     connection_attempt_counts,
     connection_retry_events,
     payload_int,
@@ -344,7 +345,8 @@ class UsageOverviewItem(QFrame):
 
     def set_event(self, event: ChatbotEvent) -> None:
         self._event = event
-        self._label.setText(usage_overview_text(event.usage_payload))
+        payload = UsagePayload.model_validate(event.usage_payload) if event.usage_payload else None
+        self._label.setText(usage_overview_text(payload))
         _propagate_geometry_change(self)
 
     def retranslate_ui(self) -> None:

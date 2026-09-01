@@ -13,6 +13,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any, Callable
 
+from pydantic import BaseModel, ConfigDict
 from PySide6.QtCore import QCoreApplication
 
 from ...services.agent import ChatbotEvent, ChatbotEventAuthor, ChatbotEventKind
@@ -34,6 +35,20 @@ class ComposerAttachmentState:
     path: str
     status: ComposerAttachmentStatus = ComposerAttachmentStatus.PENDING
     error: str | None = None
+
+
+class UsagePayload(BaseModel):
+    """Typed token-usage payload rendered by ``UsageOverviewItem``.
+
+    The upstream event may carry additional fields; ``extra="allow"`` keeps them
+    while giving the three values Xenix renders a typed, defaulted shape.
+    """
+
+    model_config = ConfigDict(extra="allow")
+
+    input_tokens: int = 0
+    cached_input_tokens: int = 0
+    output_tokens: int = 0
 
 
 def render_content_blocks(
@@ -329,23 +344,20 @@ def format_token_count(value: int) -> str:
     return f"{rounded_tenths / 10:.1f}k"
 
 
-def usage_overview_text(payload: dict[str, Any] | None) -> str:
-    payload = payload or {}
-    input_tokens = payload_int(payload, "input_tokens")
-    cached_input_tokens = payload_int(payload, "cached_input_tokens")
-    output_tokens = payload_int(payload, "output_tokens")
-    input_text = format_token_count(input_tokens)
-    if cached_input_tokens > 0:
+def usage_overview_text(payload: UsagePayload | None) -> str:
+    payload = payload or UsagePayload()
+    input_text = format_token_count(payload.input_tokens)
+    if payload.cached_input_tokens > 0:
         input_text += QCoreApplication.translate(
             "UsageOverviewItem",
             " ({cached} cached)",
-        ).format(cached=format_token_count(cached_input_tokens))
+        ).format(cached=format_token_count(payload.cached_input_tokens))
     text = QCoreApplication.translate(
         "UsageOverviewItem",
         "↑ {input} · ↓ {output}",
     ).format(
         input=input_text,
-        output=format_token_count(output_tokens),
+        output=format_token_count(payload.output_tokens),
     )
     return text
 
@@ -388,6 +400,7 @@ __all__ = [
     "SUPPORTED_DATASET_SUFFIXES",
     "ComposerAttachmentStatus",
     "ComposerAttachmentState",
+    "UsagePayload",
     "render_content_blocks",
     "chatbot_block_is_visible",
     "assistant_display_blocks",
