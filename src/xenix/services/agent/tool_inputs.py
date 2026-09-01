@@ -605,6 +605,22 @@ class ModelTaskQueryInput(AgentToolInput):
     )
 
 
+class ModelTaskStopInput(AgentToolInput):
+    task_ids: Annotated[list[RequiredString], Field(min_length=1, max_length=20)] = Field(
+        description="One or more explicit ML task ids to stop (cancel)."
+    )
+
+
+class ModelTaskWaitInput(AgentToolInput):
+    task_ids: Annotated[list[RequiredString], Field(min_length=1, max_length=20)] = Field(
+        description=(
+            "One or more explicit ML task ids to keep waiting on. Blocks up to the "
+            "same wait window and returns the completed result, or a timed_out status "
+            "summary if they are still running."
+        )
+    )
+
+
 class KnowledgeLookupInput(AgentToolInput):
     query: Annotated[
         str,

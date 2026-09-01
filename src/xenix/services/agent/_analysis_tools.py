@@ -1,8 +1,7 @@
-"""Analysis tool handlers and their projection helpers."""
+"""Analysis tool handlers: validate input, call domain services, return results."""
 
 from __future__ import annotations
 
-import re
 from typing import Any
 
 
@@ -26,29 +25,6 @@ from .tool_inputs import (
     AnalysisProfileInput,
 )
 from ._tool_common import _raise_if_cancelled
-
-
-# Synchronous wait window before a model tool returns a running_background
-# receipt. ML fit/tune/apply can outlive one conversation turn: wait up to this
-# window so fast tasks return results inline, otherwise hand back a receipt with
-# async_state="running_background" and let the Agent poll model.task.query
-# instead of blocking the turn for the task's full duration.
-MODEL_APPLY_GRACE_SECONDS = 30.0
-MODEL_TRAIN_GRACE_SECONDS = 60.0
-MAX_CLEANING_REPORT_OPERATION_ENTRIES = 12
-MAX_CLEANING_REPORT_VALIDATION_ENTRIES = 12
-MAX_CLEANING_REPORT_WARNING_ENTRIES = 5
-MAX_CLEANING_REPORT_COLUMN_NAMES = 6
-MAX_CLEANING_REPORT_WARNING_CHARS = 240
-MAX_CLEANING_REPORT_COLUMN_NAME_CHARS = 96
-MAX_CLEANING_REPORT_FILL_VALUE_CHARS = 96
-MODEL_HYPER_TRAIN_GRACE_SECONDS = 60.0
-MAX_MODEL_TASK_LOG_CHARS = 500
-MAX_MODEL_METRICS = 24
-MAX_MODEL_ROLE_BINDINGS = 16
-MAX_MODEL_ROLE_COLUMNS = 20
-MAX_MODEL_COLUMN_NAME_CHARS = 96
-_LOCAL_PATH_PATTERN = re.compile(r"(?:(?:[A-Za-z]:[\\/]|\\\\|/)[^\s'\"<>]*)")
 
 
 class AnalysisTools:

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from typing import Any, Generic, TypeVar
@@ -54,6 +53,8 @@ from .tool_inputs import (
     ModelHyperTrainInput,
     ModelMetadataInput,
     ModelTaskQueryInput,
+    ModelTaskStopInput,
+    ModelTaskWaitInput,
     ModelTrainInput,
 )
 from .tool_presentations import DEFAULT_TOOL_PRESENTATION, ToolPresentation, tool_presentation_for_name
@@ -65,29 +66,6 @@ from ._analysis_tools import AnalysisTools
 from ._data_tools import DataTools
 from ._model_tools import ModelTools
 from ._tool_common import _raise_if_cancelled
-
-
-# Synchronous wait window before a model tool returns a running_background
-# receipt. ML fit/tune/apply can outlive one conversation turn: wait up to this
-# window so fast tasks return results inline, otherwise hand back a receipt with
-# async_state="running_background" and let the Agent poll model.task.query
-# instead of blocking the turn for the task's full duration.
-MODEL_APPLY_GRACE_SECONDS = 30.0
-MODEL_TRAIN_GRACE_SECONDS = 60.0
-MAX_CLEANING_REPORT_OPERATION_ENTRIES = 12
-MAX_CLEANING_REPORT_VALIDATION_ENTRIES = 12
-MAX_CLEANING_REPORT_WARNING_ENTRIES = 5
-MAX_CLEANING_REPORT_COLUMN_NAMES = 6
-MAX_CLEANING_REPORT_WARNING_CHARS = 240
-MAX_CLEANING_REPORT_COLUMN_NAME_CHARS = 96
-MAX_CLEANING_REPORT_FILL_VALUE_CHARS = 96
-MODEL_HYPER_TRAIN_GRACE_SECONDS = 60.0
-MAX_MODEL_TASK_LOG_CHARS = 500
-MAX_MODEL_METRICS = 24
-MAX_MODEL_ROLE_BINDINGS = 16
-MAX_MODEL_ROLE_COLUMNS = 20
-MAX_MODEL_COLUMN_NAME_CHARS = 96
-_LOCAL_PATH_PATTERN = re.compile(r"(?:(?:[A-Za-z]:[\\/]|\\\\|/)[^\s'\"<>]*)")
 
 
 ToolInputT = TypeVar("ToolInputT", bound=AgentToolInput)
@@ -215,6 +193,8 @@ class AgentToolRegistry:
                 self._build_model_hyper_train_tool(),
                 self._build_model_apply_tool(),
                 self._build_model_task_query_tool(),
+                self._build_model_task_wait_tool(),
+                self._build_model_task_stop_tool(),
             )
         )
 
@@ -509,4 +489,34 @@ class AgentToolRegistry:
             description="Query ML task status, metadata, artifacts, errors, and logs by explicit task ids.",
             input_model=ModelTaskQueryInput,
             handler=self._model_tools._model_task_query,
+        )
+
+    def _build_model_task_wait_tool(
+        self,
+    ) -> ConcreteAgentTool[ModelTaskWaitInput]:
+        return self._tool(
+            name="model.task.wait",
+            provider_name="model_task_wait",
+            description=(
+                "Keep waiting on already running ML tasks by explicit task ids. Blocks up to "
+                "the same wait window as model.train/model.hyper_train/model.apply and returns "
+                "the completed result, or a timed_out status/log summary to decide again."
+            ),
+            input_model=ModelTaskWaitInput,
+            handler=self._model_tools._model_task_wait,
+        )
+
+    def _build_model_task_stop_tool(
+        self,
+    ) -> ConcreteAgentTool[ModelTaskStopInput]:
+        return self._tool(
+            name="model.task.stop",
+            provider_name="model_task_stop",
+            description=(
+                "Stop (cancel) one or more running ML tasks by explicit task ids. "
+                "Use it when model.train/model.hyper_train/model.apply reports timed_out "
+                "and the reported status/logs show the task should not continue."
+            ),
+            input_model=ModelTaskStopInput,
+            handler=self._model_tools._model_task_stop,
         )

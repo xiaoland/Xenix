@@ -1,8 +1,7 @@
-"""Model tool handlers, ML task waiting, and summary projection."""
+"""Model tool handlers: validate input, call MLService, return domain results."""
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
 
 
@@ -21,6 +20,7 @@ from ..ml_service import (
 )
 from ..storage.models import (
     MLTaskArtifactKind,
+    MLTaskType,
 )
 from ..llm.tooling import (
     ToolExecutionContext,
@@ -31,6 +31,8 @@ from .tool_inputs import (
     ModelHyperTrainInput,
     ModelMetadataInput,
     ModelTaskQueryInput,
+    ModelTaskStopInput,
+    ModelTaskWaitInput,
     ModelTrainInput,
 )
 from ._model_keys import (
@@ -41,27 +43,15 @@ from ._model_keys import (
 from ._tool_common import _raise_if_cancelled
 
 
-# Synchronous wait window before a model tool returns a running_background
-# receipt. ML fit/tune/apply can outlive one conversation turn: wait up to this
-# window so fast tasks return results inline, otherwise hand back a receipt with
-# async_state="running_background" and let the Agent poll model.task.query
-# instead of blocking the turn for the task's full duration.
+# Synchronous wait window for ML fit/tune/apply. The tool blocks up to this
+# window so fast tasks return results inline. When the window elapses the tool
+# reports pending task status and recent logs instead of raising, so the LLM can
+# stop the tasks with model.task.stop or call model.task.wait to keep waiting
+# (each wait call adds another full wait window).
 MODEL_APPLY_GRACE_SECONDS = 30.0
 MODEL_TRAIN_GRACE_SECONDS = 60.0
-MAX_CLEANING_REPORT_OPERATION_ENTRIES = 12
-MAX_CLEANING_REPORT_VALIDATION_ENTRIES = 12
-MAX_CLEANING_REPORT_WARNING_ENTRIES = 5
-MAX_CLEANING_REPORT_COLUMN_NAMES = 6
-MAX_CLEANING_REPORT_WARNING_CHARS = 240
-MAX_CLEANING_REPORT_COLUMN_NAME_CHARS = 96
-MAX_CLEANING_REPORT_FILL_VALUE_CHARS = 96
 MODEL_HYPER_TRAIN_GRACE_SECONDS = 60.0
-MAX_MODEL_TASK_LOG_CHARS = 500
-MAX_MODEL_METRICS = 24
-MAX_MODEL_ROLE_BINDINGS = 16
-MAX_MODEL_ROLE_COLUMNS = 20
-MAX_MODEL_COLUMN_NAME_CHARS = 96
-_LOCAL_PATH_PATTERN = re.compile(r"(?:(?:[A-Za-z]:[\\/]|\\\\|/)[^\s'\"<>]*)")
+MODEL_TIMEOUT_LOG_ENTRIES = 20
 
 
 class ModelTools:
@@ -181,8 +171,13 @@ class ModelTools:
             timeout_seconds=MODEL_TRAIN_GRACE_SECONDS,
         )
         if training_result is None:
-            raise ValidationError(
-                "ML training did not complete in time. Query the tasks with model.task.query."
+            return self._in_progress_result(
+                created_task_ids,
+                message=(
+                    "ML training is still running after "
+                    f"{int(MODEL_TRAIN_GRACE_SECONDS)}s. Stop it with model.task.stop, "
+                    "or call model.task.wait to keep waiting."
+                ),
             )
         tasks, trained_models = training_result
         payload = {
@@ -226,8 +221,13 @@ class ModelTools:
             timeout_seconds=MODEL_HYPER_TRAIN_GRACE_SECONDS,
         )
         if training_result is None:
-            raise ValidationError(
-                "ML hyperparameter tuning did not complete in time. Query the tasks with model.task.query."
+            return self._in_progress_result(
+                created_task_ids,
+                message=(
+                    "ML hyperparameter tuning is still running after "
+                    f"{int(MODEL_HYPER_TRAIN_GRACE_SECONDS)}s. Stop it with model.task.stop, "
+                    "or call model.task.wait to keep waiting."
+                ),
             )
         tasks, trained_models = training_result
         payload = {
@@ -264,11 +264,18 @@ class ModelTools:
             timeout_seconds=MODEL_APPLY_GRACE_SECONDS,
         )
         if completed_task is None:
-            raise ValidationError(
-                "ML apply did not complete in time. Query the task with model.task.query."
+            return self._in_progress_result(
+                [task.id],
+                message=(
+                    "ML apply is still running after "
+                    f"{int(MODEL_APPLY_GRACE_SECONDS)}s. Stop it with model.task.stop, "
+                    "or call model.task.wait to keep waiting."
+                ),
             )
-        task = completed_task
-        details = self._ml_service.get_task_details(task.id)
+        return self._apply_completion(completed_task.id)
+
+    def _apply_completion(self, task_id: str) -> ToolSuccess:
+        details = self._ml_service.get_task_details(task_id)
         output_artifact = next(
             artifact
             for artifact in details.artifacts
@@ -281,7 +288,7 @@ class ModelTools:
         typed_result = ApplyTaskResult.model_validate(details.task.result_payload or {})
         return ToolSuccess(
             value={
-                "ml_task_id": task.id,
+                "ml_task_id": task_id,
                 "artifact_id": output_artifact.artifact_id,
                 "result": typed_result.model_dump(mode="json"),
             },
@@ -309,6 +316,115 @@ class ModelTools:
             )
         return ToolSuccess(value={"task_ids": input_data.task_ids, "tasks": tasks})
 
+    def _model_task_stop(
+        self,
+        input_data: ModelTaskStopInput,
+        context: ToolExecutionContext,
+    ) -> ToolSuccess:
+        _raise_if_cancelled(self._ml_service, context)
+        stopped = []
+        for task_id in input_data.task_ids:
+            task = self._ml_service.cancel_task(task_id)
+            stopped.append({"task_id": task_id, "status": task.status.value})
+        return ToolSuccess(value={"task_ids": input_data.task_ids, "tasks": stopped})
+
+    def _model_task_wait(
+        self,
+        input_data: ModelTaskWaitInput,
+        context: ToolExecutionContext,
+    ) -> ToolSuccess:
+        _raise_if_cancelled(self._ml_service, context)
+        task_ids = input_data.task_ids
+        first = self._ml_service.get_task_details(task_ids[0]).task
+        if first.task_type is MLTaskType.APPLY:
+            return self._wait_apply_tasks(task_ids, context)
+        return self._wait_training_tasks(task_ids, context)
+
+    def _wait_training_tasks(
+        self,
+        task_ids: list[str],
+        context: ToolExecutionContext,
+    ) -> ToolSuccess:
+        result = self._ml_service.wait_for_training_models(
+            task_ids,
+            cancel_requested=context.cancel_requested,
+            timeout_seconds=MODEL_TRAIN_GRACE_SECONDS,
+        )
+        if result is None:
+            return self._in_progress_result(
+                task_ids,
+                message=(
+                    "ML tasks are still running after "
+                    f"{int(MODEL_TRAIN_GRACE_SECONDS)}s. Stop them with model.task.stop, "
+                    "or call model.task.wait to keep waiting."
+                ),
+            )
+        tasks, trained_models = result
+        return ToolSuccess(
+            value={
+                "task_ids": [task.id for task in tasks],
+                "trained_model_ids": [model.id for model in trained_models],
+                "results": [task.result_payload for task in tasks],
+            }
+        )
+
+    def _wait_apply_tasks(
+        self,
+        task_ids: list[str],
+        context: ToolExecutionContext,
+    ) -> ToolSuccess:
+        completed_ids: list[str] = []
+        for task_id in task_ids:
+            task = self._ml_service.wait_for_task(
+                task_id,
+                cancel_requested=context.cancel_requested,
+                timeout_seconds=MODEL_APPLY_GRACE_SECONDS,
+            )
+            if task is None:
+                return self._in_progress_result(
+                    task_ids,
+                    message=(
+                        "ML apply is still running after "
+                        f"{int(MODEL_APPLY_GRACE_SECONDS)}s. Stop it with model.task.stop, "
+                        "or call model.task.wait to keep waiting."
+                    ),
+                )
+            completed_ids.append(task.id)
+        if len(completed_ids) == 1:
+            return self._apply_completion(completed_ids[0])
+        return ToolSuccess(
+            value={
+                "task_ids": completed_ids,
+                "results": [
+                    self._ml_service.get_task_details(task_id).task.result_payload
+                    for task_id in completed_ids
+                ],
+            }
+        )
+
+    def _in_progress_result(self, task_ids: list[str], *, message: str) -> ToolSuccess:
+        tasks = []
+        for task_id in task_ids:
+            details = self._ml_service.get_task_details(task_id)
+            tasks.append(
+                {
+                    "task_id": task_id,
+                    "status": details.task.status.value,
+                    "logs": [
+                        log.model_dump(mode="json")
+                        for log in details.logs[-MODEL_TIMEOUT_LOG_ENTRIES:]
+                    ],
+                }
+            )
+        return ToolSuccess(
+            value={
+                "timed_out": True,
+                "task_ids": task_ids,
+                "tasks": tasks,
+                "message": message,
+            }
+        )
+
     def _resolve_apply_input_sources(self, input_sources: list[str]) -> list[ApplySourceInput]:
         return [self._resolve_apply_input_source(input_source) for input_source in input_sources]
 
@@ -333,32 +449,4 @@ class ModelTools:
             source_path=dataset.source_path,
             dataset_id=dataset.id,
         )
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
