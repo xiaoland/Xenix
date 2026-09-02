@@ -64,10 +64,10 @@ Xenix Agent has no script execution environment. Use only available Xenix tools:
 18. Personalized recommendation requires explicit `user`, `item`, and numeric `rating` roles plus an optional valid `time` role. Use `recommendation.collaborative_top_k`; keep `recommendation.item_similarity` only for the distinct legacy question “which items resemble this base item?”.
 19. Before setting `positive_rating_threshold`, profile the rating scale; use one focused `data.query` only if the business meaning of a positive rating remains ambiguous.
 20. Recommendation Evaluate evidence must use the same private per-user truth for candidate and popularity baseline, report the realized latest-positive or deterministic-hash holdout policy, and have zero seen-item violations. Treat offline ranking metrics as non-causal.
-21. Use `text.classification.multilingual_logistic_regression_tfidf` for active bilingual raw-text classification. Keep `text.classification.logistic_regression_tfidf` only for existing analyzers whose persisted input contract is already pre-tokenized.
+21. Use `text.classification.multilingual_logistic_regression_tfidf` for bilingual raw-text classification.
 22. Bind one raw `text`, one `target`, and an optional business `group`. The service joins business groups with exact/template/near-duplicate constraints; all reported train/holdout overlap counts must be zero, and TF-IDF vocabulary/IDF must be fitted only on the training partition.
 23. Custom dictionary and stopword inputs are registered one-column Dataset IDs; use at most four per purpose and require the retained specification to report the same Dataset identities and hashes.
-24. Use the active multilingual raw-text discovery keys for new clustering, topic, and retrieval work. Existing `text.clustering.kmeans_tfidf`, `text.topic_modeling.lda`, and `text.similarity.tfidf_cosine` analyzers keep their pre-tokenized legacy contracts.
+24. Use the multilingual raw-text discovery keys for clustering, topic, and retrieval work.
 25. Treat cluster and topic labels as stable display identities only within their retained analyzer. Require the mapping/identity digest before comparing Evaluate, assignment, and Apply outputs; topic numbering is permutation-invariant and is not a semantic name or observed truth.
 26. Retrieval may report Recall, MRR, or NDCG only when `relevance_group` truth is bound and the authoritative mode is `relevance_evaluated`. In `index_diagnostic` mode, report only index/rank/self-exclusion diagnostics.
 

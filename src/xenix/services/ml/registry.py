@@ -62,10 +62,6 @@ from .models.text_analysis import (
     MultilingualTextClassificationService,
     MultilingualTextSimilarityService,
     MultilingualTextTopicModelingService,
-    TokenizedTextClassificationService,
-    TokenizedTextClusteringService,
-    TokenizedTextSimilarityService,
-    TokenizedTextTopicModelingService,
 )
 from .types import ModelCatalogEntry, ModelServiceBase, parse_model_key
 
@@ -167,14 +163,10 @@ _MODEL_SERVICE_TYPES: tuple[type[ModelServiceBase], ...] = (
     MlxtendAssociationRulesService,
     CollaborativeTopKRecommendationService,
     ItemSimilarityRecommendationService,
-    TokenizedTextClassificationService,
     MultilingualTextClassificationService,
     MultilingualTextClusteringService,
     MultilingualTextTopicModelingService,
     MultilingualTextSimilarityService,
-    TokenizedTextClusteringService,
-    TokenizedTextTopicModelingService,
-    TokenizedTextSimilarityService,
 )
 
 _MODEL_SERVICES = _build_model_service_registry(_MODEL_SERVICE_TYPES)
