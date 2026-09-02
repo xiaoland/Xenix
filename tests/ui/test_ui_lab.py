@@ -5,6 +5,7 @@ import os
 import subprocess
 import sys
 from dataclasses import replace
+from pathlib import Path
 
 import pytest
 
@@ -82,7 +83,6 @@ def test_all_scenarios_build_without_runtime_services_or_state(
         _scenario, handle = _build_scenario(qapp, qtbot, scenario_id)
         assert isinstance(handle.root, QWidget)
         handle.cleanup()
-        handle.root.close()
 
     assert not runtime_home.exists()
 
@@ -94,14 +94,12 @@ def test_feature_scenarios_use_production_semantic_contracts(qapp, qtbot, ui_art
         history.root, "main.history.thread-item"
     )} == {"thread:synthetic:001", "thread:synthetic:002", "thread:synthetic:003"}
     history.cleanup()
-    history.root.close()
 
     _scenario, settings = _build_scenario(qapp, qtbot, "settings.provider-and-ocr")
     ui_artifacts.register(settings.root, name="provider-and-ocr")
     assert len(_widgets_with_role(settings.root, "settings.llm.provider.selector")) == 1
     assert len(_widgets_with_role(settings.root, "settings.knowledge.ocr.setup")) == 1
     settings.cleanup()
-    settings.root.close()
 
 
 def test_mixed_timeline_repeated_controls_have_authoritative_item_references(
@@ -123,7 +121,6 @@ def test_mixed_timeline_repeated_controls_have_authoritative_item_references(
     assert item_reference(retry_toggles[0]) == "connection:001"
     assert all(widget.accessibleName() for widget in tool_toggles + retry_toggles)
     handle.cleanup()
-    handle.root.close()
 
 
 def test_running_scenario_exposes_stop_contract(qapp: QApplication, qtbot: QtBot) -> None:
@@ -133,9 +130,15 @@ def test_running_scenario_exposes_stop_contract(qapp: QApplication, qtbot: QtBot
 
     assert view.composer.send_button.accessibleIdentifier() == "chat.composer.send-or-stop"
     assert view.composer.send_button.accessibleName() == view.tr("Stop")
+    assert view.composer.send_button.isEnabled()
     assert not view.composer.editor.isEnabled()
+
+    remove_buttons = _widgets_with_role(view, "chat.composer.attachment.remove")
+    assert {item_reference(button) for button in remove_buttons} == {
+        str(Path("C:/xenix-synthetic/quarterly-sales.csv").resolve()),
+        str(Path("C:/xenix-synthetic/regional-targets.xlsx").resolve()),
+    }
     handle.cleanup()
-    handle.root.close()
 
 
 def test_synthetic_scenario_capture_emits_structured_artifacts(
@@ -164,7 +167,6 @@ def test_synthetic_scenario_capture_emits_structured_artifacts(
     assert (destination / "manifest.json").is_file()
     assert (destination / "actual.png").stat().st_size > 0
     handle.cleanup()
-    handle.root.close()
 
 
 def test_batch_capture_cli_reconciles_registry_scenarios(tmp_path) -> None:
@@ -219,3 +221,36 @@ def test_batch_capture_aggregates_build_failure_with_stage_manifest(qapp, tmp_pa
     manifest = json.loads((run_dir / broken_spec.id / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["reason"] == "scenario-capture-failure"
     assert manifest["stage"] == "build"
+
+
+def test_batch_capture_clean_removes_prior_runs(qapp, tmp_path, monkeypatch) -> None:
+    from scripts.ui_lab import capture_all as capture_all_module
+
+    monkeypatch.setattr(capture_all_module, "list_scenarios", lambda: (get_scenario("chat.empty"),))
+    output = tmp_path / "artifacts"
+
+    first = capture_all_module.capture_all_scenarios(output, ["chat.empty"])
+    assert (output / first["run_id"] / "batch.json").is_file()
+
+    second = capture_all_module.capture_all_scenarios(output, ["chat.empty"], clean=True)
+
+    assert not (output / first["run_id"]).exists()
+    assert (output / second["run_id"] / "batch.json").is_file()
+
+
+def test_capture_verifier_reports_missing_artifacts(qapp, tmp_path, monkeypatch) -> None:
+    from scripts.ui_lab import capture_all as capture_all_module
+
+    monkeypatch.setattr(capture_all_module, "list_scenarios", lambda: (get_scenario("chat.empty"),))
+    output = tmp_path / "artifacts"
+    batch = capture_all_module.capture_all_scenarios(output, ["chat.empty"])
+    run_dir = output / batch["run_id"]
+
+    report = capture_all_module.verify_captured_artifacts(run_dir)
+    assert report["complete"] is True
+    assert report["scenarios"]["chat.empty"]["complete"] is True
+
+    (run_dir / "chat.empty" / "actual.png").unlink()
+    report = capture_all_module.verify_captured_artifacts(run_dir)
+    assert report["complete"] is False
+    assert report["scenarios"]["chat.empty"]["missing"] == ["actual.png"]

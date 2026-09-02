@@ -542,11 +542,17 @@ class ChatComposer(QWidget):
         can_edit = not self._running and not self._preparing_submission and not self._awaiting_step_confirmation
         self._editor.setEnabled(can_edit)
         self._attach_button.setEnabled(can_edit)
-        self._send_button.setEnabled(
-            not self._awaiting_step_confirmation
-            and not self._has_unready_attachments()
-            and (self._running or not self._preparing_submission)
-        )
+        if self._running:
+            # The send button is the Stop control while running; it must stay
+            # actionable even when a source attachment failed to import.
+            send_enabled = not self._awaiting_step_confirmation
+        else:
+            send_enabled = (
+                not self._awaiting_step_confirmation
+                and not self._has_unready_attachments()
+                and not self._preparing_submission
+            )
+        self._send_button.setEnabled(send_enabled)
         self._model_picker.setEnabled(bool(self._model_options) and can_edit)
         self._step_continue_button.setEnabled(self._awaiting_step_confirmation)
         self._step_stop_button.setEnabled(self._awaiting_step_confirmation)
