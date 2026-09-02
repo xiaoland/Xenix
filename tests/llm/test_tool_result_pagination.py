@@ -76,9 +76,38 @@ def test_invoke_returns_small_result_inline(tmp_path: Path) -> None:
     assert outcome.value == {"ok": True}
 
 
+def test_inline_boundary_is_2048_chars(tmp_path: Path) -> None:
+    registry = _registry(tmp_path)
+    registry.register(
+        AgentToolSpec(name="data.inline", provider_name="data_inline", description="inline"),
+        lambda _args, _ctx: ToolSuccess(value="x" * 2048),
+    )
+    registry.register(
+        AgentToolSpec(name="data.paged", provider_name="data_paged", description="paged"),
+        lambda _args, _ctx: ToolSuccess(value="y" * 2049),
+    )
+    inline = registry.invoke(
+        tool_name="data.inline",
+        provider_name="data_inline",
+        arguments={},
+        context=_context(),
+    )
+    assert isinstance(inline, ToolSuccess)
+    assert inline.value == "x" * 2048
+
+    paged = registry.invoke(
+        tool_name="data.paged",
+        provider_name="data_paged",
+        arguments={},
+        context=_context(),
+    )
+    assert isinstance(paged, ToolSuccess)
+    assert "result_id" in paged.value
+
+
 def test_invoke_pages_oversized_result_and_reads_next_page(tmp_path: Path) -> None:
     registry = _registry(tmp_path)
-    large = "x" * (64 * 1024 + 10)
+    large = "x" * 5000
     registry.register(
         AgentToolSpec(name="data.big", provider_name="data_big", description="big"),
         lambda _args, _ctx: ToolSuccess(value=large),
@@ -113,7 +142,7 @@ def test_invoke_without_store_rejects_oversized_result(tmp_path: Path) -> None:
     registry = AgentToolRegistry()
     registry.register(
         AgentToolSpec(name="data.big", provider_name="data_big", description="big"),
-        lambda _args, _ctx: ToolSuccess(value="x" * (64 * 1024 + 10)),
+        lambda _args, _ctx: ToolSuccess(value="x" * 3000),
     )
     with pytest.raises(ValidationError):
         registry.invoke(

@@ -32,6 +32,7 @@ MAX_EXCHANGE_RESULT_BYTES = 1024 * 1024
 MAX_TOOL_FAILURE_MESSAGE_CHARS = 16 * 1024
 TOOL_RESULT_PAGE_SIZE_CHARS = 1024
 TOOL_RESULT_PAGE_LIMIT_CHARS = 4096
+TOOL_RESULT_INLINE_CHARS = 2048
 
 _PUBLIC_ERROR_CODE_PATTERN = re.compile(r"^[a-z][a-z0-9_]{0,127}$")
 _SENSITIVE_DIAGNOSTIC_MARKERS = (
@@ -794,10 +795,9 @@ class AgentToolRegistry:
         context: ToolExecutionContext,
     ) -> ToolSuccess:
         text = tool_result_text(value)
-        text_bytes = len(text.encode("utf-8"))
-        if text_bytes <= MAX_TOOL_PAYLOAD_BYTES:
+        if len(text) <= TOOL_RESULT_INLINE_CHARS:
             return ToolSuccess(value=value)
-        if text_bytes > MAX_EXCHANGE_RESULT_BYTES:
+        if len(text.encode("utf-8")) > MAX_EXCHANGE_RESULT_BYTES:
             raise ValidationError("Tool result exceeds the paged result size limit.")
         if self._page_store is None:
             raise ValidationError(
