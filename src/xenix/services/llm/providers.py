@@ -50,16 +50,6 @@ class ProviderMessage(SQLModel):
     def _parse_content_blocks(cls, value: Any) -> list[CanonicalMessageBlock]:
         return list(normalize_message_blocks(value))
 
-    @property
-    def blocks(self) -> list[CanonicalMessageBlock]:
-        """Alias exposing the canonical transcript shape without mutation."""
-
-        return list(self.content_blocks)
-
-    @property
-    def canonical_blocks(self) -> tuple[CanonicalMessageBlock, ...]:
-        return tuple(self.content_blocks)
-
 
 class ProviderToolCall(SQLModel):
     provider_call_id: str
@@ -112,16 +102,8 @@ class ProviderStreamEvent:
     raw_payload: dict[str, Any] = field(default_factory=dict)
 
     @property
-    def is_delta(self) -> bool:
-        return bool(self.delta_text)
-
-    @property
     def is_tool_call_delta(self) -> bool:
         return self.tool_call_delta
-
-    @property
-    def is_complete(self) -> bool:
-        return self.response is not None
 
 
 @dataclass(frozen=True)

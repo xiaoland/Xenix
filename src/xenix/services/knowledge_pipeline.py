@@ -647,10 +647,6 @@ class ParserRouter:
             kind="parser route",
         )
 
-    @property
-    def registered_provider_ids(self) -> frozenset[str]:
-        return frozenset(self._providers)
-
     def route(self, normalized: NormalizedSource, *, ocr_ready: bool) -> ParsePlan:
         capability = self._registry.capability_for_format(normalized.source_format)
         if capability is None or capability.parser_format != normalized.parser_format:

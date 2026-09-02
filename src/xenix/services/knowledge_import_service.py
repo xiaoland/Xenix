@@ -209,9 +209,6 @@ class KnowledgeImportService:
                 for import_id in pending:
                     self._queue.put(import_id)
 
-    def preflight_import(self, source_path: Path) -> FileProbeResult:
-        return self._probe.probe(source_path)
-
     def enqueue_file(self, source_path: Path, *, password: str | None = None) -> KnowledgeImportReceipt:
         source = source_path.expanduser().resolve()
         if not source.is_file():

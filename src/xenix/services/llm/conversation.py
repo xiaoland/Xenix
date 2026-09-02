@@ -524,28 +524,6 @@ class LLMConversationService:
                         messages=self._repository.list_messages(session, input_data.thread_id),
                     )
 
-    def sample_existing_frontier(
-        self,
-        *,
-        thread_id: str,
-        expected_frontier_id: str,
-        tool_scope: ToolScope | None = None,
-        fq_model_key: str | None = None,
-        provider: AgentProvider | None = None,
-        retry_callback: Callable[[LLMRetryEvent], None] | None = None,
-    ) -> PendingSampling:
-        pending = self.begin_sampling(
-            thread_id=thread_id,
-            expected_frontier_id=expected_frontier_id,
-            tool_scope=tool_scope or ToolScope(),
-        )
-        return self.complete_pending_sampling(
-            pending_message_id=pending.pending_message_id,
-            provider=provider,
-            fq_model_key=fq_model_key,
-            retry_callback=retry_callback,
-        )
-
     def begin_sampling(
         self,
         *,

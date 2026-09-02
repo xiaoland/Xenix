@@ -78,25 +78,6 @@ _CJK_RE = re.compile(r"[\u3400-\u9fff]")
 ET.register_namespace("", _SVG_NS)
 
 
-class AnalysisGraphValidationError(ValidationError):
-    def __init__(
-        self,
-        message: str,
-        *,
-        error_code: str | None = None,
-        error_details: dict[str, Any] | None = None,
-        repair_hints: list[str] | None = None,
-        retryable: bool | None = None,
-    ) -> None:
-        super().__init__(
-            message,
-            error_code=error_code,
-            error_details=error_details,
-            repair_hints=repair_hints,
-            retryable=retryable,
-        )
-
-
 class GraphDatasetInput(SQLModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -1184,7 +1165,7 @@ class AnalysisGraphService:
         hints = list(_WORDCLOUD_REPAIR_HINTS)
         if repair_hints:
             hints.extend(repair_hints)
-        raise AnalysisGraphValidationError(
+        raise ValidationError(
             message,
             error_code=error_code,
             error_details=error_details,

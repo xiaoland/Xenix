@@ -757,9 +757,6 @@ class AgentHarnessService:
             is_final=True,
         )
 
-    def _dataset_ids(self, thread_id: str) -> list[str]:
-        return self._dataset_ids_from_snapshot(self.get_thread_snapshot(thread_id))
-
     def _sampling_tool_scope(self, thread_id: str) -> ToolScope:
         snapshot = self.get_thread_snapshot(thread_id)
         tool_names: tuple[str, ...] = ()

@@ -1005,12 +1005,6 @@ class UnsupervisedClusteringModelService(ModelServiceBase):
         )
 
     @classmethod
-    def _select_features(cls, dataframe: pd.DataFrame, feature_columns: list[str]) -> pd.DataFrame:
-        if not feature_columns:
-            raise ValidationError("Select at least one input column for clustering.")
-        return dataframe.loc[:, feature_columns].copy()
-
-    @classmethod
     def _build_pipeline(cls, **estimator_kwargs: Any) -> Pipeline:
         return Pipeline(
             steps=[
@@ -1039,29 +1033,6 @@ class UnsupervisedClusteringModelService(ModelServiceBase):
                 ("categorical", categorical_transformer, NumericAndCategoricalModelService._categorical_selector),
             ]
         )
-
-    @classmethod
-    def _normalize_cluster_labels(cls, labels: Any) -> tuple[np.ndarray, int, int]:
-        raw = np.asarray(labels, dtype=int)
-        unique_labels = sorted(set(int(value) for value in raw.tolist()))
-        if -1 in unique_labels:
-            mapped = raw.copy()
-            current = 1
-            for label in unique_labels:
-                if label == -1:
-                    continue
-                mapped[raw == label] = current
-                current += 1
-            cluster_count = current - 1
-            noise_count = int(np.sum(raw == -1))
-            return mapped, cluster_count, noise_count
-        mapped = raw + 1
-        cluster_count = len(unique_labels)
-        return mapped, cluster_count, 0
-
-    @classmethod
-    def _estimator_kwargs(cls, params_model: BaseModel) -> dict[str, Any]:
-        return params_model.model_dump(exclude_none=True, by_alias=True)
 
     @classmethod
     @abstractmethod

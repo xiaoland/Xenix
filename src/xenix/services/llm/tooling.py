@@ -642,8 +642,6 @@ class AgentToolRegistry:
         self._provider_names[registered_spec.provider_name] = registered_spec.name
         self._validators[registered_spec.name] = validator
 
-    register_tool = register
-
     def _register_builtin_result_page_tool(self) -> None:
         spec = AgentToolSpec(
             name="result.page",
