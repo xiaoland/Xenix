@@ -86,7 +86,7 @@ def capture_ui_artifacts(
         "policy": policy.value,
         "redaction": {
             "widget_text": "omitted",
-            "paths": "redacted",
+            "paths": "preserved",
             "qt_log_max_bytes": QT_LOG_MAX_BYTES,
             "qt_log_max_records": QT_LOG_MAX_RECORDS,
         },

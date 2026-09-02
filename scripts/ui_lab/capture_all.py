@@ -7,13 +7,16 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 import argparse
 import json
+import re
 import shutil
+import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from PySide6.QtWidgets import QApplication
 
+from xenix.config import default_app_home
 from xenix.ui.diagnostics import CapturePolicy, capture_ui_artifacts
 from xenix.ui.diagnostics.schema import UI_ARTIFACT_SCHEMA_VERSION
 
@@ -22,11 +25,77 @@ from .driver import configure_scenario_application, settle_scenario
 from .registry import list_scenarios
 
 
+# The exact run-id format capture_all_scenarios mints, e.g. 20260902T153045123456Z.
+_RUN_ID_PATTERN = re.compile(r"\A\d{8}T\d{12}Z\Z")
+
+
+def _repository_root() -> Path:
+    """The source repository root containing this script, if discoverable."""
+    current = Path(__file__).resolve().parent
+    for candidate in (current, *current.parents):
+        if (candidate / "pyproject.toml").is_file():
+            return candidate
+    return current
+
+
+def _refuse_dangerous_root(output_root: Path) -> None:
+    """Refuse to prune from a root where a mistake is unrecoverable.
+
+    Pruning is bounded to run directories immediately under ``output_root``, but
+    the caller must never pass a location whose direct children are not safe to
+    enumerate and delete.  This hard-rejects the repository root, the user home,
+    the runtime home, the system temp root, and a drive root.
+    """
+    dangerous = {
+        Path.home().resolve(),
+        _repository_root().resolve(),
+        default_app_home().resolve(),
+        Path(tempfile.gettempdir()).resolve(),
+        Path(output_root.anchor).resolve(),
+    }
+    if output_root in dangerous:
+        raise ValueError(f"Refusing to prune run directories from {output_root}")
+
+
+def _is_capture_run_dir(run_dir: Path) -> bool:
+    """Whether ``run_dir`` is a Xenix capture run dir this script minted."""
+    if _RUN_ID_PATTERN.fullmatch(run_dir.name) is None:
+        return False
+    batch_path = run_dir / "batch.json"
+    if not batch_path.is_file():
+        return False
+    try:
+        batch = json.loads(batch_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    return isinstance(batch, dict) and str(batch.get("run_id")) == run_dir.name
+
+
+def prune_run_directories(output_root: Path) -> int:
+    """Delete only historical Xenix capture run dirs directly under ``output_root``.
+
+    Returns the number of removed run directories.  Never removes ``output_root``
+    itself, never recurses, and only touches an immediate child when all of the
+    following hold: its name matches the Xenix run-id format, it contains a valid
+    ``batch.json``, and that manifest's ``run_id`` equals the directory name.
+    """
+    output_root = output_root.resolve()
+    _refuse_dangerous_root(output_root)
+    if not output_root.is_dir():
+        return 0
+    pruned = 0
+    for child in output_root.iterdir():
+        if child.is_dir() and _is_capture_run_dir(child):
+            shutil.rmtree(child)
+            pruned += 1
+    return pruned
+
+
 def capture_all_scenarios(
     output_root: Path,
     scenario_ids: list[str] | None = None,
     *,
-    clean: bool = False,
+    prune_runs: bool = False,
 ) -> dict[str, Any]:
     """Capture every admitted scenario from the registry into a fresh run dir.
 
@@ -34,8 +103,9 @@ def capture_all_scenarios(
     recorded as a failure and still emits a stage-tagged manifest so the failing
     phase is diagnosable instead of vanishing into a bare traceback.
 
-    When ``clean`` is set, any prior run directories under ``output_root`` are
-    removed first so the batch cannot silently mix stale artifacts.
+    When ``prune_runs`` is set, only historical Xenix run directories already under
+    ``output_root`` are removed first; ``output_root`` itself and any sibling
+    content are left intact.
     """
     app = QApplication.instance()
     if not isinstance(app, QApplication):
@@ -52,8 +122,8 @@ def capture_all_scenarios(
         expected = [scenario.id for scenario in list_scenarios()]
 
     output_root = output_root.resolve()
-    if clean and output_root.exists():
-        shutil.rmtree(output_root)
+    if prune_runs:
+        prune_run_directories(output_root)
     output_root.mkdir(parents=True, exist_ok=True)
 
     run_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%S%fZ")
@@ -191,7 +261,11 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Capture all admitted Xenix UI scenarios")
     parser.add_argument("--output", type=Path, required=True, help="Artifact output root")
     parser.add_argument("--scenario", action="append", default=None, help="Capture only this scenario (repeatable)")
-    parser.add_argument("--clean", action="store_true", help="Remove prior run directories before capturing")
+    parser.add_argument(
+        "--prune-runs",
+        action="store_true",
+        help="Remove only historical Xenix capture run dirs under --output before capturing",
+    )
     parser.add_argument("--verify", type=Path, default=None, help="Verify an existing capture run directory")
     args = parser.parse_args()
 
@@ -200,7 +274,7 @@ def main() -> int:
         print(json.dumps(report, ensure_ascii=False, sort_keys=True))
         return 0 if report["complete"] else 1
 
-    batch = capture_all_scenarios(args.output.resolve(), args.scenario, clean=args.clean)
+    batch = capture_all_scenarios(args.output.resolve(), args.scenario, prune_runs=args.prune_runs)
     print(json.dumps(batch, ensure_ascii=False, sort_keys=True))
     return 0 if batch["reconciled"] else 1
 

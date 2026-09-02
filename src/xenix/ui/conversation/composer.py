@@ -203,6 +203,7 @@ class ChatComposer(QWidget):
             self._preparing_submission = False
             self._set_composer_drop_hover(False)
             self.clear_step_confirmation()
+        self._sync_attachment_removal()
         self._sync_send_button_text()
         self._sync_composer_controls_enabled()
 
@@ -556,6 +557,14 @@ class ChatComposer(QWidget):
         self._model_picker.setEnabled(bool(self._model_options) and can_edit)
         self._step_continue_button.setEnabled(self._awaiting_step_confirmation)
         self._step_stop_button.setEnabled(self._awaiting_step_confirmation)
+
+    def _sync_attachment_removal(self) -> None:
+        enabled = not self._running and not self._preparing_submission
+        for index in range(self._attachment_layout.count()):
+            item = self._attachment_layout.itemAt(index)
+            widget = item.widget() if item is not None else None
+            if isinstance(widget, AttachmentChip):
+                widget.set_removal_enabled(enabled)
 
     def _refresh_attachment_chips(self) -> None:
         while self._attachment_layout.count() > 1:

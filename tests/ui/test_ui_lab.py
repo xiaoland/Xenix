@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytest
 
+from PySide6.QtCore import QEvent
 from PySide6.QtWidgets import QApplication, QWidget
 from pytestqt.qtbot import QtBot
 
@@ -128,6 +129,10 @@ def test_running_scenario_exposes_stop_contract(qapp: QApplication, qtbot: QtBot
     view = handle.root
     assert isinstance(view, ThreadDetailView)
 
+    # Flush deleteLater from the scenario's attachment chip refreshes so the
+    # remove controls below reflect the settled widget tree.
+    QApplication.sendPostedEvents(None, QEvent.DeferredDelete)
+
     assert view.composer.send_button.accessibleIdentifier() == "chat.composer.send-or-stop"
     assert view.composer.send_button.accessibleName() == view.tr("Stop")
     assert view.composer.send_button.isEnabled()
@@ -138,6 +143,7 @@ def test_running_scenario_exposes_stop_contract(qapp: QApplication, qtbot: QtBot
         str(Path("C:/xenix-synthetic/quarterly-sales.csv").resolve()),
         str(Path("C:/xenix-synthetic/regional-targets.xlsx").resolve()),
     }
+    assert all(not button.isEnabled() for button in remove_buttons)
     handle.cleanup()
 
 
@@ -223,7 +229,7 @@ def test_batch_capture_aggregates_build_failure_with_stage_manifest(qapp, tmp_pa
     assert manifest["stage"] == "build"
 
 
-def test_batch_capture_clean_removes_prior_runs(qapp, tmp_path, monkeypatch) -> None:
+def test_batch_capture_prune_runs_removes_prior_runs(qapp, tmp_path, monkeypatch) -> None:
     from scripts.ui_lab import capture_all as capture_all_module
 
     monkeypatch.setattr(capture_all_module, "list_scenarios", lambda: (get_scenario("chat.empty"),))
@@ -232,10 +238,54 @@ def test_batch_capture_clean_removes_prior_runs(qapp, tmp_path, monkeypatch) -> 
     first = capture_all_module.capture_all_scenarios(output, ["chat.empty"])
     assert (output / first["run_id"] / "batch.json").is_file()
 
-    second = capture_all_module.capture_all_scenarios(output, ["chat.empty"], clean=True)
+    second = capture_all_module.capture_all_scenarios(output, ["chat.empty"], prune_runs=True)
 
     assert not (output / first["run_id"]).exists()
     assert (output / second["run_id"] / "batch.json").is_file()
+
+
+def test_prune_runs_only_removes_xenix_run_dirs(qapp, tmp_path, monkeypatch) -> None:
+    from scripts.ui_lab import capture_all as capture_all_module
+
+    monkeypatch.setattr(capture_all_module, "list_scenarios", lambda: (get_scenario("chat.empty"),))
+    output = tmp_path / "artifacts"
+
+    batch = capture_all_module.capture_all_scenarios(output, ["chat.empty"])
+    genuine = output / batch["run_id"]
+
+    matching_name = output / "20200101T000000000000Z"
+    matching_name.mkdir(parents=True)
+    (matching_name / "batch.json").write_text(
+        json.dumps({"run_id": "20200101T000000000000Z"}), encoding="utf-8"
+    )
+
+    mismatched_run_id = output / "20200102T000000000000Z"
+    mismatched_run_id.mkdir(parents=True)
+    (mismatched_run_id / "batch.json").write_text(
+        json.dumps({"run_id": "20200103T000000000000Z"}), encoding="utf-8"
+    )
+
+    no_batch_json = output / "20200104T000000000000Z"
+    no_batch_json.mkdir()
+
+    not_a_run_id = output / "keep-me"
+    not_a_run_id.mkdir()
+
+    pruned = capture_all_module.prune_run_directories(output)
+
+    assert pruned == 2
+    assert not genuine.exists()
+    assert not matching_name.exists()
+    assert mismatched_run_id.exists()
+    assert no_batch_json.exists()
+    assert not_a_run_id.exists()
+
+
+def test_prune_runs_refuses_dangerous_roots() -> None:
+    from scripts.ui_lab import capture_all as capture_all_module
+
+    with pytest.raises(ValueError, match="Refusing to prune"):
+        capture_all_module.prune_run_directories(Path.home())
 
 
 def test_capture_verifier_reports_missing_artifacts(qapp, tmp_path, monkeypatch) -> None:

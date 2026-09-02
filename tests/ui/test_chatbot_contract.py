@@ -60,3 +60,22 @@ def test_composer_attachment_chip_is_addressable_by_path(qtbot: QtBot, tmp_path)
     assert remove is not None
     assert remove.accessibleIdentifier() == "chat.composer.attachment.remove"
     assert item_reference(remove) == str(attachment.resolve())
+
+
+def test_attachment_remove_is_disabled_while_running(qtbot: QtBot, tmp_path) -> None:
+    view = ThreadDetailView()
+    qtbot.addWidget(view)
+    attachment = tmp_path / "sample.csv"
+    view.restore_composer("", [str(attachment)])
+
+    def remove_button() -> QToolButton | None:
+        return view.composer.findChild(QToolButton, "attachmentChipRemoveButton")
+
+    assert remove_button() is not None
+    assert remove_button().isEnabled()
+
+    view.set_running(True)
+    assert not remove_button().isEnabled()
+
+    view.set_running(False)
+    assert remove_button().isEnabled()

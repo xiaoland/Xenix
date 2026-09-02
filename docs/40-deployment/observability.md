@@ -29,8 +29,10 @@ For source diagnosis, `XENIX_LAYOUT_DEBUG=true` schedules a structured Qt UI
 snapshot after the main layout settles and writes it to the application log. The
 snapshot contains separate QObject-ownership and real `QLayout.itemAt()` trees,
 geometry, size policy, visibility/focus state, semantic identifiers, and render
-structure. Runtime capture omits widget text, combo text, message bodies, field
-values, and paths; it never takes a screenshot.
+structure. Runtime capture omits widget text, combo text, message bodies, and
+field values; it never takes a screenshot. The structured tree retains semantic
+identifiers and per-item references, and for file-attachment chips those
+references are resolved source paths, so the tree is not path-redacted.
 
 Direct tests can explicitly register a synthetic root with the scoped
 `ui_artifacts` fixture. A call failure writes `manifest.json`, `tree.json`,
