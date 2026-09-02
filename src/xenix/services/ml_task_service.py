@@ -184,6 +184,19 @@ class MLTaskService:
             self._record_task(row)
             return row
 
+    def set_request_payload(self, ml_task_id: str, request_payload: dict[str, Any]) -> MLTaskRow:
+        """Persist a task's request payload once its task id is assigned."""
+
+        with self._session_factory() as session:
+            row = self._ml_tasks.get(session, ml_task_id)
+            if row is None:
+                raise NotFoundError(f"ML task '{ml_task_id}' was not found.")
+            row.request_payload = dict(request_payload)
+            session.add(row)
+            session.commit()
+            session.refresh(row)
+            return row
+
     @property
     def max_concurrent_tasks(self) -> int:
         return max(1, int(getattr(self._worker_runner, "max_concurrent_tasks", 1)))

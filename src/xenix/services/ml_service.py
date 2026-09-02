@@ -52,7 +52,7 @@ from .storage.models import (
     MLTaskType,
     TrainedModelRow,
 )
-from .storage.repositories import DatasetColumnBindingRepository, MLTaskRepository, TrainedModelRepository
+from .storage.repositories import DatasetColumnBindingRepository, TrainedModelRepository
 from .trained_model_metadata import parse_trained_model_metadata, with_evaluation, with_evaluation_task
 from .tabular import resolve_tabular_column_index, resolve_tabular_schema
 
@@ -165,7 +165,6 @@ class MLService:
         self._ml_task_service = ml_task_service
         self._scheduler = scheduler or self._build_default_scheduler()
         self._trained_models = TrainedModelRepository()
-        self._ml_tasks = MLTaskRepository()
         self._column_bindings = DatasetColumnBindingRepository()
         self._ml_task_service.register_completion_listener(self._handle_task_completion)
 
@@ -763,17 +762,13 @@ class MLService:
             )
         )
         request.task_id = created.id
-        with self._session_factory() as session:
-            row = self._ml_tasks.get(session, created.id)
-            if row is None:
-                raise ValidationError("Unable to persist the ML task request.")
-            row.request_payload = request.model_dump(mode="json")
-            session.add(row)
-            session.commit()
-            session.refresh(row)
-            if auto_submit:
-                self._submit_ml_task(created)
-            return row
+        row = self._ml_task_service.set_request_payload(
+            created.id,
+            request.model_dump(mode="json"),
+        )
+        if auto_submit:
+            self._submit_ml_task(created)
+        return row
 
     def _build_apply_context(self, input_data: ApplyWithFilesInput) -> "_ApplyContext":
         trained_model_id = input_data.trained_model_id.strip()
