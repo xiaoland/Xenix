@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from xenix.main import _preserve_failure_evidence, _redact_error, _remove_isolated_home
-from xenix.runtime_profile import Capabilities, RuntimeProfile, RuntimeProfileContext
+from xenix.runtime_profile import RuntimeProfile, RuntimeProfileContext
 
 
 def test_redact_error_replaces_paths_and_bounds_length() -> None:
@@ -16,7 +16,7 @@ def test_redact_error_replaces_paths_and_bounds_length() -> None:
 
 
 def test_remove_isolated_home_deletes_directory(tmp_path: Path) -> None:
-    home = tmp_path / "xenix-agent-dev-0123456789ab"
+    home = tmp_path / "xenix-isolated-0123456789ab"
     (home / "state").mkdir(parents=True)
 
     _remove_isolated_home(home)
@@ -40,9 +40,8 @@ def test_preserve_failure_evidence_writes_bounded_redacted_json(
 ) -> None:
     monkeypatch.setenv("XENIX_EVIDENCE_DIR", str(tmp_path / "evidence"))
     profile = RuntimeProfileContext(
-        RuntimeProfile.AGENT_DEV,
+        RuntimeProfile.ISOLATED,
         tmp_path / "home",
-        Capabilities.agent_safe(),
         "run-123",
         True,
     )
@@ -52,6 +51,6 @@ def test_preserve_failure_evidence_writes_bounded_redacted_json(
     output = tmp_path / "evidence" / "run-123" / "failure.json"
     assert output.exists()
     payload = json.loads(output.read_text(encoding="utf-8"))
-    assert payload["profile"] == "agent-dev"
+    assert payload["profile"] == "isolated"
     assert payload["run_id"] == "run-123"
     assert "boom" in payload["error"]

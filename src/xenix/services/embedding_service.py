@@ -198,19 +198,13 @@ class _OpenAICompatibleEmbeddingSession:
 class OpenAICompatibleEmbeddingService:
     """OpenAI-compatible adapter with an explicit immutable operation snapshot."""
 
-    def __init__(self, settings_source: EmbeddingSettingsSource, *, allow_live: bool = True) -> None:
+    def __init__(self, settings_source: EmbeddingSettingsSource) -> None:
         self._settings_source = settings_source
-        self._allow_live = allow_live
 
     def __repr__(self) -> str:
         return f"{type(self).__name__}()"
 
     def freeze(self) -> EmbeddingSession | None:
-        # An agent-safe profile treats embedding as unavailable rather than
-        # raising, so knowledge recovery skips the remote semantic index instead
-        # of failing startup on a denied live edge.
-        if not self._allow_live:
-            return None
         settings = self._settings_snapshot()
         if not settings.enabled:
             return None

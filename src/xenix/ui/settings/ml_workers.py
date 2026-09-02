@@ -18,13 +18,10 @@ class MLWorkers(QWidget):
     def __init__(
         self,
         ml_worker_settings_service: MLWorkerSettingsService,
-        *,
-        ssh_worker_setup_allowed: bool = True,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
         self._service = ml_worker_settings_service
-        self._ssh_worker_setup_allowed = ssh_worker_setup_allowed
         self._wizard: SshWorkerSetupWizard | None = None
 
         self._title_label = QLabel()
@@ -39,8 +36,6 @@ class MLWorkers(QWidget):
         layout.addRow(self._summary_label)
         layout.addRow(self._setup_button)
         self._setup_button.clicked.connect(self._open_ssh_worker_wizard)
-        if not self._ssh_worker_setup_allowed:
-            self._setup_button.setEnabled(False)
         self.retranslate_ui()
 
     def refresh(self) -> None:
@@ -71,12 +66,6 @@ class MLWorkers(QWidget):
         super().changeEvent(event)
 
     def _open_ssh_worker_wizard(self) -> None:
-        # An agent-safe profile denies SSH worker setup at the composition seam:
-        # constructing the wizard (and its SshWorkerSetupService) would let it
-        # write ~/.ssh/config and run ssh/scp. Refuse here rather than hiding the
-        # side-effect entry in a lower layer.
-        if not self._ssh_worker_setup_allowed:
-            return
         wizard = SshWorkerSetupWizard(self._service, parent=self)
         wizard.worker_saved.connect(self.refresh)
         wizard.worker_saved.connect(self.worker_saved.emit)

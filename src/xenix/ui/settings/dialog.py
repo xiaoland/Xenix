@@ -64,7 +64,6 @@ class SettingsDialog(QDialog):
         update_service: UpdateService | None = None,
         paddle_ocr_deployment: PaddleOcrDeploymentService | None = None,
         knowledge_index_service: KnowledgeIndexService | None = None,
-        ssh_worker_setup: bool = True,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
@@ -101,10 +100,7 @@ class SettingsDialog(QDialog):
         self._index_card.set_content(self._index_status)
 
         self._ml_workers_card = Card()
-        self._ml_workers = MLWorkers(
-            ml_worker_settings_service,
-            ssh_worker_setup_allowed=ssh_worker_setup,
-        )
+        self._ml_workers = MLWorkers(ml_worker_settings_service)
         self._ml_workers_card.set_content(self._ml_workers)
 
         self._tab_indexes: dict[SettingsTab, int] = {}

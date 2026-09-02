@@ -35,14 +35,9 @@ def build_argument_parser() -> argparse.ArgumentParser:
         help="Initialize the native app and exit after startup validation.",
     )
     parser.add_argument(
-        "--agent-dev",
+        "--isolated",
         action="store_true",
-        help="Agent-safe profile with a unique fresh home and remote-capability denial.",
-    )
-    parser.add_argument(
-        "--ephemeral",
-        action="store_true",
-        help="Unique fresh home with real local bootstrap on fresh state and remote-capability denial.",
+        help="Run with a unique fresh temp home; never read, migrate, or write the real user home.",
     )
     return parser
 
@@ -53,8 +48,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     # Resolve the typed profile before application import/composition so the
     # home, home-scoped mutex, and capability denials are fixed first.
     profile = resolve_runtime_profile(
-        agent_dev=args.agent_dev,
-        ephemeral=args.ephemeral,
+        isolated=args.isolated,
         smoke_test=args.smoke_test,
     )
     if profile.isolated_home:
@@ -62,7 +56,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     _print_run_manifest(profile)
     guard = SingleInstanceGuard(profile.mutex_name())
     try:
-        exit_code = run(smoke_test=args.smoke_test, capabilities=profile.capabilities)
+        exit_code = run(smoke_test=args.smoke_test)
     except BaseException:
         if profile.isolated_home:
             exc_type, exc_value, _tb = sys.exc_info()

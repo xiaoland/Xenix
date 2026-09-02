@@ -100,8 +100,6 @@ def build_headless_agent_services(
     embedding_settings_service: EmbeddingSettingsService,
     ml_worker_settings: MLWorkerSettingsService,
     usage_observability: LLMUsageObservability,
-    remote_ml_workers: bool = True,
-    live_llm: bool = True,
 ) -> HeadlessAgentServices:
     """Build the production Agent graph without owning its runtime lifecycle.
 
@@ -150,7 +148,6 @@ def build_headless_agent_services(
         session_factory,
         paths,
         worker_settings_service=ml_worker_settings,
-        allow_remote_workers=remote_ml_workers,
     )
     ml = LazyMLService(
         paths=paths,
@@ -159,9 +156,7 @@ def build_headless_agent_services(
         ml_task_service=ml_task_service,
     )
     artifacts = ArtifactService(session_factory)
-    embedding = OpenAICompatibleEmbeddingService(
-        embedding_settings_service, allow_live=live_llm
-    )
+    embedding = OpenAICompatibleEmbeddingService(embedding_settings_service)
     semantic_knowledge = KnowledgeSemanticService(
         session_factory,
         embedding_service=embedding,
