@@ -46,6 +46,10 @@ behavior except where a small, verifiable correction is clearly warranted.
   `tools.py` 2386 → 512 lines + `_data_tools.py` / `_analysis_tools.py` /
   `_model_tools.py`.
 - Slice 8 (ML waiting moved from agent layer to `MLService`) landed.
+- Slice 9 (delete agent-side projection/compaction) landed.
+- Slice 10 (delete low-value projection/shape tests) landed.
+- Slice 11 (remove async ML; timeout = notification + `model.task.stop`) landed.
+- Slice 12 (generic `result.page` paged tool results) landed; inline threshold 2048 chars.
 
 ## Refined direction (KISS / minimal)
 
@@ -69,12 +73,16 @@ The earlier work only relocated code. The real debt is **over-implementation**:
 
 ## Next Step
 
-Execute the refined direction:
+Slice 13 — super-large file slimming (see `plan.md`). Execute A→B→C→D→E, excluding
+the UI cluster. Each category lands as its own verified commit. Approved scope:
 
-1. Delete ML summary projection + cleaning compaction; return domain results.
-2. Delete projection-shape tests and other shape/static-check tests.
-3. Evaluate/delete async ML (`running_background` + `model.task.query` polling).
-4. Introduce a full-result + paginated query path for over-long outputs instead of truncation.
+- **A.** grep-verified dead-code deletion.
+- **B.** shared-helper extraction (slug/records/columns, digest, role-columns, tfidf,
+  knowledge bundle/retry helpers, duplicated file-authority check).
+- **C.** boundary fixes (repositories for dataset/knowledge persistence, storage→services
+  import, ml_service request_payload overwrite).
+- **D.** god-object extraction (thread titles, finalize dedup, wordcloud SVG, smoke checks).
+- **E.** retire legacy `Tokenized*` services (product approved).
 
 ## Open follow-up
 

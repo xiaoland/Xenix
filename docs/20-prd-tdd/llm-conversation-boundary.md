@@ -71,6 +71,13 @@ Tool modules.
   value. Provider adapters only encode that value for their wire protocol, and
   Chatbot projection only copies/renders it; neither owns a raw-result fallback
   or a second semantic result representation.
+- A ToolResult whose serialized value exceeds the inline bound is materialized
+  once into a filesystem-backed paged store (`state/paged_results/`) and the
+  boundary returns a bounded paged handle (`result_id`, `total_chars`, `page_size`,
+  `offset`, first page, `has_more`) instead of truncating or failing. The generic
+  `result.page` Tool reads later pages by character range. The store is a bounded
+  replay surface, not a second semantic authority or conversation record; it is
+  cleaned on Thread deletion and by age-based GC at startup.
 - DatasetService owns materialized data and original-source provenance. After a
   snapshot is loaded, Harness may derive an ephemeral source attachment for
   Chatbot display. That presentation is not canonical content, provider input,

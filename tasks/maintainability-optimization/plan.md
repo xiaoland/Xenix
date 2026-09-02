@@ -66,23 +66,49 @@ called out in the slice and covered by a test.
 - `MLService.wait_for_task` / `wait_for_training_models` own polling + follow-up tracking;
   agent layer no longer waits.
 
-## Slice 9 — Remove agent-side projection (KISS)
+## Slice 9 — Remove agent-side projection (KISS) (complete)
 
 - Delete ML summary projection in `_model_tools.py` (~570 lines) and cleaning
   compaction in `_data_tools.py` (~190 lines); return domain results directly.
 - No sanitization/desensitization.
 
-## Slice 10 — Delete low-value tests
+## Slice 10 — Delete low-value tests (complete)
 
 - Remove projection-shape tests and any test that re-asserts data-model shapes or
   static-check responsibilities (types/schema/enums).
 
-## Slice 11 — Evaluate/remove async ML
+## Slice 11 — Evaluate/remove async ML (complete)
 
 - Remove the grace-period wait + `running_background` receipt + `model.task.query`
   polling if ROI confirms low value; make ML tools synchronous.
+- Landed as: timeout reports status/logs (notification, not cancel) + `model.task.stop`.
 
-## Slice 12 — Full-result + paginated query (replace truncation)
+## Slice 12 — Full-result + paginated query (replace truncation) (complete)
 
 - Persist over-long tool output; expose a dedicated query tool (pagination / row
   reading) instead of truncating.
+- Landed as: `ToolResultPageStore` (`state/paged_results/`, char-based), invoke-boundary
+  paging, generic `result.page` tool, inline threshold 2048 chars.
+
+## Slice 13 — Super-large file slimming (audit → execute)
+
+Scope: everything except the UI cluster. Categories from the 5-agent audit:
+
+- **A. Dead code** (zero risk): remove grep-verified-unreferenced methods/fields across
+  `ml/models/base.py`, `ml/models/text_analysis.py`, `knowledge_pipeline.py`,
+  `knowledge_import_service.py`, `llm/conversation.py`, `llm/tooling.py`, `llm/providers.py`,
+  `ml_task_service.py`, `ml_service.py`, `paddle_ocr_service.py`, `agent/harness_service.py`,
+  `analysis_graph.py`, `data_transform.py`, `data_cleaning.py`.
+- **B. De-duplicate helpers** (low risk): shared `_slug`/`_records`/`_columns`, sha256-json
+  digest, `_role_columns`/`_single_role_column`/`_optional_role_column`, `_tfidf`/`_as_text_series`,
+  knowledge canonical-bundle + Windows retry/link helpers, and the duplicated file-authority
+  check in `data_transform.py`.
+- **C. Boundary fixes** (medium risk, highest value): move dataset provenance persistence
+  (`dataset_service.py`) and knowledge import persistence (`knowledge_import_service.py`) into
+  repositories; fix `storage/repositories/knowledge.py` storage→services import; fix
+  `ml_service.py` request_payload overwrite.
+- **D. God-object extraction** (medium risk): `conversation.py` thread-title subsystem,
+  `ml_task_service.py` finalize dedup, `analysis_graph.py` SVG/wordcloud block, `app.py` smoke checks.
+- **E. Product-gated retirement** (approved): retire the 4 legacy `Tokenized*` services in
+  `ml/models/text_analysis.py` (~900 lines) that duplicate `text_discovery.py` math, plus their
+  params and registry exports.
