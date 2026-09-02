@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import hashlib
-import json
 import math
 import time
 import warnings
@@ -20,6 +18,7 @@ from statsmodels.tsa.statespace.sarimax import SARIMAX
 
 from ....exceptions import ValidationError
 from ...storage.models import ProblemKind
+from ..digests import sha256_json
 from ..contracts import (
     ApplySummary,
     ApplyTaskRequest,
@@ -1031,13 +1030,7 @@ def _require_finite(values: np.ndarray, label: str, group_index: int | None) -> 
 
 
 def _digest_json(value: Any) -> str:
-    encoded = json.dumps(
-        value,
-        ensure_ascii=False,
-        separators=(",", ":"),
-        sort_keys=True,
-    ).encode("utf-8")
-    return hashlib.sha256(encoded).hexdigest()
+    return sha256_json(value)
 
 
 _FORECAST_TRAIN_ROLE_SCHEMA = ModelRoleSchema(
