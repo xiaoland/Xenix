@@ -84,6 +84,25 @@ the UI cluster. Each category lands as its own verified commit. Approved scope:
 - **D.** god-object extraction (thread titles, finalize dedup, wordcloud SVG, smoke checks).
 - **E.** retire legacy `Tokenized*` services (product approved).
 
+## Slice 13 progress
+
+Landed (committed on `develop`):
+
+- **A (dead code)** `f5b3953`: base/conversation/tooling/providers/harness/knowledge/
+  analysis_graph/paddle_ocr. ~116 lines.
+- **B (dedup)** `4c87cb5` (SQL file-authority + `_role_columns`), `df03d68`
+  (sha256-json → `digests.sha256_json`). Deferred as higher-risk/low-value: digest flag
+  unification, base `_build_pipeline` cross-class, knowledge bundle/retry module, `_slug`/`_tfidf`.
+- **E (Tokenized retirement)** `4676a2f`: full deletion (product chose "break legacy
+  analyzers"); registry/`__init__`/tests/SKILL.md updated. ~861 lines.
+- **Compat alias/fallback** `4297387`: removed `paddle_ocr.status()` alias + `getattr` fallbacks.
+- **C4 (request_payload)** `f869a19`: `MLTaskService.set_request_payload`; removed dead
+  `ml_service._ml_tasks`.
+
+Remaining: **C1** (dataset provenance → repositories), **C2** (knowledge import → repository),
+**C3** (storage→services `knowledge_projection` import), **D** (thread titles / finalize dedup /
+wordcloud SVG / smoke checks), plus lower-value **B** leftovers.
+
 ## Open follow-up
 
 - `_compact_table` (data.query result) still needs a decision once truncation is
