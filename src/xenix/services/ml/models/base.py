@@ -32,6 +32,7 @@ from ..contracts import (
     SplitFacts,
     TuningSummary,
     TrainingScopeFacts,
+    _role_columns,
 )
 from ..clustering_evidence import ClusteringEvaluationFacts
 from ..dataset_loader import load_dataset, load_holdout_frame
@@ -820,15 +821,6 @@ def _is_unlabeled_value(value: Any) -> bool:
     except TypeError:
         pass
     return isinstance(value, str) and not value.strip()
-
-
-def _role_columns(role_bindings: list[dict[str, Any]], role: str) -> list[str]:
-    for binding in role_bindings:
-        if binding.get("role") == role:
-            columns = binding.get("columns")
-            if isinstance(columns, list):
-                return [str(column) for column in columns]
-    return []
 
 
 class UnsupervisedClusteringModelService(ModelServiceBase):

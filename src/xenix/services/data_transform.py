@@ -203,13 +203,7 @@ class DuckDbSqlValidator:
         if disallowed:
             raise ValidationError(f"SQL contains unsupported statement keyword: {disallowed[0]}.")
 
-        for index, token in enumerate(significant):
-            if token.kind == "word" and token.lower in _DISALLOWED_FUNCTIONS:
-                next_token = significant[index + 1] if index + 1 < len(significant) else None
-                if next_token is None or next_token.value == "(":
-                    raise ValidationError(f"SQL cannot call DuckDB file scan function '{token.value}'.")
-            if token.kind == "string" and self._previous_word(significant, index) in {"from", "join"}:
-                raise ValidationError("SQL cannot read direct file paths; use registered dataset bindings.")
+        self._validate_no_file_authority(significant)
 
         referenced_aliases = sorted(
             {
@@ -273,16 +267,13 @@ class DuckDbSqlValidator:
             normalized = normalized[:-1].rstrip()
         return normalized
 
-    def normalize_alias(self, alias: str) -> str:
-        return self._normalize_alias(alias)
-
     def _validate_aliases(self, bindings: list[DatasetSqlBinding]) -> list[str]:
         if not bindings:
             raise ValidationError("At least one dataset binding is required.")
         aliases: list[str] = []
         seen: set[str] = set()
         for binding in bindings:
-            alias = self._normalize_alias(binding.alias)
+            alias = self.normalize_alias(binding.alias)
             lowered = alias.lower()
             if lowered in seen:
                 raise ValidationError(f"Dataset binding alias '{alias}' is duplicated.")
@@ -290,7 +281,7 @@ class DuckDbSqlValidator:
             aliases.append(alias)
         return aliases
 
-    def _normalize_alias(self, alias: str) -> str:
+    def normalize_alias(self, alias: str) -> str:
         normalized = str(alias or "").strip()
         if not normalized:
             raise ValidationError("Dataset binding alias cannot be empty.")
