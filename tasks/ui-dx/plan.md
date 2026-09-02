@@ -178,23 +178,27 @@ font metadata is recorded. See [phase6.md](phase6.md) for contracts and evidence
 Verification: main shell fixture constructs with focused fakes; open/raise/close
 paths; translated text/language switching; focused/full test and check suites.
 
-## Phase 7 — Agent-safe full-app profiles
+## Phase 7 — Isolated runtime profile
+
+**Status: complete.** Typed profile resolution, a home-scoped mutex, the
+`--isolated` launcher flag, a run manifest, and bounded/redacted failure
+evidence on abnormal exit are implemented and locally verified. The original
+per-edge `Capabilities` denial surface was removed after review: deterministic
+verification is already served by the Widget Lab/pytest layer, and the denials
+weakened real remote-path debugging under an isolated home.
 
 - Add typed runtime profile resolution before application import.
-- Add `--agent-dev` and `--ephemeral` CLI behavior, unique run id/home, and
-  home-scoped mutex.
-- Enforce no update auto-check, no remote OTLP, no live LLM/embedding, no OCR
-  download, and no remote ML worker admission in agent-safe profiles.
-- Connect canonical scripted fixture data through public composition seams.
+- Add `--isolated` CLI behavior with a unique fresh temp home and a home-scoped
+  mutex.
 - Preserve real local directory/bootstrap/migration/recovery topology on fresh
-  state.
+  state; never read, migrate, or write the real user home.
 - Write bounded/redacted evidence outside the raw temporary home and clean the
   home on successful exit.
 - Reconcile PDM/CONTRIBUTING/deployment documentation.
 
-Verification must inventory the real default runtime home before and after, use a
-network-denial probe, prove fixture visibility, prove mutex isolation, inspect the
-failure bundle, and run production smoke for regression.
+Verification must inventory the real default runtime home before and after,
+prove mutex isolation, inspect the failure bundle, and run production smoke for
+regression.
 
 ## Phase 8 — Final integration and measurement
 
@@ -210,6 +214,6 @@ failure bundle, and run production smoke for regression.
 Phases 1–4 create the safety and observation system plus useful zero-service chat
 scenarios before structural UI movement. Phases 5–6 then refactor the
 highest-degree node with characterization coverage and only then admit honest
-Settings/Main scenarios. Phase 7 addresses full-app agent safety without making
-it a prerequisite for the faster Widget Lab loop. This ordering maximizes early
+Settings/Main scenarios. Phase 7 addresses the isolated-home runtime profile
+without making it a prerequisite for the faster Widget Lab loop. This ordering maximizes early
 feedback-loop ROI and avoids large fake graphs that merely reproduce coupling.

@@ -61,7 +61,7 @@ flowchart TD
     W --> E[Evidence capture]
     T --> E
 
-    X[Production or agent-dev launcher] --> RP[RuntimeProfile]
+    X[Production or isolated launcher] --> RP[RuntimeProfile]
     RP --> CR[Composition root]
     CR --> CC[Conversation controller/port]
     CR --> AC[Auxiliary-window coordinator]
@@ -289,27 +289,22 @@ reason.
 ```text
 RuntimeProfile
   PRODUCTION
-  DEVELOPMENT
-  AGENT_DEV
-  EPHEMERAL_SMOKE
+  ISOLATED
 ```
 
-| Policy | Production | Development | Agent dev | Ephemeral smoke |
-| --- | --- | --- | --- | --- |
-| Home | platform default | explicit durable dev home | unique fresh home | unique fresh home |
-| Network | configured | configured/explicit | deny by default | deny |
-| Update auto-check | normal | normal | disabled | disabled |
-| OTLP export | configured | explicit | disabled | disabled |
-| Fixtures | none | none | deterministic synthetic | smoke only |
-| Local bootstrap/recovery | real | real | real on fresh state | real on fresh state |
-| Mutex | production scope | dev scope | home fingerprint | home fingerprint |
-| Failure evidence | normal diagnostics | normal diagnostics | bounded/redacted | bounded/redacted |
+| Policy | Production | Isolated |
+| --- | --- | --- |
+| Home | platform default | unique fresh temp home |
+| Local bootstrap/recovery | real | real on fresh state |
+| Mutex | production scope | home fingerprint |
+| Failure evidence | normal diagnostics | bounded/redacted |
 
-`--agent-dev` and `--ephemeral` are distinct user concepts but compose into the
-agent-safe full-app command. The launcher resolves an explicit typed profile before
-importing the application and prints a small run manifest. Remote denial is
-enforced where adapters are composed; changing environment variables alone is not
-sufficient.
+`--isolated` selects a unique fresh home under the system temp root; the real
+user home is never read, migrated, or written. The launcher resolves an explicit
+typed profile before importing the application and prints a small run manifest.
+Remote capability admission is not part of the profile: it stays governed by
+each service's own settings and environment, so an isolated run can still
+exercise the real providers when targeting remote behavior for debugging.
 
 ## Type-checking strategy
 

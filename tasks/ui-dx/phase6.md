@@ -135,7 +135,7 @@ The font policy follows Qt's distinction between a requested
 
 ### Remaining task boundaries
 
-Phase 7's agent-safe whole-app profiles and Phase 8's packaging/final measurement
+Phase 7's isolated runtime profile and Phase 8's packaging/final measurement
 remain separate. The history title delivery gate does not cancel provider I/O
 already in flight; it only prevents late presentation changes. No new service
 cancellation semantics, chatbot file split, or pixel baseline is claimed here.

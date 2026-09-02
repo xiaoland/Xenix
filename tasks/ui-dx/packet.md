@@ -6,7 +6,7 @@ Shorten the UI feedback loop for agents and humans without creating a second
 application architecture. The primary path should render deterministic widget
 states without booting storage, network adapters, update checks, OCR, ML, or the
 user's configuration. The full application path should remain available through
-an explicit isolated/offline runtime profile.
+an explicit isolated runtime profile.
 
 Hypothesis: the highest-return slice is one reusable scenario contract feeding a
 small Qt Widget Lab, widget-contract tests, screenshots, and structured failure
@@ -20,14 +20,15 @@ line-count-driven file splitting.
   approved SVC v14 consumer-baseline cherry-pick `f528d1f`.
 - Branch: `feat/ui-dx`.
 - Worktree: `F:\CODING\Project\Xenix_native-ui-dx`.
-- State: Phases 0–3, 5 and 6 complete; Phase 7 runtime profiles are implemented
-  and locally verified (remote ML worker, SSH worker setup, live LLM/embedding,
-  and update/OTLP denials are wired; isolated home is cleaned on success and
-  bounded redacted evidence is preserved on failure). Two Phase 7 acceptance
-  probes remain: end-to-end subprocess network denial and a real failure-bundle
-  inspection. Phase 4 has passed real positive-path CI/artifact inspection on
-  draft PR #124; whole-job failure/always-upload negative acceptance remains
-  pending.
+- State: Phases 0–3, 5 and 6 complete; Phase 7 runtime profile is implemented
+  and locally verified (`--isolated` selects a unique fresh temp home and never
+  reads, migrates, or writes the real user home; the home is cleaned on success
+  and bounded redacted evidence is preserved on failure). One Phase 7 acceptance
+  probe remains: a real isolated `--isolated --smoke-test` run that leaves no
+  `xenix-isolated-*` home behind. The originally planned `Capabilities` remote
+  denials were removed after review; see [phase7.md](phase7.md). Phase 4 has
+  passed real positive-path CI/artifact inspection on draft PR #124;
+  whole-job failure/always-upload negative acceptance remains pending.
 - Authority: the user has authorized continuation and task-scoped commits without
   further per-phase approval.
 
@@ -37,9 +38,8 @@ line-count-driven file splitting.
   translation, and recovery semantics remain unchanged unless a planned slice
   explicitly proves the change.
 - Agent/test modes must never read, migrate, or write the real user runtime home.
-- Offline modes must disable remote update, telemetry export, LLM, embedding,
-  OCR download, and remote ML worker edges through composition capabilities, not
-  ambient convention alone.
+- Remote capability admission is governed by each service's own settings and
+  environment, not by a launcher profile.
 - CI artifacts never include the raw SQLite database, provider settings,
   credentials, arbitrary user content, or an entire runtime home.
 - `MainWindow` will not receive a single giant dependency bag that merely hides
@@ -112,13 +112,13 @@ line-count-driven file splitting.
   and OCR lifecycle. MainWindow has 8 inputs/591 lines; SettingsDialog has 778
   lines. Five scenes are admitted, resolved font identity prevents icon fallback,
   and full tests pass 208/208. See [phase6.md](phase6.md).
-- Phase 7 implements agent-safe runtime profiles: `RuntimeProfile`,
-  `Capabilities`, home-scoped mutex, `--agent-dev`/`--ephemeral` launcher flags,
-  a run manifest, and composition-based denial of update auto-check, remote OTLP,
-  remote ML worker admission, SSH worker setup, and live LLM/embedding. The
-  launcher cleans an isolated home on success and preserves bounded redacted
-  `failure.json` on failure. Focused UI is 61/61 and an isolated `--agent-dev
-  --smoke-test` run completes with no leftover home. See [phase7.md](phase7.md).
+- Phase 7 implements the isolated runtime profile: `RuntimeProfile`
+  (`production` / `isolated`), a home-scoped mutex, the `--isolated` launcher
+  flag, and a run manifest. The launcher cleans an isolated home on success and
+  preserves bounded redacted `failure.json` on failure. The originally planned
+  `Capabilities` remote-denial surface was dropped so an isolated home does not
+  also force offline behavior. Focused UI is 61/61 and the isolated home is
+  unit-verified; see [phase7.md](phase7.md).
 - Chatbot split (handoff #8, recommended order #3): `ThreadDetailView` is now a
   155-line composition root that forwards signals; the pure event→display-data
   projection lives in `conversation/presentation.py`, the presentation widgets in
@@ -182,11 +182,9 @@ Detailed evidence is in [preflight.md](preflight.md); source research is in
      is covered.
    - Split large files only as these boundaries become real.
 
-7. **Agent-safe full-app profile**
+7. **Isolated runtime profile**
    - Introduce a typed runtime profile propagated from launcher to composition.
-   - `--agent-dev`: deterministic fixtures, explicit remote-capability denial,
-     no automatic update or remote telemetry.
-   - `--ephemeral`: unique runtime home and home-scoped mutex; run real local
+   - `--isolated`: unique fresh temp home and home-scoped mutex; run real local
      bootstrap/recovery topology against fresh state, never the user home.
    - Preserve only bounded, redacted failure evidence outside the temporary home.
 
@@ -213,8 +211,8 @@ Detailed evidence is in [preflight.md](preflight.md); source research is in
 - `MainWindow` focused tests can construct the shell without manually providing
   every concrete application service; the production composition root still
   wires real services explicitly.
-- `--agent-dev --ephemeral` proves that the default user home is unchanged and
-  that remote edges are denied while the main window can still be inspected.
+- `--isolated` proves that the default user home is unchanged while the main
+  window can still be inspected against fresh state.
 - Existing production startup, smoke, translation, and packaged behavior remain
   green.
 - No screenshot baseline is shared across OS/style/font/DPI identities.
@@ -240,8 +238,9 @@ Detailed evidence is in [preflight.md](preflight.md); source research is in
 - D4: structured/semantic assertions are the default; bitmap comparison is narrow.
 - D5: reduce `MainWindow` degree through feature ports/coordinators, not a service
   locator or dependency-parameter object alone.
-- D6: fresh-home isolation preserves production-local bootstrap/recovery behavior;
-  only remote capabilities and fixtures vary by profile.
+- D6: fresh-home isolation preserves production-local bootstrap/recovery behavior
+  and never reaches the real user home; it does not restrict remote capability
+  admission.
 - D7: mypy remains the required checker; no second mandatory Pyright gate.
 - D8: pytest-qt 4.5.0 is admitted by the Python 3.14.2 compatibility spike even
   though its published classifiers currently stop at Python 3.13.
