@@ -17,7 +17,7 @@ from .knowledge_service import (
     bound_knowledge_units,
     prepare_knowledge_search_text,
 )
-from .knowledge_projection import (
+from .storage.knowledge_projection import (
     RETRIEVAL_PROJECTION_VERSION,
     knowledge_unit_id,
     retrieval_content_fingerprint,

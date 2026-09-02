@@ -16,7 +16,7 @@ from .knowledge_service import (
     KnowledgeSemanticIntegrityError,
     KnowledgeSemanticUnavailable,
 )
-from .knowledge_projection import (
+from .storage.knowledge_projection import (
     CORPUS_FINGERPRINT_SCHEMA,
     KnowledgeProjectionIdentity,
     KnowledgeProjectionSnapshot,

@@ -9,7 +9,7 @@ from xenix.services.knowledge_service import (
     bound_knowledge_units,
     prepare_knowledge_search_text,
 )
-from xenix.services.knowledge_projection import (
+from xenix.services.storage.knowledge_projection import (
     RETRIEVAL_PROJECTION_VERSION,
     knowledge_unit_id,
     retrieval_content_fingerprint,

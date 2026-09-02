@@ -37,7 +37,7 @@ from xenix.services.storage.models import (
     KnowledgeVectorGenerationRow,
 )
 from xenix.services.storage.repositories.knowledge import KnowledgeRepository
-from xenix.services.knowledge_projection import (
+from xenix.services.storage.knowledge_projection import (
     RETRIEVAL_PROJECTION_VERSION,
     retrieval_content_fingerprint,
 )

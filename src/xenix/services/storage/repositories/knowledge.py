@@ -15,7 +15,7 @@ from ..models import (
     KnowledgeUnitRow,
     KnowledgeVectorGenerationRow,
 )
-from ...knowledge_projection import (
+from ..knowledge_projection import (
     CORPUS_FINGERPRINT_SCHEMA,
     KnowledgeProjectionIdentity,
     KnowledgeProjectionMetadata,
