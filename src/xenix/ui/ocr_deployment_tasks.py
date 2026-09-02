@@ -28,10 +28,7 @@ class OcrStatusTask(QRunnable):
 
     def run(self) -> None:
         try:
-            status_reader = getattr(self._deployment, "status_snapshot", None)
-            if status_reader is None:
-                status_reader = self._deployment.status
-            status = status_reader()
+            status = self._deployment.status_snapshot()
             if status.state is PaddleOcrState.CHECKING:
                 status = self._deployment.verify_active()
         except Exception:

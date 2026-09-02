@@ -316,11 +316,6 @@ class PaddleOcrDeploymentService:
             generation_id=runtime.generation_id,
         )
 
-    def status(self) -> PaddleOcrStatus:
-        """Compatibility alias for existing service consumers."""
-
-        return self.status_snapshot()
-
     def install(self, progress: Callable[[str], None] | None = None) -> PaddleOcrStatus:
         source = self._bundle_source
         if source is None:
