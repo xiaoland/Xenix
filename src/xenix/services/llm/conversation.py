@@ -10,13 +10,11 @@ from __future__ import annotations
 
 import json
 import logging
-import re
 import threading
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any
 
 from pydantic import field_validator
@@ -43,15 +41,11 @@ from ..storage.repositories import ConversationRepository
 from .messages import (
     AssistantOutputItem,
     CanonicalMessageBlock,
-    DatasetBlock,
-    MarkdownBlock,
     ProviderOutputItem,
     SourceAttachmentBlock,
-    TextBlock,
     ToolCallOutputItem,
     blocks_from_payload,
     blocks_to_json,
-    blocks_to_markdown,
     normalize_message_blocks,
 )
 from .providers import (
@@ -75,15 +69,19 @@ from .tooling import (
     terminal_tool_result,
     tool_failure_from_exception,
 )
+from .thread_titles import (
+    THREAD_TITLE_SYSTEM_PROMPT,
+    assistant_response_text,
+    fallback_initial_thread_title,
+    initial_thread_title_prompt,
+    is_initial_title_eligible,
+    is_initial_title_target,
+    sanitize_thread_title,
+    thread_title_snapshot_prompt,
+)
 
 
 LOGGER = logging.getLogger(__name__)
-THREAD_TITLE_MAX_LENGTH = 80
-THREAD_TITLE_SYSTEM_PROMPT = (
-    "You generate concise conversation titles for Xenix threads. "
-    "Return exactly one title only. Use the user's language when it is clear. "
-    "Do not include quotes, markdown, labels, or trailing punctuation."
-)
 
 
 def _utc_now() -> datetime:
@@ -233,7 +231,7 @@ class LLMConversationService:
         if not self.has_thread_title_model():
             raise ValidationError("Thread title model is not configured.")
         title = self._model_thread_title(
-            self._thread_title_snapshot_prompt(self.get_thread_snapshot(thread_id)),
+            thread_title_snapshot_prompt(self.get_thread_snapshot(thread_id)),
             thread_id=thread_id,
         )
         if title is None:
@@ -265,12 +263,12 @@ class LLMConversationService:
             if appended_snapshot.thread.id != thread_id:
                 raise ValidationError("The supplied append snapshot belongs to a different Thread.")
             snapshot = appended_snapshot
-            if not self._is_initial_title_target(snapshot, first_user_message_id):
+            if not is_initial_title_target(snapshot, first_user_message_id):
                 return self.get_thread_snapshot(thread_id)
         else:
             with self._gate(thread_id):
                 snapshot = self.get_thread_snapshot(thread_id)
-                if not self._is_initial_title_target(snapshot, first_user_message_id):
+                if not is_initial_title_target(snapshot, first_user_message_id):
                     return snapshot
 
         try:
@@ -461,7 +459,7 @@ class LLMConversationService:
                     thread_id=thread_id,
                     expected_frontier_id=expected_frontier_id,
                     client_submission_id=normalized_id,
-                    initial_title_eligible=self.is_initial_title_eligible(snapshot),
+                    initial_title_eligible=is_initial_title_eligible(snapshot),
                 )
 
     def release_user_submission_claim(self, claim: SubmissionClaim) -> None:
@@ -1032,23 +1030,13 @@ class LLMConversationService:
         }
         return self._require_llm_service().complete(**arguments)
 
-    def is_initial_title_eligible(self, snapshot: ConversationSnapshot) -> bool:
-        """Whether an append may establish this Thread's initial title."""
-
-        final_messages = [
-            message
-            for message in snapshot.messages
-            if message.kind is not ConversationMessageKind.PENDING_LLM_SAMPLING
-        ]
-        return _is_blank_thread_title(snapshot.thread.title) and not final_messages
-
     def _automatic_initial_thread_title(self, snapshot: ConversationSnapshot) -> str:
-        fallback = self._fallback_initial_thread_title(snapshot)
+        fallback = fallback_initial_thread_title(snapshot)
         if not self.has_thread_title_model():
             return fallback
         try:
             title = self._model_thread_title(
-                self._initial_thread_title_prompt(snapshot),
+                initial_thread_title_prompt(snapshot),
                 thread_id=snapshot.thread.id,
             )
             if title is None:
@@ -1068,7 +1056,7 @@ class LLMConversationService:
             ],
             thread_id=thread_id,
         )
-        return _sanitize_thread_title(_assistant_response_text(response))
+        return sanitize_thread_title(assistant_response_text(response))
 
     def _complete_thread_title(
         self,
@@ -1117,83 +1105,6 @@ class LLMConversationService:
         if not isinstance(value, str):
             return None
         return value.strip() or None
-
-    @staticmethod
-    def _is_initial_title_target(snapshot: ConversationSnapshot, first_user_message_id: str) -> bool:
-        final_messages = [
-            message
-            for message in snapshot.messages
-            if message.kind is not ConversationMessageKind.PENDING_LLM_SAMPLING
-        ]
-        return (
-            _is_blank_thread_title(snapshot.thread.title)
-            and len(final_messages) == 1
-            and final_messages[0].id == first_user_message_id
-            and final_messages[0].kind is ConversationMessageKind.USER
-        )
-
-    @staticmethod
-    def _initial_thread_title_prompt(snapshot: ConversationSnapshot) -> str:
-        first_message = next(
-            (
-                message
-                for message in snapshot.messages
-                if message.kind is ConversationMessageKind.USER
-            ),
-            None,
-        )
-        content = (
-            blocks_to_markdown(blocks_from_payload(first_message.content_payload))
-            if first_message is not None
-            else ""
-        )
-        return "Create a short title for this first user message.\n\nMessage:\n" + content
-
-    @staticmethod
-    def _thread_title_snapshot_prompt(snapshot: ConversationSnapshot) -> str:
-        messages = [
-            {
-                "kind": message.kind.value,
-                "text": _thread_title_message_text(message),
-            }
-            for message in snapshot.messages
-            if message.kind is not ConversationMessageKind.PENDING_LLM_SAMPLING
-        ]
-        payload = {
-            "thread_id": snapshot.thread.id,
-            "current_title": snapshot.thread.title,
-            "messages": messages,
-        }
-        return (
-            "Create a short title for this full conversation thread. "
-            "Use all persisted messages in the JSON payload.\n\n"
-            f"{json.dumps(payload, ensure_ascii=False)}"
-        )
-
-    @staticmethod
-    def _fallback_initial_thread_title(snapshot: ConversationSnapshot) -> str:
-        first_message = next(
-            (
-                message
-                for message in snapshot.messages
-                if message.kind is ConversationMessageKind.USER
-            ),
-            None,
-        )
-        if first_message is None:
-            return "New analysis"
-        for block in blocks_from_payload(first_message.content_payload):
-            if isinstance(block, (TextBlock, MarkdownBlock)):
-                title = _sanitize_thread_title(block.text)
-            elif isinstance(block, DatasetBlock):
-                title = _sanitize_thread_title(block.name)
-            elif isinstance(block, SourceAttachmentBlock):
-                title = _sanitize_thread_title(_file_stem(block.file_name))
-            else:
-                title = None
-            if title is not None:
-                return title
-        return "New analysis"
 
     def _provider_messages(self, snapshot: ConversationSnapshot) -> list[ProviderMessage]:
         rows: list[ProviderMessage] = [ProviderMessage(role="system", content=snapshot.thread.system_prompt)]
@@ -1552,41 +1463,3 @@ class LLMConversationService:
         if self._llm_service is None:
             raise ValidationError("LLM Conversation Service has no model gateway.")
         return self._llm_service
-
-
-def _assistant_response_text(response: ProviderResponse) -> str:
-    return "\n".join(
-        item.text.strip()
-        for item in response.output_items
-        if isinstance(item, AssistantOutputItem) and item.text and item.text.strip()
-    )
-
-
-def _thread_title_message_text(message: ConversationMessageRow) -> str:
-    if message.kind in {ConversationMessageKind.USER, ConversationMessageKind.CLIENT_CONTROL}:
-        return blocks_to_markdown(blocks_from_payload(message.content_payload))
-    if message.kind is ConversationMessageKind.ASSISTANT:
-        return "\n".join(value for value in (message.text, message.refusal) if value)
-    if message.kind is ConversationMessageKind.TOOL_CALL:
-        return f"Tool call: {message.tool_id or ''}".strip()
-    if message.kind is ConversationMessageKind.TOOL_RESULT:
-        return message.error_summary or "Tool result"
-    return ""
-
-
-def _file_stem(file_name: str | None) -> str:
-    return Path(file_name).stem if file_name else ""
-
-
-def _is_blank_thread_title(value: str | None) -> bool:
-    return not value or not value.strip()
-
-
-def _sanitize_thread_title(raw: str) -> str | None:
-    title = re.sub(r"\s+", " ", raw).strip().lstrip("#-*• ").strip()
-    for prefix in ("Title:", "title:", "标题：", "标题:"):
-        if title.startswith(prefix):
-            title = title[len(prefix):].strip()
-            break
-    title = title.strip("\"'`“”‘’").rstrip(".。!！?？").strip()
-    return (title[:THREAD_TITLE_MAX_LENGTH].rstrip() or None) if title else None

@@ -98,10 +98,11 @@ Landed (committed on `develop`):
 - **Compat alias/fallback** `4297387`: removed `paddle_ocr.status()` alias + `getattr` fallbacks.
 - **C4 (request_payload)** `f869a19`: `MLTaskService.set_request_payload`; removed dead
   `ml_service._ml_tasks`.
+- **C3 (projection relocation)** `a9b1acc`: `knowledge_projection.py` moved into `storage/`,
+  removing the storage→services reverse import.
 
 Remaining: **C1** (dataset provenance → repositories), **C2** (knowledge import → repository),
-**C3** (storage→services `knowledge_projection` import), **D** (thread titles / finalize dedup /
-wordcloud SVG / smoke checks), plus lower-value **B** leftovers.
+**D** (thread titles / finalize dedup / wordcloud SVG / smoke checks), plus lower-value **B** leftovers.
 
 ## Open follow-up
 
