@@ -294,6 +294,7 @@ def _load_runtime_imports(
     dataset_export_service = load_module("xenix.services.dataset_export_service")
     embedding_service = load_module("xenix.services.embedding_service")
     link_router = load_module("xenix.services.link_router")
+    job_service = load_module("xenix.services.job_service")
     knowledge_import = load_module("xenix.services.knowledge_import_service")
     knowledge_derivation = load_module("xenix.services.knowledge_derivation_service")
     knowledge_document_lifecycle = load_module(
@@ -330,6 +331,7 @@ def _load_runtime_imports(
         ),
         KnowledgeIndexService=knowledge_index.KnowledgeIndexService,
         KnowledgeTaskQueryService=knowledge_task_query.KnowledgeTaskQueryService,
+        JobQueryService=job_service.JobQueryService,
         KnowledgeWorkspaceService=knowledge_workspace.KnowledgeWorkspaceService,
         PaddleOcrDeploymentService=paddle_ocr.PaddleOcrDeploymentService,
         PaddleOcrService=paddle_ocr.PaddleOcrService,
@@ -527,6 +529,7 @@ def build_main_window(
         knowledge_import_service = None
         knowledge_derivation_service = None
         knowledge_index_service = None
+        scheduler = None
         runtime_shutdown_started = False
         runtime_shutdown_connected = False
 
@@ -544,6 +547,8 @@ def build_main_window(
                 knowledge_derivation_service.shutdown()
             if knowledge_index_service is not None:
                 knowledge_index_service.shutdown()
+            if scheduler is not None:
+                scheduler.shutdown()
             context.engine.dispose()
             flush_observability()
             shutdown_logging()
@@ -566,6 +571,7 @@ def build_main_window(
                 paths.logs / LLM_USAGE_JOURNAL_FILE_NAME
             ),
         )
+        scheduler = agent_services.scheduler
         link_router = runtime.LinkRouter(
             artifact_service=agent_services.artifacts,
         )
@@ -578,11 +584,13 @@ def build_main_window(
             semantic_service=agent_services.knowledge_semantic,
             embedding_service=agent_services.embedding,
             embedding_settings_source=embedding_settings_service,
+            scheduler=scheduler,
         )
         knowledge_derivation_service = runtime.KnowledgeDerivationService(
             paths=paths,
             session_factory=context.session_factory,
             retrieval_ready_notifier=knowledge_index_service.notify_corpus_changed,
+            scheduler=scheduler,
         )
         knowledge_import_service = runtime.KnowledgeImportService(
             paths=paths,
@@ -591,6 +599,7 @@ def build_main_window(
             knowledge_repository=KnowledgeRepository(),
             canonical_ready_notifier=knowledge_derivation_service.enqueue_generation,
             corpus_changed_notifier=knowledge_index_service.notify_corpus_changed,
+            scheduler=scheduler,
         )
         knowledge_document_lifecycle_service = (
             runtime.KnowledgeDocumentLifecycleService(
@@ -601,17 +610,37 @@ def build_main_window(
         knowledge_task_query_service = runtime.KnowledgeTaskQueryService(
             context.session_factory
         )
+        job_query_service = runtime.JobQueryService(
+            context.session_factory,
+            knowledge_task_query_service,
+        )
         knowledge_workspace_service = runtime.KnowledgeWorkspaceService(
             knowledge_service=agent_services.knowledge,
             task_query=knowledge_task_query_service,
             index_service=knowledge_index_service,
             ocr_deployment=paddle_ocr_deployment,
         )
+        from .services.knowledge_job_handlers import (
+            KnowledgeDerivationHandler,
+            KnowledgeImportHandler,
+            KnowledgeIndexHandler,
+        )
+
+        knowledge_handlers = [
+            KnowledgeImportHandler(knowledge_import_service),
+            KnowledgeDerivationHandler(knowledge_derivation_service),
+            KnowledgeIndexHandler(knowledge_index_service),
+        ]
+        for handler in knowledge_handlers:
+            scheduler.register_handler(handler)
+        for handler in knowledge_handlers:
+            scheduler.recover_handler(handler)
         _emit_startup_timing("services.construct", step_start)
 
         step_start = time.perf_counter()
         from .ui.conversation.execution import ThreadedSubmissionExecutor
         from .ui.history import HarnessHistoryAdapter
+        from .ui.job_center import JobCenterDialog
         from .ui.knowledge_workspace import KnowledgeWorkspaceDialog
         from .ui.settings_dialog import SettingsDialog
         from .ui.software_update import SoftwareUpdateController
@@ -650,6 +679,13 @@ def build_main_window(
                 parent=owner,
             )
 
+        def create_job_center(owner: QWidget) -> JobCenterDialog:
+            return JobCenterDialog(
+                job_query_service,
+                scheduler=scheduler,
+                parent=owner,
+            )
+
         def create_auxiliary(owner: QWidget) -> AuxiliaryWindowCoordinator:
             return AuxiliaryWindowCoordinator(
                 owner,
@@ -658,6 +694,7 @@ def build_main_window(
                 detail_factory=lambda parent, task_ids: ToolCallDetailView(
                     ml_service=agent_services.ml, task_ids=task_ids, parent=parent,
                 ),
+                job_center_factory=create_job_center,
                 update_controller=(
                     SoftwareUpdateController(owner, update_service)
                     if update_service is not None else None
