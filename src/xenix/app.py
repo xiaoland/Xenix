@@ -29,6 +29,7 @@ from .observability import (
     start_span,
 )
 from .resources import package_resource_path
+from .services.storage.repositories import KnowledgeRepository
 from .trial_lock import TrialLockCheck, check_trial_lock, trial_purchase_url
 from .ui.startup_splash import StartupSplash, StartupStage
 
@@ -587,6 +588,7 @@ def build_main_window(
             paths=paths,
             session_factory=context.session_factory,
             artifact_service=agent_services.artifacts,
+            knowledge_repository=KnowledgeRepository(),
             canonical_ready_notifier=knowledge_derivation_service.enqueue_generation,
             corpus_changed_notifier=knowledge_index_service.notify_corpus_changed,
         )
