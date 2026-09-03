@@ -407,125 +407,18 @@ class MLTaskService:
         result = FitTaskResult.model_validate_json(task_result_path(self._paths, row.id).read_text(encoding="utf-8"))
         if result.error_summary:
             raise ValidationError(result.error_summary)
-        evaluation_model_path = Path(result.model_artifact_path)
-        final_model_path = Path(result.final_model_artifact_path) if result.final_model_artifact_path else evaluation_model_path
-        holdout_path = Path(result.holdout_artifact_path) if result.holdout_artifact_path else None
-        export_path = Path(result.export_artifact_path) if result.export_artifact_path else None
-        report_path = Path(result.report_artifact_path) if result.report_artifact_path else None
-        self._require_existing_path(evaluation_model_path)
-        self._require_existing_path(final_model_path)
-        if holdout_path is not None:
-            self._require_existing_path(holdout_path)
-        if export_path is not None:
-            self._require_existing_path(export_path)
-        if report_path is not None:
-            self._require_existing_path(report_path)
-        catalog_entry = _get_model_catalog_entry(result.model_key)
-        training_scopes = result.training_scopes
-        model_display_name = catalog_entry.display_name
-        artifact_file_name = build_artifact_file_name(
-            trained_model_context.run_name,
-            model_display_name,
-            row.created_at,
-            row.id,
-        )
-        canonical_path = self._copy_canonical_model(row, artifact_file_name, final_model_path)
-        metadata = TrainedModelMetadata(
-            model_key=result.model_key,
-            evaluation_kind=trained_model_context.evaluation_kind or catalog_entry.evaluation_kind.value,
-            model_family=trained_model_context.model_family or catalog_entry.model_family.value,
-            model_task_kind=trained_model_context.model_task_kind or catalog_entry.model_task_kind.value,
-            supports_evaluation=catalog_entry.supports_evaluation,
-            supports_apply=catalog_entry.supports_apply,
-            apply_mode=catalog_entry.apply_mode.value,
-            forecast_options=(
+        return self._finalize_training_task(
+            session,
+            row,
+            trained_model_context=trained_model_context,
+            result=result,
+            forecast_options_json=(
                 request.forecast_options.model_dump(mode="json")
                 if request.forecast_options is not None
                 else None
             ),
-            model_display_name=model_display_name,
-            display_name=model_display_name,
-            saved_name=build_saved_name(
-                trained_model_context.run_name,
-                model_display_name,
-                row.created_at,
-            ),
-            artifact_file_name=artifact_file_name_from_path(str(canonical_path)),
-            save_note=build_save_note(model_display_name),
-            training_operation=row.task_type.value,
-            source_run_name=trained_model_context.run_name,
-            source_dataset_name=trained_model_context.dataset_name,
-            source_dataset_file_name=trained_model_context.dataset_file_name,
-            train_role_bindings=[dict(binding) for binding in trained_model_context.train_role_bindings],
-            apply_role_schema=dict(trained_model_context.apply_role_schema),
-            result_contract=dict(trained_model_context.result_contract),
-            dataset_row_count=trained_model_context.dataset_row_count,
-            dataset_column_count=trained_model_context.dataset_column_count,
-            preview_columns=list(trained_model_context.preview_columns),
-            preview_rows=[list(row_values) for row_values in trained_model_context.preview_rows],
-            training_params=dict(result.params),
-            evaluation_model_training_scope=(
-                training_scopes.evaluation_model
-                if training_scopes is not None
-                else ("holdout_train_split" if result.final_model_artifact_path else None)
-            ),
-            apply_model_training_scope=(
-                training_scopes.apply_model
-                if training_scopes is not None
-                else ("all_eligible_rows" if result.final_model_artifact_path else None)
-            ),
+            extra_metadata_fields={"training_params": dict(result.params)},
         )
-        trained_model = self._trained_models.create(
-            session,
-            TrainedModelRow(
-                dataset_id=row.dataset_id,
-                ml_task_id=row.id,
-                model_key=result.model_key,
-                problem_kind=catalog_entry.problem_kind,
-                artifact_path=str(canonical_path),
-                metadata_payload=metadata.model_dump(mode="json"),
-            ),
-        )
-        payload = result.model_dump(mode="json")
-        payload["trained_model_id"] = trained_model.id
-        payload["canonical_model_artifact_path"] = str(canonical_path)
-        payload["evaluation_model_artifact_path"] = str(evaluation_model_path)
-        if (
-            export_path is not None
-            and "table" in catalog_entry.result_contract.train_result_kinds
-        ):
-            payload["result_dataset_id"] = self._materialize_fit_result_dataset(
-                session=session,
-                row=row,
-                source_csv_path=export_path,
-                result_name_suffix=self._fit_result_name_suffix(catalog_entry.model_task_kind),
-            )
-        artifacts = [
-            MLTaskArtifactInput(artifact_kind=MLTaskArtifactKind.MODEL, absolute_path=str(canonical_path)),
-        ]
-        if holdout_path is not None:
-            artifacts.append(
-                MLTaskArtifactInput(
-                    artifact_kind=MLTaskArtifactKind.HOLDOUT_DATA,
-                    absolute_path=str(holdout_path),
-                    ready_to_open=False,
-                )
-            )
-        if export_path is not None:
-            artifacts.append(
-                MLTaskArtifactInput(
-                    artifact_kind=MLTaskArtifactKind.EXPORT_FILE,
-                    absolute_path=str(export_path),
-                )
-            )
-        if report_path is not None:
-            artifacts.append(
-                MLTaskArtifactInput(
-                    artifact_kind=MLTaskArtifactKind.TRAINING_REPORT,
-                    absolute_path=str(report_path),
-                )
-            )
-        return payload, artifacts
 
     def _finalize_tuning_task(
         self,
@@ -539,6 +432,35 @@ class MLTaskService:
         )
         if result.error_summary:
             raise ValidationError(result.error_summary)
+        return self._finalize_training_task(
+            session,
+            row,
+            trained_model_context=trained_model_context,
+            result=result,
+            forecast_options_json=(
+                request.forecast_options.model_dump(mode="json")
+                if request.forecast_options is not None
+                else None
+            ),
+            extra_metadata_fields={
+                "best_params": dict(result.best_params),
+                "tuning_grid": {
+                    str(key): list(values)
+                    for key, values in request.hyperparameter_tuning.param_grid.items()
+                },
+            },
+        )
+
+    def _finalize_training_task(
+        self,
+        session: Any,
+        row: MLTaskRow,
+        *,
+        trained_model_context: TrainedModelContextPayload,
+        result: FitTaskResult | HyperparameterTuningTaskResult,
+        forecast_options_json: dict[str, Any] | None,
+        extra_metadata_fields: Mapping[str, Any],
+    ) -> tuple[dict[str, Any], list[MLTaskArtifactInput]]:
         evaluation_model_path = Path(result.model_artifact_path)
         final_model_path = Path(result.final_model_artifact_path) if result.final_model_artifact_path else evaluation_model_path
         holdout_path = Path(result.holdout_artifact_path) if result.holdout_artifact_path else None
@@ -570,11 +492,7 @@ class MLTaskService:
             supports_evaluation=catalog_entry.supports_evaluation,
             supports_apply=catalog_entry.supports_apply,
             apply_mode=catalog_entry.apply_mode.value,
-            forecast_options=(
-                request.forecast_options.model_dump(mode="json")
-                if request.forecast_options is not None
-                else None
-            ),
+            forecast_options=forecast_options_json,
             model_display_name=model_display_name,
             display_name=model_display_name,
             saved_name=build_saved_name(
@@ -595,11 +513,6 @@ class MLTaskService:
             dataset_column_count=trained_model_context.dataset_column_count,
             preview_columns=list(trained_model_context.preview_columns),
             preview_rows=[list(row_values) for row_values in trained_model_context.preview_rows],
-            best_params=dict(result.best_params),
-            tuning_grid={
-                str(key): list(values)
-                for key, values in request.hyperparameter_tuning.param_grid.items()
-            },
             evaluation_model_training_scope=(
                 training_scopes.evaluation_model
                 if training_scopes is not None
@@ -610,6 +523,7 @@ class MLTaskService:
                 if training_scopes is not None
                 else ("all_eligible_rows" if result.final_model_artifact_path else None)
             ),
+            **extra_metadata_fields,
         )
         trained_model = self._trained_models.create(
             session,
