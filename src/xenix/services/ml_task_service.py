@@ -45,7 +45,7 @@ from .storage.layout import (
     task_request_path,
     task_result_path,
 )
-from .trained_model_metadata import (
+from .ml.trained_model_metadata import (
     TrainedModelMetadata,
     artifact_file_name_from_path,
     build_artifact_file_name,

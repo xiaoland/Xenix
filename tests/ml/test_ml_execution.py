@@ -28,7 +28,7 @@ from xenix.services.storage.models import (
     MLTaskArtifactKind,
     MLTaskStatus,
 )
-from xenix.services.trained_model_metadata import parse_trained_model_metadata
+from xenix.services.ml.trained_model_metadata import parse_trained_model_metadata
 
 _FIXTURE_ROOT = FIXTURES_ROOT / "ml_foundation"
 _TRAIN_FIXTURE = _FIXTURE_ROOT / "grouped_lifecycle_v1.csv"

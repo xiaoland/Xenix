@@ -53,7 +53,7 @@ from .storage.models import (
     TrainedModelRow,
 )
 from .storage.repositories import DatasetColumnBindingRepository, TrainedModelRepository
-from .trained_model_metadata import parse_trained_model_metadata, with_evaluation, with_evaluation_task
+from .ml.trained_model_metadata import parse_trained_model_metadata, with_evaluation, with_evaluation_task
 from .tabular import resolve_tabular_column_index, resolve_tabular_schema
 
 if TYPE_CHECKING:

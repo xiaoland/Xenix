@@ -7,7 +7,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from ..data_tokenization_contracts import TextPreparationInput
-from ..trained_model_metadata import TrainedModelContextPayload
+from .trained_model_metadata import TrainedModelContextPayload
 from .clustering_evidence import ClusteringEvaluationFacts
 from .recommendation_evidence import (
     RecommendationEvaluationFacts,
