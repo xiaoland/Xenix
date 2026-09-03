@@ -143,7 +143,7 @@ class MLTaskService:
         self._trained_models = TrainedModelRepository()
         self._artifact_service = ArtifactService(session_factory)
         self._worker_runner = worker_runner or MLWorkerPool(
-            worker_settings_service or MLWorkerSettingsService(paths)
+            worker_settings_service or MLWorkerSettingsService(paths),
         )
         self._callbacks: list[Callable[[MLTaskRow], None]] = []
         self._lock = threading.Lock()

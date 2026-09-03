@@ -51,6 +51,7 @@ dev = [
     "mypy>=2.3.0",
     "types-jsonschema>=4.26.0.20260518",
     "pytest-testmon>=2.2.0",
+    "pytest-qt==4.5.0",
 ]
 release = [
     "oss2==2.19.1",
@@ -92,10 +93,16 @@ benchmark-agent-harness-evaluate = "python scripts/evaluate_agent_harness_report
 benchmark-agent-harness-calibrate-judge = "python scripts/calibrate_agent_harness_judge.py"
 check = { composite = ["agent-skills-generate", "agent-skills-check", "lint", "typecheck", "knowledge-ocr-lock-check", "python -m compileall src tests scripts"] }
 diagnostic-bundle = "python scripts/create_diagnostic_bundle.py"
+ui-lab = { cmd = "python -m scripts.ui_lab", env = { PYTHONPATH = "src" } }
+ui-capture = { cmd = "python -m scripts.ui_lab.capture_cli", env = { PYTHONPATH = "src" } }
+ui-capture-all = { cmd = "python -m scripts.ui_lab.capture_all", env = { PYTHONPATH = "src" } }
+ui-native-smoke = { cmd = "python scripts/run_pytest.py --direct tests/ui_native/native_window_smoke.py -q", env = { QT_QPA_PLATFORM = "windows" } }
+ui-artifacts-index = "python -m scripts.ui_lab.artifact_index --root ui-artifacts"
 
 [tool.pytest.ini_options]
 pythonpath = ["src", "."]
 testpaths = ["tests"]
+qt_api = "pyside6"
 markers = [
     "agent_harness_live: explicit real-provider Agent Harness benchmark case",
 ]
@@ -113,14 +120,35 @@ ignore = ["E731"]
 [tool.ruff.lint.per-file-ignores]
 "scripts/package_app.py" = ["E402"]
 "scripts/run_packaged.py" = ["E402"]
+"scripts/ui_lab/capture_cli.py" = ["E402"]
 
 [tool.mypy]
 python_version = "3.14"
 platform = "win32"
 mypy_path = "src"
 files = [
+    "src/xenix/application_services.py",
+    "src/xenix/ui/history/panel.py",
+    "src/xenix/ui/windows/auxiliary.py",
+    "src/xenix/ui/settings/contracts.py",
+    "src/xenix/ui/settings/provider.py",
+    "src/xenix/ui/settings/ocr.py",
+    "src/xenix/ui/ocr_deployment_tasks.py",
+    "src/xenix/ui/conversation/turn_controller.py",
+    "src/xenix/ui/conversation/execution.py",
+    "scripts/ui_lab/__main__.py",
+    "scripts/ui_lab/artifact_index.py",
+    "scripts/ui_lab/capture_all.py",
+    "scripts/ui_lab/capture_cli.py",
+    "scripts/ui_lab/contracts.py",
+    "scripts/ui_lab/driver.py",
+    "scripts/ui_lab/feature_scenarios.py",
+    "scripts/ui_lab/gallery.py",
+    "scripts/ui_lab/registry.py",
+    "scripts/ui_lab/scenarios.py",
     "scripts/build_knowledge_ocr_runtime.py",
     "src/xenix/release_config.py",
+    "src/xenix/runtime_profile.py",
     "src/xenix/trial_lock.py",
     "src/xenix/services/agent/knowledge_tool.py",
     "src/xenix/services/agent/skill_catalog.py",
@@ -135,7 +163,12 @@ files = [
     "src/xenix/services/ml/registry.py",
     "src/xenix/services/ml/types.py",
     "src/xenix/services/ml/worker_settings.py",
-    "src/xenix/services/trained_model_metadata.py",
+    "src/xenix/services/ml/trained_model_metadata.py",
+    "src/xenix/ui/semantic_identity.py",
+    "src/xenix/ui/diagnostics/capture.py",
+    "src/xenix/ui/diagnostics/schema.py",
+    "src/xenix/ui/diagnostics/snapshot.py",
+    "src/xenix/ui/layout_debug.py",
 ]
 plugins = ["pydantic.mypy"]
 follow_imports = "silent"

@@ -13,6 +13,7 @@ __pypackages__/
 .testmondata
 .coverage
 .coverage.*
+/ui-artifacts/
 
 # Build artifacts
 build/

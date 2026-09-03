@@ -14,8 +14,10 @@ Setup.
 
 `develop` is the integration line. Promote it through a same-repository
 `develop -> main` pull request. Native CI is scoped to PRs targeting `main`; its
-single stable `Native CI` check is required. Do not locally merge and push `main`,
-and do not use a feature branch as the head of a `main` PR.
+single stable `Native CI` check is required. Do not locally merge and push `main`.
+A task-specific `feat/* -> main` draft PR is a documented exception for CI
+acceptance against a clean `main` baseline; it never merges. Do not open ordinary
+feature-branch PRs directly to `main`.
 
 Merging the promotion PR creates a release-eligible `main` result but publishes
 nothing. The only release authorization is a pushed immutable

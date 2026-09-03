@@ -13,8 +13,9 @@ from typing import TYPE_CHECKING, Literal
 
 from PySide6.QtCore import QCoreApplication, QElapsedTimer, QEventLoop, QThread, QUrl
 from PySide6.QtGui import QDesktopServices, QIcon
-from PySide6.QtWidgets import QApplication, QMessageBox
+from PySide6.QtWidgets import QApplication, QMessageBox, QWidget
 
+from .application_services import ApplicationServices
 from .config import APP_NAME, APP_ORGANIZATION, ensure_app_dirs, get_app_paths
 from .exceptions import StorageBootstrapError, install_exception_hooks
 from .i18n import TranslationManager
@@ -28,8 +29,6 @@ from .observability import (
     start_span,
 )
 from .resources import package_resource_path
-from .smoke_checks import run_smoke_checks
-from .services.storage.repositories import KnowledgeRepository
 from .trial_lock import TrialLockCheck, check_trial_lock, trial_purchase_url
 from .ui.startup_splash import StartupSplash, StartupStage
 
@@ -42,8 +41,9 @@ STARTUP_TIMING_ENV = "XENIX_STARTUP_TIMING"
 _STARTUP_TIMING_T0 = time.perf_counter()
 StorageRecoveryAction = Literal["quarantine", "open", "exit"]
 
-# Raised when the packaged trial lock blocks entry; run() catches it and
-# returns exit code 1 instead of surfacing a crash dialog.
+# This is an advertisement policy, not a second tool registry.  The LLM
+# boundary remains the authority for registered definitions and validates the
+# frozen scope before accepting or invoking any provider Tool Call.
 class TrialLockStartupExit(Exception):
     pass
 
@@ -300,7 +300,6 @@ def _load_runtime_imports(
     )
     knowledge_index = load_module("xenix.services.knowledge_index_service")
     knowledge_task_query = load_module("xenix.services.knowledge_task_query")
-    job_service = load_module("xenix.services.job_service")
     knowledge_workspace = load_module("xenix.services.knowledge_workspace_service")
     paddle_ocr = load_module("xenix.services.paddle_ocr_service")
     lazy_ml_service = load_module("xenix.services.lazy_ml_service")
@@ -330,7 +329,6 @@ def _load_runtime_imports(
         ),
         KnowledgeIndexService=knowledge_index.KnowledgeIndexService,
         KnowledgeTaskQueryService=knowledge_task_query.KnowledgeTaskQueryService,
-        JobQueryService=job_service.JobQueryService,
         KnowledgeWorkspaceService=knowledge_workspace.KnowledgeWorkspaceService,
         PaddleOcrDeploymentService=paddle_ocr.PaddleOcrDeploymentService,
         PaddleOcrService=paddle_ocr.PaddleOcrService,
@@ -341,6 +339,47 @@ def _load_runtime_imports(
         StorageBootstrapService=storage.StorageBootstrapService,
         database_path=storage_layout.database_path,
     )
+
+
+def _register_agent_skill_tools(
+    registry,
+    catalog,
+    *,
+    activated_skill_names_provider: Callable[[str], set[str]] | None = None,
+) -> None:
+    """Compatibility forwarding for historical desktop/test imports."""
+
+    from .services.agent.composition import register_agent_skill_tools
+
+    register_agent_skill_tools(
+        registry,
+        catalog,
+        activated_skill_names_provider=activated_skill_names_provider,
+    )
+
+
+def _agent_skill_activated_skill_names(snapshot) -> set[str]:
+    """Compatibility forwarding for historical desktop/test imports."""
+
+    from .services.agent.composition import agent_skill_activated_skill_names
+
+    return agent_skill_activated_skill_names(snapshot)
+
+
+def _agent_skill_context_messages(catalog, snapshot) -> list:
+    """Compatibility forwarding for historical desktop/test imports."""
+
+    from .services.agent.composition import agent_skill_context_messages
+
+    return agent_skill_context_messages(catalog, snapshot)
+
+
+def _agent_skill_tool_scope_names(snapshot) -> tuple[str, ...] | None:
+    """Compatibility forwarding for historical desktop/test imports."""
+
+    from .services.agent.composition import agent_skill_tool_scope_names
+
+    return agent_skill_tool_scope_names(snapshot)
 
 
 def _load_runtime_imports_with_events(
@@ -369,6 +408,7 @@ def build_main_window(
     show_splash: bool | None = None,
     splash_hold_ms: int = 0,
     flush_startup_observability: bool = False,
+    on_services_ready: Callable[[ApplicationServices], None] | None = None,
 ) -> tuple[QApplication, MainWindow]:
     build_start = time.perf_counter()
     _emit_startup_timing("build_main_window.start")
@@ -486,7 +526,6 @@ def build_main_window(
         knowledge_import_service = None
         knowledge_derivation_service = None
         knowledge_index_service = None
-        scheduler = None
         runtime_shutdown_started = False
         runtime_shutdown_connected = False
 
@@ -504,8 +543,6 @@ def build_main_window(
                 knowledge_derivation_service.shutdown()
             if knowledge_index_service is not None:
                 knowledge_index_service.shutdown()
-            if scheduler is not None:
-                scheduler.shutdown()
             context.engine.dispose()
             flush_observability()
             shutdown_logging()
@@ -528,7 +565,6 @@ def build_main_window(
                 paths.logs / LLM_USAGE_JOURNAL_FILE_NAME
             ),
         )
-        scheduler = agent_services.scheduler
         link_router = runtime.LinkRouter(
             artifact_service=agent_services.artifacts,
         )
@@ -541,38 +577,19 @@ def build_main_window(
             semantic_service=agent_services.knowledge_semantic,
             embedding_service=agent_services.embedding,
             embedding_settings_source=embedding_settings_service,
-            scheduler=scheduler,
         )
         knowledge_derivation_service = runtime.KnowledgeDerivationService(
             paths=paths,
             session_factory=context.session_factory,
             retrieval_ready_notifier=knowledge_index_service.notify_corpus_changed,
-            scheduler=scheduler,
         )
         knowledge_import_service = runtime.KnowledgeImportService(
             paths=paths,
             session_factory=context.session_factory,
             artifact_service=agent_services.artifacts,
-            knowledge_repository=KnowledgeRepository(),
             canonical_ready_notifier=knowledge_derivation_service.enqueue_generation,
             corpus_changed_notifier=knowledge_index_service.notify_corpus_changed,
-            scheduler=scheduler,
         )
-        from .services.knowledge_job_handlers import (
-            KnowledgeDerivationHandler,
-            KnowledgeImportHandler,
-            KnowledgeIndexHandler,
-        )
-
-        knowledge_handlers = [
-            KnowledgeImportHandler(knowledge_import_service),
-            KnowledgeDerivationHandler(knowledge_derivation_service),
-            KnowledgeIndexHandler(knowledge_index_service),
-        ]
-        for handler in knowledge_handlers:
-            scheduler.register_handler(handler)
-        for handler in knowledge_handlers:
-            scheduler.recover_handler(handler)
         knowledge_document_lifecycle_service = (
             runtime.KnowledgeDocumentLifecycleService(
                 session_factory=context.session_factory,
@@ -581,10 +598,6 @@ def build_main_window(
         )
         knowledge_task_query_service = runtime.KnowledgeTaskQueryService(
             context.session_factory
-        )
-        job_query_service = runtime.JobQueryService(
-            context.session_factory,
-            knowledge_task_query_service,
         )
         knowledge_workspace_service = runtime.KnowledgeWorkspaceService(
             knowledge_service=agent_services.knowledge,
@@ -595,38 +608,84 @@ def build_main_window(
         _emit_startup_timing("services.construct", step_start)
 
         step_start = time.perf_counter()
+        from .ui.conversation.execution import ThreadedSubmissionExecutor
+        from .ui.history import HarnessHistoryAdapter
+        from .ui.knowledge_workspace import KnowledgeWorkspaceDialog
+        from .ui.settings_dialog import SettingsDialog
+        from .ui.software_update import SoftwareUpdateController
+        from .ui.tool_call_detail_view import ToolCallDetailView
+        from .ui.windows.auxiliary import AuxiliaryWindowCoordinator
+
+        def create_settings(owner: QWidget) -> SettingsDialog:
+            return SettingsDialog(
+                paths=paths,
+                log_path=log_path,
+                db_path=runtime.database_path(paths),
+                translation_manager=translation_manager,
+                llm_service=llm_service,
+                llm_settings_service=llm_settings_service,
+                embedding_settings_service=embedding_settings_service,
+                ml_worker_settings_service=ml_worker_settings_service,
+                update_service=update_service,
+                paddle_ocr_deployment=paddle_ocr_deployment,
+                knowledge_index_service=knowledge_index_service,
+                parent=owner,
+            )
+
+        def create_knowledge(
+            owner: QWidget, open_settings: Callable[[], None]
+        ) -> KnowledgeWorkspaceDialog:
+            return KnowledgeWorkspaceDialog(
+                import_service=knowledge_import_service,
+                derivation_service=knowledge_derivation_service,
+                knowledge_service=agent_services.knowledge,
+                knowledge_index_service=knowledge_index_service,
+                ocr_deployment=paddle_ocr_deployment,
+                task_query_service=knowledge_task_query_service,
+                workspace_service=knowledge_workspace_service,
+                document_lifecycle_service=knowledge_document_lifecycle_service,
+                open_knowledge_settings=open_settings,
+                parent=owner,
+            )
+
+        def create_auxiliary(owner: QWidget) -> AuxiliaryWindowCoordinator:
+            return AuxiliaryWindowCoordinator(
+                owner,
+                settings_factory=create_settings,
+                knowledge_factory=create_knowledge,
+                detail_factory=lambda parent, task_ids: ToolCallDetailView(
+                    ml_service=agent_services.ml, task_ids=task_ids, parent=parent,
+                ),
+                update_controller=(
+                    SoftwareUpdateController(owner, update_service)
+                    if update_service is not None else None
+                ),
+            )
+
         window = MainWindow(
-            paths=paths,
-            log_path=log_path,
-            db_path=runtime.database_path(paths),
-            translation_manager=translation_manager,
+            current_locale=translation_manager.current_locale,
             agent_harness_service=agent_services.harness,
+            conversation_executor=ThreadedSubmissionExecutor(
+                agent_services.harness.submit_user_turn_stream
+            ),
             llm_service=llm_service,
-            llm_settings_service=llm_settings_service,
-            embedding_settings_service=embedding_settings_service,
-            ml_worker_settings_service=ml_worker_settings_service,
             artifact_service=agent_services.artifacts,
             link_router=link_router,
-            dataset_service=agent_services.datasets,
-            ml_service=agent_services.ml,
-            update_service=update_service,
-            knowledge_import_service=knowledge_import_service,
-            knowledge_derivation_service=knowledge_derivation_service,
-            knowledge_service=agent_services.knowledge,
-            knowledge_index_service=knowledge_index_service,
-            paddle_ocr_deployment=paddle_ocr_deployment,
-            knowledge_task_query_service=knowledge_task_query_service,
-            job_query_service=job_query_service,
-            scheduler=scheduler,
-            knowledge_workspace_service=knowledge_workspace_service,
-            knowledge_document_lifecycle_service=(
-                knowledge_document_lifecycle_service
-            ),
+            history_port=HarnessHistoryAdapter(agent_services.harness),
+            auxiliary_factory=create_auxiliary,
         )
         _emit_startup_timing("main_window.construct", step_start)
         app.aboutToQuit.connect(shutdown_runtime)
         runtime_shutdown_connected = True
         window.closing.connect(shutdown_runtime)
+        if on_services_ready is not None:
+            on_services_ready(ApplicationServices(
+                agent=agent_services,
+                knowledge_import=knowledge_import_service,
+                knowledge_derivation=knowledge_derivation_service,
+                knowledge_index=knowledge_index_service,
+                knowledge_tasks=knowledge_task_query_service,
+            ))
 
         _update_startup_stage(app, splash, StartupStage.READY)
         _hold_startup_splash(app, splash, splash_hold_ms)
@@ -660,6 +719,142 @@ def build_main_window(
         raise
 
 
+def _run_smoke_checks(paths) -> None:
+    import pandas as pd
+    from polars._cpu_check import get_runtime_repr
+
+    from .services.analysis_graph import AnalysisGraphService, GraphDatasetInput
+    from .services.data_transform import (
+        DataQueryInput,
+        DataQueryTransformService,
+        DatasetSqlBinding,
+    )
+    from .services.dataset_inspection import detect_source_format
+    from .services.ml.models.regression import XGBoostRegressionService
+    from .services.tabular import load_tabular_frame
+
+    if get_runtime_repr() != "rtcompat":
+        raise RuntimeError("Polars packaged runtime smoke expected rtcompat runtime.")
+
+    duckdb_smoke_path = paths.temp / "duckdb-smoke.parquet"
+    pd.DataFrame({"value": [1, 2]}).to_parquet(duckdb_smoke_path)
+    result = DataQueryTransformService(paths).query(
+        DataQueryInput(
+            bindings=[
+                DatasetSqlBinding(
+                    alias="input",
+                    dataset_id="smoke-dataset",
+                    source_path=str(duckdb_smoke_path.resolve()),
+                )
+            ],
+            sql="SELECT SUM(value) AS total FROM input",
+            limit=1,
+        )
+    )
+    if not result.rows or result.rows[0].get("total") != 3:
+        raise RuntimeError("DuckDB smoke query failed.")
+
+    tabular_csv_smoke_path = paths.temp / "tabular-smoke.csv"
+    tabular_csv_smoke_path.write_text("label,value\nA,1\nB,2\n", encoding="utf-8")
+    csv_frame = load_tabular_frame(
+        tabular_csv_smoke_path,
+        detect_source_format(tabular_csv_smoke_path),
+    )
+    if csv_frame.height != 2 or csv_frame.width != 2:
+        raise RuntimeError("Polars CSV smoke read failed.")
+
+    tabular_xlsx_smoke_path = paths.temp / "tabular-smoke.xlsx"
+    pd.DataFrame([{"label": "A", "value": 1}, {"label": "B", "value": 2}]).to_excel(
+        tabular_xlsx_smoke_path,
+        index=False,
+    )
+    xlsx_frame = load_tabular_frame(
+        tabular_xlsx_smoke_path,
+        detect_source_format(tabular_xlsx_smoke_path),
+    )
+    if xlsx_frame.height != 2 or xlsx_frame.width != 2:
+        raise RuntimeError("Polars Excel smoke read failed.")
+
+    graph_smoke_path = paths.temp / "graph-smoke.csv"
+    graph_smoke_path.write_text("label,value\nA,1\nB,2\n", encoding="utf-8")
+    graph_result = AnalysisGraphService(paths).graph_dataset(
+        GraphDatasetInput(
+            source_path=str(graph_smoke_path.resolve()),
+            dataset_name="Graph smoke",
+            spec={
+                "width": 300,
+                "height": 180,
+                "title": "Graph smoke",
+                "mark": "bar",
+                "encoding": {
+                    "x": {"field": "label", "type": "nominal"},
+                    "y": {"field": "value", "type": "quantitative"},
+                    "color": {"value": "#4c78a8"},
+                },
+            },
+        )
+    )
+    graph_output = Path(graph_result.output_path)
+    if not graph_output.is_file() or not graph_output.read_text(encoding="utf-8").lstrip().startswith("<svg"):
+        raise RuntimeError("Vega-Lite graph smoke render failed.")
+
+    wordcloud_smoke_path = paths.temp / "graph-wordcloud-smoke.csv"
+    wordcloud_smoke_path.write_text(
+        "word,count\nsales,40\nmargin,28\nnorth,22\n",
+        encoding="utf-8",
+    )
+    wordcloud_result = AnalysisGraphService(paths).graph_dataset(
+        GraphDatasetInput(
+            source_path=str(wordcloud_smoke_path.resolve()),
+            dataset_name="Graph wordcloud smoke",
+            wordcloud_spec={
+                "title": "Graph wordcloud smoke",
+                "width": 360,
+                "height": 220,
+            },
+        )
+    )
+    wordcloud_svg = Path(wordcloud_result.output_path).read_text(encoding="utf-8")
+    if "<title>sales: 40</title>" not in wordcloud_svg or "Graph wordcloud smoke" not in wordcloud_svg:
+        raise RuntimeError("Wordcloud smoke render failed.")
+
+    xgboost_estimator = XGBoostRegressionService._build_estimator(
+        n_estimators=2,
+        max_depth=1,
+        learning_rate=0.5,
+    )
+    xgboost_estimator.fit([[0.0], [1.0], [2.0], [3.0]], [0.0, 1.0, 2.0, 3.0])
+    xgboost_prediction = xgboost_estimator.predict([[1.5]])
+    if len(xgboost_prediction) != 1:
+        raise RuntimeError("XGBoost packaged runtime smoke fit failed.")
+
+    from .services.forecast_packaged_smoke import run_forecasting_packaged_smoke
+
+    run_forecasting_packaged_smoke()
+
+    from .services.recommendation_packaged_smoke import (
+        run_recommendation_packaged_smoke,
+    )
+
+    run_recommendation_packaged_smoke()
+
+    from .services.text_classification_packaged_smoke import (
+        run_text_classification_packaged_smoke,
+    )
+
+    run_text_classification_packaged_smoke()
+
+    from .services.text_discovery_packaged_smoke import (
+        run_text_discovery_packaged_smoke,
+    )
+
+    run_text_discovery_packaged_smoke()
+
+    from .services.knowledge_packaged_smoke import run_knowledge_packaged_smoke
+
+    run_knowledge_packaged_smoke(paths)
+
+
 def run(*, smoke_test: bool = False) -> int:
     try:
         app, window = build_main_window(
@@ -686,7 +881,7 @@ def run(*, smoke_test: bool = False) -> int:
 
     if smoke_test:
         try:
-            run_smoke_checks(ensure_app_dirs(get_app_paths()))
+            _run_smoke_checks(ensure_app_dirs(get_app_paths()))
             window.show()
             app.processEvents()
             window.close()

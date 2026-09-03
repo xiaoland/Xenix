@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
+from typing import Protocol
 
 from PySide6.QtCore import QObject, QRunnable, Signal
 
 from ..exceptions import ValidationError
 from ..services.paddle_ocr_service import (
-    PaddleOcrDeploymentService,
     PaddleOcrState,
     PaddleOcrStatus,
 )
@@ -14,12 +15,18 @@ from ..services.paddle_ocr_service import (
 LOGGER = logging.getLogger(__name__)
 
 
+class PaddleOcrDeploymentPort(Protocol):
+    def status_snapshot(self) -> PaddleOcrStatus: ...
+    def verify_active(self) -> PaddleOcrStatus: ...
+    def install(self, progress: Callable[[str], None] | None = None) -> PaddleOcrStatus: ...
+
+
 class OcrStatusSignals(QObject):
     finished = Signal(int, object)
 
 
 class OcrStatusTask(QRunnable):
-    def __init__(self, deployment: PaddleOcrDeploymentService, generation: int) -> None:
+    def __init__(self, deployment: PaddleOcrDeploymentPort, generation: int) -> None:
         super().__init__()
         self.setAutoDelete(False)
         self._deployment = deployment
@@ -45,7 +52,7 @@ class OcrInstallSignals(QObject):
 
 
 class OcrInstallTask(QRunnable):
-    def __init__(self, deployment: PaddleOcrDeploymentService, generation: int) -> None:
+    def __init__(self, deployment: PaddleOcrDeploymentPort, generation: int) -> None:
         super().__init__()
         self.setAutoDelete(False)
         self._deployment = deployment
@@ -54,9 +61,7 @@ class OcrInstallTask(QRunnable):
 
     def run(self) -> None:
         try:
-            status = self._deployment.install(
-                lambda phase: self.signals.phase.emit(self._generation, phase)
-            )
+            status = self._deployment.install(lambda phase: self.signals.phase.emit(self._generation, phase))
         except Exception as exc:
             code = (
                 exc.error_code
@@ -70,4 +75,4 @@ class OcrInstallTask(QRunnable):
         self.signals.finished.emit(self._generation, status)
 
 
-__all__ = ["OcrInstallTask", "OcrStatusTask"]
+__all__ = ["OcrInstallTask", "OcrStatusTask", "PaddleOcrDeploymentPort"]
