@@ -105,10 +105,15 @@ Landed (committed on `develop`):
 - **D2 (finalize dedup)** `5bd7a9f`: merged `_finalize_fit_task`/`_finalize_tuning_task`
   into `_finalize_training_task` shared helper, -124 lines in `ml_task_service.py`.
 - **D4 (smoke checks)** `0254090`: extracted `_run_smoke_checks` to `smoke_checks.py` module.
+- **C1 (dataset→repos)** `c6fae21`: routed dataset import/workbook/derivation/reference
+  persistence into `DatasetRepository` (+9 methods).
+- **C2 (knowledge→repo)** `76bfd5c`: added `KnowledgeRepository` dependency to
+  `KnowledgeImportService`, routing all `session.get`/`session.add`/`select` calls
+  through repository methods (+5 new methods).
 
-Remaining: **C1** (dataset provenance → repositories), **C2** (knowledge import → repository),
-**D3** (analysis_graph wordcloud SVG extraction — deferred: large extraction with many
-AnalysisGraphService infrastructure dependencies), plus lower-value **B** leftovers.
+Remaining: lower-value **B** leftovers (`_build_pipeline` cross-class, knowledge
+bundle/retry, `_slug`/`_tfidf`), **D3** wordcloud SVG extraction, and compat alias
+cleanup.
 
 ## Open follow-up
 
