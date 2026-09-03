@@ -1,11 +1,21 @@
 from __future__ import annotations
 
+from collections.abc import Collection
 from datetime import datetime
 
 from sqlalchemy import and_, exists, or_
 from sqlmodel import Session, select
 
-from ..models import DatasetDerivationInputRow, DatasetDerivationRow, DatasetRow
+from ..models import (
+    DatasetColumnBindingRow,
+    DatasetDerivationInputRow,
+    DatasetDerivationRow,
+    DatasetImportRow,
+    DatasetRow,
+    DatasetWorkbookRow,
+    MLTaskRow,
+    TrainedModelRow,
+)
 
 
 class DatasetRepository:
@@ -139,4 +149,99 @@ class DatasetRepository:
 
     def delete(self, session: Session, row: DatasetRow) -> None:
         session.delete(row)
+        session.flush()
+
+    # ------------------------------------------------------------------
+    # Import provenance
+    # ------------------------------------------------------------------
+
+    def create_import(self, session: Session, row: DatasetImportRow) -> DatasetImportRow:
+        session.add(row)
+        session.flush()
+        session.refresh(row)
+        return row
+
+    def create_workbook(self, session: Session, row: DatasetWorkbookRow) -> DatasetWorkbookRow:
+        session.add(row)
+        session.flush()
+        session.refresh(row)
+        return row
+
+    def get_import(self, session: Session, import_id: str) -> DatasetImportRow | None:
+        return session.get(DatasetImportRow, import_id)
+
+    # ------------------------------------------------------------------
+    # Derivation provenance
+    # ------------------------------------------------------------------
+
+    def get_derivation(self, session: Session, dataset_id: str) -> DatasetDerivationRow | None:
+        return session.get(DatasetDerivationRow, dataset_id)
+
+    def list_derivations_by_tool_calls(
+        self, session: Session, tool_call_message_ids: Collection[str],
+    ) -> list[DatasetDerivationRow]:
+        statement = (
+            select(DatasetDerivationRow)
+            .where(DatasetDerivationRow.tool_call_message_id.in_(tool_call_message_ids))
+            .order_by(DatasetDerivationRow.created_at, DatasetDerivationRow.dataset_id)
+        )
+        return list(session.exec(statement))
+
+    def list_derivation_inputs(
+        self, session: Session, dataset_id: str,
+    ) -> list[DatasetDerivationInputRow]:
+        statement = (
+            select(DatasetDerivationInputRow)
+            .where(DatasetDerivationInputRow.derivation_dataset_id == dataset_id)
+            .order_by(DatasetDerivationInputRow.input_position)
+        )
+        return list(session.exec(statement))
+
+    def list_derivation_input_ids(
+        self, session: Session, dataset_id: str,
+    ) -> list[str]:
+        statement = select(DatasetDerivationInputRow.input_dataset_id).where(
+            DatasetDerivationInputRow.derivation_dataset_id == dataset_id,
+        )
+        return [row for row in session.exec(statement)]
+
+    def create_derivation(
+        self,
+        session: Session,
+        *,
+        derivation: DatasetDerivationRow,
+        inputs: list[DatasetDerivationInputRow],
+    ) -> None:
+        session.add(derivation)
+        session.flush()
+        for input_row in inputs:
+            session.add(input_row)
+        session.flush()
+
+    def has_references(self, session: Session, dataset_id: str) -> bool:
+        reference_statements = [
+            select(DatasetRow.id).where(DatasetRow.copied_from == dataset_id),
+            select(DatasetRow.id).where(DatasetRow.derived_from_dataset_id == dataset_id),
+            select(DatasetDerivationInputRow.id).where(
+                DatasetDerivationInputRow.input_dataset_id == dataset_id,
+            ),
+            select(DatasetColumnBindingRow.id).where(
+                DatasetColumnBindingRow.dataset_id == dataset_id,
+            ),
+            select(MLTaskRow.id).where(MLTaskRow.dataset_id == dataset_id),
+            select(TrainedModelRow.id).where(TrainedModelRow.dataset_id == dataset_id),
+        ]
+        return any(session.exec(statement).first() is not None for statement in reference_statements)
+
+    def delete_derivation(self, session: Session, dataset_id: str) -> None:
+        input_rows = session.exec(
+            select(DatasetDerivationInputRow).where(
+                DatasetDerivationInputRow.derivation_dataset_id == dataset_id,
+            ),
+        )
+        for row in input_rows:
+            session.delete(row)
+        derivation = session.get(DatasetDerivationRow, dataset_id)
+        if derivation is not None:
+            session.delete(derivation)
         session.flush()

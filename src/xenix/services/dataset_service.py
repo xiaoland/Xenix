@@ -15,7 +15,7 @@ from uuid import uuid4
 import polars as pl
 from pydantic import StringConstraints
 from sqlalchemy.orm import sessionmaker
-from sqlmodel import Field, SQLModel, col, select
+from sqlmodel import Field, SQLModel
 
 from ..config import AppPaths
 from ..exceptions import NotFoundError, ValidationError
@@ -28,16 +28,13 @@ from .dataset_inspection import (
     inspect_dataset_file,
 )
 from .storage.models import (
-    DatasetColumnBindingRow,
     DatasetDerivationInputRow,
     DatasetDerivationRow,
     DatasetImportRow,
     DatasetRow,
     DatasetSourceFormat,
     DatasetWorkbookRow,
-    MLTaskRow,
     ProjectRow,
-    TrainedModelRow,
 )
 from .storage.repositories import DatasetRepository, ProjectRepository
 from .tabular import (
@@ -225,28 +222,30 @@ class DatasetService:
             import_row: DatasetImportRow | None = None
             workbook_row: DatasetWorkbookRow | None = None
             if not is_derived:
-                import_row = DatasetImportRow(
-                    project_id=project_id,
-                    original_path=str(source_path.resolve()),
-                    original_file_name=source_path.name,
-                    source_format=source_format,
-                    status="succeeded",
-                    created_at=now,
-                )
-                session.add(import_row)
-                session.flush()
-                if source_format in {DatasetSourceFormat.XLSX, DatasetSourceFormat.XLS}:
-                    workbook_row = DatasetWorkbookRow(
-                        import_id=import_row.id,
-                        sheet_count=len(frame_specs),
-                        engine="polars-calamine",
-                        metadata_payload={
-                            "sheet_names": [str(spec["sheet_name"]) for spec in frame_specs],
-                        },
+                import_row = self._datasets.create_import(
+                    session,
+                    DatasetImportRow(
+                        project_id=project_id,
+                        original_path=str(source_path.resolve()),
+                        original_file_name=source_path.name,
+                        source_format=source_format,
+                        status="succeeded",
                         created_at=now,
+                    ),
+                )
+                if source_format in {DatasetSourceFormat.XLSX, DatasetSourceFormat.XLS}:
+                    workbook_row = self._datasets.create_workbook(
+                        session,
+                        DatasetWorkbookRow(
+                            import_id=import_row.id,
+                            sheet_count=len(frame_specs),
+                            engine="polars-calamine",
+                            metadata_payload={
+                                "sheet_names": [str(spec["sheet_name"]) for spec in frame_specs],
+                            },
+                            created_at=now,
+                        ),
                     )
-                    session.add(workbook_row)
-                    session.flush()
             materialized: list[_MaterializedDataset] = []
             written_paths: list[Path] = []
             try:
@@ -438,7 +437,7 @@ class DatasetService:
             dataset = self._datasets.get(session, dataset_id)
             if dataset is None:
                 raise NotFoundError(f"Dataset '{dataset_id}' was not found.")
-            derivation = session.get(DatasetDerivationRow, dataset.id)
+            derivation = self._datasets.get_derivation(session, dataset.id)
             if derivation is None:
                 return None
             return self._dataset_audit_presentation(session, dataset, derivation)
@@ -466,14 +465,9 @@ class DatasetService:
         }
         if not requested:
             return []
-        statement = (
-            select(DatasetDerivationRow)
-            .where(col(DatasetDerivationRow.tool_call_message_id).in_(requested))
-            .order_by(DatasetDerivationRow.created_at, DatasetDerivationRow.dataset_id)
-        )
         with self._session_factory() as session:
             audits: list[DatasetAuditPresentation] = []
-            for derivation in session.exec(statement):
+            for derivation in self._datasets.list_derivations_by_tool_calls(session, requested):
                 dataset = self._datasets.get(session, derivation.dataset_id)
                 if dataset is not None:
                     audits.append(
@@ -510,7 +504,7 @@ class DatasetService:
                 if not isinstance(import_id, str) or not import_id.strip():
                     return None
                 import_id = import_id.strip()
-                imported = session.get(DatasetImportRow, import_id)
+                imported = self._datasets.get_import(session, import_id)
                 if imported is None:
                     return None
 
@@ -783,15 +777,7 @@ class DatasetService:
         dataset: DatasetRow,
         derivation: DatasetDerivationRow,
     ) -> DatasetAuditPresentation:
-        input_rows = list(
-            session.exec(
-                select(DatasetDerivationInputRow)
-                .where(
-                    DatasetDerivationInputRow.derivation_dataset_id == dataset.id
-                )
-                .order_by(DatasetDerivationInputRow.input_position)
-            )
-        )
+        input_rows = self._datasets.list_derivation_inputs(session, dataset.id)
         inputs: list[DatasetAuditInputPresentation] = []
         for edge in input_rows:
             source = self._datasets.get(session, edge.input_dataset_id)
@@ -824,13 +810,7 @@ class DatasetService:
         known = memo.get(dataset_id)
         if known is not None:
             return known
-        input_ids = list(
-            session.exec(
-                select(DatasetDerivationInputRow.input_dataset_id).where(
-                    DatasetDerivationInputRow.derivation_dataset_id == dataset_id
-                )
-            )
-        )
+        input_ids = self._datasets.list_derivation_input_ids(session, dataset_id)
         if not input_ids:
             dataset = self._datasets.get(session, dataset_id)
             if dataset is not None and dataset.derived_from_dataset_id:
@@ -866,27 +846,26 @@ class DatasetService:
         derivation: DatasetDerivationInput,
         now: datetime,
     ) -> None:
-        session.add(
-            DatasetDerivationRow(
+        self._datasets.create_derivation(
+            session,
+            derivation=DatasetDerivationRow(
                 dataset_id=dataset_id,
                 operation_name=derivation.operation_name,
                 parameters_payload=dict(derivation.parameters_payload),
                 agent_explanation=derivation.agent_explanation,
                 tool_call_message_id=derivation.tool_call_message_id,
                 created_at=now,
-            )
-        )
-        session.flush()
-        for position, source in enumerate(derivation.inputs):
-            session.add(
+            ),
+            inputs=[
                 DatasetDerivationInputRow(
                     derivation_dataset_id=dataset_id,
                     input_dataset_id=source.dataset_id,
                     input_position=position,
                     alias=source.alias,
                 )
-            )
-        session.flush()
+                for position, source in enumerate(derivation.inputs)
+            ],
+        )
 
     def _resolve_project_id(
         self,
@@ -926,27 +905,7 @@ class DatasetService:
         return True
 
     def _has_dataset_references(self, session, dataset_id: str) -> bool:
-        reference_statements = [
-            select(DatasetRow.id).where(DatasetRow.copied_from == dataset_id),
-            select(DatasetRow.id).where(DatasetRow.derived_from_dataset_id == dataset_id),
-            select(DatasetDerivationInputRow.id).where(
-                DatasetDerivationInputRow.input_dataset_id == dataset_id
-            ),
-            select(DatasetColumnBindingRow.id).where(DatasetColumnBindingRow.dataset_id == dataset_id),
-            select(MLTaskRow.id).where(MLTaskRow.dataset_id == dataset_id),
-            select(TrainedModelRow.id).where(TrainedModelRow.dataset_id == dataset_id),
-        ]
-        return any(session.exec(statement).first() is not None for statement in reference_statements)
+        return self._datasets.has_references(session, dataset_id)
 
     def _delete_dataset_derivation(self, session, dataset_id: str) -> None:
-        input_rows = session.exec(
-            select(DatasetDerivationInputRow).where(
-                DatasetDerivationInputRow.derivation_dataset_id == dataset_id
-            )
-        )
-        for row in input_rows:
-            session.delete(row)
-        derivation = session.get(DatasetDerivationRow, dataset_id)
-        if derivation is not None:
-            session.delete(derivation)
-        session.flush()
+        self._datasets.delete_derivation(session, dataset_id)
