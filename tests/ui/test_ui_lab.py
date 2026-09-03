@@ -229,6 +229,33 @@ def test_batch_capture_aggregates_build_failure_with_stage_manifest(qapp, tmp_pa
     assert manifest["stage"] == "build"
 
 
+def test_batch_capture_aggregates_configure_failure_with_stage_manifest(qapp, tmp_path, monkeypatch) -> None:
+    """Configure failure is recorded as stage 'configure', not 'build'."""
+    from scripts.ui_lab import capture_all as capture_all_module
+
+    def broken_configure(_app, _scenario):
+        raise RuntimeError("synthetic configure failure")
+
+    monkeypatch.setattr(capture_all_module, "configure_scenario_application", broken_configure)
+    spec = list_scenarios()[0]
+    monkeypatch.setattr(capture_all_module, "list_scenarios", lambda: (spec,))
+
+    batch = capture_all_module.capture_all_scenarios(tmp_path / "artifacts", [spec.id])
+
+    assert batch["reconciled"] is False
+    assert batch["failures"] == [
+        {
+            "scenario_id": spec.id,
+            "stage": "configure",
+            "error": "RuntimeError: synthetic configure failure",
+        }
+    ]
+    run_dir = tmp_path / "artifacts" / batch["run_id"]
+    manifest = json.loads((run_dir / spec.id / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["reason"] == "scenario-capture-failure"
+    assert manifest["stage"] == "configure"
+
+
 def test_batch_capture_prune_runs_removes_prior_runs(qapp, tmp_path, monkeypatch) -> None:
     from scripts.ui_lab import capture_all as capture_all_module
 
@@ -298,9 +325,32 @@ def test_capture_verifier_reports_missing_artifacts(qapp, tmp_path, monkeypatch)
 
     report = capture_all_module.verify_captured_artifacts(run_dir)
     assert report["complete"] is True
+    assert report["reconciled"] is True
+    assert report["failures"] == []
     assert report["scenarios"]["chat.empty"]["complete"] is True
 
     (run_dir / "chat.empty" / "actual.png").unlink()
     report = capture_all_module.verify_captured_artifacts(run_dir)
     assert report["complete"] is False
     assert report["scenarios"]["chat.empty"]["missing"] == ["actual.png"]
+
+
+def test_capture_verifier_rejects_unreconciled_batch(qapp, tmp_path, monkeypatch) -> None:
+    """Verifier must report incomplete when expected != captured or failures exist."""
+    from scripts.ui_lab import capture_all as capture_all_module
+
+    def broken(_context):
+        raise RuntimeError("synthetic build failure")
+
+    broken_spec = replace(list_scenarios()[0], build=broken)
+    monkeypatch.setattr(capture_all_module, "list_scenarios", lambda: (broken_spec,))
+
+    output = tmp_path / "artifacts"
+    batch = capture_all_module.capture_all_scenarios(output, [broken_spec.id])
+    run_dir = output / batch["run_id"]
+
+    report = capture_all_module.verify_captured_artifacts(run_dir)
+    assert report["complete"] is False
+    assert report["reconciled"] is False
+    assert len(report["failures"]) == 1
+    assert report["failures"][0]["scenario_id"] == broken_spec.id

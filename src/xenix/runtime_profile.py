@@ -1,9 +1,9 @@
 """Typed runtime profile resolved before application composition.
 
-The launcher resolves this before importing the application so the home and the
-home-scoped single-instance mutex are fixed before any service is composed. An
-isolated run uses a unique fresh home under the system temp root and never
-reads, migrates, or writes the real user home.
+The launcher resolves this, sets ``XENIX_APP_HOME``, acquires the home-scoped
+single-instance mutex, and only then imports the application.  An isolated run
+uses a unique fresh home under the system temp root and never reads, migrates,
+or writes the real user home.
 """
 
 from __future__ import annotations

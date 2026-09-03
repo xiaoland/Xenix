@@ -134,14 +134,17 @@ def capture_all_scenarios(
     for scenario in list_scenarios():
         if scenario.id not in expected:
             continue
-        try:
-            handle = scenario.build(ScenarioContext(app))
-        except Exception as exc:
-            failures.append(_failure(scenario.id, "build", exc))
-            _write_failure_manifest(run_dir, scenario.id, "build", exc)
-            continue
+        configured = False
         try:
             configure_scenario_application(app, scenario)
+            configured = True
+            handle = scenario.build(ScenarioContext(app))
+        except Exception as exc:
+            stage = "build" if configured else "configure"
+            failures.append(_failure(scenario.id, stage, exc))
+            _write_failure_manifest(run_dir, scenario.id, stage, exc)
+            continue
+        try:
             handle.root.resize(scenario.viewport_width, scenario.viewport_height)
             handle.root.show()
             settle_scenario(handle.root, handle.readiness)
@@ -212,12 +215,14 @@ _REQUIRED_SCENARIO_ARTIFACTS = ("tree.json", "actual.png")
 
 
 def verify_captured_artifacts(run_dir: Path) -> dict[str, Any]:
-    """Verify that every captured scenario in a run dir has complete artifacts.
+    """Verify that every captured scenario in a run dir has complete artifacts
+    and that the batch is reconciled (expected == captured, no failures).
 
     Reads the registry-derived ``batch.json`` and checks, per captured scenario,
     that its manifest declares ``tree.json`` and ``actual.png``, that both exist on
-    disk, and that ``actual.png`` is non-empty.  Returns a report with an overall
-    ``complete`` flag and a per-scenario breakdown.
+    disk, and that ``actual.png`` is non-empty.  Also checks that the run's
+    ``reconciled`` flag is true and the ``failures`` list is empty.  Returns a
+    report with an overall ``complete`` flag and a per-scenario breakdown.
     """
     run_dir = run_dir.resolve()
     batch_path = run_dir / "batch.json"
@@ -225,9 +230,16 @@ def verify_captured_artifacts(run_dir: Path) -> dict[str, Any]:
         raise ValueError(f"Not a capture run directory (missing batch.json): {run_dir}")
     batch = json.loads(batch_path.read_text(encoding="utf-8"))
     captured = [str(scenario_id) for scenario_id in batch.get("captured_scenarios", [])]
+    expected = [str(scenario_id) for scenario_id in batch.get("expected_scenarios", [])]
+    failures = list(batch.get("failures", []))
+
+    reconciled = batch.get("reconciled", False)
+    if not reconciled and not captured and not failures:
+        # batch.json may have been written by an older version; validate manually
+        reconciled = not failures and set(expected) == set(captured)
 
     scenarios: dict[str, dict[str, Any]] = {}
-    complete = True
+    complete = reconciled
     for scenario_id in captured:
         scenario_dir = run_dir / scenario_id
         manifest_path = scenario_dir / "manifest.json"
@@ -253,6 +265,10 @@ def verify_captured_artifacts(run_dir: Path) -> dict[str, Any]:
     return {
         "run_id": batch.get("run_id"),
         "complete": complete,
+        "reconciled": reconciled,
+        "expected_scenarios": sorted(expected),
+        "captured_scenarios": sorted(captured),
+        "failures": failures,
         "scenarios": scenarios,
     }
 

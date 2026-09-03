@@ -12,7 +12,6 @@ from multiprocessing import freeze_support
 from pathlib import Path
 from typing import Sequence
 
-from .app import run
 from .runtime_profile import (
     RuntimeProfileContext,
     is_isolated_home_path,
@@ -45,8 +44,10 @@ def build_argument_parser() -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None) -> int:
     freeze_support()
     args = build_argument_parser().parse_args(list(argv) if argv is not None else None)
-    # Resolve the typed profile before application import/composition so the
-    # home, home-scoped mutex, and capability denials are fixed first.
+    # Resolve the typed profile, set the home, acquire the home-scoped mutex,
+    # and only then import the application.  This guarantees that any future
+    # app-level import-time path resolution sees the correct XENIX_APP_HOME
+    # and that the home is never reached without the mutex held.
     profile = resolve_runtime_profile(
         isolated=args.isolated,
         smoke_test=args.smoke_test,
@@ -54,8 +55,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     if profile.isolated_home:
         os.environ["XENIX_APP_HOME"] = str(profile.runtime_home)
     _print_run_manifest(profile)
+
     guard = SingleInstanceGuard(profile.mutex_name())
     try:
+        from .app import run
+
         exit_code = run(smoke_test=args.smoke_test)
     except BaseException:
         if profile.isolated_home:
