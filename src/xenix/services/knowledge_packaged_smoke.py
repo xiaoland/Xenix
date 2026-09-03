@@ -14,6 +14,7 @@ from ..config import AppPaths, ensure_app_dirs
 from ..release_config import ReleaseConfig
 from .artifact_service import ArtifactService
 from .knowledge_content_store import KnowledgeContentStore
+from .storage.repositories import KnowledgeRepository
 from .knowledge_derivation_service import (
     KnowledgeDerivationService,
     KnowledgeDerivationView,
@@ -136,6 +137,7 @@ def run_knowledge_packaged_smoke(paths: AppPaths) -> None:
             paths=smoke_paths,
             session_factory=storage.session_factory,
             artifact_service=artifacts,
+            knowledge_repository=KnowledgeRepository(),
             canonical_ready_notifier=derivation.enqueue_generation,
         )
         lifecycle = KnowledgeDocumentLifecycleService(
@@ -277,6 +279,7 @@ def run_knowledge_packaged_smoke(paths: AppPaths) -> None:
                 paths=smoke_paths,
                 session_factory=ocr_storage.session_factory,
                 artifact_service=ArtifactService(ocr_storage.session_factory),
+                knowledge_repository=KnowledgeRepository(),
                 canonical_ready_notifier=derivation.enqueue_generation,
             )
             try:

@@ -605,6 +605,45 @@ class KnowledgeRepository:
         session.refresh(row)
         return row
 
+    def list_all_imports(self, session: Session) -> list[KnowledgeImportRow]:
+        return list(
+            session.exec(
+                select(KnowledgeImportRow).order_by(KnowledgeImportRow.created_at.desc())
+            )
+        )
+
+    def get_import_retry_of(
+        self, session: Session, *, retry_of_id: str,
+    ) -> KnowledgeImportRow | None:
+        return session.exec(
+            select(KnowledgeImportRow)
+            .where(KnowledgeImportRow.retry_of == retry_of_id)
+            .order_by(KnowledgeImportRow.created_at.desc())
+        ).first()
+
+    def max_attempt_number(
+        self,
+        session: Session,
+        *,
+        planned_document_id: str,
+        excluding_import_id: str | None = None,
+    ) -> int:
+        from sqlalchemy import func
+        statement = select(func.max(KnowledgeImportRow.attempt_number)).where(
+            KnowledgeImportRow.planned_document_id == planned_document_id
+        )
+        if excluding_import_id is not None:
+            statement = statement.where(KnowledgeImportRow.id != excluding_import_id)
+        return session.exec(statement).first() or 0
+
+    def list_all_documents(self, session: Session) -> list[KnowledgeDocumentRow]:
+        return list(session.exec(select(KnowledgeDocumentRow)))
+
+    def list_all_canonical_generations(
+        self, session: Session,
+    ) -> list[KnowledgeCanonicalGenerationRow]:
+        return list(session.exec(select(KnowledgeCanonicalGenerationRow)))
+
     def create_canonical_generation(
         self,
         session: Session,
