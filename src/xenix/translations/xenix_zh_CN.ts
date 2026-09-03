@@ -133,8 +133,8 @@
     <message>
         <location filename="../ui/conversation/composer.py" line="185"/>
         <location filename="../ui/conversation/composer.py" line="186"/>
-        <location filename="../ui/conversation/composer.py" line="413"/>
-        <location filename="../ui/conversation/composer.py" line="424"/>
+        <location filename="../ui/conversation/composer.py" line="414"/>
+        <location filename="../ui/conversation/composer.py" line="425"/>
         <source>Attach files</source>
         <translation>添加文件</translation>
     </message>
@@ -151,8 +151,8 @@
     </message>
     <message>
         <location filename="../ui/conversation/composer.py" line="190"/>
-        <location filename="../ui/conversation/composer.py" line="287"/>
-        <location filename="../ui/conversation/composer.py" line="298"/>
+        <location filename="../ui/conversation/composer.py" line="288"/>
+        <location filename="../ui/conversation/composer.py" line="299"/>
         <source>Stop</source>
         <translation>停止</translation>
     </message>
@@ -167,19 +167,19 @@
         <translation>松开后添加到下一条消息</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/composer.py" line="289"/>
-        <location filename="../ui/conversation/composer.py" line="295"/>
-        <location filename="../ui/conversation/composer.py" line="302"/>
+        <location filename="../ui/conversation/composer.py" line="290"/>
+        <location filename="../ui/conversation/composer.py" line="296"/>
+        <location filename="../ui/conversation/composer.py" line="303"/>
         <source>Send</source>
         <translation>发送</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/composer.py" line="300"/>
+        <location filename="../ui/conversation/composer.py" line="301"/>
         <source>Preparing attachments</source>
         <translation>正在准备附件</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/composer.py" line="415"/>
+        <location filename="../ui/conversation/composer.py" line="416"/>
         <source>Data files (*.csv *.xlsx *.xls)</source>
         <translation>数据文件 (*.csv *.xlsx *.xls)</translation>
     </message>
@@ -330,14 +330,108 @@ This route will stay available after model selection is connected.</source>
     </message>
 </context>
 <context>
+    <name>DatasetAuditDialog</name>
+    <message>
+        <location filename="../ui/dataset_audit_dialog.py" line="143"/>
+        <source>Dataset: {name} ({dataset_id})</source>
+        <translation>数据集：{name} ({dataset_id})</translation>
+    </message>
+    <message>
+        <location filename="../ui/dataset_audit_dialog.py" line="146"/>
+        <source>Generation: {generation}</source>
+        <translation>代数：{generation}</translation>
+    </message>
+    <message>
+        <location filename="../ui/dataset_audit_dialog.py" line="147"/>
+        <source>Recorded operation: {operation}</source>
+        <translation>记录的操作：{operation}</translation>
+    </message>
+    <message>
+        <location filename="../ui/dataset_audit_dialog.py" line="150"/>
+        <source>Recorded at: {created_at}</source>
+        <translation>记录于：{created_at}</translation>
+    </message>
+    <message>
+        <location filename="../ui/dataset_audit_dialog.py" line="156"/>
+        <location filename="../ui/dataset_audit_dialog.py" line="186"/>
+        <source>Inputs</source>
+        <translation>输入</translation>
+    </message>
+    <message>
+        <location filename="../ui/dataset_audit_dialog.py" line="158"/>
+        <source>{position}. {name} ({dataset_id})</source>
+        <translation>{position}. {name} ({dataset_id})</translation>
+    </message>
+    <message>
+        <location filename="../ui/dataset_audit_dialog.py" line="164"/>
+        <source>alias {alias}</source>
+        <translation>别名 {alias}</translation>
+    </message>
+    <message>
+        <location filename="../ui/dataset_audit_dialog.py" line="168"/>
+        <source>Recorded parameters</source>
+        <translation>记录的参数</translation>
+    </message>
+    <message>
+        <location filename="../ui/dataset_audit_dialog.py" line="174"/>
+        <source>Agent-authored explanation</source>
+        <translation>Agent 生成的说明</translation>
+    </message>
+    <message>
+        <location filename="../ui/dataset_audit_dialog.py" line="175"/>
+        <source>Not system-verified.</source>
+        <translation>未经系统验证。</translation>
+    </message>
+    <message>
+        <location filename="../ui/dataset_audit_dialog.py" line="180"/>
+        <source>Session Datasets</source>
+        <translation>会话数据集</translation>
+    </message>
+    <message>
+        <location filename="../ui/dataset_audit_dialog.py" line="183"/>
+        <source>Dataset</source>
+        <translation>数据集</translation>
+    </message>
+    <message>
+        <location filename="../ui/dataset_audit_dialog.py" line="184"/>
+        <source>Generation</source>
+        <translation>代数</translation>
+    </message>
+    <message>
+        <location filename="../ui/dataset_audit_dialog.py" line="185"/>
+        <source>Operation</source>
+        <translation>操作</translation>
+    </message>
+    <message>
+        <location filename="../ui/dataset_audit_dialog.py" line="187"/>
+        <source>Recorded</source>
+        <translation>记录于</translation>
+    </message>
+    <message>
+        <location filename="../ui/dataset_audit_dialog.py" line="191"/>
+        <source>No datasets have been produced by this conversation yet.</source>
+        <translation>此会话尚未生成数据集。</translation>
+    </message>
+    <message>
+        <location filename="../ui/dataset_audit_dialog.py" line="193"/>
+        <source>Refresh</source>
+        <translation>刷新</translation>
+    </message>
+    <message>
+        <location filename="../ui/dataset_audit_dialog.py" line="194"/>
+        <source>Close</source>
+        <translation>关闭</translation>
+    </message>
+</context>
+<context>
     <name>Exceptions</name>
     <message>
-        <location filename="../exceptions.py" line="76"/>
+        <location filename="../exceptions.py" line="82"/>
         <source>Xenix</source>
         <translation>Xenix</translation>
     </message>
     <message>
-        <location filename="../exceptions.py" line="78"/>
+        <location filename="../exceptions.py" line="84"/>
         <source>An unexpected error occurred. Check the log file for details.</source>
         <translation>发生意外错误。请查看日志文件了解详情。</translation>
     </message>
@@ -353,6 +447,190 @@ This route will stay available after model selection is connected.</source>
         <location filename="../ui/widgets/file_drop_zone.py" line="38"/>
         <source>Supports .csv, .xlsx, and .xls</source>
         <translation>支持 .csv、.xlsx 和 .xls</translation>
+    </message>
+</context>
+<context>
+    <name>JobCenterDialog</name>
+    <message>
+        <location filename="../ui/job_center.py" line="178"/>
+        <source>Jobs could not be loaded.</source>
+        <translation>无法加载任务。</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="210"/>
+        <source>%1 jobs · %2 active · %3 failed</source>
+        <translation>%1 个任务 · %2 个进行中 · %3 个失败</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="249"/>
+        <source>Reference: %1
+Domain: %2
+Type: %3
+Target: %4
+Status: %5
+Phase: %6
+Updated: %7</source>
+        <translation>引用：%1
+域：%2
+类型：%3
+对象：%4
+状态：%5
+阶段：%6
+更新时间：%7</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="262"/>
+        <source>
+Error: %1</source>
+        <translation>
+错误：%1</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="263"/>
+        <source>Job Details</source>
+        <translation>任务详情</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="267"/>
+        <location filename="../ui/job_center.py" line="297"/>
+        <source>Knowledge</source>
+        <translation>知识库</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="268"/>
+        <location filename="../ui/job_center.py" line="298"/>
+        <source>Machine learning</source>
+        <translation>机器学习</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="273"/>
+        <source>Queued</source>
+        <translation>已排队</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="274"/>
+        <source>Running</source>
+        <translation>运行中</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="275"/>
+        <source>Succeeded</source>
+        <translation>成功</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="276"/>
+        <source>Failed</source>
+        <translation>失败</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="277"/>
+        <source>Cancelled</source>
+        <translation>已取消</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="282"/>
+        <source>Import</source>
+        <translation>导入</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="283"/>
+        <source>Content preparation</source>
+        <translation>内容准备</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="284"/>
+        <source>Index build</source>
+        <translation>索引构建</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="285"/>
+        <source>Model training</source>
+        <translation>模型训练</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="286"/>
+        <source>Parameter tuning</source>
+        <translation>参数调优</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="287"/>
+        <source>Evaluation</source>
+        <translation>评估</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="288"/>
+        <source>Apply model</source>
+        <translation>应用模型</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="294"/>
+        <source>Jobs</source>
+        <translation>任务</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="296"/>
+        <source>All services</source>
+        <translation>所有服务</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="300"/>
+        <source>All statuses</source>
+        <translation>所有状态</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="305"/>
+        <source>Search jobs</source>
+        <translation>搜索任务</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="308"/>
+        <source>Service</source>
+        <translation>服务</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="309"/>
+        <source>Type</source>
+        <translation>类型</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="310"/>
+        <source>Target</source>
+        <translation>对象</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="311"/>
+        <source>Status</source>
+        <translation>状态</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="312"/>
+        <source>Updated</source>
+        <translation>更新时间</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="315"/>
+        <source>Details</source>
+        <translation>详情</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="316"/>
+        <source>Cancel</source>
+        <translation>取消</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="317"/>
+        <source>Refresh</source>
+        <translation>刷新</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="318"/>
+        <source>Close</source>
+        <translation>关闭</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="319"/>
+        <source>Load more</source>
+        <translation>加载更多</translation>
     </message>
 </context>
 <context>
@@ -1357,24 +1635,30 @@ Trigger: %2</source>
 <context>
     <name>MainWindow</name>
     <message>
-        <location filename="../ui/main_window.py" line="169"/>
+        <location filename="../ui/main_window.py" line="177"/>
         <source>Xenix Native</source>
         <translation>Xenix 原生版</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="170"/>
+        <location filename="../ui/main_window.py" line="178"/>
         <source>Xenix</source>
         <translation>Xenix</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="171"/>
+        <location filename="../ui/main_window.py" line="179"/>
         <source>Settings</source>
         <translation>设置</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="172"/>
+        <location filename="../ui/main_window.py" line="180"/>
         <source>Knowledge</source>
         <translation>知识库</translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="181"/>
+        <location filename="../ui/windows/auxiliary.py" line="109"/>
+        <source>Jobs</source>
+        <translation>任务</translation>
     </message>
     <message>
         <location filename="../ui/history/panel.py" line="221"/>
@@ -1460,14 +1744,19 @@ Trigger: %2</source>
         <translation type="vanished">正在下载 Xenix {version}...</translation>
     </message>
     <message>
-        <location filename="../ui/windows/auxiliary.py" line="85"/>
+        <location filename="../ui/windows/auxiliary.py" line="90"/>
         <source>Knowledge Workspace</source>
         <translation>知识工作区</translation>
     </message>
     <message>
-        <location filename="../ui/windows/auxiliary.py" line="86"/>
+        <location filename="../ui/windows/auxiliary.py" line="91"/>
         <source>Knowledge services are not available.</source>
         <translation>知识库服务当前不可用。</translation>
+    </message>
+    <message>
+        <location filename="../ui/windows/auxiliary.py" line="110"/>
+        <source>Job services are not available.</source>
+        <translation>任务服务不可用。</translation>
     </message>
     <message>
         <location filename="../ui/chat_workspace.py" line="276"/>
@@ -1564,16 +1853,16 @@ Trigger: %2</source>
 <context>
     <name>SettingsDialog</name>
     <message>
-        <location filename="../ui/settings/dialog.py" line="191"/>
-        <location filename="../ui/settings/dialog.py" line="317"/>
-        <location filename="../ui/settings/dialog.py" line="342"/>
-        <location filename="../ui/settings/provider.py" line="211"/>
-        <location filename="../ui/settings/provider.py" line="233"/>
+        <location filename="../ui/settings/dialog.py" line="187"/>
+        <location filename="../ui/settings/dialog.py" line="313"/>
+        <location filename="../ui/settings/dialog.py" line="338"/>
+        <location filename="../ui/settings/provider.py" line="212"/>
+        <location filename="../ui/settings/provider.py" line="234"/>
         <source>Settings</source>
         <translation>设置</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="192"/>
+        <location filename="../ui/settings/dialog.py" line="188"/>
         <source>Language</source>
         <translation>语言</translation>
     </message>
@@ -1583,13 +1872,13 @@ Trigger: %2</source>
     </message>
     <message>
         <location filename="../ui/settings/embedding.py" line="101"/>
-        <location filename="../ui/settings/provider.py" line="155"/>
+        <location filename="../ui/settings/provider.py" line="156"/>
         <source>Base URL</source>
         <translation>基础 URL</translation>
     </message>
     <message>
         <location filename="../ui/settings/embedding.py" line="102"/>
-        <location filename="../ui/settings/provider.py" line="156"/>
+        <location filename="../ui/settings/provider.py" line="157"/>
         <source>API key</source>
         <translation>API 密钥</translation>
     </message>
@@ -1599,83 +1888,83 @@ Trigger: %2</source>
         <translation>模型</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="161"/>
+        <location filename="../ui/settings/provider.py" line="162"/>
         <source>Turn guard model</source>
         <translation>轮次守卫模型</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="162"/>
+        <location filename="../ui/settings/provider.py" line="163"/>
         <source>Thread title model</source>
         <translation>线程标题模型</translation>
     </message>
     <message>
         <location filename="../ui/settings/embedding.py" line="109"/>
-        <location filename="../ui/settings/provider.py" line="158"/>
+        <location filename="../ui/settings/provider.py" line="159"/>
         <source>Timeout</source>
         <translation>超时</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="193"/>
+        <location filename="../ui/settings/dialog.py" line="189"/>
         <source>AI</source>
         <translation>AI</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="196"/>
+        <location filename="../ui/settings/dialog.py" line="192"/>
         <source>Knowledge Base</source>
         <translation>知识库</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="200"/>
+        <location filename="../ui/settings/dialog.py" line="196"/>
         <source>ML Workers</source>
         <translation>ML 工作器</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="149"/>
+        <location filename="../ui/settings/provider.py" line="150"/>
         <source>Global models</source>
         <translation>全局模型</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="150"/>
+        <location filename="../ui/settings/provider.py" line="151"/>
         <source>LLM providers</source>
         <translation>LLM 提供商</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="151"/>
+        <location filename="../ui/settings/provider.py" line="152"/>
         <source>Provider</source>
         <translation>提供商</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="152"/>
+        <location filename="../ui/settings/provider.py" line="153"/>
         <source>Provider key</source>
         <translation>提供商键</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="153"/>
+        <location filename="../ui/settings/provider.py" line="154"/>
         <source>Provider name</source>
         <translation>提供商名称</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="154"/>
+        <location filename="../ui/settings/provider.py" line="155"/>
         <source>Dialect</source>
         <translation>方言</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="157"/>
+        <location filename="../ui/settings/provider.py" line="158"/>
         <source>Models</source>
         <translation>模型</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="159"/>
+        <location filename="../ui/settings/provider.py" line="160"/>
         <source>Streaming</source>
         <translation>流式输出</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="160"/>
+        <location filename="../ui/settings/provider.py" line="161"/>
         <source>Default model</source>
         <translation>默认模型</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="163"/>
+        <location filename="../ui/settings/provider.py" line="164"/>
         <source>LLM retry attempts</source>
         <translation>LLM 重试次数</translation>
     </message>
@@ -1726,17 +2015,17 @@ Trigger: %2</source>
         <translation>重建索引...</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="164"/>
+        <location filename="../ui/settings/provider.py" line="165"/>
         <source>Add</source>
         <translation>添加</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="165"/>
+        <location filename="../ui/settings/provider.py" line="166"/>
         <source>Remove</source>
         <translation>移除</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="167"/>
+        <location filename="../ui/settings/provider.py" line="168"/>
         <source>OpenAI-compatible</source>
         <translation>OpenAI 兼容</translation>
     </message>
@@ -1757,17 +2046,17 @@ Trigger: %2</source>
         <translation type="vanished">AIMock API 密钥</translation>
     </message>
     <message>
-        <location filename="../ui/settings/ml_workers.py" line="64"/>
+        <location filename="../ui/settings/ml_workers.py" line="59"/>
         <source>ML workers</source>
         <translation>ML 工作器</translation>
     </message>
     <message>
-        <location filename="../ui/settings/ml_workers.py" line="65"/>
+        <location filename="../ui/settings/ml_workers.py" line="60"/>
         <source>Add SSH worker...</source>
         <translation>添加 SSH 工作器...</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="207"/>
+        <location filename="../ui/settings/dialog.py" line="203"/>
         <source>About</source>
         <translation>关于</translation>
     </message>
@@ -1800,7 +2089,7 @@ Trigger: %2</source>
         <translation type="vanished">打开日志目录</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="208"/>
+        <location filename="../ui/settings/dialog.py" line="204"/>
         <source>Save</source>
         <translation>保存</translation>
     </message>
@@ -1871,22 +2160,22 @@ Trigger: %2</source>
         <translation>本地 PaddleOCR 尚未安装</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="252"/>
+        <location filename="../ui/settings/dialog.py" line="248"/>
         <source>English</source>
         <translation>English</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="253"/>
+        <location filename="../ui/settings/dialog.py" line="249"/>
         <source>Simplified Chinese</source>
         <translation>简体中文</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="277"/>
+        <location filename="../ui/settings/dialog.py" line="273"/>
         <source>Language Switch Failed</source>
         <translation>语言切换失败</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="278"/>
+        <location filename="../ui/settings/dialog.py" line="274"/>
         <source>Unable to switch the application language.
 
 {details}</source>
@@ -1895,33 +2184,33 @@ Trigger: %2</source>
 {details}</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="330"/>
-        <location filename="../ui/settings/dialog.py" line="356"/>
+        <location filename="../ui/settings/dialog.py" line="326"/>
+        <location filename="../ui/settings/dialog.py" line="352"/>
         <source>Knowledge Indexes</source>
         <translation>知识库索引</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="358"/>
+        <location filename="../ui/settings/dialog.py" line="354"/>
         <source>Embedding settings were saved, but the vector rebuild could not be queued.</source>
         <translation>Embedding 设置已保存，但无法将文本向量重建加入队列。</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="367"/>
+        <location filename="../ui/settings/dialog.py" line="363"/>
         <source>Rebuild text vectors?</source>
         <translation>重建文本向量？</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="370"/>
+        <location filename="../ui/settings/dialog.py" line="366"/>
         <source>This change uses a different embedding space. Existing text vectors cannot be reused for current Knowledge content.</source>
         <translation>此更改将使用不同的 Embedding 空间。现有文本向量无法用于当前知识库内容。</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="375"/>
+        <location filename="../ui/settings/dialog.py" line="371"/>
         <source>Save and rebuild now</source>
         <translation>保存并立即重建</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="379"/>
+        <location filename="../ui/settings/dialog.py" line="375"/>
         <source>Save; rebuild later</source>
         <translation>保存；稍后重建</translation>
     </message>
@@ -1931,7 +2220,7 @@ Trigger: %2</source>
         <translation>知识库索引服务不可用</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="331"/>
+        <location filename="../ui/settings/dialog.py" line="327"/>
         <location filename="../ui/settings/index_status.py" line="166"/>
         <source>Knowledge index status is unavailable</source>
         <translation>无法获取知识库索引状态</translation>
@@ -2072,7 +2361,7 @@ Text vectors: %2</source>
         <translation>未知状态</translation>
     </message>
     <message>
-        <location filename="../ui/settings/ml_workers.py" line="53"/>
+        <location filename="../ui/settings/ml_workers.py" line="48"/>
         <source>{local_count} local, {ssh_count} SSH, {slots} execution slot(s).</source>
         <translation>{local_count} 个本地，{ssh_count} 个 SSH，{slots} 个执行槽。</translation>
     </message>
@@ -2081,12 +2370,12 @@ Text vectors: %2</source>
         <translation type="vanished">此提供商由部署管理，无法在此处移除。</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="322"/>
+        <location filename="../ui/settings/provider.py" line="339"/>
         <source>Built into packaged app</source>
         <translation>已内置于打包应用</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="372"/>
+        <location filename="../ui/settings/provider.py" line="389"/>
         <source>None</source>
         <translation>无</translation>
     </message>
@@ -2906,12 +3195,12 @@ Reason: {reason}</source>
         <translation>前往购买</translation>
     </message>
     <message>
-        <location filename="../app.py" line="883"/>
+        <location filename="../app.py" line="913"/>
         <source>Unable to start Xenix</source>
         <translation>无法启动 Xenix</translation>
     </message>
     <message>
-        <location filename="../app.py" line="884"/>
+        <location filename="../app.py" line="914"/>
         <source>Xenix could not finish startup.
 
 {error}</source>

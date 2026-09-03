@@ -9,7 +9,7 @@ from xenix.config import ensure_app_dirs, get_app_paths
 from xenix.services.job_scheduler import JobCapabilities
 from xenix.services.job_service import JobDomain, JobItem, JobQueryService, JobStatus
 from xenix.services.storage import StorageBootstrapService
-from xenix.ui.job_center import JobCenterDialog
+from xenix.ui.job_center import JOB_PAGE_SIZE, JobCenterDialog
 
 
 @pytest.fixture()
@@ -80,5 +80,27 @@ def test_job_center_disables_cancel_when_not_cancellable(app, monkeypatch, tmp_p
     assert not dialog._cancel_button.isEnabled()
     dialog._cancel_button.click()
     assert scheduler.cancelled == []
+    dialog.shutdown()
+    storage.engine.dispose()
+
+
+def test_job_center_load_more_reveals_lazy_page(app, monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
+    paths = ensure_app_dirs(get_app_paths())
+    storage = StorageBootstrapService().initialize(paths)
+    dialog = JobCenterDialog(JobQueryService(storage.session_factory))
+
+    # Below a full page the lazy-load control stays hidden.
+    dialog._render_jobs([_job_item()])
+    assert dialog._load_more_button.isHidden()
+
+    # A full page signals that more rows may exist.
+    dialog._render_jobs([_job_item() for _ in range(JOB_PAGE_SIZE)])
+    assert not dialog._load_more_button.isHidden()
+
+    before = dialog._limit
+    dialog._load_more()
+    assert dialog._limit == before + JOB_PAGE_SIZE
+
     dialog.shutdown()
     storage.engine.dispose()

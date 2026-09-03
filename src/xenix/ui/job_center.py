@@ -22,6 +22,7 @@ from ..services.job_scheduler import JobScheduler
 from ..services.job_service import JobDomain, JobItem, JobQueryService, JobStatus
 
 JOB_POLL_INTERVAL_MS = 2_000
+JOB_PAGE_SIZE = 50
 
 
 class _JobLoadSignals(QObject):
@@ -36,6 +37,7 @@ class _JobLoad(QRunnable):
         domain: JobDomain | None,
         status: JobStatus | None,
         search: str,
+        limit: int,
     ) -> None:
         super().__init__()
         self._service = service
@@ -43,6 +45,7 @@ class _JobLoad(QRunnable):
         self._domain = domain
         self._status = status
         self._search = search
+        self._limit = limit
         self.signals = _JobLoadSignals()
 
     def run(self) -> None:
@@ -51,6 +54,7 @@ class _JobLoad(QRunnable):
                 domain=self._domain,
                 status=self._status,
                 search=self._search,
+                limit=self._limit,
             )
         except Exception as exc:
             result = exc
@@ -74,6 +78,7 @@ class JobCenterDialog(QDialog):
         self._scheduler = scheduler
         self._thread_pool = QThreadPool(self)
         self._generation = 0
+        self._limit = JOB_PAGE_SIZE
         self._load: _JobLoad | None = None
         self._load_pending = False
         self._active = False
@@ -106,6 +111,9 @@ class JobCenterDialog(QDialog):
         self._refresh_button.clicked.connect(self.refresh)
         self._close_button = QPushButton(self)
         self._close_button.clicked.connect(self.hide)
+        self._load_more_button = QPushButton(self)
+        self._load_more_button.clicked.connect(self._load_more)
+        self._load_more_button.setVisible(False)
         self._table.itemSelectionChanged.connect(self._update_action_buttons)
 
         filters = QHBoxLayout()
@@ -114,6 +122,7 @@ class JobCenterDialog(QDialog):
         filters.addWidget(self._search, 1)
         actions = QHBoxLayout()
         actions.addWidget(self._summary)
+        actions.addWidget(self._load_more_button)
         actions.addStretch(1)
         actions.addWidget(self._details_button)
         actions.addWidget(self._cancel_button)
@@ -142,13 +151,20 @@ class JobCenterDialog(QDialog):
             self._domain_filter.currentData(),
             self._status_filter.currentData(),
             self._search.text(),
+            self._limit,
         )
         load.signals.finished.connect(self._on_loaded)
         self._load = load
         self._thread_pool.start(load)
 
+    def _load_more(self) -> None:
+        self._limit += JOB_PAGE_SIZE
+        self._generation += 1
+        self.refresh()
+
     def _filters_changed(self, *_args: object) -> None:
         self._generation += 1
+        self._limit = JOB_PAGE_SIZE
         self.refresh()
 
     def _on_loaded(self, generation: int, result: object) -> None:
@@ -196,6 +212,8 @@ class JobCenterDialog(QDialog):
             .replace("%2", str(active_count))
             .replace("%3", str(failed_count))
         )
+        # A full page signals that more rows may exist; offer lazy loading.
+        self._load_more_button.setVisible(len(jobs) >= self._limit)
 
     def _selected_job(self) -> JobItem | None:
         row = self._table.currentRow()
@@ -298,6 +316,7 @@ class JobCenterDialog(QDialog):
         self._cancel_button.setText(self.tr("Cancel"))
         self._refresh_button.setText(self.tr("Refresh"))
         self._close_button.setText(self.tr("Close"))
+        self._load_more_button.setText(self.tr("Load more"))
         self._update_action_buttons()
 
     @staticmethod
@@ -336,4 +355,4 @@ class JobCenterDialog(QDialog):
         self._thread_pool.waitForDone()
 
 
-__all__ = ["JOB_POLL_INTERVAL_MS", "JobCenterDialog"]
+__all__ = ["JOB_PAGE_SIZE", "JOB_POLL_INTERVAL_MS", "JobCenterDialog"]
