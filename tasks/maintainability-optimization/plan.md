@@ -112,3 +112,17 @@ Scope: everything except the UI cluster. Categories from the 5-agent audit:
 - **E. Product-gated retirement** (approved): retire the 4 legacy `Tokenized*` services in
   `ml/models/text_analysis.py` (~900 lines) that duplicate `text_discovery.py` math, plus their
   params and registry exports.
+
+## Slice 13 — Complete ✅
+
+All five categories landed (14 commits, `197 passed`, `pdm run check` green):
+
+| Category | Outcome |
+|---|---|
+| **A. Dead code** | ~116 lines removed (base, conversation, tooling, providers, harness, knowledge, analysis_graph, paddle_ocr) |
+| **B. Helper dedup** | SQL file-authority check unified; `_role_columns` extracted; sha256-json consolidated to `digests.sha256_json` |
+| **C. Boundary fixes** | C1: `dataset_service` → `DatasetRepository` (+9 methods); C2: `knowledge_import_service` → `KnowledgeRepository` (+5 methods); C3: `knowledge_projection` relocated to `storage/`; C4: `ml_service` request_payload routed through `MLTaskService` |
+| **D. God-object extraction** | D1: thread-title subsystem → `llm/thread_titles.py`; D2: fit/tuning finalize dedup → `_finalize_training_task`; D4: smoke checks → `smoke_checks.py` |
+| **E. Tokenized retirement** | 4 legacy services + params + registry exports deleted (~861 lines) |
+
+**Dependency topology audit** (file-level graph): no storage→services reverse imports, no cross-package cycles, no remaining direct session operations outside repositories. The `ml/` package is correctly organized — ML-exclusive modules are in `ml/`, and only 3 genuinely shared leaf modules (`data_tokenization_contracts`, `dataset_inspection`, `tabular`) are imported from `services/` root.

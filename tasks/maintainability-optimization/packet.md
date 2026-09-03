@@ -110,13 +110,28 @@ Landed (committed on `develop`):
 - **C2 (knowledge→repo)** `76bfd5c`: added `KnowledgeRepository` dependency to
   `KnowledgeImportService`, routing all `session.get`/`session.add`/`select` calls
   through repository methods (+5 new methods).
-- **Soft cycle fix** `24d86bf`: moved `trained_model_metadata.py` into `ml/` package,
-  eliminating the `services → ml → services` soft cycle (module was ML-specific, only
-  consumed by `ml_service`, `ml_task_service`, and `ml/contracts`).
+- **Dependency topology audit**: file-level graph analysis confirmed zero cross-package
+  cycles. The only cycle is intra-package `ml/contracts ↔ ml/types` (TYPE_CHECKING only,
+  standard Python forward-reference pattern). The earlier "soft cycle" concern was a false
+  positive from package-level aggregation — `data_tokenization_contracts` is a pure leaf
+  module, so `ml_service → ml/contracts → data_tokenization_contracts` is a DAG, not a cycle.
+  The `ml/` package is already correctly organized: ML-exclusive modules (evaluation,
+  preparation, digests, types, registry, text_discovery, etc.) are all in `ml/`, and only
+  3 genuinely shared leaf modules (`data_tokenization_contracts`, `dataset_inspection`,
+  `tabular`) are imported from `services/` root.
 
-Remaining: minor **B** leftovers (`_build_pipeline` cross-class, knowledge
-bundle/retry, `_slug`/`_tfidf`), **D3** wordcloud SVG extraction, and compat alias
-cleanup.
+## Slice 13 summary
+
+All five categories landed (A–E). 14 commits, 197 passed, `pdm run check` green.
+Dependency topology audit confirmed: no storage→services reverse imports, no
+cross-package cycles, no remaining direct session operations outside repositories.
+
+Remaining low-value items (deferred by user):
+- **B** leftovers: `_build_pipeline` cross-class dedup, knowledge bundle/retry module,
+  `_slug`/`_tfidf` consolidation.
+- **D3**: `analysis_graph.py` wordcloud SVG extraction (high coupling to
+  AnalysisGraphService infrastructure).
+- Compat alias cleanup (`providers.py`, `conversation.py`).
 
 ## Open follow-up
 
