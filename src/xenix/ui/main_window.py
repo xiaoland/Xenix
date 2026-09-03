@@ -59,6 +59,8 @@ class MainWindow(QMainWindow):
         self._settings_button.clicked.connect(self._open_settings)
         self._knowledge_button = QPushButton(parent=self)
         self._knowledge_button.clicked.connect(self._open_knowledge_workspace)
+        self._jobs_button = QPushButton(parent=self)
+        self._jobs_button.clicked.connect(self._open_jobs)
 
         self._history_panel = HistoryPanel(
             history_port,
@@ -119,8 +121,10 @@ class MainWindow(QMainWindow):
         emphasize_label(self._title_label, point_delta=2)
         self._settings_button.setMinimumWidth(96)
         self._knowledge_button.setMinimumWidth(112)
+        self._jobs_button.setMinimumWidth(72)
         header_layout.addWidget(self._title_label)
         header_layout.addStretch(1)
+        header_layout.addWidget(self._jobs_button)
         header_layout.addWidget(self._knowledge_button)
         header_layout.addWidget(self._settings_button)
         layout.addLayout(header_layout)
@@ -140,6 +144,7 @@ class MainWindow(QMainWindow):
     def _assign_semantic_identities(self) -> None:
         identify(self._settings_button, "main.header.settings")
         identify(self._knowledge_button, "main.header.knowledge")
+        identify(self._jobs_button, "main.header.jobs")
 
     def _open_settings(
         self,
@@ -151,6 +156,9 @@ class MainWindow(QMainWindow):
 
     def _open_knowledge_workspace(self) -> None:
         self._auxiliary_windows.show_knowledge()
+
+    def _open_jobs(self) -> None:
+        self._auxiliary_windows.show_jobs()
 
     def _reload_agent_provider(self) -> None:
         self._chat_workspace.sync_model_options()
@@ -170,6 +178,7 @@ class MainWindow(QMainWindow):
         self._title_label.setText(self.tr("Xenix"))
         self._settings_button.setText(self.tr("Settings"))
         self._knowledge_button.setText(self.tr("Knowledge"))
+        self._jobs_button.setText(self.tr("Jobs"))
         self._history_panel.retranslate_ui()
         self._thread_detail_view.retranslate_ui()
         self._auxiliary_windows.retranslate_ui()

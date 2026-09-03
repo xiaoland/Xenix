@@ -14,6 +14,7 @@ from ..config import AppPaths, ensure_app_dirs
 from ..release_config import ReleaseConfig
 from .artifact_service import ArtifactService
 from .knowledge_content_store import KnowledgeContentStore
+from .storage.repositories import KnowledgeRepository
 from .knowledge_derivation_service import (
     KnowledgeDerivationService,
     KnowledgeDerivationView,
@@ -38,6 +39,7 @@ def run_knowledge_packaged_smoke(paths: AppPaths) -> None:
     # Keep heavy document runtimes operation-scoped. Importing Docling mutates the
     # process-wide ElementTree namespace registry, which must not affect unrelated
     # SVG generation merely because this smoke module was discovered.
+    import anydoc
     from docling_core.types.doc import DocItemLabel, DoclingDocument
     from docx import Document
     from pptx import Presentation
@@ -87,6 +89,17 @@ def run_knowledge_packaged_smoke(paths: AppPaths) -> None:
         if "Knowledge packaged smoke" not in docling_document.export_to_text():
             raise RuntimeError("Docling packaged Knowledge IR parse failed.")
 
+        anydoc_rtf = root / "knowledge-anydoc-smoke.rtf"
+        anydoc_rtf.write_bytes(
+            b"{\\rtf1\\ansi Knowledge packaged AnyDoc Rust parser smoke}"
+        )
+        if (
+            anydoc.format_from_path(str(anydoc_rtf)) != "rtf"
+            or "AnyDoc Rust parser smoke"
+            not in anydoc.to_markdown(str(anydoc_rtf))
+        ):
+            raise RuntimeError("AnyDoc packaged Knowledge parser failed.")
+
         worker_docx = root / "knowledge-worker-smoke.docx"
         worker_document = Document()
         worker_document.add_paragraph("Knowledge frozen worker smoke")
@@ -124,6 +137,7 @@ def run_knowledge_packaged_smoke(paths: AppPaths) -> None:
             paths=smoke_paths,
             session_factory=storage.session_factory,
             artifact_service=artifacts,
+            knowledge_repository=KnowledgeRepository(),
             canonical_ready_notifier=derivation.enqueue_generation,
         )
         lifecycle = KnowledgeDocumentLifecycleService(
@@ -265,6 +279,7 @@ def run_knowledge_packaged_smoke(paths: AppPaths) -> None:
                 paths=smoke_paths,
                 session_factory=ocr_storage.session_factory,
                 artifact_service=ArtifactService(ocr_storage.session_factory),
+                knowledge_repository=KnowledgeRepository(),
                 canonical_ready_notifier=derivation.enqueue_generation,
             )
             try:
@@ -299,6 +314,7 @@ def run_knowledge_packaged_smoke(paths: AppPaths) -> None:
         json.dumps(
             {
                 "schema_version": 1,
+                "anydoc_rust_parser": True,
                 "docling_ir": True,
                 "pdfium_render": True,
                 "pikepdf": True,

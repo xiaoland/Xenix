@@ -155,6 +155,9 @@ class AnalysisLambdaService:
         *,
         cancel_requested: Callable[[], bool],
     ) -> None:
+        # Run user/LLM code in a fresh OS process so it is hard-isolated from the
+        # desktop runtime and killable on timeout/cancel; memory, import, and I/O
+        # effects cannot leak back, and a hard deadline is enforceable via kill().
         if getattr(sys, "frozen", False):
             command = [
                 sys.executable,

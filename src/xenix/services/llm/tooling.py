@@ -5,80 +5,33 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
-import re
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Generic, TypeAlias, TypeVar, cast, overload
 
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import SchemaError
-from pydantic import BaseModel, Field, ValidationError as PydanticValidationError, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationError as PydanticValidationError,
+    field_validator,
+)
 from sqlmodel import SQLModel
 
 from ...exceptions import ValidationError
+from .tool_result_page_store import ToolResultPageStore
 
 
 MAX_TOOL_CALLS = 16
 MAX_TOOL_PAYLOAD_BYTES = 64 * 1024
 MAX_EXCHANGE_RESULT_BYTES = 1024 * 1024
 MAX_TOOL_FAILURE_MESSAGE_CHARS = 16 * 1024
-
-_PUBLIC_ERROR_CODE_PATTERN = re.compile(r"^[a-z][a-z0-9_]{0,127}$")
-_SENSITIVE_DIAGNOSTIC_MARKERS = (
-    "api key",
-    "api-key",
-    "api_key",
-    "apikey",
-    "authorization",
-    "bearer",
-    "credential",
-    "password",
-    "secret",
-    "token",
-)
-_SENSITIVE_DIAGNOSTIC_KEYS = (
-    "credential",
-    "endpoint",
-    "password",
-    "path",
-    "secret",
-    "token",
-    "url",
-    "uri",
-)
-_PUBLIC_VALIDATION_DETAIL_KEYS = frozenset(
-    {
-        "actual_count",
-        "actual_dimensions",
-        "available_modes",
-        "category_count",
-        "color_field",
-        "color_mode",
-        "count_field",
-        "dimensions",
-        "distance_metric",
-        "engine",
-        "expected_count",
-        "expected_dimensions",
-        "field",
-        "field_role",
-        "maximum_dimensions",
-        "maximum_length",
-        "minimum",
-        "mode",
-        "operation",
-        "palette_size",
-        "requested_field",
-        "requested_mode",
-        "schema_keyword",
-        "sql",
-        "status_code",
-        "text_index",
-        "total_terms",
-        "visible_terms",
-        "word_field",
-    }
-)
+TOOL_RESULT_PAGE_SIZE_CHARS = 1024
+TOOL_RESULT_PAGE_LIMIT_CHARS = 4096
+TOOL_RESULT_INLINE_CHARS = 2048
 
 # A Tool Result is a JSON value, rather than a JSON-object-only payload.  In
 # particular, tabular tools return Xenix Table Text directly as a string.  The
@@ -136,6 +89,7 @@ class ToolExecutionContext:
     """Bounded live context supplied to an injected implementation."""
 
     thread_id: str
+    tool_call_message_id: str | None = None
     dataset_ids: tuple[str, ...] = ()
     cancel_requested: Callable[[], bool] = lambda: False
 
@@ -147,7 +101,14 @@ class ToolSuccess:
     value: ToolResultValue
 
     def __post_init__(self) -> None:
-        ensure_bounded_tool_result_value(self.value, label="Tool success value")
+        # A concrete Tool may return up to the exchange-level bound. The invoke
+        # boundary re-pages anything above the inline Tool payload bound, so a
+        # large raw value never crosses the LLM boundary un-paged.
+        ensure_bounded_tool_result_value(
+            self.value,
+            label="Tool success value",
+            max_bytes=MAX_EXCHANGE_RESULT_BYTES,
+        )
 
 
 @dataclass(frozen=True)
@@ -193,6 +154,16 @@ class ToolFailure:
         if self.retryable is not None:
             value["retryable"] = self.retryable
         return value
+
+
+class ResultPageInput(BaseModel):
+    """Input for the generic paged-result reader."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    result_id: str = Field(min_length=1, max_length=64)
+    offset: int = Field(default=0, ge=0)
+    limit: int = Field(default=TOOL_RESULT_PAGE_SIZE_CHARS, ge=1, le=TOOL_RESULT_PAGE_LIMIT_CHARS)
 
 
 ToolInvocationOutcome: TypeAlias = ToolSuccess | ToolFailure
@@ -543,10 +514,15 @@ class AgentToolRegistry:
     def __init__(
         self,
         tools: Mapping[str, RegisteredTool] | Iterable[RegisteredTool] | None = None,
+        *,
+        paged_results_dir: Path | None = None,
     ) -> None:
         self._tools: dict[str, RegisteredTool] = {}
         self._provider_names: dict[str, str] = {}
         self._validators: dict[str, Draft202012Validator] = {}
+        self._page_store = (
+            ToolResultPageStore(paged_results_dir) if paged_results_dir is not None else None
+        )
         values = (tools or {}).values() if isinstance(tools, Mapping) else (tools or ())
         for tool in values:
             self._register(
@@ -554,6 +530,8 @@ class AgentToolRegistry:
                 tool.implementation,
                 input_model=tool.input_model,
             )
+        if self._page_store is not None:
+            self._register_builtin_result_page_tool()
 
     @overload
     def register(self, tool: AgentTool[ModelInputT], implementation: None = None) -> None: ...
@@ -606,7 +584,51 @@ class AgentToolRegistry:
         self._provider_names[registered_spec.provider_name] = registered_spec.name
         self._validators[registered_spec.name] = validator
 
-    register_tool = register
+    def _register_builtin_result_page_tool(self) -> None:
+        spec = AgentToolSpec(
+            name="result.page",
+            provider_name="result_page",
+            description=(
+                "Read one page of a large paged tool result by character range. "
+                "Use it when a tool returns a paged result with result_id, total_chars, "
+                "and has_more=true; pass result_id plus offset to read subsequent pages."
+            ),
+            parameters_schema=project_provider_tool_schema(ResultPageInput),
+        )
+        self._register(spec, self._page_result, input_model=ResultPageInput)
+
+    def _page_result(
+        self,
+        input_data: ResultPageInput,
+        _context: ToolExecutionContext,
+    ) -> ToolSuccess:
+        if self._page_store is None:
+            raise ValidationError("Paged results are unavailable.")
+        page = self._page_store.read_page(
+            input_data.result_id,
+            offset=input_data.offset,
+            limit=input_data.limit,
+        )
+        return ToolSuccess(
+            value={
+                "result_id": input_data.result_id,
+                "offset": input_data.offset,
+                "limit": input_data.limit,
+                "total_chars": page.total_chars,
+                "text": page.text,
+                "has_more": page.has_more,
+            }
+        )
+
+    def delete_thread_results(self, thread_id: str) -> int:
+        if self._page_store is None:
+            return 0
+        return self._page_store.delete_for_thread(thread_id)
+
+    def collect_garbage(self, *, max_age_seconds: int) -> int:
+        if self._page_store is None:
+            return 0
+        return self._page_store.collect_garbage(max_age_seconds=max_age_seconds)
 
     def list_specs(self, scope: ToolScope | None = None) -> list[AgentToolSpec]:
         names = set(scope.tool_names) if scope is not None and scope.tool_names else None
@@ -702,12 +724,42 @@ class AgentToolRegistry:
         )
         tool = self.get(tool_name)
         outcome = tool.implementation(validated_arguments, context)
-        if isinstance(outcome, (ToolSuccess, ToolFailure)):
+        if isinstance(outcome, ToolFailure):
             return outcome
-        # Existing injected integrations may still return a direct JSON value.
-        # It is normalized once at the LLM-owned Tool interface, never wrapped
-        # into a second raw-payload representation.
-        return ToolSuccess(value=outcome)
+        value = outcome.value if isinstance(outcome, ToolSuccess) else outcome
+        return self._bound_success(value, context)
+
+    def _bound_success(
+        self,
+        value: ToolResultValue,
+        context: ToolExecutionContext,
+    ) -> ToolSuccess:
+        text = tool_result_text(value)
+        if len(text) <= TOOL_RESULT_INLINE_CHARS:
+            return ToolSuccess(value=value)
+        if len(text.encode("utf-8")) > MAX_EXCHANGE_RESULT_BYTES:
+            raise ValidationError("Tool result exceeds the paged result size limit.")
+        if self._page_store is None:
+            raise ValidationError(
+                "Tool result exceeds the inline payload bound and paged results are unavailable."
+            )
+        result_id = self._page_store.save(
+            thread_id=context.thread_id,
+            tool_call_message_id=context.tool_call_message_id,
+            text=text,
+        )
+        total_chars = len(text)
+        has_more = total_chars > TOOL_RESULT_PAGE_SIZE_CHARS
+        return ToolSuccess(
+            value={
+                "result_id": result_id,
+                "total_chars": total_chars,
+                "page_size": TOOL_RESULT_PAGE_SIZE_CHARS,
+                "offset": 0,
+                "text": text[:TOOL_RESULT_PAGE_SIZE_CHARS],
+                "has_more": has_more,
+            }
+        )
 
 
 def _pydantic_error_schema_keyword(exc: PydanticValidationError) -> str:
@@ -744,6 +796,27 @@ def canonical_json_bytes(value: Any) -> bytes:
         raise ValidationError("Tool payload is not JSON serializable.") from exc
 
 
+def tool_result_text(value: ToolResultValue) -> str:
+    """Return the canonical string form of a Tool result for paging.
+
+    A string result (for example XTT) is paged as-is; any structured value is
+    paged as its compact JSON representation with non-ASCII text preserved.
+    """
+
+    if isinstance(value, str):
+        return value
+    try:
+        return json.dumps(
+            value,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        )
+    except (TypeError, ValueError) as exc:
+        raise ValidationError("Tool payload is not JSON serializable.") from exc
+
+
 def ensure_bounded_json(value: Any, *, label: str) -> None:
     if not isinstance(value, dict):
         raise ValidationError(f"{label} must be a JSON object.")
@@ -755,13 +828,18 @@ def ensure_bounded_json(value: Any, *, label: str) -> None:
         )
 
 
-def ensure_bounded_tool_result_value(value: ToolResultValue, *, label: str) -> None:
+def ensure_bounded_tool_result_value(
+    value: ToolResultValue,
+    *,
+    label: str,
+    max_bytes: int = MAX_TOOL_PAYLOAD_BYTES,
+) -> None:
     """Validate one direct JSON ToolResult value without changing its shape."""
 
     payload = canonical_json_bytes(value)
-    if len(payload) > MAX_TOOL_PAYLOAD_BYTES:
+    if len(payload) > max_bytes:
         raise ValidationError(
-            f"{label} exceeds the {MAX_TOOL_PAYLOAD_BYTES}-byte limit.",
+            f"{label} exceeds the {max_bytes}-byte limit.",
             error_code="llm_tool_payload_too_large",
         )
 
@@ -794,19 +872,10 @@ def canonical_tool_result_value(
         return copy.deepcopy(value)
     if isinstance(value, dict) and value.get("type") == "tool_failure":
         return copy.deepcopy(value)
-    fallback_message = "Tool execution failed."
     legacy_message = legacy_error_summary.strip() if isinstance(legacy_error_summary, str) else ""
-    if not legacy_message or not _diagnostic_value_is_public(legacy_message):
-        legacy_message = fallback_message
-    legacy_details = (
-        copy.deepcopy(value)
-        if value is not None and _diagnostic_value_is_public(value)
-        else None
-    )
-    # Some old failed rows retained a bounded diagnostic payload alongside the
-    # generic summary. Preserve only public structured detail that still fits
-    # the current canonical value bound; this is a read compatibility
-    # conversion, not a mutation or second durable result field.
+    if not legacy_message:
+        legacy_message = "Tool execution failed."
+    legacy_details = copy.deepcopy(value) if value is not None else None
     try:
         return ToolFailure(
             code="legacy_tool_failure",
@@ -821,92 +890,31 @@ def canonical_tool_result_value(
 
 
 def tool_failure_from_exception(exc: Exception) -> ToolFailure:
-    """Project an exception into a provider-safe failure without exposing diagnostics."""
+    """Project an exception into an agent-visible tool failure.
 
-    if not isinstance(exc, ValidationError):
-        return _unexpected_tool_failure()
+    The LLM is the primary consumer of Tool failures and must see the concrete
+    error to self-correct.  Preserve the full exception text and structured
+    repair contract; never collapse a specific failure into a generic sentinel.
+    """
 
-    code = exc.error_code or "tool_validation_failed"
-    message = str(exc).strip() or "Tool input is invalid."
-    details = dict(exc.error_details) if exc.error_details else None
-    hints = tuple(exc.repair_hints)
-    if not _validation_diagnostic_is_public(
-        code=code,
-        message=message,
-        details=details,
-        hints=hints,
-    ):
-        return _invalid_tool_input_failure()
-    try:
-        return ToolFailure(
-            code=code,
-            message=message,
-            details=details,
-            repair_hints=hints,
-            retryable=exc.retryable,
-        )
-    except ValidationError:
-        return _invalid_tool_input_failure()
+    if isinstance(exc, ValidationError):
+        code = exc.error_code or "tool_validation_failed"
+        message = str(exc).strip() or "Tool input is invalid."
+        details = dict(exc.error_details) if exc.error_details else None
+        hints = tuple(exc.repair_hints)
+        try:
+            return ToolFailure(
+                code=code,
+                message=message,
+                details=details,
+                repair_hints=hints,
+                retryable=exc.retryable,
+            )
+        except ValidationError:
+            return ToolFailure(code=code, message=message)
 
-
-def _unexpected_tool_failure() -> ToolFailure:
+    message = str(exc).strip() or type(exc).__name__
     return ToolFailure(
         code="tool_execution_failed",
-        message="Tool execution failed.",
+        message=message,
     )
-
-
-def _invalid_tool_input_failure() -> ToolFailure:
-    return ToolFailure(
-        code="tool_validation_failed",
-        message="Tool input is invalid.",
-        retryable=False,
-    )
-
-
-def _validation_diagnostic_is_public(
-    *,
-    code: str,
-    message: str,
-    details: ToolResultValue | None,
-    hints: tuple[str, ...],
-) -> bool:
-    if not _PUBLIC_ERROR_CODE_PATTERN.fullmatch(code):
-        return False
-    return all(
-        _diagnostic_value_is_public(value)
-        for value in (message, details, list(hints))
-        if value is not None
-    )
-
-
-def _diagnostic_value_is_public(value: ToolResultValue, *, key: str | None = None) -> bool:
-    if key is not None:
-        normalized_key = key.casefold().replace("-", "_")
-        if (
-            normalized_key not in _PUBLIC_VALIDATION_DETAIL_KEYS
-            or any(marker in normalized_key for marker in _SENSITIVE_DIAGNOSTIC_KEYS)
-        ):
-            return False
-    if value is None or isinstance(value, bool | int | float):
-        return True
-    if isinstance(value, str):
-        normalized = value.strip().casefold()
-        if any(marker in normalized for marker in _SENSITIVE_DIAGNOSTIC_MARKERS):
-            return False
-        return not (
-            "://" in normalized
-            or "/" in value
-            or "\\" in value
-            or value.startswith(("~", "."))
-            or (len(value) >= 2 and value[0].isalpha() and value[1] == ":")
-        )
-    if isinstance(value, list | tuple):
-        return all(_diagnostic_value_is_public(item) for item in value)
-    if isinstance(value, dict):
-        return all(
-            isinstance(item_key, str)
-            and _diagnostic_value_is_public(item_value, key=item_key)
-            for item_key, item_value in value.items()
-        )
-    return False

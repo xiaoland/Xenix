@@ -21,8 +21,8 @@ Contributor, test, translation, and packaging commands are owned by [CONTRIBUTIN
 - `tests` contains unit tests for config, storage bootstrap, repositories, services, logging, and resource resolution.
 - `scripts` contains developer helpers used by `pdm run`.
 - `ml` contains legacy model scripts; native ML implementation lives under `src/xenix/services/ml`.
-- `docs` stores canonical durable documentation layers.
-- `tasks` stores active disposable agent workspaces; retention is owned by [AGENTS.md](AGENTS.md).
+- `docs` stores durable project knowledge.
+- `tasks` stores active task packets; retention is owned by [AGENTS.md](AGENTS.md).
 - `xenix.spec` is the canonical Windows PyInstaller `onedir` spec.
 
 ## Documentation Model

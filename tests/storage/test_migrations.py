@@ -17,11 +17,18 @@ from xenix.services.storage.migrations import (
     get_user_version,
     migrate_v23_to_v24,
     migrate_v24_to_v25,
+    migrate_v25_to_v26,
+    migrate_v26_to_v27,
 )
 from xenix.services.storage.models import (
     ArtifactKind,
     ArtifactRow,
     DatasetColumnBindingRow,
+    DatasetDerivationInputRow,
+    DatasetDerivationRow,
+    JobDomain,
+    JobRow,
+    JobStatus,
     KnowledgeCanonicalGenerationRow,
     KnowledgeDerivationRow,
     KnowledgeDocumentRow,
@@ -30,7 +37,7 @@ from xenix.services.storage.models import (
     KnowledgeVectorGenerationRow,
 )
 from xenix.services.storage.repositories.knowledge import KnowledgeRepository
-from xenix.services.knowledge_projection import (
+from xenix.services.storage.knowledge_projection import (
     RETRIEVAL_PROJECTION_VERSION,
     retrieval_content_fingerprint,
 )
@@ -130,6 +137,134 @@ def test_v24_to_v25_adds_nullable_public_artifact_reference(tmp_path: Path) -> N
     assert "artifact_id" in columns
     assert any(row[2] == "artifact" and row[3] == "artifact_id" for row in foreign_keys)
     assert legacy_artifact_id is None
+
+
+def test_v25_to_v26_adds_dataset_derivation_tables(tmp_path: Path) -> None:
+    database = tmp_path / "v25.db"
+    engine = create_engine(f"sqlite:///{database.as_posix()}")
+    with engine.begin() as connection:
+        connection.exec_driver_sql("PRAGMA user_version=25")
+
+    assert migrate_v25_to_v26(engine) == 26
+    assert get_user_version(engine) == 26
+    inspector = inspect(engine)
+    assert {"dataset_derivation", "dataset_derivation_input"}.issubset(
+        inspector.get_table_names()
+    )
+    with engine.begin() as connection:
+        connection.exec_driver_sql(
+            "INSERT INTO dataset_derivation VALUES (?, ?, ?, ?, ?, ?)",
+            (
+                "dataset-output",
+                "data.transform",
+                '{"sql":"SELECT 1"}',
+                "keep valid rows",
+                "tool-call-1",
+                _NOW,
+            ),
+        )
+        connection.exec_driver_sql(
+            "INSERT INTO dataset_derivation_input VALUES (?, ?, ?, ?, ?)",
+            ("edge-1", "dataset-output", "dataset-input", 0, "input"),
+        )
+    with Session(engine) as session:
+        derivation = session.get(DatasetDerivationRow, "dataset-output")
+        edge = session.get(DatasetDerivationInputRow, "edge-1")
+        assert derivation is not None
+        assert derivation.parameters_payload == {"sql": "SELECT 1"}
+        assert derivation.tool_call_message_id == "tool-call-1"
+        assert edge is not None and edge.input_position == 0
+
+
+def test_v26_to_v27_adds_job_table_and_backfills_domain_authorities(tmp_path: Path) -> None:
+    database = tmp_path / "v26.db"
+    engine = create_engine(f"sqlite:///{database.as_posix()}")
+    with engine.begin() as connection:
+        connection.exec_driver_sql(
+            """
+            CREATE TABLE ml_task (
+                id VARCHAR NOT NULL PRIMARY KEY,
+                task_type VARCHAR NOT NULL,
+                status VARCHAR NOT NULL,
+                error_summary VARCHAR,
+                created_at DATETIME NOT NULL,
+                updated_at DATETIME NOT NULL,
+                started_at DATETIME,
+                finished_at DATETIME
+            )
+            """
+        )
+        for table in ("knowledge_import", "knowledge_derivation", "knowledge_index_task"):
+            connection.exec_driver_sql(
+                f"""
+                CREATE TABLE {table} (
+                    id VARCHAR NOT NULL PRIMARY KEY,
+                    status VARCHAR NOT NULL,
+                    phase VARCHAR NOT NULL,
+                    error_summary VARCHAR,
+                    created_at DATETIME NOT NULL,
+                    updated_at DATETIME NOT NULL
+                )
+                """
+            )
+        connection.exec_driver_sql(
+            "INSERT INTO ml_task (id, task_type, status, created_at, updated_at) "
+            "VALUES ('ml-pending', 'fit', 'pending', ?, ?), "
+            "('ml-running', 'apply', 'running', ?, ?), "
+            "('ml-done', 'evaluate', 'succeeded', ?, ?), "
+            "('ml-failed', 'fit', 'failed', ?, ?)",
+            (_NOW, _NOW, _NOW, _NOW, _NOW, _NOW, _NOW, _NOW),
+        )
+        connection.exec_driver_sql(
+            "INSERT INTO knowledge_import (id, status, phase, created_at, updated_at) "
+            "VALUES ('imp-pending', 'pending', 'queued', ?, ?), "
+            "('imp-ready', 'canonical_ready', 'completed', ?, ?), "
+            "('imp-reused', 'reused', 'completed', ?, ?), "
+            "('imp-attention', 'needs_attention', 'parsing', ?, ?), "
+            "('imp-cancelled', 'cancelled', 'parsing', ?, ?)",
+            (_NOW, _NOW, _NOW, _NOW, _NOW, _NOW, _NOW, _NOW, _NOW, _NOW),
+        )
+        connection.exec_driver_sql(
+            "INSERT INTO knowledge_derivation (id, status, phase, created_at, updated_at) "
+            "VALUES ('der-queued', 'queued', 'queued', ?, ?), "
+            "('der-ready', 'retrieval_ready', 'completed', ?, ?)",
+            (_NOW, _NOW, _NOW, _NOW),
+        )
+        connection.exec_driver_sql(
+            "INSERT INTO knowledge_index_task (id, status, phase, created_at, updated_at) "
+            "VALUES ('idx-queued', 'queued', 'queued', ?, ?), "
+            "('idx-failed', 'failed', 'indexing', ?, ?)",
+            (_NOW, _NOW, _NOW, _NOW),
+        )
+        connection.exec_driver_sql("PRAGMA user_version=26")
+
+    assert migrate_v26_to_v27(engine) == 27
+    assert get_user_version(engine) == 27
+    inspector = inspect(engine)
+    assert "job" in inspector.get_table_names()
+    assert {"uq_job_domain_reference"}.issubset(
+        {constraint["name"] for constraint in inspector.get_unique_constraints("job")}
+    )
+
+    with Session(engine) as session:
+        jobs = {job.reference: job for job in session.exec(select(JobRow))}
+        assert len(jobs) == 13
+        assert jobs["ml-pending"].domain is JobDomain.ML
+        assert jobs["ml-pending"].status is JobStatus.QUEUED
+        assert jobs["ml-pending"].kind == "fit"
+        assert jobs["ml-done"].status is JobStatus.SUCCEEDED
+        assert jobs["ml-failed"].status is JobStatus.FAILED
+        assert jobs["imp-pending"].domain is JobDomain.KNOWLEDGE
+        assert jobs["imp-pending"].kind == "import"
+        assert jobs["imp-pending"].status is JobStatus.QUEUED
+        assert jobs["imp-ready"].status is JobStatus.SUCCEEDED
+        assert jobs["imp-reused"].status is JobStatus.SUCCEEDED
+        assert jobs["imp-attention"].status is JobStatus.FAILED
+        assert jobs["imp-cancelled"].status is JobStatus.CANCELLED
+        assert jobs["der-queued"].kind == "content_preparation"
+        assert jobs["der-ready"].status is JobStatus.SUCCEEDED
+        assert jobs["idx-queued"].kind == "index_build"
+        assert jobs["idx-failed"].status is JobStatus.FAILED
 
 
 def _create_unsupported_database(db_path: Path, version: int) -> None:
@@ -751,7 +886,7 @@ def test_fresh_v23_schema_is_orm_fts_fk_and_unique_readable(
 
     context = StorageBootstrapService().initialize(paths)
 
-    assert get_user_version(context.engine) == CURRENT_SCHEMA_VERSION == 25
+    assert get_user_version(context.engine) == CURRENT_SCHEMA_VERSION == 27
     assert {
         "knowledge_canonical_generation",
         "knowledge_derivation",
@@ -781,7 +916,7 @@ def test_static_supported_fixture_upgrades_with_orm_fts_and_fk_proof(
 
     context = StorageBootstrapService().initialize(paths)
 
-    assert get_user_version(context.engine) == CURRENT_SCHEMA_VERSION == 25
+    assert get_user_version(context.engine) == CURRENT_SCHEMA_VERSION == 27
     with context.session_factory() as session:
         artifact = session.get(ArtifactRow, "artifact-1")
         assert artifact is not None and artifact.kind is ArtifactKind.FILE

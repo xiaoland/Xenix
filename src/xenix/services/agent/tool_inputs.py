@@ -425,6 +425,16 @@ class DataTransformInput(AgentToolInput):
         default=None,
         description="Optional name for the generated transformed dataset.",
     )
+    explanation: Annotated[
+        str,
+        StringConstraints(strip_whitespace=True, max_length=2048),
+    ] | None = Field(
+        default=None,
+        description=(
+            "Optional Agent-authored explanation of why this transformation supports the analysis. "
+            "It is recorded for audit and is not system-verified evidence."
+        ),
+    )
 
     @model_validator(mode="after")
     def _has_input_source(self) -> DataTransformInput:
@@ -585,13 +595,13 @@ class ModelTaskQueryInput(AgentToolInput):
     )
     include_logs: bool = Field(
         default=False,
-        description="Set true to include bounded task logs in the response.",
+        description="Set true to include task logs in the response.",
     )
-    max_log_entries: Annotated[int, Field(ge=0, le=50)] = Field(
-        default=20,
-        description=(
-            "Maximum number of log entries to return per task when include_logs is true."
-        ),
+
+
+class ModelTaskStopInput(AgentToolInput):
+    task_ids: Annotated[list[RequiredString], Field(min_length=1, max_length=20)] = Field(
+        description="One or more explicit ML task ids to stop (cancel)."
     )
 
 

@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import hashlib
-import json
 import math
 import time
 import warnings
@@ -20,6 +18,7 @@ from statsmodels.tsa.statespace.sarimax import SARIMAX
 
 from ....exceptions import ValidationError
 from ...storage.models import ProblemKind
+from ..digests import sha256_json
 from ..contracts import (
     ApplySummary,
     ApplyTaskRequest,
@@ -693,6 +692,10 @@ def _fit_selected_sarima(
 
 
 def _fit_statsmodels_sarima(values: np.ndarray, order: SarimaOrderSpec) -> SarimaFitOutcome:
+    # Non-default SARIMAX construction: trend="n" (the differencing orders carry
+    # the level), and stationarity/invertibility enforcement is left off so the
+    # bounded order search is not pre-rejected at initialization. Convergence is
+    # judged from mle_retvals["converged"] below, not the parameter transform.
     caught: list[warnings.WarningMessage]
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
@@ -1027,13 +1030,7 @@ def _require_finite(values: np.ndarray, label: str, group_index: int | None) -> 
 
 
 def _digest_json(value: Any) -> str:
-    encoded = json.dumps(
-        value,
-        ensure_ascii=False,
-        separators=(",", ":"),
-        sort_keys=True,
-    ).encode("utf-8")
-    return hashlib.sha256(encoded).hexdigest()
+    return sha256_json(value)
 
 
 _FORECAST_TRAIN_ROLE_SCHEMA = ModelRoleSchema(

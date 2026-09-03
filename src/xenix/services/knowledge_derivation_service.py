@@ -5,7 +5,7 @@ import threading
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy.orm import sessionmaker
 from sqlmodel import select
@@ -17,12 +17,13 @@ from .knowledge_service import (
     bound_knowledge_units,
     prepare_knowledge_search_text,
 )
-from .knowledge_projection import (
+from .storage.knowledge_projection import (
     RETRIEVAL_PROJECTION_VERSION,
     knowledge_unit_id,
     retrieval_content_fingerprint,
 )
 from .storage.models import (
+    JobDomain,
     KnowledgeCanonicalGenerationRow,
     KnowledgeDerivationRow,
     KnowledgeDocumentRow,
@@ -30,6 +31,9 @@ from .storage.models import (
     utc_now,
 )
 from .storage.repositories.knowledge import KnowledgeRepository
+
+if TYPE_CHECKING:
+    from .job_scheduler import JobScheduler
 
 _STOP = object()
 LOGGER = logging.getLogger(__name__)
@@ -63,27 +67,39 @@ class KnowledgeDerivationService:
         session_factory: sessionmaker,
         retrieval_ready_notifier: Callable[[str], object] | None = None,
         start_worker: bool = True,
+        scheduler: JobScheduler | None = None,
     ) -> None:
         self._session_factory = session_factory
         self._store = KnowledgeContentStore(paths)
         self._repository = KnowledgeRepository()
         self._retrieval_ready_notifier = retrieval_ready_notifier
+        self._scheduler = scheduler
         self._queue: queue.Queue[str | object] = queue.Queue()
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
-        pending = self._recover_jobs()
-        if start_worker:
-            self._thread = threading.Thread(
-                target=self._worker_main,
-                name="xenix-knowledge-derivation",
-                daemon=True,
-            )
-            self._thread.start()
-            for job_id in pending:
-                self.notify(job_id)
+        if scheduler is None:
+            pending = self.recover_pending()
+            if start_worker:
+                self._thread = threading.Thread(
+                    target=self._worker_main,
+                    name="xenix-knowledge-derivation",
+                    daemon=True,
+                )
+                self._thread.start()
+                for job_id in pending:
+                    self.notify(job_id)
 
     def notify(self, job_id: str) -> None:
-        if not self._stop.is_set():
+        self._submit(job_id)
+
+    def _submit(self, job_id: str) -> None:
+        if self._scheduler is not None:
+            self._scheduler.enqueue(
+                JobDomain.KNOWLEDGE,
+                "content_preparation",
+                job_id,
+            )
+        elif not self._stop.is_set():
             self._queue.put(job_id)
 
     def enqueue_generation(
@@ -343,7 +359,17 @@ class KnowledgeDerivationService:
             finally:
                 self._queue.task_done()
 
-    def _recover_jobs(self) -> list[str]:
+    def run_unit(self, job_id: str) -> None:
+        self.derive_now(job_id)
+
+    def job_outcome(self, job_id: str) -> tuple[str, str | None]:
+        with self._session_factory() as session:
+            row = session.get(KnowledgeDerivationRow, job_id)
+            if row is None:
+                return ("failed", "Knowledge derivation job is missing.")
+            return (row.status, row.error_summary)
+
+    def recover_pending(self) -> list[str]:
         pending: list[str] = []
         with self._session_factory() as session:
             rows = list(
@@ -435,15 +461,20 @@ class KnowledgeDerivationService:
 
 def _knowledge_units(document: Any) -> list[KnowledgeUnitInput]:
     units: list[KnowledgeUnitInput] = []
+    headings: dict[int, str] = {}
     for item, level in document.iterate_items():
-        text = str(getattr(item, "text", "") or "").strip()
-        label = str(getattr(getattr(item, "label", None), "value", getattr(item, "label", ""))).casefold()
-        if not text and label != "picture" and hasattr(item, "export_to_markdown"):
-            try:
-                text = str(item.export_to_markdown(doc=document)).strip()
-            except Exception:
-                text = ""
+        label = _docling_item_label(item)
+        text = _docling_item_text(item, document=document, label=label)
         if not text:
+            continue
+        if label in {"title", "section_header"}:
+            heading_level = (
+                0
+                if label == "title"
+                else max(1, _heading_level(item, fallback=int(level)))
+            )
+            headings = {key: value for key, value in headings.items() if key < heading_level}
+            headings[heading_level] = text
             continue
         locator: dict[str, Any] = {"level": int(level)}
         provenance = list(getattr(item, "prov", ()) or ())
@@ -453,9 +484,36 @@ def _knowledge_units(document: Any) -> list[KnowledgeUnitInput]:
                 locator["page"] = int(page_no)
         if "page" not in locator:
             locator["passage"] = len(units) + 1
+        heading_path = tuple(headings[key] for key in sorted(headings))
+        if heading_path:
+            locator["heading_path"] = list(heading_path)
+            text = f"{' > '.join(heading_path)}\n\n{text}"
         units.append(KnowledgeUnitInput(text=text, locator=locator))
     if not units:
         fallback = str(document.export_to_text()).strip()
         if fallback:
             units.append(KnowledgeUnitInput(text=fallback, locator={"document": True}))
     return bound_knowledge_units(units)
+
+
+def _docling_item_label(item: Any) -> str:
+    label = getattr(item, "label", "")
+    return str(getattr(label, "value", label)).casefold()
+
+
+def _docling_item_text(item: Any, *, document: Any, label: str) -> str:
+    text = str(getattr(item, "text", "") or "").strip()
+    if text or label == "picture" or not hasattr(item, "export_to_markdown"):
+        return text
+    try:
+        return str(item.export_to_markdown(doc=document)).strip()
+    except Exception:
+        return ""
+
+
+def _heading_level(item: Any, *, fallback: int) -> int:
+    raw_level = getattr(item, "level", fallback)
+    try:
+        return max(0, int(raw_level))
+    except (TypeError, ValueError):
+        return max(0, fallback)

@@ -20,7 +20,12 @@ from uuid import uuid4
 from sqlmodel import Field, SQLModel
 
 from ...exceptions import NotFoundError, ValidationError
-from ..dataset_service import DatasetService, RegisterDatasetInput
+from ...observability import start_span
+from ..dataset_service import (
+    DatasetAuditPresentation,
+    DatasetService,
+    RegisterDatasetInput,
+)
 from ..llm import (
     AppendUserMessageInput,
     CanonicalMessageBlock,
@@ -191,6 +196,7 @@ class AgentHarnessService:
             canonical_events,
             self._resolve_dataset_source_presentation,
         )
+        canonical_events = self._enrich_dataset_audits(canonical_events)
         usage_by_terminal = {
             overview.terminal_llm_message_id: _usage_chatbot_event(overview)
             for overview in self._conversation_service.usage_overviews(snapshot)
@@ -202,6 +208,49 @@ class AgentHarnessService:
             if usage_event is not None:
                 events.append(usage_event)
         return events
+
+    def _enrich_dataset_audits(
+        self,
+        events: list[ChatbotEvent],
+    ) -> list[ChatbotEvent]:
+        if self._dataset_service is None:
+            return events
+        enriched: list[ChatbotEvent] = []
+        for event in events:
+            if event.kind is not ChatbotEventKind.TOOL or not event.tool_call_id:
+                enriched.append(event)
+                continue
+            audits = self._dataset_service.resolve_dataset_audits_for_tool_call(
+                event.tool_call_id
+            )
+            if not audits:
+                enriched.append(event)
+                continue
+            detail_blocks = [*event.detail_blocks]
+            detail_blocks.extend(
+                {
+                    "type": "dataset_audit",
+                    **audit.model_dump(mode="json"),
+                }
+                for audit in audits
+            )
+            enriched.append(event.model_copy(update={"detail_blocks": detail_blocks}))
+        return enriched
+
+    def resolve_session_dataset_audits(
+        self,
+        thread_id: str,
+    ) -> list[DatasetAuditPresentation]:
+        """Resolve generated-Dataset evidence for one conversation Thread."""
+
+        if self._dataset_service is None:
+            return []
+        tool_call_ids = self._conversation_service.list_tool_call_message_ids(
+            thread_id
+        )
+        return self._dataset_service.resolve_dataset_audits_for_tool_calls(
+            tool_call_ids
+        )
 
     def set_provider(self, provider: AgentProvider | None) -> None:
         self._provider = provider
@@ -244,6 +293,21 @@ class AgentHarnessService:
         return final
 
     def submit_user_turn_stream(self, input_data: SubmitUserTurnInput) -> Iterator[AgentHarnessStreamEvent]:
+        """Submit one turn under the production trace boundary used by benchmarks."""
+
+        with start_span(
+            "agent.harness.submit_user_turn",
+            {
+                "gen_ai.operation.name": "invoke_agent",
+                "gen_ai.request.model": input_data.fq_model_key or "thread_default",
+                "gen_ai.conversation.id": input_data.thread_id or "new",
+                "agent.attachment.dataset.count": len(input_data.dataset_attachments),
+                "agent.attachment.source.count": len(input_data.source_attachments),
+            },
+        ):
+            yield from self._submit_user_turn_stream(input_data)
+
+    def _submit_user_turn_stream(self, input_data: SubmitUserTurnInput) -> Iterator[AgentHarnessStreamEvent]:
         self._validate_submission(input_data)
         thread_id = input_data.thread_id
         if thread_id is None:
@@ -692,9 +756,6 @@ class AgentHarnessService:
             chatbot_events=self.project_chatbot_events(snapshot),
             is_final=True,
         )
-
-    def _dataset_ids(self, thread_id: str) -> list[str]:
-        return self._dataset_ids_from_snapshot(self.get_thread_snapshot(thread_id))
 
     def _sampling_tool_scope(self, thread_id: str) -> ToolScope:
         snapshot = self.get_thread_snapshot(thread_id)

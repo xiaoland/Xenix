@@ -58,18 +58,6 @@ class PaddleOcrStatus:
     model_pack_id: str | None = None
     generation_id: str | None = None
 
-    @property
-    def installed(self) -> bool:
-        return self.state in {PaddleOcrState.READY, PaddleOcrState.REPAIR_REQUIRED}
-
-    @property
-    def models_ready(self) -> bool:
-        return self.state is PaddleOcrState.READY
-
-    @property
-    def detail(self) -> str | None:
-        return self.reason_code
-
 
 @dataclass(frozen=True)
 class PaddleOcrBundleCatalog:
@@ -328,11 +316,6 @@ class PaddleOcrDeploymentService:
             generation_id=runtime.generation_id,
         )
 
-    def status(self) -> PaddleOcrStatus:
-        """Compatibility alias for existing service consumers."""
-
-        return self.status_snapshot()
-
     def install(self, progress: Callable[[str], None] | None = None) -> PaddleOcrStatus:
         source = self._bundle_source
         if source is None:
@@ -415,9 +398,6 @@ class PaddleOcrDeploymentService:
             if staging_root.exists():
                 _remove_private_tree(staging_root, root=self._staging)
             self._clear_transient_if(PaddleOcrState.INSTALLING)
-
-    def repair(self, progress: Callable[[str], None] | None = None) -> PaddleOcrStatus:
-        return self.install(progress)
 
     def verify_active(self) -> PaddleOcrStatus:
         self._set_transient(PaddleOcrStatus(PaddleOcrState.CHECKING, "verifying"))

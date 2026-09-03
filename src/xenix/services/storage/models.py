@@ -66,6 +66,19 @@ class MLTaskStatus(StrEnum):
     CANCELLED = "cancelled"
 
 
+class JobDomain(StrEnum):
+    KNOWLEDGE = "knowledge"
+    ML = "ml"
+
+
+class JobStatus(StrEnum):
+    QUEUED = "queued"
+    RUNNING = "running"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
 class DatasetSourceFormat(StrEnum):
     CSV = "csv"
     PARQUET = "parquet"
@@ -149,6 +162,43 @@ class DatasetRow(SQLModel, table=True):
     ml_task_id: str | None = Field(default=None, foreign_key="ml_task.id", index=True, unique=True)
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
+
+
+class DatasetDerivationRow(SQLModel, table=True):
+    """Authoritative operation record for one generated Dataset."""
+
+    __tablename__ = "dataset_derivation"
+
+    dataset_id: str = Field(primary_key=True, foreign_key="dataset.id")
+    operation_name: str = Field(index=True)
+    parameters_payload: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    agent_explanation: str | None = None
+    # Tool execution happens before the staged ToolCall Message is committed,
+    # so this is a stable future reference rather than an immediate FK.
+    tool_call_message_id: str | None = Field(default=None, index=True)
+    created_at: datetime = Field(default_factory=utc_now)
+
+
+class DatasetDerivationInputRow(SQLModel, table=True):
+    """One ordered input edge in a Dataset derivation."""
+
+    __tablename__ = "dataset_derivation_input"
+    __table_args__ = (
+        UniqueConstraint(
+            "derivation_dataset_id",
+            "input_position",
+            name="uq_dataset_derivation_input_position",
+        ),
+    )
+
+    id: str = Field(default_factory=generate_id, primary_key=True)
+    derivation_dataset_id: str = Field(foreign_key="dataset_derivation.dataset_id", index=True)
+    input_dataset_id: str = Field(foreign_key="dataset.id", index=True)
+    input_position: int
+    alias: str | None = None
 
 
 class DatasetImportRow(SQLModel, table=True):
@@ -238,6 +288,45 @@ class MLTaskRow(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=utc_now)
 
 
+class JobRow(SQLModel, table=True):
+    """Unified scheduling record owned by the Job layer."""
+
+    __tablename__ = "job"
+    __table_args__ = (
+        UniqueConstraint("domain", "reference", name="uq_job_domain_reference"),
+    )
+
+    id: str = Field(default_factory=generate_id, primary_key=True)
+    domain: JobDomain = Field(
+        sa_column=Column(
+            SQLAlchemyEnum(
+                JobDomain,
+                values_callable=lambda enum_class: [member.value for member in enum_class],
+            ),
+            nullable=False,
+            index=True,
+        ),
+    )
+    kind: str = Field(index=True)
+    reference: str = Field(index=True)
+    status: JobStatus = Field(
+        sa_column=Column(
+            SQLAlchemyEnum(
+                JobStatus,
+                values_callable=lambda enum_class: [member.value for member in enum_class],
+            ),
+            nullable=False,
+            index=True,
+        ),
+    )
+    phase: str = Field(default="queued")
+    error_summary: str | None = None
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
+
+
 class MLTaskArtifactRow(SQLModel, table=True):
     __tablename__ = "ml_task_artifact"
 
@@ -271,6 +360,16 @@ class ConversationThreadRow(SQLModel, table=True):
 
 
 class ConversationMessageRow(SQLModel, table=True):
+    """Conversation message row.
+
+    Messages are append-only: once a row's kind leaves PENDING_LLM_SAMPLING it is
+    immutable (enforced by the conversation_message_final_immutable trigger). The
+    single PENDING_LLM_SAMPLING placeholder per thread (partial unique index
+    ux_conversation_message_pending_thread) is the only row updated in place; the
+    Conversation writer finalizes it together with its Tool Call/Result siblings.
+    Callers must not mutate committed rows directly.
+    """
+
     __tablename__ = "conversation_message"
     __table_args__ = (
         UniqueConstraint("thread_id", "sequence_index", name="uq_conversation_message_thread_sequence"),

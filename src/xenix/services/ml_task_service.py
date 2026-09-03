@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import queue
 import shutil
 import threading
 from collections.abc import Callable, Iterable, Mapping
@@ -46,7 +45,7 @@ from .storage.layout import (
     task_request_path,
     task_result_path,
 )
-from .trained_model_metadata import (
+from .ml.trained_model_metadata import (
     TrainedModelMetadata,
     artifact_file_name_from_path,
     build_artifact_file_name,
@@ -146,15 +145,9 @@ class MLTaskService:
         self._worker_runner = worker_runner or MLWorkerPool(
             worker_settings_service or MLWorkerSettingsService(paths),
         )
-        self._queue: queue.Queue[str] = queue.Queue()
         self._callbacks: list[Callable[[MLTaskRow], None]] = []
-        self._dispatcher_thread: threading.Thread | None = None
         self._lock = threading.Lock()
-        self._submitted_ids: set[str] = set()
         self._trace_carriers: dict[str, dict[str, str]] = {}
-        self._dispatch_semaphore = threading.BoundedSemaphore(
-            max(1, int(getattr(self._worker_runner, "max_dispatch_threads", 1)))
-        )
 
     def register_completion_listener(self, callback: Callable[[MLTaskRow], None]) -> None:
         self._callbacks.append(callback)
@@ -191,7 +184,25 @@ class MLTaskService:
             self._record_task(row)
             return row
 
-    def submit_ml_task(self, ml_task_id: str) -> None:
+    def set_request_payload(self, ml_task_id: str, request_payload: dict[str, Any]) -> MLTaskRow:
+        """Persist a task's request payload once its task id is assigned."""
+
+        with self._session_factory() as session:
+            row = self._ml_tasks.get(session, ml_task_id)
+            if row is None:
+                raise NotFoundError(f"ML task '{ml_task_id}' was not found.")
+            row.request_payload = dict(request_payload)
+            session.add(row)
+            session.commit()
+            session.refresh(row)
+            return row
+
+    @property
+    def max_concurrent_tasks(self) -> int:
+        return max(1, int(getattr(self._worker_runner, "max_concurrent_tasks", 1)))
+
+    def prepare_ml_task(self, ml_task_id: str) -> None:
+        """Stage a pending task for dispatch: validate, write request, capture trace."""
         task = self.get_ml_task(ml_task_id)
         if task.status is not MLTaskStatus.PENDING:
             raise InvalidStateTransitionError(
@@ -207,14 +218,25 @@ class MLTaskService:
             json.dumps(task.request_payload, indent=2, ensure_ascii=True),
             encoding="utf-8",
         )
+        with self._lock:
+            self._trace_carriers[ml_task_id] = inject_context({})
+
+    def run_task(self, ml_task_id: str) -> MLTaskRow | None:
+        """Execute a queued task to completion and notify completion listeners."""
+        from .runtime_activity import activity_coordinator
 
         with self._lock:
-            if ml_task_id in self._submitted_ids:
-                return
-            self._submitted_ids.add(ml_task_id)
-            self._trace_carriers[ml_task_id] = inject_context({})
-            self._queue.put(ml_task_id)
-            self._ensure_dispatcher_locked()
+            carrier = self._trace_carriers.pop(ml_task_id, {})
+        token = otel_context.attach(extract_context(carrier)) if carrier else None
+        try:
+            with activity_coordinator.work(f"ml:{ml_task_id}"):
+                finished_task = self._run_task(ml_task_id)
+                if finished_task is not None:
+                    self._notify_callbacks(finished_task)
+                return finished_task
+        finally:
+            if token is not None:
+                otel_context.detach(token)
 
     def start_ml_task(self, input_data: StartMLTaskInput) -> MLTaskRow:
         with self._session_factory() as session:
@@ -302,45 +324,6 @@ class MLTaskService:
             if line.strip()
         ]
 
-    def _ensure_dispatcher_locked(self) -> None:
-        if self._dispatcher_thread is not None and self._dispatcher_thread.is_alive():
-            return
-        self._dispatcher_thread = threading.Thread(
-            target=self._dispatch_loop,
-            name="xenix-ml-dispatcher",
-            daemon=True,
-        )
-        self._dispatcher_thread.start()
-
-    def _dispatch_loop(self) -> None:
-        while True:
-            ml_task_id = self._queue.get()
-            self._dispatch_semaphore.acquire()
-            threading.Thread(
-                target=self._run_queued_task,
-                args=(ml_task_id,),
-                name=f"xenix-ml-task-{ml_task_id[:8]}",
-                daemon=True,
-            ).start()
-
-    def _run_queued_task(self, ml_task_id: str) -> None:
-        from .runtime_activity import activity_coordinator
-
-        carrier = self._trace_carriers.pop(ml_task_id, {})
-        token = otel_context.attach(extract_context(carrier)) if carrier else None
-        try:
-            with activity_coordinator.work(f"ml:{ml_task_id}"):
-                finished_task = self._run_task(ml_task_id)
-                if finished_task is not None:
-                    self._notify_callbacks(finished_task)
-        finally:
-            if token is not None:
-                otel_context.detach(token)
-            with self._lock:
-                self._submitted_ids.discard(ml_task_id)
-            self._queue.task_done()
-            self._dispatch_semaphore.release()
-
     def _run_task(self, ml_task_id: str) -> MLTaskRow | None:
         task = self.get_ml_task(ml_task_id)
         if task.status is not MLTaskStatus.PENDING:
@@ -424,125 +407,18 @@ class MLTaskService:
         result = FitTaskResult.model_validate_json(task_result_path(self._paths, row.id).read_text(encoding="utf-8"))
         if result.error_summary:
             raise ValidationError(result.error_summary)
-        evaluation_model_path = Path(result.model_artifact_path)
-        final_model_path = Path(result.final_model_artifact_path) if result.final_model_artifact_path else evaluation_model_path
-        holdout_path = Path(result.holdout_artifact_path) if result.holdout_artifact_path else None
-        export_path = Path(result.export_artifact_path) if result.export_artifact_path else None
-        report_path = Path(result.report_artifact_path) if result.report_artifact_path else None
-        self._require_existing_path(evaluation_model_path)
-        self._require_existing_path(final_model_path)
-        if holdout_path is not None:
-            self._require_existing_path(holdout_path)
-        if export_path is not None:
-            self._require_existing_path(export_path)
-        if report_path is not None:
-            self._require_existing_path(report_path)
-        catalog_entry = _get_model_catalog_entry(result.model_key)
-        training_scopes = result.training_scopes
-        model_display_name = catalog_entry.display_name
-        artifact_file_name = build_artifact_file_name(
-            trained_model_context.run_name,
-            model_display_name,
-            row.created_at,
-            row.id,
-        )
-        canonical_path = self._copy_canonical_model(row, artifact_file_name, final_model_path)
-        metadata = TrainedModelMetadata(
-            model_key=result.model_key,
-            evaluation_kind=trained_model_context.evaluation_kind or catalog_entry.evaluation_kind.value,
-            model_family=trained_model_context.model_family or catalog_entry.model_family.value,
-            model_task_kind=trained_model_context.model_task_kind or catalog_entry.model_task_kind.value,
-            supports_evaluation=catalog_entry.supports_evaluation,
-            supports_apply=catalog_entry.supports_apply,
-            apply_mode=catalog_entry.apply_mode.value,
-            forecast_options=(
+        return self._finalize_training_task(
+            session,
+            row,
+            trained_model_context=trained_model_context,
+            result=result,
+            forecast_options_json=(
                 request.forecast_options.model_dump(mode="json")
                 if request.forecast_options is not None
                 else None
             ),
-            model_display_name=model_display_name,
-            display_name=model_display_name,
-            saved_name=build_saved_name(
-                trained_model_context.run_name,
-                model_display_name,
-                row.created_at,
-            ),
-            artifact_file_name=artifact_file_name_from_path(str(canonical_path)),
-            save_note=build_save_note(model_display_name),
-            training_operation=row.task_type.value,
-            source_run_name=trained_model_context.run_name,
-            source_dataset_name=trained_model_context.dataset_name,
-            source_dataset_file_name=trained_model_context.dataset_file_name,
-            train_role_bindings=[dict(binding) for binding in trained_model_context.train_role_bindings],
-            apply_role_schema=dict(trained_model_context.apply_role_schema),
-            result_contract=dict(trained_model_context.result_contract),
-            dataset_row_count=trained_model_context.dataset_row_count,
-            dataset_column_count=trained_model_context.dataset_column_count,
-            preview_columns=list(trained_model_context.preview_columns),
-            preview_rows=[list(row_values) for row_values in trained_model_context.preview_rows],
-            training_params=dict(result.params),
-            evaluation_model_training_scope=(
-                training_scopes.evaluation_model
-                if training_scopes is not None
-                else ("holdout_train_split" if result.final_model_artifact_path else None)
-            ),
-            apply_model_training_scope=(
-                training_scopes.apply_model
-                if training_scopes is not None
-                else ("all_eligible_rows" if result.final_model_artifact_path else None)
-            ),
+            extra_metadata_fields={"training_params": dict(result.params)},
         )
-        trained_model = self._trained_models.create(
-            session,
-            TrainedModelRow(
-                dataset_id=row.dataset_id,
-                ml_task_id=row.id,
-                model_key=result.model_key,
-                problem_kind=catalog_entry.problem_kind,
-                artifact_path=str(canonical_path),
-                metadata_payload=metadata.model_dump(mode="json"),
-            ),
-        )
-        payload = result.model_dump(mode="json")
-        payload["trained_model_id"] = trained_model.id
-        payload["canonical_model_artifact_path"] = str(canonical_path)
-        payload["evaluation_model_artifact_path"] = str(evaluation_model_path)
-        if (
-            export_path is not None
-            and "table" in catalog_entry.result_contract.train_result_kinds
-        ):
-            payload["result_dataset_id"] = self._materialize_fit_result_dataset(
-                session=session,
-                row=row,
-                source_csv_path=export_path,
-                result_name_suffix=self._fit_result_name_suffix(catalog_entry.model_task_kind),
-            )
-        artifacts = [
-            MLTaskArtifactInput(artifact_kind=MLTaskArtifactKind.MODEL, absolute_path=str(canonical_path)),
-        ]
-        if holdout_path is not None:
-            artifacts.append(
-                MLTaskArtifactInput(
-                    artifact_kind=MLTaskArtifactKind.HOLDOUT_DATA,
-                    absolute_path=str(holdout_path),
-                    ready_to_open=False,
-                )
-            )
-        if export_path is not None:
-            artifacts.append(
-                MLTaskArtifactInput(
-                    artifact_kind=MLTaskArtifactKind.EXPORT_FILE,
-                    absolute_path=str(export_path),
-                )
-            )
-        if report_path is not None:
-            artifacts.append(
-                MLTaskArtifactInput(
-                    artifact_kind=MLTaskArtifactKind.TRAINING_REPORT,
-                    absolute_path=str(report_path),
-                )
-            )
-        return payload, artifacts
 
     def _finalize_tuning_task(
         self,
@@ -556,6 +432,35 @@ class MLTaskService:
         )
         if result.error_summary:
             raise ValidationError(result.error_summary)
+        return self._finalize_training_task(
+            session,
+            row,
+            trained_model_context=trained_model_context,
+            result=result,
+            forecast_options_json=(
+                request.forecast_options.model_dump(mode="json")
+                if request.forecast_options is not None
+                else None
+            ),
+            extra_metadata_fields={
+                "best_params": dict(result.best_params),
+                "tuning_grid": {
+                    str(key): list(values)
+                    for key, values in request.hyperparameter_tuning.param_grid.items()
+                },
+            },
+        )
+
+    def _finalize_training_task(
+        self,
+        session: Any,
+        row: MLTaskRow,
+        *,
+        trained_model_context: TrainedModelContextPayload,
+        result: FitTaskResult | HyperparameterTuningTaskResult,
+        forecast_options_json: dict[str, Any] | None,
+        extra_metadata_fields: Mapping[str, Any],
+    ) -> tuple[dict[str, Any], list[MLTaskArtifactInput]]:
         evaluation_model_path = Path(result.model_artifact_path)
         final_model_path = Path(result.final_model_artifact_path) if result.final_model_artifact_path else evaluation_model_path
         holdout_path = Path(result.holdout_artifact_path) if result.holdout_artifact_path else None
@@ -587,11 +492,7 @@ class MLTaskService:
             supports_evaluation=catalog_entry.supports_evaluation,
             supports_apply=catalog_entry.supports_apply,
             apply_mode=catalog_entry.apply_mode.value,
-            forecast_options=(
-                request.forecast_options.model_dump(mode="json")
-                if request.forecast_options is not None
-                else None
-            ),
+            forecast_options=forecast_options_json,
             model_display_name=model_display_name,
             display_name=model_display_name,
             saved_name=build_saved_name(
@@ -612,11 +513,6 @@ class MLTaskService:
             dataset_column_count=trained_model_context.dataset_column_count,
             preview_columns=list(trained_model_context.preview_columns),
             preview_rows=[list(row_values) for row_values in trained_model_context.preview_rows],
-            best_params=dict(result.best_params),
-            tuning_grid={
-                str(key): list(values)
-                for key, values in request.hyperparameter_tuning.param_grid.items()
-            },
             evaluation_model_training_scope=(
                 training_scopes.evaluation_model
                 if training_scopes is not None
@@ -627,6 +523,7 @@ class MLTaskService:
                 if training_scopes is not None
                 else ("all_eligible_rows" if result.final_model_artifact_path else None)
             ),
+            **extra_metadata_fields,
         )
         trained_model = self._trained_models.create(
             session,

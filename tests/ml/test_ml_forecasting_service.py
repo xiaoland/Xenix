@@ -25,7 +25,7 @@ from xenix.services.ml_service import (
 from xenix.services.ml_task_service import MLTaskService
 from xenix.services.storage import StorageBootstrapService
 from xenix.services.storage.models import MLTaskArtifactKind, MLTaskStatus
-from xenix.services.trained_model_metadata import parse_trained_model_metadata
+from xenix.services.ml.trained_model_metadata import parse_trained_model_metadata
 
 FIXTURE = FIXTURES_ROOT / "ml_cf_service" / "weekly_panel_v1.csv"
 FIXTURE_SHA256 = "37f02afd4419c6cc379865b129a6b30762b35ce950cc44946953bc505d43e50c"

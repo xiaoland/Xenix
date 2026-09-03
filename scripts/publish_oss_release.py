@@ -111,7 +111,7 @@ def validated_artifacts(
     *,
     expected_tag: str,
     expected_commit: str,
-    expected_promotion_pr: int,
+    expected_promotion_pr: int | None,
     expected_repository: str | None = None,
 ) -> list[dict]:
     if not isinstance(manifest, dict) or manifest.get("schema_version") != MANIFEST_SCHEMA_VERSION:
@@ -129,7 +129,10 @@ def validated_artifacts(
         or release.keys() != {"protocol_version", "tag", "promotion_pr"}
         or release.get("protocol_version") != RELEASE_PROTOCOL_VERSION
         or release.get("tag") != expected_tag
-        or release.get("promotion_pr") != expected_promotion_pr
+        or (
+            expected_promotion_pr is not None
+            and release.get("promotion_pr") != expected_promotion_pr
+        )
         or not isinstance(workflow, dict)
         or workflow.keys() != {"repository", "run_id", "run_attempt"}
         or type(workflow.get("run_id")) is not int
@@ -252,7 +255,7 @@ def build_plan(
     manifest_path: Path,
     expected_tag: str,
     expected_commit: str,
-    expected_promotion_pr: int,
+    expected_promotion_pr: int | None,
     expected_repository: str | None,
 ) -> PublicationPlan:
     manifest_path = manifest_path.resolve()
@@ -404,6 +407,9 @@ class OssReleaseStore:
 
     def put_bytes_mutable(self, key: str, data: bytes) -> None:
         self.bucket.put_object(key, data, headers={"Cache-Control": "no-cache"})
+
+    def delete(self, key: str) -> None:
+        self.bucket.delete_object(key)
 
     def copy(
         self,
@@ -606,8 +612,63 @@ def _write_github_outputs(plan: PublicationPlan, result: PublicationResult) -> N
         stream.write(f"visibility_seconds={result.visibility_seconds}\n")
 
 
+def _optional_positive_int(raw: str) -> int | None:
+    value = raw.strip()
+    if not value:
+        return None
+    parsed = int(value)
+    if parsed < 1:
+        raise ValueError("promotion PR must be a positive integer when present")
+    return parsed
+
+
+def cleanup_orphans(tag: str, store: OssReleaseStore) -> None:
+    """Delete orphaned immutable objects left by a failed publish.
+
+    A transient failure after the immutable uploads leaves the versioned
+    package and OCR objects plus the manifest, while the canonical feed still
+    points at the previous release. Removing only those immutable objects lets
+    an unchanged-tag retry converge instead of failing closed on a byte
+    mismatch caused by a non-reproducible rebuild.
+    """
+    manifest_key = f"published/release-manifests/{tag}.json"
+    if not store.exists(manifest_key):
+        print(f"cleanup_manifest_missing key={manifest_key}")
+        return
+    manifest = json.loads(store.read(manifest_key))
+    if not isinstance(manifest, dict):
+        raise RuntimeError("Release manifest is not an object.")
+    artifacts = manifest.get("artifacts")
+    if not isinstance(artifacts, list):
+        raise RuntimeError("Release manifest has no artifacts.")
+    excluded = FEED_NAMES | {
+        str(item.get("name") or "")
+        for item in artifacts
+        if isinstance(item, dict)
+        and item.get("type") == "desktop_release"
+        and str(item.get("name") or "").endswith("-Setup.exe")
+    }
+    keys = [
+        f"published/{item['name']}"
+        for item in artifacts
+        if isinstance(item, dict) and item.get("name") not in excluded
+    ] + [manifest_key]
+    for key in keys:
+        if store.exists(key):
+            store.delete(key)
+            print(f"cleanup_deleted key={key}")
+        else:
+            print(f"cleanup_absent key={key}")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--cleanup-orphans",
+        dest="cleanup_tag",
+        default="",
+        help="Delete orphaned immutable objects for a release tag instead of publishing.",
+    )
     parser.add_argument(
         "--manifest",
         type=Path,
@@ -617,17 +678,23 @@ def main() -> int:
     parser.add_argument("--commit", default=os.environ.get("GITHUB_SHA", ""))
     parser.add_argument(
         "--promotion-pr",
-        type=int,
-        default=os.environ.get("XENIX_PROMOTION_PR"),
+        default=os.environ.get("XENIX_PROMOTION_PR", ""),
     )
     parser.add_argument(
         "--repository",
         default=os.environ.get("GITHUB_REPOSITORY", ""),
     )
     args = parser.parse_args()
-    if not args.tag or not args.commit or not args.promotion_pr or not args.repository:
+    if args.cleanup_tag:
+        store = OssReleaseStore.from_environment(
+            checkpoint_root=Path("build") / "release-upload-checkpoints",
+        )
+        cleanup_orphans(args.cleanup_tag, store)
+        return 0
+    promotion_pr = _optional_positive_int(args.promotion_pr)
+    if not args.tag or not args.commit or not args.repository:
         raise RuntimeError(
-            "Release tag, commit, promotion PR, and repository are required."
+            "Release tag, commit, and repository are required."
         )
     root = Path(__file__).resolve().parents[1]
     plan = build_plan(
@@ -635,7 +702,7 @@ def main() -> int:
         manifest_path=(root / args.manifest),
         expected_tag=args.tag,
         expected_commit=args.commit,
-        expected_promotion_pr=args.promotion_pr,
+        expected_promotion_pr=promotion_pr,
         expected_repository=args.repository,
     )
     store = OssReleaseStore.from_environment(

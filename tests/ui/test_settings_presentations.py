@@ -50,6 +50,26 @@ def test_add_provider_preserves_global_model_choices(qapp: QApplication, qtbot: 
     assert editor._llm_thread_title_model_selector.currentData() == "one/b"
 
 
+def test_editing_models_refreshes_global_model_selectors(qapp: QApplication, qtbot: QtBot) -> None:
+    editor = ProviderSettingsEditor(
+        LLMSettings(
+            providers=[LLMProviderConfig(key="one", display_name="One", models=["a", "b"])],
+            default_fq_model_key="one/a",
+        )
+    )
+    qtbot.addWidget(editor)
+    assert editor._llm_default_model_selector.count() == 2
+
+    editor._provider_models_input.setPlainText("a\nb\nc")
+
+    assert editor._llm_default_model_selector.count() == 3
+    assert [editor._llm_default_model_selector.itemData(i) for i in range(3)] == [
+        "one/a",
+        "one/b",
+        "one/c",
+    ]
+
+
 def test_provider_switch_with_invalid_draft_warns_and_preserves_input(
     qapp: QApplication,
     qtbot: QtBot,

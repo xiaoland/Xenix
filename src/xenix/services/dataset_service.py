@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Collection
+
 import csv
 import codecs
 import logging
@@ -7,11 +9,13 @@ import shutil
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Annotated, Any
 from uuid import uuid4
 
 import polars as pl
+from pydantic import StringConstraints
 from sqlalchemy.orm import sessionmaker
-from sqlmodel import Field, SQLModel, select
+from sqlmodel import Field, SQLModel
 
 from ..config import AppPaths
 from ..exceptions import NotFoundError, ValidationError
@@ -24,14 +28,13 @@ from .dataset_inspection import (
     inspect_dataset_file,
 )
 from .storage.models import (
-    DatasetColumnBindingRow,
+    DatasetDerivationInputRow,
+    DatasetDerivationRow,
     DatasetImportRow,
     DatasetRow,
     DatasetSourceFormat,
     DatasetWorkbookRow,
-    MLTaskRow,
     ProjectRow,
-    TrainedModelRow,
 )
 from .storage.repositories import DatasetRepository, ProjectRepository
 from .tabular import (
@@ -60,11 +63,31 @@ class _MaterializedDataset:
     preview_columns: list[str]
 
 
+RequiredDerivationText = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=1),
+]
+
+
+class DatasetDerivationSourceInput(SQLModel):
+    dataset_id: RequiredDerivationText
+    alias: str | None = None
+
+
+class DatasetDerivationInput(SQLModel):
+    operation_name: RequiredDerivationText
+    inputs: list[DatasetDerivationSourceInput] = Field(min_length=1)
+    parameters_payload: dict[str, Any] = Field(default_factory=dict)
+    agent_explanation: str | None = None
+    tool_call_message_id: str | None = None
+
+
 class RegisterDatasetInput(SQLModel):
     source_path: str
     project_id: str | None = None
     name: str | None = None
     derived_from_dataset_id: str | None = None
+    derivation: DatasetDerivationInput | None = None
 
 
 class RenameDatasetInput(SQLModel):
@@ -114,6 +137,25 @@ class DatasetSourcePresentation:
     is_openable: bool
 
 
+class DatasetAuditInputPresentation(SQLModel):
+    dataset_id: str
+    name: str
+    position: int
+    alias: str | None = None
+
+
+class DatasetAuditPresentation(SQLModel):
+    dataset_id: str
+    name: str
+    generation: int
+    operation_name: str
+    parameters_payload: dict[str, Any] = Field(default_factory=dict)
+    agent_explanation: str | None = None
+    tool_call_message_id: str | None = None
+    created_at: datetime
+    inputs: list[DatasetAuditInputPresentation] = Field(default_factory=list)
+
+
 class DatasetService:
     def __init__(self, session_factory: sessionmaker, paths: AppPaths) -> None:
         self._session_factory = session_factory
@@ -122,6 +164,12 @@ class DatasetService:
         self._datasets = DatasetRepository()
 
     def register_dataset(self, input_data: RegisterDatasetInput) -> DatasetRow:
+        """Register a source file by materializing an app-owned Parquet copy.
+
+        The returned DatasetRow's source_path and source_format describe the
+        app-owned Parquet copy, not the caller's original file; the original
+        provenance is preserved on the paired DatasetImportRow.
+        """
         return self._register_materialized_datasets(input_data)[0].row
 
     def _register_materialized_datasets(self, input_data: RegisterDatasetInput) -> list[_MaterializedDataset]:
@@ -144,44 +192,60 @@ class DatasetService:
             raise ValidationError("Dataset file must contain at least one non-empty table.")
 
         with self._session_factory() as session:
-            derived_from = None
+            derivation = input_data.derivation
+            derivation_sources = self._resolve_derivation_sources(session, derivation)
+            derived_from: DatasetRow | None = None
             if input_data.derived_from_dataset_id:
                 derived_from = self._datasets.get(session, input_data.derived_from_dataset_id)
                 if derived_from is None:
                     raise NotFoundError(
                         f"Dataset '{input_data.derived_from_dataset_id}' was not found."
                     )
+                if derivation is not None and derived_from.id not in {
+                    source.id for source in derivation_sources
+                }:
+                    raise ValidationError(
+                        "The compatibility parent must be one of the derivation inputs."
+                    )
+            elif derivation_sources:
+                unique_source_ids = {source.id for source in derivation_sources}
+                if len(unique_source_ids) == 1:
+                    derived_from = derivation_sources[0]
+            source_datasets = derivation_sources or ([derived_from] if derived_from else [])
             project_id = self._resolve_project_id(
                 session,
                 input_data.project_id,
-                derived_from=derived_from,
+                source_datasets=source_datasets,
             )
+            is_derived = bool(source_datasets)
             now = _utc_now()
             import_row: DatasetImportRow | None = None
             workbook_row: DatasetWorkbookRow | None = None
-            if derived_from is None:
-                import_row = DatasetImportRow(
-                    project_id=project_id,
-                    original_path=str(source_path.resolve()),
-                    original_file_name=source_path.name,
-                    source_format=source_format,
-                    status="succeeded",
-                    created_at=now,
-                )
-                session.add(import_row)
-                session.flush()
-                if source_format in {DatasetSourceFormat.XLSX, DatasetSourceFormat.XLS}:
-                    workbook_row = DatasetWorkbookRow(
-                        import_id=import_row.id,
-                        sheet_count=len(frame_specs),
-                        engine="polars-calamine",
-                        metadata_payload={
-                            "sheet_names": [str(spec["sheet_name"]) for spec in frame_specs],
-                        },
+            if not is_derived:
+                import_row = self._datasets.create_import(
+                    session,
+                    DatasetImportRow(
+                        project_id=project_id,
+                        original_path=str(source_path.resolve()),
+                        original_file_name=source_path.name,
+                        source_format=source_format,
+                        status="succeeded",
                         created_at=now,
+                    ),
+                )
+                if source_format in {DatasetSourceFormat.XLSX, DatasetSourceFormat.XLS}:
+                    workbook_row = self._datasets.create_workbook(
+                        session,
+                        DatasetWorkbookRow(
+                            import_id=import_row.id,
+                            sheet_count=len(frame_specs),
+                            engine="polars-calamine",
+                            metadata_payload={
+                                "sheet_names": [str(spec["sheet_name"]) for spec in frame_specs],
+                            },
+                            created_at=now,
+                        ),
                     )
-                    session.add(workbook_row)
-                    session.flush()
             materialized: list[_MaterializedDataset] = []
             written_paths: list[Path] = []
             try:
@@ -193,7 +257,7 @@ class DatasetService:
                         dataset_name = f"{name} - {sheet_name}"
                     output_path = self._dataset_storage_path(
                         dataset_id,
-                        derived=derived_from is not None,
+                        derived=is_derived,
                     )
                     frame = spec["frame"]
                     frame.write_parquet(output_path)
@@ -216,6 +280,13 @@ class DatasetService:
                         updated_at=now,
                     )
                     self._datasets.create(session, row)
+                    if derivation is not None:
+                        self._create_dataset_derivation(
+                            session,
+                            dataset_id=row.id,
+                            derivation=derivation,
+                            now=now,
+                        )
                     materialized.append(
                         _MaterializedDataset(
                             row=row,
@@ -309,6 +380,7 @@ class DatasetService:
             if self._has_dataset_references(session, row.id):
                 raise ValidationError("Dataset is already referenced and cannot be discarded.")
             source_path = Path(row.source_path)
+            self._delete_dataset_derivation(session, row.id)
             self._datasets.delete(session, row)
             session.commit()
             if self._is_service_owned_dataset_path(source_path):
@@ -358,6 +430,51 @@ class DatasetService:
                 raise NotFoundError(f"Dataset '{dataset_id}' was not found.")
             return row
 
+    def get_dataset_audit(self, dataset_id: str) -> DatasetAuditPresentation | None:
+        """Return persisted derivation evidence for one Dataset, if it has any."""
+
+        with self._session_factory() as session:
+            dataset = self._datasets.get(session, dataset_id)
+            if dataset is None:
+                raise NotFoundError(f"Dataset '{dataset_id}' was not found.")
+            derivation = self._datasets.get_derivation(session, dataset.id)
+            if derivation is None:
+                return None
+            return self._dataset_audit_presentation(session, dataset, derivation)
+
+    def resolve_dataset_audits_for_tool_call(
+        self,
+        tool_call_message_id: str,
+    ) -> list[DatasetAuditPresentation]:
+        """Resolve generated Dataset evidence by its originating ToolCall."""
+
+        if not tool_call_message_id:
+            return []
+        return self.resolve_dataset_audits_for_tool_calls([tool_call_message_id])
+
+    def resolve_dataset_audits_for_tool_calls(
+        self,
+        tool_call_message_ids: Collection[str],
+    ) -> list[DatasetAuditPresentation]:
+        """Resolve generated Dataset evidence for a set of originating ToolCalls."""
+
+        requested = {
+            message_id
+            for message_id in tool_call_message_ids
+            if isinstance(message_id, str) and message_id
+        }
+        if not requested:
+            return []
+        with self._session_factory() as session:
+            audits: list[DatasetAuditPresentation] = []
+            for derivation in self._datasets.list_derivations_by_tool_calls(session, requested):
+                dataset = self._datasets.get(session, derivation.dataset_id)
+                if dataset is not None:
+                    audits.append(
+                        self._dataset_audit_presentation(session, dataset, derivation)
+                    )
+            return audits
+
     def resolve_dataset_source_presentation(
         self,
         dataset_id: str,
@@ -387,7 +504,7 @@ class DatasetService:
                 if not isinstance(import_id, str) or not import_id.strip():
                     return None
                 import_id = import_id.strip()
-                imported = session.get(DatasetImportRow, import_id)
+                imported = self._datasets.get_import(session, import_id)
                 if imported is None:
                     return None
 
@@ -654,22 +771,122 @@ class DatasetService:
         directory.mkdir(parents=True, exist_ok=True)
         return directory / f"{dataset_id}.parquet"
 
+    def _dataset_audit_presentation(
+        self,
+        session,
+        dataset: DatasetRow,
+        derivation: DatasetDerivationRow,
+    ) -> DatasetAuditPresentation:
+        input_rows = self._datasets.list_derivation_inputs(session, dataset.id)
+        inputs: list[DatasetAuditInputPresentation] = []
+        for edge in input_rows:
+            source = self._datasets.get(session, edge.input_dataset_id)
+            inputs.append(
+                DatasetAuditInputPresentation(
+                    dataset_id=edge.input_dataset_id,
+                    name=source.name if source is not None else edge.input_dataset_id,
+                    position=edge.input_position,
+                    alias=edge.alias,
+                )
+            )
+        return DatasetAuditPresentation(
+            dataset_id=dataset.id,
+            name=dataset.name,
+            generation=self._dataset_generation(session, dataset.id, {}),
+            operation_name=derivation.operation_name,
+            parameters_payload=dict(derivation.parameters_payload),
+            agent_explanation=derivation.agent_explanation,
+            tool_call_message_id=derivation.tool_call_message_id,
+            created_at=derivation.created_at,
+            inputs=inputs,
+        )
+
+    def _dataset_generation(
+        self,
+        session,
+        dataset_id: str,
+        memo: dict[str, int],
+    ) -> int:
+        known = memo.get(dataset_id)
+        if known is not None:
+            return known
+        input_ids = self._datasets.list_derivation_input_ids(session, dataset_id)
+        if not input_ids:
+            dataset = self._datasets.get(session, dataset_id)
+            if dataset is not None and dataset.derived_from_dataset_id:
+                input_ids = [dataset.derived_from_dataset_id]
+        generation = (
+            1 + max(self._dataset_generation(session, input_id, memo) for input_id in input_ids)
+            if input_ids
+            else 0
+        )
+        memo[dataset_id] = generation
+        return generation
+
+    def _resolve_derivation_sources(
+        self,
+        session,
+        derivation: DatasetDerivationInput | None,
+    ) -> list[DatasetRow]:
+        if derivation is None:
+            return []
+        sources: list[DatasetRow] = []
+        for source in derivation.inputs:
+            row = self._datasets.get(session, source.dataset_id)
+            if row is None:
+                raise NotFoundError(f"Dataset '{source.dataset_id}' was not found.")
+            sources.append(row)
+        return sources
+
+    def _create_dataset_derivation(
+        self,
+        session,
+        *,
+        dataset_id: str,
+        derivation: DatasetDerivationInput,
+        now: datetime,
+    ) -> None:
+        self._datasets.create_derivation(
+            session,
+            derivation=DatasetDerivationRow(
+                dataset_id=dataset_id,
+                operation_name=derivation.operation_name,
+                parameters_payload=dict(derivation.parameters_payload),
+                agent_explanation=derivation.agent_explanation,
+                tool_call_message_id=derivation.tool_call_message_id,
+                created_at=now,
+            ),
+            inputs=[
+                DatasetDerivationInputRow(
+                    derivation_dataset_id=dataset_id,
+                    input_dataset_id=source.dataset_id,
+                    input_position=position,
+                    alias=source.alias,
+                )
+                for position, source in enumerate(derivation.inputs)
+            ],
+        )
+
     def _resolve_project_id(
         self,
         session,
         project_id: str | None,
         *,
-        derived_from: DatasetRow | None = None,
+        source_datasets: list[DatasetRow],
     ) -> str:
+        source_project_ids = {source.project_id for source in source_datasets}
+        if len(source_project_ids) > 1:
+            raise ValidationError("Dataset derivation inputs must belong to one project.")
+        source_project_id = next(iter(source_project_ids), None)
         normalized = project_id.strip() if project_id else ""
         if normalized:
             if self._projects.get(session, normalized) is None:
                 raise NotFoundError(f"Project '{normalized}' was not found.")
-            if derived_from is not None and derived_from.project_id != normalized:
-                raise ValidationError("Derived dataset source does not belong to the provided project.")
+            if source_project_id is not None and source_project_id != normalized:
+                raise ValidationError("Dataset derivation inputs do not belong to the provided project.")
             return normalized
-        if derived_from is not None:
-            return derived_from.project_id
+        if source_project_id is not None:
+            return source_project_id
         projects = self._projects.list_all(session)
         if projects:
             return projects[0].id
@@ -688,11 +905,7 @@ class DatasetService:
         return True
 
     def _has_dataset_references(self, session, dataset_id: str) -> bool:
-        reference_statements = [
-            select(DatasetRow.id).where(DatasetRow.copied_from == dataset_id),
-            select(DatasetRow.id).where(DatasetRow.derived_from_dataset_id == dataset_id),
-            select(DatasetColumnBindingRow.id).where(DatasetColumnBindingRow.dataset_id == dataset_id),
-            select(MLTaskRow.id).where(MLTaskRow.dataset_id == dataset_id),
-            select(TrainedModelRow.id).where(TrainedModelRow.dataset_id == dataset_id),
-        ]
-        return any(session.exec(statement).first() is not None for statement in reference_statements)
+        return self._datasets.has_references(session, dataset_id)
+
+    def _delete_dataset_derivation(self, session, dataset_id: str) -> None:
+        self._datasets.delete_derivation(session, dataset_id)

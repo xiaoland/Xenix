@@ -1,72 +1,35 @@
 from __future__ import annotations
 
-import hashlib
-import re
-import time
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Any, Generic, TypeVar, cast
+from typing import Any, Generic, TypeVar
 
-import pandas as pd
 from pydantic import ValidationError as PydanticValidationError
 
 from ...config import AppPaths
-from ...exceptions import NotFoundError, ValidationError
-from ..analysis_graph import AnalysisGraphService, GraphDatasetInput
-from ..analysis_lambda import AnalysisLambdaDataset, AnalysisLambdaInput, AnalysisLambdaService
-from ..analysis_profile import AnalysisProfileService, ProfileDatasetInput
+from ...exceptions import ValidationError
+from ..analysis_graph import AnalysisGraphService
+from ..analysis_lambda import AnalysisLambdaService
+from ..analysis_profile import AnalysisProfileService
 from ..artifact_service import (
     ArtifactService,
-    RegisterArtifactInput,
-    build_artifact_uri,
 )
 from ..data_cleaning import (
-    CleanOperation,
-    CleanDatasetInput,
     DataCleaningService,
     cleaning_operation_group_names,
-    cleaning_operation_metadata,
 )
-from ..data_tokenization import DataTokenizationService, TokenizeDatasetInput
-from ..data_tokenization_contracts import StagedTextResourceInput
+from ..data_tokenization import DataTokenizationService
 from ..data_transform import (
-    DataQueryInput,
     DataQueryTransformService,
-    DataTransformInput,
-    DatasetSqlBinding,
 )
-from ..dataset_inspection import InspectDatasetInput, detect_source_format, load_dataframe
 from ..dataset_export_service import DatasetExportService
-from ..dataset_service import DatasetService
-from ..ml.registry import get_model_catalog_entry, list_model_catalog, list_model_keys
-from ..ml.contracts import (
-    ApplyTaskResult,
-    CandidateMetrics,
-    EvaluateTaskResult,
-    FitTaskResult,
-    HyperparameterTuningTaskResult,
+from ..dataset_service import (
+    DatasetService,
 )
-from ..ml.types import EvaluationKind, ModelCatalogEntry, ModelFamily, ModelTaskKind
 from ..ml_service import (
-    ApplySourceInput,
-    ApplyWithFilesInput,
-    CreateColumnBindingInput,
-    FitWithEvaluateInput,
     MLService,
-    InlineApplyRowsInput as ServiceInlineApplyRowsInput,
-    TuneWithEvaluateInput,
 )
 from ..preprocessing_worker import LocalPreprocessingWorkerRunner, PreprocessingWorkerRunner
-from ..storage.models import (
-    ArtifactKind,
-    MLTaskArtifactKind,
-    MLTaskRow,
-    MLTaskStatus,
-    MLTaskType,
-    TrainedModelRow,
-)
-from ..trained_model_metadata import parse_trained_model_metadata
 from ..llm.tooling import (
     AgentTool as TypedAgentTool,
     AgentToolRegistry as LLMToolRegistry,
@@ -74,7 +37,6 @@ from ..llm.tooling import (
     ToolExecutionContext,
     ToolSuccess,
 )
-from ..llm.xenix_table_text import render_xenix_table_tool_result
 from .tool_inputs import (
     AgentToolInput,
     AnalysisGraphInput,
@@ -91,42 +53,18 @@ from .tool_inputs import (
     ModelHyperTrainInput,
     ModelMetadataInput,
     ModelTaskQueryInput,
+    ModelTaskStopInput,
     ModelTrainInput,
 )
 from .tool_presentations import DEFAULT_TOOL_PRESENTATION, ToolPresentation, tool_presentation_for_name
+from ._model_keys import (
+    build_model_key_aliases,
+)
 
-
-_MODEL_ALIAS_SUFFIXES = {
-    "classification",
-    "classifier",
-    "clustering",
-    "regression",
-    "regressor",
-}
-_MODEL_KEY_ALIAS_OVERRIDES = {
-    "k_neighbors": "regression.knn",
-    "kneighbors": "regression.knn",
-    "k_neighbors_classifier": "classification.knn",
-    "kneighborsclassifier": "classification.knn",
-    "k_neighbors_regressor": "regression.knn",
-    "kneighborsregressor": "regression.knn",
-}
-MODEL_APPLY_GRACE_SECONDS = 30.0
-MODEL_TRAIN_GRACE_SECONDS = 60.0
-MAX_CLEANING_REPORT_OPERATION_ENTRIES = 12
-MAX_CLEANING_REPORT_VALIDATION_ENTRIES = 12
-MAX_CLEANING_REPORT_WARNING_ENTRIES = 5
-MAX_CLEANING_REPORT_COLUMN_NAMES = 6
-MAX_CLEANING_REPORT_WARNING_CHARS = 240
-MAX_CLEANING_REPORT_COLUMN_NAME_CHARS = 96
-MAX_CLEANING_REPORT_FILL_VALUE_CHARS = 96
-MODEL_HYPER_TRAIN_GRACE_SECONDS = 60.0
-MAX_MODEL_TASK_LOG_CHARS = 500
-MAX_MODEL_METRICS = 24
-MAX_MODEL_ROLE_BINDINGS = 16
-MAX_MODEL_ROLE_COLUMNS = 20
-MAX_MODEL_COLUMN_NAME_CHARS = 96
-_LOCAL_PATH_PATTERN = re.compile(r"(?:(?:[A-Za-z]:[\\/]|\\\\|/)[^\s'\"<>]*)")
+from ._analysis_tools import AnalysisTools
+from ._data_tools import DataTools
+from ._model_tools import ModelTools
+from ._tool_common import _raise_if_cancelled
 
 
 ToolInputT = TypeVar("ToolInputT", bound=AgentToolInput)
@@ -203,19 +141,38 @@ class AgentToolRegistry:
         analysis_graph_service: AnalysisGraphService | None = None,
         analysis_lambda_service: AnalysisLambdaService | None = None,
     ) -> None:
-        self._paths = paths
-        self._dataset_service = dataset_service
-        self._data_cleaning_service = data_cleaning_service
-        self._data_tokenization_service = data_tokenization_service or DataTokenizationService(paths)
-        self._data_transform_service = data_transform_service
-        self._analysis_profile_service = analysis_profile_service or AnalysisProfileService(dataset_service)
-        self._analysis_graph_service = analysis_graph_service or AnalysisGraphService(paths)
-        self._analysis_lambda_service = analysis_lambda_service or AnalysisLambdaService(paths)
+        data_tokenization_service = data_tokenization_service or DataTokenizationService(paths)
+        analysis_profile_service = analysis_profile_service or AnalysisProfileService(dataset_service)
+        analysis_graph_service = analysis_graph_service or AnalysisGraphService(paths)
+        analysis_lambda_service = analysis_lambda_service or AnalysisLambdaService(paths)
+        preprocessing_worker_runner = preprocessing_worker_runner or LocalPreprocessingWorkerRunner()
+        model_key_aliases = build_model_key_aliases()
+        self._data_tools = DataTools(
+            paths=paths,
+            dataset_service=dataset_service,
+            data_cleaning_service=data_cleaning_service,
+            data_tokenization_service=data_tokenization_service,
+            data_transform_service=data_transform_service,
+            ml_service=ml_service,
+            preprocessing_worker_runner=preprocessing_worker_runner,
+        )
+        self._analysis_tools = AnalysisTools(
+            dataset_service=dataset_service,
+            artifact_service=artifact_service,
+            analysis_profile_service=analysis_profile_service,
+            analysis_graph_service=analysis_graph_service,
+            analysis_lambda_service=analysis_lambda_service,
+            ml_service=ml_service,
+        )
+        self._model_tools = ModelTools(
+            paths=paths,
+            dataset_service=dataset_service,
+            artifact_service=artifact_service,
+            ml_service=ml_service,
+            model_key_aliases=model_key_aliases,
+        )
         self._ml_service = ml_service
-        self._artifact_service = artifact_service
         _ = dataset_export_service
-        self._preprocessing_worker_runner = preprocessing_worker_runner or LocalPreprocessingWorkerRunner()
-        self._model_key_aliases = self._build_model_key_aliases()
         self._tools = _index_agent_tools(
             (
                 self._build_data_integrate_tool(),
@@ -235,6 +192,7 @@ class AgentToolRegistry:
                 self._build_model_hyper_train_tool(),
                 self._build_model_apply_tool(),
                 self._build_model_task_query_tool(),
+                self._build_model_task_stop_tool(),
             )
         )
 
@@ -263,7 +221,7 @@ class AgentToolRegistry:
         arguments: dict[str, Any],
         context: ToolExecutionContext,
     ) -> ToolSuccess:
-        self._raise_if_cancelled(context)
+        _raise_if_cancelled(self._ml_service, context)
         tool = self._tools.get(tool_name)
         if tool is None:
             raise ValidationError(f"Tool '{tool_name}' is not registered.")
@@ -272,7 +230,7 @@ class AgentToolRegistry:
         except PydanticValidationError as exc:
             raise ValidationError(_tool_input_error_message(exc)) from None
         result = tool.registration.implementation(input_data, context)
-        self._raise_if_cancelled(context)
+        _raise_if_cancelled(self._ml_service, context)
         if not isinstance(result, ToolSuccess):
             raise ValidationError("Concrete Agent Tool returned an unsupported outcome.")
         return result
@@ -305,7 +263,7 @@ class AgentToolRegistry:
             provider_name="data_integrate",
             description="Combine two or more registered datasets into a generated derived dataset.",
             input_model=DataIntegrateInput,
-            handler=self._data_integrate,
+            handler=self._data_tools._data_integrate,
         )
 
     def _build_analysis_graph_tool(self) -> ConcreteAgentTool[AnalysisGraphInput]:
@@ -319,7 +277,7 @@ class AgentToolRegistry:
                 "frequency table from data.query or data.transform."
             ),
             input_model=AnalysisGraphInput,
-            handler=self._analysis_graph,
+            handler=self._analysis_tools._analysis_graph,
         )
 
     def _build_analysis_profile_tool(self) -> ConcreteAgentTool[AnalysisProfileInput]:
@@ -334,7 +292,7 @@ class AgentToolRegistry:
                 "only when a material business-role ambiguity remains after this profile."
             ),
             input_model=AnalysisProfileInput,
-            handler=self._analysis_profile,
+            handler=self._analysis_tools._analysis_profile,
         )
 
     def _build_analysis_lambda_tool(
@@ -355,7 +313,7 @@ class AgentToolRegistry:
                 "bytes/io.BytesIO, or matplotlib Figure. value=... is accepted as an alias for content=...."
             ),
             input_model=AnalysisLambdaToolInput,
-            handler=self._analysis_lambda,
+            handler=self._analysis_tools._analysis_lambda,
         )
 
     def _build_data_clean_tool(self) -> ConcreteAgentTool[DataCleanInput]:
@@ -377,7 +335,7 @@ class AgentToolRegistry:
                 "data.query/data.clean call before using indexes."
             ),
             input_model=DataCleanInput,
-            handler=self._data_clean,
+            handler=self._data_tools._data_clean,
         )
 
     def _build_data_clean_metadata_tool(
@@ -391,7 +349,7 @@ class AgentToolRegistry:
                 "operation or parameter is uncertain."
             ),
             input_model=DataCleanMetadataInput,
-            handler=self._data_clean_metadata,
+            handler=self._data_tools._data_clean_metadata,
             provider_field_enums=(
                 ("groups", cleaning_operation_group_names()),
             ),
@@ -410,7 +368,7 @@ class AgentToolRegistry:
                 "do not mix the two forms for one selector."
             ),
             input_model=DataTokenizeInput,
-            handler=self._data_tokenize,
+            handler=self._data_tools._data_tokenize,
         )
 
     def _build_data_query_tool(self) -> ConcreteAgentTool[DataQueryToolInput]:
@@ -428,7 +386,7 @@ class AgentToolRegistry:
                 "Returns bounded rows and does not create a derived dataset or artifact."
             ),
             input_model=DataQueryToolInput,
-            handler=self._data_query,
+            handler=self._data_tools._data_query,
         )
 
     def _build_data_transform_tool(
@@ -450,7 +408,7 @@ class AgentToolRegistry:
                 "Xenix materializes SELECT * FROM output."
             ),
             input_model=DataTransformToolInput,
-            handler=self._data_transform,
+            handler=self._data_tools._data_transform,
         )
 
     def _build_data_feature_select_tool(
@@ -465,7 +423,7 @@ class AgentToolRegistry:
                 "current dataset schema and persists canonical names."
             ),
             input_model=DataFeatureSelectInput,
-            handler=self._data_feature_select,
+            handler=self._data_tools._data_feature_select,
         )
 
     def _build_model_metadata_tool(self) -> ConcreteAgentTool[ModelMetadataInput]:
@@ -477,7 +435,7 @@ class AgentToolRegistry:
                 "and parameter schema with model_key."
             ),
             input_model=ModelMetadataInput,
-            handler=self._model_metadata,
+            handler=self._model_tools._model_metadata,
         )
 
     def _build_model_train_tool(self) -> ConcreteAgentTool[ModelTrainInput]:
@@ -490,7 +448,7 @@ class AgentToolRegistry:
                 "parameter detail."
             ),
             input_model=ModelTrainInput,
-            handler=self._model_train,
+            handler=self._model_tools._model_train,
         )
 
     def _build_model_hyper_train_tool(
@@ -505,7 +463,7 @@ class AgentToolRegistry:
                 "include_param_grid_schema=true."
             ),
             input_model=ModelHyperTrainInput,
-            handler=self._model_hyper_train,
+            handler=self._model_tools._model_hyper_train,
         )
 
     def _build_model_apply_tool(self) -> ConcreteAgentTool[ModelApplyInput]:
@@ -517,7 +475,7 @@ class AgentToolRegistry:
                 "or pass horizon alone to create a native future forecast."
             ),
             input_model=ModelApplyInput,
-            handler=self._model_apply,
+            handler=self._model_tools._model_apply,
         )
 
     def _build_model_task_query_tool(
@@ -528,1971 +486,20 @@ class AgentToolRegistry:
             provider_name="model_task_query",
             description="Query ML task status, metadata, artifacts, errors, and logs by explicit task ids.",
             input_model=ModelTaskQueryInput,
-            handler=self._model_task_query,
+            handler=self._model_tools._model_task_query,
         )
 
-    def _data_integrate(
+    def _build_model_task_stop_tool(
         self,
-        input_data: DataIntegrateInput,
-        context: ToolExecutionContext,
-    ) -> ToolSuccess:
-        self._raise_if_cancelled(context)
-        datasets = [
-            self._dataset_service.get_dataset(dataset_id)
-            for dataset_id in input_data.dataset_ids
-        ]
-        frames = [self._load_frame(Path(dataset.source_path).expanduser().resolve()) for dataset in datasets]
-        output_dir = self._paths.artifacts / "datasets" / "integrated"
-        output_dir.mkdir(parents=True, exist_ok=True)
-        name = input_data.name or "Integrated dataset"
-        output_path = output_dir / f"{self._slug(name)}-{int(time.time())}.csv"
-        pd.concat(frames, ignore_index=True).to_csv(output_path, index=False)
-        input_dataset_ids = [dataset.id for dataset in datasets]
-        payload = self._register_generated_dataset_result(
-            context,
-            output_path=output_path,
-            name=name,
-            summary="Integrated dataset created.",
-            metadata_payload={"input_dataset_ids": input_dataset_ids},
-        )
-        payload["input_dataset_ids"] = input_dataset_ids
-        return self._tabular_tool_success("data.integrate", payload)
-
-    def _analysis_graph(
-        self,
-        input_data: AnalysisGraphInput,
-        context: ToolExecutionContext,
-    ) -> ToolSuccess:
-        self._raise_if_cancelled(context)
-        dataset = self._dataset_service.get_dataset(input_data.dataset_id)
-        raw_spec = (
-            input_data.spec.model_dump(by_alias=True, exclude_none=True)
-            if input_data.spec is not None
-            else None
-        )
-        raw_wordcloud_spec = (
-            input_data.wordcloud_spec.model_dump(exclude_none=True)
-            if input_data.wordcloud_spec is not None
-            else None
-        )
-        graph_result = self._analysis_graph_service.graph_dataset(
-            GraphDatasetInput(
-                source_path=dataset.source_path,
-                dataset_name=dataset.name,
-                spec=raw_spec,
-                wordcloud_spec=raw_wordcloud_spec,
-            )
-        )
-        graph_metadata = graph_result.graph_metadata
-        default_title = f"{dataset.name} graph"
-        title = str(graph_metadata.get("title") or default_title).strip() or default_title
-        spec_format = str(graph_metadata.get("spec_format") or "graph")
-        artifact = self._artifact_service.register_artifact(
-            RegisterArtifactInput(
-                kind=ArtifactKind.IMAGE,
-                title=title,
-                absolute_path=graph_result.output_path,
-                mime_type="image/svg+xml",
-                summary=f"Graph generated by analysis.graph ({spec_format}).",
-                preview_payload=graph_metadata,
-                metadata_payload={
-                    "dataset_id": dataset.id,
-                    "analysis_graph": graph_metadata,
-                },
-            )
-        )
-        payload = {
-            "dataset_id": dataset.id,
-            "artifact_id": artifact.id,
-            "graph": graph_metadata,
-        }
-        return ToolSuccess(value=payload)
-
-    def _analysis_lambda(
-        self,
-        input_data: AnalysisLambdaToolInput,
-        context: ToolExecutionContext,
-    ) -> ToolSuccess:
-        self._raise_if_cancelled(context)
-        datasets: list[AnalysisLambdaDataset] = []
-        for alias, dataset_id in input_data.datasets.items():
-            dataset = self._dataset_service.get_dataset(dataset_id)
-            datasets.append(
-                AnalysisLambdaDataset(
-                    alias=alias,
-                    dataset_id=dataset.id,
-                    dataset_name=dataset.name,
-                    source_path=dataset.source_path,
-                )
-            )
-
-        lambda_result = self._analysis_lambda_service.run_lambda(
-            AnalysisLambdaInput(
-                code=input_data.code,
-                datasets=datasets,
-                params=input_data.params,
-                manifest=input_data.manifest,
+    ) -> ConcreteAgentTool[ModelTaskStopInput]:
+        return self._tool(
+            name="model.task.stop",
+            provider_name="model_task_stop",
+            description=(
+                "Stop (cancel) one or more running ML tasks by explicit task ids. "
+                "Use it when model.train/model.hyper_train/model.apply reports timed_out "
+                "and the reported status/logs show the task should not continue."
             ),
-            cancel_requested=context.cancel_requested,
+            input_model=ModelTaskStopInput,
+            handler=self._model_tools._model_task_stop,
         )
-        artifact_map: dict[str, str] = {}
-        artifact_payloads: list[dict[str, Any]] = []
-        for descriptor in lambda_result.artifacts:
-            kind = self._lambda_artifact_kind(descriptor.kind)
-            metadata_payload = {
-                "analysis_lambda": {
-                    "placeholder_id": descriptor.placeholder_id,
-                    "kind": descriptor.kind,
-                    "metadata": descriptor.metadata_payload,
-                }
-            }
-            artifact = self._artifact_service.register_artifact(
-                RegisterArtifactInput(
-                    kind=kind,
-                    title=descriptor.title,
-                    absolute_path=descriptor.absolute_path,
-                    mime_type=descriptor.mime_type,
-                    summary=descriptor.summary,
-                    metadata_payload=metadata_payload,
-                )
-            )
-            uri = build_artifact_uri(artifact.id)
-            artifact_map[descriptor.placeholder_id] = artifact.id
-            artifact_payloads.append(
-                {
-                    "artifact_id": artifact.id,
-                    "uri": uri,
-                    "title": artifact.title,
-                    "kind": artifact.kind.value,
-                    "mime_type": artifact.mime_type,
-                    "placeholder_id": descriptor.placeholder_id,
-                }
-            )
-
-        output = self._rewrite_lambda_artifact_uris(lambda_result.output, artifact_map)
-        payload = {
-            "result": {
-                "output": output,
-            },
-            "artifacts": artifact_payloads,
-            "dataset_ids": [dataset.dataset_id for dataset in datasets],
-        }
-        return ToolSuccess(value=payload)
-
-    def _data_clean(
-        self,
-        input_data: DataCleanInput,
-        context: ToolExecutionContext,
-    ) -> ToolSuccess:
-        self._raise_if_cancelled(context)
-        dataset = self._dataset_service.get_dataset(input_data.dataset_id)
-        name = input_data.name or f"{dataset.name} cleaned"
-        operations = [
-            operation.model_dump(mode="python")
-            for operation in input_data.operations
-        ]
-        if not operations:
-            report: dict[str, Any] = {
-                "row_count_before": None,
-                "row_count_after": None,
-                "rows_removed": 0,
-                "operations": [],
-                "validation_rules": [],
-                "warnings": [],
-                "no_op": True,
-            }
-            return self._tabular_tool_success(
-                "data.clean",
-                {
-                    "dataset_id": dataset.id,
-                    "source_dataset_id": dataset.id,
-                    "scope": "whole_dataset",
-                    "holdout_safe_model_preparation": False,
-                    "cleaning_report": report,
-                    "message": (
-                        "No whole-Dataset cleaning operations were requested. Nothing happened. "
-                        "Use split-fitted model preparation for holdout-safe learned preprocessing."
-                    ),
-                },
-            )
-        try:
-            clean_input = CleanDatasetInput(
-                source_path=dataset.source_path,
-                name=name,
-                operations=[
-                    CleanOperation(**operation)
-                    for operation in operations
-                ],
-            )
-        except PydanticValidationError as exc:
-            raise ValidationError("operations must contain objects with operation and optional params.") from exc
-        clean_result = self._data_cleaning_service.clean_dataset(clean_input)
-        row_count_before = int(clean_result.report.get("row_count_before", 0))
-        row_count_after = int(clean_result.report.get("row_count_after", 0))
-        payload = self._register_generated_dataset_result(
-            context,
-            output_path=Path(clean_result.output_path),
-            name=name,
-            summary=(
-                f"Whole-Dataset cleaned result created. Rows: {row_count_before} -> {row_count_after}. "
-                "This business transformation is not holdout-safe learned model preparation."
-            ),
-            derived_from_dataset_id=dataset.id,
-            metadata_payload={"cleaning_report": clean_result.report},
-        )
-        payload["row_count_before"] = row_count_before
-        payload["row_count_after"] = row_count_after
-        payload["source_dataset_id"] = dataset.id
-        payload["scope"] = "whole_dataset"
-        payload["holdout_safe_model_preparation"] = False
-        payload["cleaning_report"] = self._compact_cleaning_report(clean_result.report)
-        return self._tabular_tool_success("data.clean", payload)
-
-    def _analysis_profile(
-        self,
-        input_data: AnalysisProfileInput,
-        context: ToolExecutionContext,
-    ) -> ToolSuccess:
-        self._raise_if_cancelled(context)
-        result = self._analysis_profile_service.profile_dataset(
-            ProfileDatasetInput(
-                dataset_id=input_data.dataset_id,
-                field_limit=input_data.field_limit,
-                numeric_summary_limit=input_data.numeric_summary_limit,
-                correlation_column_limit=input_data.correlation_column_limit,
-            )
-        )
-        return ToolSuccess(value=result.model_dump(mode="json"))
-
-    def _data_clean_metadata(
-        self,
-        input_data: DataCleanMetadataInput,
-        context: ToolExecutionContext,
-    ) -> ToolSuccess:
-        self._raise_if_cancelled(context)
-        groups: list[str] = (
-            list(input_data.groups)
-            if input_data.groups is not None
-            else []
-        )
-        payload = cleaning_operation_metadata(groups)
-        return ToolSuccess(value=payload)
-
-    def _data_tokenize(
-        self,
-        input_data: DataTokenizeInput,
-        context: ToolExecutionContext,
-    ) -> ToolSuccess:
-        self._raise_if_cancelled(context)
-        dataset = self._dataset_service.get_dataset(input_data.dataset_id)
-        custom_dictionary_resources = self._staged_text_resources(
-            input_data.custom_dictionary_dataset_ids,
-            project_id=dataset.project_id,
-        )
-        stopword_resources = self._staged_text_resources(
-            input_data.stopword_dataset_ids,
-            project_id=dataset.project_id,
-        )
-        default_name = f"{dataset.name} tokenized"
-        name = input_data.name or default_name
-        tokenize_result = self._data_tokenization_service.tokenize_dataset(
-            TokenizeDatasetInput(
-                source_path=dataset.source_path,
-                name=name,
-                text_column=input_data.text_column,
-                text_column_index=input_data.text_column_index,
-                id_columns=input_data.id_columns,
-                id_column_indexes=input_data.id_column_indexes,
-                output=input_data.output,
-                tokenizer_profile=input_data.tokenizer_profile,
-                phrase_mode=input_data.phrase_mode,
-                custom_dictionary_resources=custom_dictionary_resources,
-                stopword_resources=stopword_resources,
-            )
-        )
-        raw_row_count = tokenize_result.report.get("output_row_count", 0)
-        row_count = (
-            raw_row_count
-            if isinstance(raw_row_count, int) and not isinstance(raw_row_count, bool)
-            else 0
-        )
-        payload = self._register_generated_dataset_result(
-            context,
-            output_path=Path(tokenize_result.output_path),
-            name=name,
-            summary=f"Tokenized dataset created. Rows: {row_count}.",
-            derived_from_dataset_id=dataset.id,
-            metadata_payload={"tokenization_report": tokenize_result.report},
-        )
-        payload["row_count"] = row_count
-        payload["tokenization_report"] = tokenize_result.report
-        return self._tabular_tool_success("data.tokenize", payload)
-
-    def _staged_text_resources(
-        self,
-        dataset_ids: list[str],
-        *,
-        project_id: str,
-    ) -> list[StagedTextResourceInput]:
-        resources: list[StagedTextResourceInput] = []
-        for dataset_id in dataset_ids:
-            dataset = self._dataset_service.get_dataset(dataset_id)
-            if dataset.project_id != project_id:
-                raise ValidationError(
-                    "Text preparation resources must belong to the input Dataset project."
-                )
-            source_path = Path(dataset.source_path)
-            if not source_path.is_file():
-                raise ValidationError("Text preparation resource source file is missing.")
-            inspection = self._dataset_service.inspect_source_file(
-                InspectDatasetInput(source_path=str(source_path.resolve()))
-            )
-            if inspection.column_count != 1 or not 1 <= inspection.row_count <= 20_000:
-                raise ValidationError(
-                    "Each text preparation resource must contain one term column and 1-20,000 rows."
-                )
-            digest = hashlib.sha256()
-            with source_path.open("rb") as source:
-                for chunk in iter(lambda: source.read(1024 * 1024), b""):
-                    digest.update(chunk)
-            resources.append(
-                StagedTextResourceInput(
-                    dataset_id=dataset.id,
-                    absolute_path=str(source_path.resolve()),
-                    source_sha256=digest.hexdigest(),
-                )
-            )
-        return resources
-
-    def _data_query(
-        self,
-        input_data: DataQueryToolInput,
-        context: ToolExecutionContext,
-    ) -> ToolSuccess:
-        self._raise_if_cancelled(context)
-        bindings = self._resolve_sql_bindings(
-            input_data,
-        )
-        query_result = self._data_transform_service.query(
-            DataQueryInput(
-                bindings=bindings,
-                sql=input_data.sql,
-                limit=input_data.limit,
-                column_reference=input_data.column_reference,
-            )
-        )
-        payload = {
-            "columns": self._query_columns_payload(query_result.columns),
-            "rows": self._query_rows_payload(query_result.rows, query_result.columns),
-            "returned_row_count": query_result.returned_row_count,
-            "total_row_count": query_result.total_row_count,
-            "truncated": query_result.truncated,
-        }
-        return self._tabular_tool_success("data.query", payload)
-
-    def _data_transform(
-        self,
-        input_data: DataTransformToolInput,
-        context: ToolExecutionContext,
-    ) -> ToolSuccess:
-        self._raise_if_cancelled(context)
-        bindings = self._resolve_sql_bindings(input_data)
-        input_dataset_ids = [binding.dataset_id for binding in bindings]
-        default_name = "Transformed dataset"
-        if len(bindings) == 1:
-            default_name = f"{self._dataset_service.get_dataset(bindings[0].dataset_id).name} transformed"
-        name = input_data.name or default_name
-        transform_result = self._data_transform_service.transform(
-            DataTransformInput(
-                bindings=bindings,
-                sql=input_data.sql,
-                name=name,
-                column_reference=input_data.column_reference,
-            )
-        )
-        derived_from_dataset_id = input_dataset_ids[0] if len(set(input_dataset_ids)) == 1 else None
-        payload = self._register_generated_dataset_result(
-            context,
-            output_path=Path(transform_result.output_path),
-            name=name,
-            summary=f"Transformed dataset created. Rows: {transform_result.row_count}.",
-            derived_from_dataset_id=derived_from_dataset_id,
-            metadata_payload={
-                "transform_report": transform_result.transform_report,
-                "input_dataset_ids": input_dataset_ids,
-            },
-        )
-        payload["row_count"] = transform_result.row_count
-        payload["columns"] = transform_result.columns
-        payload["transform_report"] = transform_result.transform_report
-        payload["input_dataset_ids"] = input_dataset_ids
-        return self._tabular_tool_success("data.transform", payload)
-
-    def _data_feature_select(
-        self,
-        input_data: DataFeatureSelectInput,
-        context: ToolExecutionContext,
-    ) -> ToolSuccess:
-        self._raise_if_cancelled(context)
-        binding = self._ml_service.create_column_binding(
-            CreateColumnBindingInput(
-                dataset_id=input_data.dataset_id,
-                model_key=input_data.model_key,
-                role_bindings=[
-                    role_binding.model_dump(mode="python", exclude_none=True)
-                    for role_binding in input_data.role_bindings
-                ],
-            )
-        )
-        return ToolSuccess(
-            value={
-                "binding_id": binding.id,
-                "dataset_id": binding.dataset_id,
-                "role_bindings": list(binding.role_bindings),
-                "model_key": binding.model_key,
-                "model_family": binding.model_family,
-                "model_task_kind": binding.model_task_kind,
-            },
-        )
-
-    def _model_metadata(
-        self,
-        input_data: ModelMetadataInput,
-        context: ToolExecutionContext,
-    ) -> ToolSuccess:
-        self._raise_if_cancelled(context)
-        detail_model_key: str | None = None
-        if input_data.model_key is not None:
-            detail_model_key = self._normalize_model_keys(
-                [input_data.model_key],
-                field_name="model_key",
-            )[0]
-
-        detail_query = detail_model_key is not None
-
-        if detail_query:
-            assert detail_model_key is not None
-            catalog_entries = [get_model_catalog_entry(detail_model_key)]
-        else:
-            catalog_entries = list_model_catalog()
-
-        selected_model_family = (
-            ModelFamily(input_data.model_family)
-            if input_data.model_family is not None
-            else None
-        )
-        if selected_model_family is not None:
-            catalog_entries = [
-                entry for entry in catalog_entries if entry.model_family == selected_model_family
-            ]
-
-        catalog_entries = sorted(
-            catalog_entries,
-            key=lambda entry: (
-                entry.model_family.value,
-                entry.model_task_kind.value,
-                entry.evaluation_kind.value,
-                entry.problem_kind.value if entry.problem_kind is not None else "",
-                entry.recommendation_tier,
-                entry.model_key,
-            ),
-        )
-        include_param_grid_schema = input_data.include_param_grid_schema
-        include_param_schema = detail_query or include_param_grid_schema
-        if not detail_query:
-            include_param_schema = False
-            include_param_grid_schema = False
-        models = [
-            self._model_catalog_payload(
-                entry,
-                detail_query=detail_query,
-                include_param_schema=include_param_schema,
-                include_param_grid_schema=include_param_grid_schema,
-            )
-            for entry in catalog_entries
-        ]
-        payload = {
-            "model_keys": [model["model_key"] for model in models],
-            "models": models,
-        }
-        return ToolSuccess(value=payload)
-
-    def _model_train(
-        self,
-        input_data: ModelTrainInput,
-        context: ToolExecutionContext,
-    ) -> ToolSuccess:
-        self._raise_if_cancelled(context)
-        binding_id = input_data.binding_id
-        models = self._normalize_model_keys(
-            input_data.models,
-            field_name="models",
-        )
-        params_by_model = self._normalize_model_mapping(
-            input_data.params_by_model,
-            field_name="params_by_model",
-        )
-        binding = self._ml_service.get_column_binding(binding_id)
-        dataset_id = binding.dataset_id
-        created_task_ids: list[str] = []
-        for model_key in models:
-            self._raise_if_cancelled(context)
-            created = self._ml_service.fit_with_evaluate(
-                FitWithEvaluateInput(
-                    binding_id=binding_id,
-                    run_name=input_data.run_name,
-                    model_key=model_key,
-                    params=dict(params_by_model.get(model_key) or {}),
-                )
-            )
-            created_task_ids.append(created.id)
-        training_result = self._wait_for_training_models_or_none(
-            created_task_ids,
-            context=context,
-            timeout_seconds=MODEL_TRAIN_GRACE_SECONDS,
-        )
-        if training_result is None:
-            return self._training_task_receipt(
-                dataset_id=dataset_id,
-                root_task_ids=created_task_ids,
-                operation="fit",
-            )
-        tasks, trained_models = training_result
-        payload = {
-            "async_state": "completed",
-            "dataset_id": dataset_id,
-            "task_ids": [task.id for task in tasks],
-            "ml_tasks": [self._ml_task_payload(task) for task in tasks],
-            "trained_models": [self._trained_model_payload(model) for model in trained_models],
-        }
-        return ToolSuccess(value=payload)
-
-    def _model_hyper_train(
-        self,
-        input_data: ModelHyperTrainInput,
-        context: ToolExecutionContext,
-    ) -> ToolSuccess:
-        self._raise_if_cancelled(context)
-        binding_id = input_data.binding_id
-        normalized_grids = self._normalize_model_mapping(
-            input_data.param_grids_by_model,
-            field_name="param_grids_by_model",
-            require_hyperparameter_tuning=True,
-        )
-        binding = self._ml_service.get_column_binding(binding_id)
-        dataset_id = binding.dataset_id
-        created_task_ids: list[str] = []
-        for model_key, grid in normalized_grids.items():
-            self._raise_if_cancelled(context)
-            created = self._ml_service.tune_with_evaluate(
-                TuneWithEvaluateInput(
-                    binding_id=binding_id,
-                    run_name=input_data.run_name,
-                    model_key=model_key,
-                    param_grid=dict(grid),
-                )
-            )
-            created_task_ids.append(created.id)
-        training_result = self._wait_for_training_models_or_none(
-            created_task_ids,
-            context=context,
-            timeout_seconds=MODEL_HYPER_TRAIN_GRACE_SECONDS,
-        )
-        if training_result is None:
-            return self._training_task_receipt(
-                dataset_id=dataset_id,
-                root_task_ids=created_task_ids,
-                operation="hyperparameter_tuning",
-            )
-        tasks, trained_models = training_result
-        payload = {
-            "async_state": "completed",
-            "dataset_id": dataset_id,
-            "task_ids": [task.id for task in tasks],
-            "ml_tasks": [self._ml_task_payload(task) for task in tasks],
-            "trained_models": [self._trained_model_payload(model) for model in trained_models],
-        }
-        return ToolSuccess(value=payload)
-
-    def _model_apply(
-        self,
-        input_data: ModelApplyInput,
-        context: ToolExecutionContext,
-    ) -> ToolSuccess:
-        self._raise_if_cancelled(context)
-        resolved_input_sources = self._resolve_apply_input_sources(input_data.input_sources)
-        apply_input = ApplyWithFilesInput(
-            trained_model_id=input_data.trained_model_id,
-            input_sources=resolved_input_sources,
-            input_rows=(
-                ServiceInlineApplyRowsInput(
-                    **input_data.input_rows.model_dump(mode="python")
-                )
-                if input_data.input_rows is not None
-                else None
-            ),
-            horizon=input_data.horizon,
-        )
-        task = self._ml_service.apply(apply_input)
-        completed_task = self._wait_for_task_or_none(
-            task.id,
-            context=context,
-            timeout_seconds=MODEL_APPLY_GRACE_SECONDS,
-        )
-        if completed_task is None:
-            return self._single_task_receipt(
-                task_id=task.id,
-                operation="apply",
-            )
-        task = completed_task
-        details = self._ml_service.get_task_details(task.id)
-        output_artifact = next(
-            artifact
-            for artifact in details.artifacts
-            if artifact.artifact_kind is MLTaskArtifactKind.APPLY_RESULT
-        )
-        if not output_artifact.artifact_id:
-            raise ValidationError(
-                "The completed apply task has no public Artifact reference. Re-run apply."
-            )
-        result_payload = details.task.result_payload or {}
-        typed_result = ApplyTaskResult.model_validate(result_payload)
-        text_apply_facts = typed_result.text_classification_apply_facts
-        raw_text_apply = any(
-            facts is not None
-            for facts in (
-                text_apply_facts,
-                typed_result.text_clustering_apply_facts,
-                typed_result.text_topic_apply_facts,
-                typed_result.text_retrieval_apply_facts,
-            )
-        )
-        return ToolSuccess(
-            value={
-                "async_state": "completed",
-                "ml_task_id": task.id,
-                "task_ids": [task.id],
-                "ml_tasks": [self._ml_task_payload(task)],
-                "model_key": typed_result.model_key,
-                "training_dataset_id": task.dataset_id,
-                "source_dataset_ids": list(result_payload.get("source_dataset_ids", [])),
-                "source_artifact_ids": list(result_payload.get("source_artifact_ids", [])),
-                "result_dataset_id": result_payload.get("result_dataset_id"),
-                "artifact_id": output_artifact.artifact_id,
-                "row_count": result_payload.get("row_count"),
-                "apply_input_contract": "raw_text" if raw_text_apply else None,
-                "text_classification_apply_facts": (
-                    text_apply_facts.model_dump(mode="json") if text_apply_facts else None
-                ),
-                "text_clustering_apply_facts": (
-                    self._text_discovery_payload(typed_result.text_clustering_apply_facts)
-                    if typed_result.text_clustering_apply_facts
-                    else None
-                ),
-                "text_topic_apply_facts": (
-                    self._text_discovery_payload(typed_result.text_topic_apply_facts)
-                    if typed_result.text_topic_apply_facts
-                    else None
-                ),
-                "text_retrieval_apply_facts": (
-                    self._text_discovery_payload(typed_result.text_retrieval_apply_facts)
-                    if typed_result.text_retrieval_apply_facts
-                    else None
-                ),
-            },
-        )
-
-    def _resolve_apply_input_sources(self, input_sources: list[str]) -> list[ApplySourceInput]:
-        return [self._resolve_apply_input_source(input_source) for input_source in input_sources]
-
-    def _resolve_apply_input_source(self, input_source: str) -> ApplySourceInput:
-        source = input_source.strip()
-        if source.startswith("artifact://"):
-            artifact = self._artifact_service.resolve_uri(source)
-            if not artifact.exists:
-                raise ValidationError("Apply input artifact file is missing.")
-            return ApplySourceInput(
-                source_path=artifact.absolute_path,
-                artifact_id=artifact.artifact_id,
-            )
-
-        try:
-            dataset = self._dataset_service.get_dataset(source)
-        except NotFoundError:
-            raise ValidationError("model.apply input_sources must be registered dataset ids or artifact:// URIs.") from None
-        if not Path(dataset.source_path).exists():
-            raise ValidationError("Apply input dataset source file is missing.")
-        return ApplySourceInput(
-            source_path=dataset.source_path,
-            dataset_id=dataset.id,
-        )
-
-    def _model_task_query(
-        self,
-        input_data: ModelTaskQueryInput,
-        context: ToolExecutionContext,
-    ) -> ToolSuccess:
-        self._raise_if_cancelled(context)
-        tasks = [
-            self._ml_task_details_payload(
-                task_id,
-                include_logs=input_data.include_logs,
-                max_log_entries=input_data.max_log_entries,
-            )
-            for task_id in input_data.task_ids
-        ]
-        payload = {
-            "task_ids": input_data.task_ids,
-            "tasks": tasks,
-        }
-        return ToolSuccess(value=payload)
-
-    def _resolve_sql_bindings(
-        self,
-        input_data: DataQueryToolInput | DataTransformToolInput,
-    ) -> list[DatasetSqlBinding]:
-        if input_data.bindings is not None:
-            bindings: list[DatasetSqlBinding] = []
-            for input_binding in input_data.bindings:
-                dataset = self._dataset_service.get_dataset(input_binding.dataset_id)
-                bindings.append(
-                    DatasetSqlBinding(
-                        alias=input_binding.alias,
-                        dataset_id=dataset.id,
-                        source_path=dataset.source_path,
-                    )
-                )
-            return bindings
-
-        dataset_id = input_data.dataset_id
-        if dataset_id is None:
-            raise AssertionError("Validated SQL Tool input must own an input source.")
-        dataset = self._dataset_service.get_dataset(dataset_id)
-        return [
-            DatasetSqlBinding(
-                alias="input",
-                dataset_id=dataset.id,
-                source_path=dataset.source_path,
-            )
-        ]
-
-    def _query_columns_payload(self, columns: list[dict[str, str]]) -> dict[str, Any]:
-        rows = [
-            [
-                str(column.get("name") or ""),
-                str(column.get("type") or ""),
-                index,
-            ]
-            for index, column in enumerate(columns)
-        ]
-        return self._compact_table(["name", "type", "index"], rows)
-
-    def _query_rows_payload(
-        self,
-        rows: list[dict[str, Any]],
-        columns: list[dict[str, str]],
-    ) -> dict[str, Any]:
-        column_names = [str(column.get("name") or "") for column in columns]
-        data = [[row.get(column_name) for column_name in column_names] for row in rows]
-        return {
-            "_schema": {column_name: index for index, column_name in enumerate(column_names)},
-            "data": data,
-        }
-
-    def _compact_cleaning_report(self, report: dict[str, Any]) -> dict[str, Any]:
-        """Project full execution audit into the bounded next-call facts.
-
-        The complete report is retained in the generated artifact metadata.  A
-        provider only needs the operation sequence, aggregate effects, small
-        field samples and warnings needed to decide its next Tool call.
-        """
-
-        compact: dict[str, Any] = {}
-        for key in ("row_count_before", "row_count_after", "rows_removed", "no_op"):
-            value = report.get(key)
-            if isinstance(value, (str, int, float, bool)) or value is None:
-                compact[key] = value
-
-        operations = report.get("operations")
-        if isinstance(operations, list):
-            compact["operation_count"] = len(operations)
-            compact["operations"] = [
-                self._compact_cleaning_report_operation(item)
-                for item in operations[:MAX_CLEANING_REPORT_OPERATION_ENTRIES]
-                if isinstance(item, dict)
-            ]
-            omitted = len(operations) - len(compact["operations"])
-            if omitted:
-                compact["omitted_operation_entries"] = omitted
-
-        validation_rules = report.get("validation_rules")
-        if isinstance(validation_rules, list):
-            compact["validation_rule_count"] = len(validation_rules)
-            compact["validation_rules"] = [
-                self._compact_cleaning_validation_rule(item)
-                for item in validation_rules[:MAX_CLEANING_REPORT_VALIDATION_ENTRIES]
-                if isinstance(item, dict)
-            ]
-            omitted = len(validation_rules) - len(compact["validation_rules"])
-            if omitted:
-                compact["omitted_validation_rules"] = omitted
-
-        warnings = report.get("warnings")
-        if isinstance(warnings, list):
-            normalized_warnings = [
-                self._bounded_cleaning_text(item, MAX_CLEANING_REPORT_WARNING_CHARS)
-                for item in warnings
-                if str(item).strip()
-            ]
-            compact["warning_count"] = len(normalized_warnings)
-            if normalized_warnings:
-                compact["warnings"] = normalized_warnings[:MAX_CLEANING_REPORT_WARNING_ENTRIES]
-                omitted = len(normalized_warnings) - len(compact["warnings"])
-                if omitted:
-                    compact["omitted_warnings"] = omitted
-        return compact
-
-    def _compact_cleaning_report_operation(self, operation: dict[str, Any]) -> dict[str, Any]:
-        compact: dict[str, Any] = {}
-        name = operation.get("operation")
-        if isinstance(name, str) and name:
-            compact["operation"] = name
-        for key in (
-            "column",
-            "rows_removed",
-            "cells_filled",
-            "cells_changed",
-            "coerced_to_null",
-            "columns_changed",
-            "columns_removed",
-            "threshold",
-            "multiplier",
-            "target_type",
-            "style",
-            "ascii_lower",
-            "drop_first",
-            "max_categories",
-        ):
-            value = operation.get(key)
-            if isinstance(value, (str, int, float, bool)):
-                if key == "column":
-                    compact[key] = self._bounded_cleaning_text(
-                        value,
-                        MAX_CLEANING_REPORT_COLUMN_NAME_CHARS,
-                    )
-                else:
-                    compact[key] = value
-        if "resolved_fill_value" in operation:
-            compact["resolved_fill_value"] = self._compact_cleaning_scalar(
-                operation.get("resolved_fill_value")
-            )
-        feature_range = operation.get("feature_range")
-        if (
-            isinstance(feature_range, list)
-            and len(feature_range) == 2
-            and all(isinstance(value, (int, float)) and not isinstance(value, bool) for value in feature_range)
-        ):
-            compact["feature_range"] = list(feature_range)
-        self._compact_cleaning_report_columns(compact, "columns", operation.get("columns"))
-        self._compact_cleaning_report_columns(compact, "dropped_columns", operation.get("dropped_columns"))
-        self._compact_cleaning_report_columns(compact, "evaluated_columns", operation.get("evaluated_columns"))
-        self._compact_cleaning_report_columns(
-            compact,
-            "encoded_columns",
-            operation.get("encoded_columns"),
-            include_empty=True,
-        )
-        skipped_columns = operation.get("skipped_columns")
-        if isinstance(skipped_columns, list):
-            self._compact_cleaning_report_columns(
-                compact,
-                "skipped_columns",
-                [
-                    item.get("column")
-                    for item in skipped_columns
-                    if isinstance(item, dict) and item.get("column") is not None
-                ],
-            )
-        columns_summary = operation.get("columns_summary")
-        if isinstance(columns_summary, list):
-            generated_columns: list[Any] = []
-            for summary in columns_summary:
-                if isinstance(summary, dict) and isinstance(summary.get("generated_columns"), list):
-                    generated_columns.extend(summary["generated_columns"])
-            self._compact_cleaning_report_columns(compact, "generated_columns", generated_columns)
-        for source_key, count_key in (
-            ("mapping", "renamed_column_count"),
-            ("generated_empty_names", "generated_column_name_count"),
-            ("duplicate_collisions", "duplicate_column_name_count"),
-            ("columns_summary", "column_summary_count"),
-            ("category_columns", "generated_category_column_count"),
-        ):
-            value = operation.get(source_key)
-            if isinstance(value, (list, dict)):
-                compact[count_key] = len(value)
-        return compact
-
-    @staticmethod
-    def _compact_cleaning_scalar(value: Any) -> str | int | float | bool | None:
-        if value is None or isinstance(value, int | float | bool):
-            return value
-        return AgentToolRegistry._bounded_cleaning_text(
-            value,
-            MAX_CLEANING_REPORT_FILL_VALUE_CHARS,
-        )
-
-    def _compact_cleaning_validation_rule(self, rule: dict[str, Any]) -> dict[str, Any]:
-        compact: dict[str, Any] = {}
-        for key in ("name", "column", "operation", "action", "violations", "rows_removed"):
-            value = rule.get(key)
-            if isinstance(value, (str, int, float, bool)):
-                if key in {"name", "column"}:
-                    compact[key] = self._bounded_cleaning_text(
-                        value,
-                        MAX_CLEANING_REPORT_COLUMN_NAME_CHARS,
-                    )
-                else:
-                    compact[key] = value
-        return compact
-
-    @staticmethod
-    def _compact_cleaning_report_columns(
-        compact: dict[str, Any],
-        key: str,
-        value: Any,
-        *,
-        include_empty: bool = False,
-    ) -> None:
-        if not isinstance(value, list):
-            return
-        values = [str(item) for item in value if str(item).strip()]
-        if not values:
-            if include_empty:
-                compact[key] = []
-                compact[f"{key}_count"] = 0
-            return
-        compact[key] = [
-            AgentToolRegistry._bounded_cleaning_text(item, MAX_CLEANING_REPORT_COLUMN_NAME_CHARS)
-            for item in values[:MAX_CLEANING_REPORT_COLUMN_NAMES]
-        ]
-        compact[f"{key}_count"] = len(values)
-        omitted = len(values) - len(compact[key])
-        if omitted:
-            compact[f"omitted_{key}"] = omitted
-
-    @staticmethod
-    def _bounded_cleaning_text(value: Any, limit: int) -> str:
-        text = str(value)
-        if len(text) <= limit:
-            return text
-        if limit <= 1:
-            return text[:limit]
-        return text[: limit - 1] + "…"
-
-    def _tabular_tool_success(self, tool_name: str, payload: dict[str, Any]) -> ToolSuccess:
-        """Return the one canonical value for a tabular Tool.
-
-        The formatter runs while the concrete Tool still owns the raw
-        intermediate payload.  Once this method returns, only the XTT text
-        (when the payload has a tabular contract) crosses the LLM boundary;
-        there is no later raw-payload-to-XTT projection.
-        """
-
-        rendered = render_xenix_table_tool_result(
-            tool_name=tool_name,
-            status="succeeded",
-            payload=payload,
-        )
-        return ToolSuccess(value=rendered if rendered is not None else payload)
-
-    def _register_generated_dataset_result(
-        self,
-        context: ToolExecutionContext,
-        *,
-        output_path: Path,
-        name: str,
-        summary: str,
-        derived_from_dataset_id: str | None = None,
-        metadata_payload: dict[str, Any] | None = None,
-    ) -> dict[str, Any]:
-        resolved_output_path = output_path.resolve()
-        payload = self._preprocessing_worker_runner.run(
-            "data.register_generated_dataset",
-            {
-                "output_path": str(resolved_output_path),
-                "name": name,
-                "summary": summary,
-                "derived_from_dataset_id": derived_from_dataset_id,
-                "metadata_payload": dict(metadata_payload or {}),
-            },
-            paths=self._paths,
-        )
-        return payload
-
-    def _compact_table(self, keys: list[str], rows: list[list[Any]]) -> dict[str, Any]:
-        return {
-            "_schema": {key: index for index, key in enumerate(keys)},
-            "data": rows,
-        }
-
-    def _lambda_artifact_kind(self, raw_kind: str) -> ArtifactKind:
-        value = str(raw_kind or "").strip()
-        if value == "image":
-            return ArtifactKind.IMAGE
-        if value == "report":
-            return ArtifactKind.REPORT
-        if value in {"dataset", "file", "table"}:
-            return ArtifactKind.FILE
-        try:
-            return ArtifactKind(value)
-        except ValueError:
-            return ArtifactKind.OTHER
-
-    def _rewrite_lambda_artifact_uris(self, value: Any, artifact_map: dict[str, str]) -> Any:
-        if isinstance(value, str):
-            rewritten = value
-            for placeholder_id, artifact_id in artifact_map.items():
-                rewritten = rewritten.replace(f"artifact://{placeholder_id}", build_artifact_uri(artifact_id))
-            return rewritten
-        if isinstance(value, list):
-            return [self._rewrite_lambda_artifact_uris(item, artifact_map) for item in value]
-        if isinstance(value, dict):
-            return {
-                key: self._rewrite_lambda_artifact_uris(item, artifact_map)
-                for key, item in value.items()
-            }
-        return value
-
-    def _load_frame(self, path: Path) -> pd.DataFrame:
-        source_format = detect_source_format(path)
-        if source_format.value == "unknown":
-            raise ValidationError("Only .csv, .parquet, .xlsx, and .xls dataset files are supported.")
-        return load_dataframe(path, source_format)
-
-    def _wait_for_training_models_or_none(
-        self,
-        root_task_ids: list[str],
-        *,
-        context: ToolExecutionContext,
-        timeout_seconds: float,
-    ) -> tuple[list[MLTaskRow], list[TrainedModelRow]] | None:
-        deadline = time.time() + timeout_seconds
-        while time.time() < deadline:
-            root_tasks = [self._ml_service.get_task_details(task_id).task for task_id in root_task_ids]
-            trained_models = self._trained_models_for_root_tasks(root_task_ids)
-            related_tasks = self._related_training_tasks(root_tasks, trained_models)
-            self._raise_if_cancelled(
-                context,
-                ml_task_ids=[task.id for task in related_tasks] or root_task_ids,
-            )
-
-            failed = [
-                task
-                for task in related_tasks
-                if task.status in {MLTaskStatus.FAILED, MLTaskStatus.CANCELLED}
-            ]
-            if failed:
-                raise ValidationError(f"ML task '{failed[0].id}' finished with status '{failed[0].status.value}'.")
-
-            root_tasks_succeeded = all(task.status is MLTaskStatus.SUCCEEDED for task in root_tasks)
-            if root_tasks_succeeded and len(trained_models) == len(root_task_ids):
-                pending_evaluation = False
-                models_by_root_task = {model.ml_task_id: model for model in trained_models}
-                for root_task in root_tasks:
-                    model = models_by_root_task.get(root_task.id)
-                    if model is None:
-                        pending_evaluation = True
-                        break
-                    if self._training_task_requires_follow_up_evaluation(root_task):
-                        evaluation_task_id = self._evaluation_task_id_for_model(model)
-                        if not evaluation_task_id:
-                            pending_evaluation = True
-                            break
-                        evaluation_task = self._ml_service.get_task_details(evaluation_task_id).task
-                        if evaluation_task.status is not MLTaskStatus.SUCCEEDED:
-                            pending_evaluation = True
-                            break
-                if not pending_evaluation:
-                    return self._related_training_tasks(root_tasks, trained_models), trained_models
-
-            time.sleep(0.1)
-        return None
-
-    def _wait_for_task(
-        self,
-        task_id: str,
-        *,
-        context: ToolExecutionContext,
-        timeout_seconds: float = 120.0,
-    ) -> MLTaskRow:
-        task = self._wait_for_task_or_none(task_id, context=context, timeout_seconds=timeout_seconds)
-        if task is None:
-            raise ValidationError(f"Timed out waiting for ML task '{task_id}'.")
-        return task
-
-    def _wait_for_task_or_none(
-        self,
-        task_id: str,
-        *,
-        context: ToolExecutionContext,
-        timeout_seconds: float,
-    ) -> MLTaskRow | None:
-        deadline = time.time() + timeout_seconds
-        while time.time() < deadline:
-            self._raise_if_cancelled(context, ml_task_ids=[task_id])
-            task = self._ml_service.get_task_details(task_id).task
-            if task.status in self._terminal_statuses():
-                if task.status is not MLTaskStatus.SUCCEEDED:
-                    raise ValidationError(f"ML task '{task.id}' finished with status '{task.status.value}'.")
-                return task
-            time.sleep(0.1)
-        return None
-
-    def _raise_if_cancelled(self, context: ToolExecutionContext, *, ml_task_ids: list[str] | None = None) -> None:
-        if not context.cancel_requested():
-            return
-        if ml_task_ids:
-            for task_id in ml_task_ids:
-                try:
-                    self._ml_service.cancel_task(task_id)
-                except Exception:
-                    continue
-        raise ValidationError("Agent run was cancelled.")
-
-    def _terminal_statuses(self) -> set[MLTaskStatus]:
-        return {MLTaskStatus.SUCCEEDED, MLTaskStatus.FAILED, MLTaskStatus.CANCELLED}
-
-    def _trained_models_for_root_tasks(self, root_task_ids: list[str]) -> list[TrainedModelRow]:
-        models_by_task_id: dict[str, TrainedModelRow] = {}
-        for task_id in root_task_ids:
-            model = self._ml_service.get_trained_model_by_ml_task(task_id)
-            if model is not None:
-                models_by_task_id[task_id] = model
-        return [models_by_task_id[task_id] for task_id in root_task_ids if task_id in models_by_task_id]
-
-    def _related_training_tasks(
-        self,
-        root_tasks: list[MLTaskRow],
-        trained_models: list[TrainedModelRow],
-    ) -> list[MLTaskRow]:
-        tasks: list[MLTaskRow] = []
-        seen_task_ids: set[str] = set()
-        for task in root_tasks:
-            tasks.append(task)
-            seen_task_ids.add(task.id)
-        for model in trained_models:
-            evaluation_task_id = self._evaluation_task_id_for_model(model)
-            if not evaluation_task_id or evaluation_task_id in seen_task_ids:
-                continue
-            task = self._ml_service.get_task_details(evaluation_task_id).task
-            tasks.append(task)
-            seen_task_ids.add(task.id)
-        return tasks
-
-    def _evaluation_task_id_for_model(self, model: TrainedModelRow) -> str | None:
-        task_id = model.metadata_payload.get("evaluation_ml_task_id")
-        if isinstance(task_id, str) and task_id.strip():
-            return task_id
-        return None
-
-    def _training_task_requires_follow_up_evaluation(self, task: MLTaskRow) -> bool:
-        continuation = task.request_payload.get("continuation_plan")
-        return isinstance(continuation, dict) and continuation.get("next_operation") == "evaluate"
-
-    def _training_task_receipt(
-        self,
-        *,
-        dataset_id: str,
-        root_task_ids: list[str],
-        operation: str,
-    ) -> ToolSuccess:
-        root_tasks = [self._ml_service.get_task_details(task_id).task for task_id in root_task_ids]
-        trained_models = self._trained_models_for_root_tasks(root_task_ids)
-        tasks = self._related_training_tasks(root_tasks, trained_models)
-        task_ids = [task.id for task in tasks] or list(root_task_ids)
-        payload = {
-            "async_state": "running_background",
-            "dataset_id": dataset_id,
-            "operation": operation,
-            "task_ids": task_ids,
-            "root_task_ids": list(root_task_ids),
-            "ml_tasks": [self._ml_task_payload(task) for task in tasks],
-            "trained_models": [self._trained_model_payload(model) for model in trained_models],
-        }
-        return ToolSuccess(value=payload)
-
-    def _single_task_receipt(
-        self,
-        *,
-        task_id: str,
-        operation: str,
-    ) -> ToolSuccess:
-        task = self._ml_service.get_task_details(task_id).task
-        payload = {
-            "async_state": "running_background",
-            "operation": operation,
-            "ml_task_id": task.id,
-            "task_ids": [task.id],
-            "root_task_ids": [task.id],
-            "dataset_id": task.dataset_id,
-            "ml_tasks": [self._ml_task_payload(task)],
-        }
-        return ToolSuccess(value=payload)
-
-    def _ml_task_payload(self, task: MLTaskRow) -> dict[str, Any]:
-        return {
-            "task_id": task.id,
-            "dataset_id": task.dataset_id,
-            "task_type": task.task_type.value,
-            "status": task.status.value,
-            "model_key": self._model_key_from_task_payload(task.request_payload),
-            "error_summary": self._bounded_status_message(task.error_summary),
-            "created_at": task.created_at.isoformat() if task.created_at else None,
-            "started_at": task.started_at.isoformat() if task.started_at else None,
-            "finished_at": task.finished_at.isoformat() if task.finished_at else None,
-            "updated_at": task.updated_at.isoformat() if task.updated_at else None,
-            "follow_up_task_ids": self._follow_up_task_ids(task),
-        }
-
-    def _ml_task_details_payload(
-        self,
-        task_id: str,
-        *,
-        include_logs: bool,
-        max_log_entries: int,
-    ) -> dict[str, Any]:
-        details = self._ml_service.get_task_details(task_id)
-        task_payload = self._ml_task_payload(details.task)
-        logs = (
-            [
-                {
-                    "timestamp": log.timestamp,
-                    "level": log.level,
-                    "message": self._bounded_status_message(log.message),
-                }
-                for log in details.logs[-max_log_entries:]
-            ]
-            if include_logs and max_log_entries
-            else []
-        )
-        task_payload.update(
-            {
-                "request": self._task_request_summary(
-                    details.task.request_payload,
-                    task_type=details.task.task_type,
-                ),
-                "result": self._task_result_summary(details.task),
-                "artifacts": [
-                    {
-                        "ml_task_artifact_id": artifact.id,
-                        "artifact_id": artifact.artifact_id,
-                        "artifact_kind": artifact.artifact_kind.value,
-                        "ready_to_open": artifact.ready_to_open,
-                        "created_at": artifact.created_at.isoformat() if artifact.created_at else None,
-                    }
-                    for artifact in details.artifacts
-                ],
-                "logs": logs,
-            }
-        )
-        return task_payload
-
-    def _task_request_summary(
-        self,
-        request_payload: dict[str, Any],
-        *,
-        task_type: MLTaskType,
-    ) -> dict[str, Any]:
-        summary: dict[str, Any] = {
-            key: request_payload[key]
-            for key in ("project_id", "dataset_id", "evaluation_kind")
-            if isinstance(request_payload.get(key), str)
-        }
-        roles = request_payload.get("train_role_bindings")
-        if isinstance(roles, list):
-            summary["train_role_bindings"] = self._bounded_role_bindings(roles)
-        snapshot = request_payload.get("dataset_snapshot")
-        if isinstance(snapshot, dict):
-            summary["dataset_snapshot"] = {
-                key: snapshot[key]
-                for key in (
-                    "schema_version",
-                    "dataset_id",
-                    "source_sha256",
-                    "source_byte_size",
-                    "schema_digest",
-                )
-                if key in snapshot
-            }
-        policy = request_payload.get("evaluation_policy")
-        if isinstance(policy, dict):
-            summary["evaluation_policy"] = {
-                key: policy[key]
-                for key in (
-                    "policy_key",
-                    "evaluation_kind",
-                    "primary_metric_name",
-                    "primary_metric_direction",
-                    "split_strategy",
-                    "test_size",
-                    "cv_folds",
-                    "random_state",
-                )
-                if key in policy
-            }
-        if task_type is MLTaskType.FIT:
-            summary["manual_training"] = self._model_command_summary(
-                request_payload.get("manual_training"),
-                parameter_field="params",
-            )
-        elif task_type is MLTaskType.HYPERPARAMETER_TUNING:
-            summary["hyperparameter_tuning"] = self._model_command_summary(
-                request_payload.get("hyperparameter_tuning"),
-                parameter_field="param_grid",
-            )
-        elif task_type is MLTaskType.EVALUATE:
-            summary["evaluate_model"] = self._model_reference_summary(
-                request_payload.get("evaluate_model")
-            )
-        elif task_type is MLTaskType.APPLY:
-            summary["apply_model"] = self._model_reference_summary(
-                request_payload.get("apply_model")
-            )
-            inputs = request_payload.get("input_files")
-            if isinstance(inputs, list):
-                summary["input_sources"] = [
-                    {
-                        key: value[key]
-                        for key in ("source_kind", "dataset_id", "artifact_id")
-                        if isinstance(value, dict) and value.get(key) is not None
-                    }
-                    for value in inputs[:20]
-                    if isinstance(value, dict)
-                ]
-                summary["input_source_count"] = len(inputs)
-                summary["input_sources_truncated"] = len(inputs) > 20
-            if isinstance(request_payload.get("forecast_horizon"), int):
-                summary["forecast_horizon"] = request_payload["forecast_horizon"]
-        return summary
-
-    def _task_result_summary(self, task: MLTaskRow) -> dict[str, Any] | None:
-        payload = task.result_payload
-        if not isinstance(payload, dict):
-            return None
-        try:
-            if task.task_type is MLTaskType.FIT:
-                result = FitTaskResult.model_validate(payload)
-                return self._training_result_summary(result, payload)
-            if task.task_type is MLTaskType.HYPERPARAMETER_TUNING:
-                result = HyperparameterTuningTaskResult.model_validate(payload)
-                summary = self._training_result_summary(result, payload)
-                summary["best_params"] = self._bounded_parameter_mapping(result.best_params)
-                return summary
-            if task.task_type is MLTaskType.EVALUATE:
-                result = EvaluateTaskResult.model_validate(payload)
-                return {
-                    "trained_model_id": result.trained_model_id,
-                    "model_key": result.model_key,
-                    "evaluation_kind": result.evaluation_kind.value,
-                    "evaluation": (
-                        self._candidate_metrics_payload(result.evaluation)
-                        if result.evaluation
-                        else None
-                    ),
-                    "baseline_evaluation": (
-                        self._candidate_metrics_payload(result.baseline_evaluation)
-                        if result.baseline_evaluation
-                        else None
-                    ),
-                    "comparison": (
-                        result.comparison.model_dump(mode="json")
-                        if result.comparison
-                        else None
-                    ),
-                    "split_facts": (
-                        result.split_facts.model_dump(mode="json")
-                        if result.split_facts
-                        else None
-                    ),
-                    "preparation_facts": (
-                        result.preparation_facts.model_dump(mode="json")
-                        if result.preparation_facts
-                        else None
-                    ),
-                    "forecast_evaluation": (
-                        self._forecast_evaluation_payload(result.forecast_evaluation)
-                        if result.forecast_evaluation
-                        else None
-                    ),
-                    "clustering_evaluation": (
-                        self._clustering_evaluation_payload(
-                            result.clustering_evaluation
-                        )
-                        if result.clustering_evaluation
-                        else None
-                    ),
-                    "recommendation_evaluation": (
-                        self._recommendation_evaluation_payload(
-                            result.recommendation_evaluation
-                        )
-                        if result.recommendation_evaluation
-                        else None
-                    ),
-                    "text_classification_evaluation": (
-                        result.text_classification_evaluation.model_dump(mode="json")
-                        if result.text_classification_evaluation
-                        else None
-                    ),
-                    "text_clustering_evaluation": (
-                        self._text_discovery_payload(result.text_clustering_evaluation)
-                        if result.text_clustering_evaluation
-                        else None
-                    ),
-                    "text_topic_evaluation": (
-                        self._text_discovery_payload(result.text_topic_evaluation)
-                        if result.text_topic_evaluation
-                        else None
-                    ),
-                    "text_retrieval_evaluation": (
-                        self._text_discovery_payload(result.text_retrieval_evaluation)
-                        if result.text_retrieval_evaluation
-                        else None
-                    ),
-                }
-            if task.task_type is MLTaskType.APPLY:
-                result = ApplyTaskResult.model_validate(payload)
-                return {
-                    "trained_model_id": result.trained_model_id,
-                    "model_key": result.model_key,
-                    "summary": result.summary.model_dump(mode="json"),
-                    "source_dataset_ids": list(result.source_dataset_ids),
-                    "source_artifact_ids": list(result.source_artifact_ids),
-                    "result_dataset_id": payload.get("result_dataset_id"),
-                    "text_classification_apply_facts": (
-                        result.text_classification_apply_facts.model_dump(mode="json")
-                        if result.text_classification_apply_facts
-                        else None
-                    ),
-                    "text_clustering_apply_facts": (
-                        self._text_discovery_payload(result.text_clustering_apply_facts)
-                        if result.text_clustering_apply_facts
-                        else None
-                    ),
-                    "text_topic_apply_facts": (
-                        self._text_discovery_payload(result.text_topic_apply_facts)
-                        if result.text_topic_apply_facts
-                        else None
-                    ),
-                    "text_retrieval_apply_facts": (
-                        self._text_discovery_payload(result.text_retrieval_apply_facts)
-                        if result.text_retrieval_apply_facts
-                        else None
-                    ),
-                }
-        except PydanticValidationError:
-            return {"contract_status": "stored_result_invalid"}
-        return {"contract_status": "unsupported_task_type"}
-
-    def _training_result_summary(
-        self,
-        result: FitTaskResult | HyperparameterTuningTaskResult,
-        payload: dict[str, Any],
-    ) -> dict[str, Any]:
-        return {
-            "trained_model_id": payload.get("trained_model_id"),
-            "model_key": result.model_key,
-            "evaluation_kind": result.evaluation_kind.value,
-            "split_facts": (
-                result.split_facts.model_dump(mode="json") if result.split_facts else None
-            ),
-            "preparation_facts": (
-                result.preparation_facts.model_dump(mode="json")
-                if result.preparation_facts
-                else None
-            ),
-            "recommendation_split_facts": (
-                result.recommendation_split_facts.model_dump(mode="json")
-                if result.recommendation_split_facts
-                else None
-            ),
-            "recommendation_preparation_facts": (
-                result.recommendation_preparation_facts.model_dump(mode="json")
-                if result.recommendation_preparation_facts
-                else None
-            ),
-            "text_preparation_specification": (
-                result.text_preparation_specification.model_dump(mode="json")
-                if result.text_preparation_specification
-                else None
-            ),
-            "text_preparation_facts": (
-                result.text_preparation_facts.model_dump(mode="json")
-                if result.text_preparation_facts
-                else None
-            ),
-            "text_leakage_facts": (
-                result.text_leakage_facts.model_dump(mode="json")
-                if result.text_leakage_facts
-                else None
-            ),
-            "text_vectorization_facts": (
-                result.text_vectorization_facts.model_dump(mode="json")
-                if result.text_vectorization_facts
-                else None
-            ),
-            "text_clustering_evaluation": (
-                self._text_discovery_payload(result.text_clustering_evaluation)
-                if result.text_clustering_evaluation
-                else None
-            ),
-            "text_topic_evaluation": (
-                self._text_discovery_payload(result.text_topic_evaluation)
-                if result.text_topic_evaluation
-                else None
-            ),
-            "text_retrieval_evaluation": (
-                self._text_discovery_payload(result.text_retrieval_evaluation)
-                if result.text_retrieval_evaluation
-                else None
-            ),
-            "training_scope": {
-                "evaluation_model": (
-                    result.training_scopes.evaluation_model
-                    if result.training_scopes
-                    else (
-                        "holdout_train_split"
-                        if result.final_model_artifact_path
-                        else None
-                    )
-                ),
-                "apply_model": (
-                    result.training_scopes.apply_model
-                    if result.training_scopes
-                    else (
-                        "all_eligible_rows"
-                        if result.final_model_artifact_path
-                        else None
-                    )
-                ),
-            },
-            "result_dataset_id": payload.get("result_dataset_id"),
-        }
-
-    def _candidate_metrics_payload(self, metrics: CandidateMetrics) -> dict[str, Any]:
-        ordered_metrics = sorted(metrics.metrics.items())
-        details = metrics.details
-        payload: dict[str, Any] = {
-            "primary_metric_name": metrics.primary_metric_name,
-            "primary_metric_value": metrics.primary_metric_value,
-            "metrics": dict(ordered_metrics[:MAX_MODEL_METRICS]),
-            "metric_count": len(ordered_metrics),
-            "metrics_truncated": len(ordered_metrics) > MAX_MODEL_METRICS,
-        }
-        prediction_digest = details.get("prediction_digest")
-        if isinstance(prediction_digest, str):
-            payload["prediction_digest"] = prediction_digest
-        probability_metrics = details.get("probability_metrics")
-        if isinstance(probability_metrics, dict):
-            payload["probability_metrics"] = {
-                "available": probability_metrics.get("available"),
-                "reason": self._bounded_status_message(probability_metrics.get("reason")),
-            }
-        return payload
-
-    def _forecast_evaluation_payload(self, facts: Any) -> dict[str, Any]:
-        """Project bounded temporal facts without group values or raw forecasts."""
-
-        payload = facts.model_dump(mode="json")
-        preparation = payload.get("preparation")
-        if isinstance(preparation, dict):
-            # Column names are already role-bound schema facts; group values never
-            # enter this contract.
-            payload["preparation"] = preparation
-        return payload
-
-    def _text_discovery_payload(self, facts: Any) -> dict[str, Any]:
-        """Project typed bounded discovery facts without raw text or document ids."""
-
-        payload = facts.model_dump(mode="json")
-        limitations = payload.get("limitations")
-        if isinstance(limitations, list):
-            payload["limitations"] = [
-                self._bounded_status_message(value) for value in limitations[:8]
-            ]
-        return payload
-
-    def _clustering_evaluation_payload(self, facts: Any) -> dict[str, Any]:
-        payload = facts.model_dump(mode="json")
-        sizes = payload.get("sizes")
-        if isinstance(sizes, list):
-            payload["sizes"] = sizes[:24]
-            payload["size_fact_count"] = len(sizes)
-            payload["sizes_truncated"] = len(sizes) > 24
-        profiles = payload.get("profiles")
-        if isinstance(profiles, list):
-            bounded_profiles: list[dict[str, Any]] = []
-            for raw_profile in profiles[:12]:
-                if not isinstance(raw_profile, dict):
-                    continue
-                profile = dict(raw_profile)
-                for key in ("numeric", "categorical"):
-                    values = profile.get(key)
-                    if isinstance(values, list):
-                        bounded_values = []
-                        for raw_value in values[:12]:
-                            if not isinstance(raw_value, dict):
-                                continue
-                            value = dict(raw_value)
-                            if key == "categorical" and isinstance(
-                                value.get("top_value"), str
-                            ):
-                                value["top_value"] = value["top_value"][:120]
-                            bounded_values.append(value)
-                        profile[key] = bounded_values
-                bounded_profiles.append(profile)
-            payload["profiles"] = bounded_profiles
-            payload["profile_count"] = len(profiles)
-            payload["profiles_truncated"] = len(profiles) > 12
-        label_map = payload.get("label_map")
-        if isinstance(label_map, dict) and isinstance(label_map.get("entries"), list):
-            entries = label_map["entries"]
-            label_map["entries"] = entries[:24]
-            label_map["entry_count"] = len(entries)
-            label_map["entries_truncated"] = len(entries) > 24
-        limitations = payload.get("limitations")
-        if isinstance(limitations, list):
-            payload["limitations"] = [
-                self._bounded_status_message(value) for value in limitations[:10]
-            ]
-        return payload
-
-    def _recommendation_evaluation_payload(self, facts: Any) -> dict[str, Any]:
-        """Project ranking evidence without held-out truth or user/item values."""
-
-        payload = facts.model_dump(mode="json")
-        limitations = payload.get("limitations")
-        if isinstance(limitations, list):
-            payload["limitations"] = [
-                self._bounded_status_message(value) for value in limitations[:10]
-            ]
-        cold_start = payload.get("cold_start")
-        if isinstance(cold_start, dict) and isinstance(
-            cold_start.get("limitations"), list
-        ):
-            cold_start["limitations"] = [
-                self._bounded_status_message(value)
-                for value in cold_start["limitations"][:10]
-            ]
-        return payload
-
-    def _model_command_summary(
-        self,
-        value: Any,
-        *,
-        parameter_field: str,
-    ) -> dict[str, Any]:
-        if not isinstance(value, dict):
-            return {}
-        parameters = value.get(parameter_field)
-        parameter_names = sorted(str(key) for key in parameters) if isinstance(parameters, dict) else []
-        return {
-            "model_key": value.get("model_key"),
-            "parameter_names": parameter_names[:32],
-            "parameter_count": len(parameter_names),
-            "parameters_truncated": len(parameter_names) > 32,
-        }
-
-    def _model_reference_summary(self, value: Any) -> dict[str, Any]:
-        if not isinstance(value, dict):
-            return {}
-        return {
-            key: value[key]
-            for key in ("trained_model_id", "model_key")
-            if isinstance(value.get(key), str)
-        }
-
-    def _bounded_parameter_mapping(self, value: dict[str, Any]) -> dict[str, Any]:
-        items = sorted(value.items())
-        parameters = {
-            str(key)[:MAX_MODEL_COLUMN_NAME_CHARS]: scalar
-            for key, scalar in items[:32]
-            if isinstance(scalar, str | int | float | bool) or scalar is None
-        }
-        return {
-            "values": parameters,
-            "parameter_count": len(items),
-            "parameters_truncated": len(items) > 32,
-        }
-
-    def _bounded_role_bindings(self, value: list[Any]) -> list[dict[str, Any]]:
-        bindings: list[dict[str, Any]] = []
-        for binding in value[:MAX_MODEL_ROLE_BINDINGS]:
-            if not isinstance(binding, dict):
-                continue
-            columns = binding.get("columns")
-            bounded_columns = (
-                [
-                    str(column)[:MAX_MODEL_COLUMN_NAME_CHARS]
-                    for column in columns[:MAX_MODEL_ROLE_COLUMNS]
-                ]
-                if isinstance(columns, list)
-                else []
-            )
-            column_count = len(columns) if isinstance(columns, list) else 0
-            bindings.append(
-                {
-                    "role": str(binding.get("role") or "")[:MAX_MODEL_COLUMN_NAME_CHARS],
-                    "columns": bounded_columns,
-                    "column_count": column_count,
-                    "columns_truncated": column_count > MAX_MODEL_ROLE_COLUMNS,
-                }
-            )
-        return bindings
-
-    def _bounded_status_message(self, value: Any) -> str | None:
-        if value is None:
-            return None
-        message = str(value).replace(str(self._paths.home), "[app-home]")
-        message = _LOCAL_PATH_PATTERN.sub("[local-path]", message)
-        if len(message) > MAX_MODEL_TASK_LOG_CHARS:
-            return message[: MAX_MODEL_TASK_LOG_CHARS - 1] + "…"
-        return message
-
-    def _model_key_from_task_payload(self, request_payload: dict[str, Any]) -> str | None:
-        for key in ("manual_training", "hyperparameter_tuning", "evaluate_model", "apply_model"):
-            value = request_payload.get(key)
-            if isinstance(value, dict) and isinstance(value.get("model_key"), str):
-                return cast(str, value["model_key"])
-        return None
-
-    def _follow_up_task_ids(self, task: MLTaskRow) -> list[str]:
-        if task.task_type not in {MLTaskType.FIT, MLTaskType.HYPERPARAMETER_TUNING}:
-            return []
-        model = self._ml_service.get_trained_model_by_ml_task(task.id)
-        if model is None:
-            return []
-        evaluation_task_id = self._evaluation_task_id_for_model(model)
-        return [evaluation_task_id] if evaluation_task_id else []
-
-    def _trained_model_payload(self, model: TrainedModelRow) -> dict[str, Any]:
-        metadata = parse_trained_model_metadata(model.metadata_payload)
-        payload: dict[str, Any] = {
-            "trained_model_id": model.id,
-            "dataset_id": model.dataset_id,
-            "model_key": model.model_key,
-        }
-        if metadata is None:
-            payload["metadata_contract_status"] = "unavailable"
-            return payload
-        payload.update(
-            {
-                "evaluation_kind": metadata.evaluation_kind,
-                "model_family": metadata.model_family,
-                "model_task_kind": metadata.model_task_kind,
-                "supports_evaluation": metadata.supports_evaluation,
-                "supports_apply": metadata.supports_apply,
-                "apply_mode": metadata.apply_mode,
-                "forecast_options": (
-                    self._bounded_parameter_mapping(metadata.forecast_options)
-                    if metadata.forecast_options
-                    else None
-                ),
-                "train_role_bindings": self._bounded_role_bindings(
-                    metadata.train_role_bindings
-                ),
-                "training_scope": {
-                    "evaluation_model": metadata.evaluation_model_training_scope,
-                    "apply_model": metadata.apply_model_training_scope,
-                },
-                "evaluation_task_id": metadata.evaluation_ml_task_id,
-                "evaluation_facts_authority": metadata.evaluation_facts_authority,
-            }
-        )
-        return payload
-
-    def _model_catalog_payload(
-        self,
-        entry: ModelCatalogEntry,
-        *,
-        detail_query: bool,
-        include_param_schema: bool,
-        include_param_grid_schema: bool,
-    ) -> dict[str, Any]:
-        payload: dict[str, Any] = {
-            "model_key": entry.model_key,
-            "display_name": entry.display_name,
-            "description": entry.guidance,
-            "problem_kind": entry.problem_kind.value if entry.problem_kind is not None else None,
-            "evaluation_kind": entry.evaluation_kind.value,
-            "model_family": entry.model_family.value,
-            "model_task_kind": entry.model_task_kind.value,
-            "family": entry.family,
-            "recommendation_tier": entry.recommendation_tier,
-            "supports_fit": entry.supports_fit,
-            "supports_evaluation": entry.supports_evaluation,
-            "supports_apply": entry.supports_apply,
-            "apply_mode": entry.apply_mode.value,
-            "supports_hyperparameter_tuning": entry.supports_hyperparameter_tuning,
-        }
-        if detail_query:
-            payload.update(
-                {
-                    "summary_metric_name": entry.summary_metric_name,
-                    "requires_target": entry.requires_target,
-                    "train_role_schema": entry.train_role_schema.model_dump(mode="json"),
-                    "apply_role_schema": entry.apply_role_schema.model_dump(mode="json"),
-                    "result_contract": entry.result_contract.model_dump(mode="json"),
-                }
-            )
-        if include_param_schema:
-            payload["param_schema"] = entry.param_schema
-        if include_param_grid_schema:
-            payload["param_grid_schema"] = entry.param_grid_schema
-        return payload
-
-    def _normalize_model_mapping(
-        self,
-        raw_mapping: Any,
-        *,
-        field_name: str,
-        require_hyperparameter_tuning: bool = False,
-    ) -> dict[str, Any]:
-        if raw_mapping is None:
-            return {}
-        if not isinstance(raw_mapping, dict):
-            raise ValidationError(f"{field_name} must be an object keyed by model key.")
-        normalized: dict[str, Any] = {}
-        failures: list[str] = []
-        for raw_key, value in raw_mapping.items():
-            model_key = self._canonical_model_key(str(raw_key))
-            if model_key is None:
-                failures.append(str(raw_key))
-                continue
-            if value is None:
-                value = {}
-            if not isinstance(value, dict):
-                failures.append(f"{raw_key} must map to an object")
-                continue
-            if require_hyperparameter_tuning:
-                catalog = get_model_catalog_entry(model_key)
-                if not catalog.supports_hyperparameter_tuning:
-                    failures.append(f"{raw_key} lacks hyperparameter_tuning support")
-                    continue
-            normalized[model_key] = value
-        if failures:
-            raise ValidationError(self._model_key_error_message(field_name, failures))
-        return normalized
-
-    def _normalize_model_keys(
-        self,
-        raw_keys: list[str],
-        *,
-        field_name: str,
-        require_hyperparameter_tuning: bool = False,
-    ) -> list[str]:
-        normalized: list[str] = []
-        failures: list[str] = []
-        for raw_key in raw_keys:
-            model_key = self._canonical_model_key(raw_key)
-            if model_key is None:
-                failures.append(raw_key)
-                continue
-            if require_hyperparameter_tuning:
-                catalog = get_model_catalog_entry(model_key)
-                if not catalog.supports_hyperparameter_tuning:
-                    failures.append(f"{raw_key} lacks hyperparameter_tuning support")
-                    continue
-            if model_key not in normalized:
-                normalized.append(model_key)
-        if failures:
-            raise ValidationError(self._model_key_error_message(field_name, failures))
-        return normalized
-
-    def _canonical_model_key(self, raw_key: str) -> str | None:
-        value = raw_key.strip()
-        available = set(list_model_keys())
-        if value in available:
-            return value
-        lowered = value.lower()
-        if lowered in available:
-            return lowered
-        for token in self._model_key_alias_tokens(value):
-            aliased = self._model_key_aliases.get(token)
-            if aliased in available:
-                return aliased
-        return None
-
-    def _build_model_key_aliases(self) -> dict[str, str]:
-        aliases: dict[str, str] = {}
-        priorities: dict[str, int] = {}
-        for entry in list_model_catalog():
-            priority = self._model_alias_priority(entry)
-            for token in self._model_entry_alias_tokens(entry):
-                if priority < priorities.get(token, 100):
-                    aliases[token] = entry.model_key
-                    priorities[token] = priority
-        aliases.update(_MODEL_KEY_ALIAS_OVERRIDES)
-        return aliases
-
-    def _model_entry_alias_tokens(self, entry: ModelCatalogEntry) -> set[str]:
-        leaf_key = entry.model_key.split(".", 1)[-1]
-        values = {
-            entry.model_key,
-            entry.model_key.replace(".", "_"),
-            leaf_key,
-            entry.display_name,
-            f"{entry.evaluation_kind.value}_{leaf_key}",
-            f"{entry.model_family.value}_{leaf_key}",
-            f"{entry.model_task_kind.value}_{leaf_key}",
-        }
-        if entry.problem_kind is not None:
-            values.add(f"{entry.problem_kind.value}_{leaf_key}")
-        tokens: set[str] = set()
-        for value in values:
-            for token in self._model_key_alias_tokens(value):
-                tokens.add(token)
-                stripped = self._strip_model_alias_suffix(token)
-                if stripped:
-                    tokens.update(self._model_key_alias_tokens(stripped))
-        return tokens
-
-    def _model_alias_priority(self, entry: ModelCatalogEntry) -> int:
-        if entry.evaluation_kind is EvaluationKind.REGRESSION:
-            return 0
-        if entry.evaluation_kind is EvaluationKind.CLASSIFICATION:
-            return 1
-        task_order = {
-            ModelTaskKind.SEGMENTER: 2,
-            ModelTaskKind.TEXT_ANALYZER: 3,
-            ModelTaskKind.RETRIEVER: 4,
-            ModelTaskKind.ANOMALY_SCORER: 5,
-            ModelTaskKind.RULE_MINER: 6,
-            ModelTaskKind.RECOMMENDER: 7,
-        }
-        return task_order.get(entry.model_task_kind, 100)
-
-    def _model_key_alias_tokens(self, value: str) -> list[str]:
-        token = "".join(char.lower() if char.isalnum() else "_" for char in value).strip("_")
-        while "__" in token:
-            token = token.replace("__", "_")
-        if not token:
-            return []
-        compact = token.replace("_", "")
-        return [token] if compact == token else [token, compact]
-
-    def _strip_model_alias_suffix(self, token: str) -> str:
-        parts = token.split("_")
-        if len(parts) > 1 and parts[-1] in _MODEL_ALIAS_SUFFIXES:
-            return "_".join(parts[:-1])
-        return ""
-
-    def _model_key_error_message(self, field_name: str, failures: list[str]) -> str:
-        return (
-            f"{field_name} contains unsupported model keys: {', '.join(failures)}. "
-            "Call model.metadata to inspect available canonical model keys. "
-            f"Available keys: {', '.join(list_model_keys())}."
-        )
-
-    def _slug(self, value: str) -> str:
-        normalized = "".join(char.lower() if char.isalnum() else "-" for char in value).strip("-")
-        return normalized or "dataset"

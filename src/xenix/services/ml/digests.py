@@ -8,6 +8,26 @@ from typing import Any, Iterable
 import numpy as np
 
 
+def sha256_json(
+    value: Any,
+    *,
+    default: Any = None,
+    allow_nan: bool = True,
+) -> str:
+    """Return the one canonical sha256 over a compact JSON representation."""
+
+    kwargs: dict[str, Any] = {
+        "ensure_ascii": False,
+        "separators": (",", ":"),
+        "sort_keys": True,
+    }
+    if default is not None:
+        kwargs["default"] = default
+    if not allow_nan:
+        kwargs["allow_nan"] = False
+    return hashlib.sha256(json.dumps(value, **kwargs).encode("utf-8")).hexdigest()
+
+
 def prediction_digest(predictions: Iterable[Any]) -> str:
     """Return the one typed canonical digest for ordered model outputs."""
 

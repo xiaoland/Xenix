@@ -40,6 +40,7 @@ from .contracts import (
     BenchmarkInputError,
     BenchmarkMetrics,
     BenchmarkRunStatus,
+    BenchmarkTraceResult,
     JudgeResult,
     JudgeStatus,
     SemanticVerdict,
@@ -55,6 +56,7 @@ from .budgets import (
     run_isolated_call,
 )
 from .judge import judge_independence, run_judge
+from .telemetry import BenchmarkTrace, load_trace_journal
 
 
 LLM_SETTINGS_PATH_ENV = "XENIX_AGENT_BENCHMARK_LLM_SETTINGS_PATH"
@@ -74,6 +76,7 @@ class BenchmarkSettingsError(ValueError):
 class BenchmarkRun:
     result: AgentHarnessBenchmarkResult
     persisted: bool
+    output_path: Path | None = None
 
 
 @dataclass(frozen=True)
@@ -581,6 +584,7 @@ def run_benchmark(
         prefix="xenix-agent-benchmark-parent-",
         ignore_cleanup_errors=True,
     ) as temporary_parent:
+        trace_journal_path = Path(temporary_parent) / f"{run_id}.trace.jsonl"
         outcome = run_isolated_call(
             _run_model_cell,
             {
@@ -598,8 +602,13 @@ def run_benchmark(
                 "judge_configuration": judge_configuration,
                 "budget_policy": budget_policy,
                 "temporary_parent": Path(temporary_parent),
+                "trace_journal_path": trace_journal_path,
             },
             timeout_seconds=budget_policy.max_wall_seconds,
+        )
+        recovered_trace = BenchmarkTraceResult(
+            trace_id=run_id,
+            events=load_trace_journal(trace_journal_path),
         )
     if outcome.status is IsolatedCallStatus.COMPLETED and isinstance(
         outcome.value,
@@ -621,6 +630,7 @@ def run_benchmark(
             ),
             identity=cell_identity,
             failure_kind="process_wall_time_exceeded",
+            trace=recovered_trace,
         )
     else:
         result = AgentHarnessBenchmarkResult(
@@ -636,6 +646,7 @@ def run_benchmark(
             ),
             identity=cell_identity,
             failure_kind=outcome.failure_kind or "child_process_failed",
+            trace=recovered_trace,
         )
     invocation_total = (
         invocation_reported_subject_tokens
@@ -683,10 +694,12 @@ def _run_model_cell(
     judge_configuration: _JudgeConfiguration,
     budget_policy: BenchmarkBudgetPolicy,
     temporary_parent: Path,
+    trace_journal_path: Path,
 ) -> AgentHarnessBenchmarkResult:
+    trace_recorder = BenchmarkTrace(run_id, trace_journal_path)
     setup_error = _model_setup_error(settings, model_key)
     if setup_error is not None:
-        return _invalid_result(
+        result = _invalid_result(
             case_id=case.case_id,
             provider_model=model_key,
             execution_mode=execution_mode,
@@ -694,6 +707,13 @@ def _run_model_cell(
             failure_kind=setup_error,
             run_id=run_id,
             budget_policy=budget_policy,
+        )
+        return replace(
+            result,
+            trace=BenchmarkTraceResult(
+                trace_id=trace_recorder.trace_id,
+                events=trace_recorder.events,
+            ),
         )
 
     budget = BenchmarkBudgetController(budget_policy)
@@ -714,37 +734,55 @@ def _run_model_cell(
         thread_id: str | None = None
         turn_seconds = 0.0
         try:
-            cell = _open_benchmark_cell(
-                execution_mode=execution_mode,
-                paths=paths,
-                settings=settings,
-                embedding_settings=embedding_settings,
-                budget=budget,
-            )
+            with trace_recorder.span(
+                "benchmark.cell.open",
+                execution_mode=execution_mode.value,
+                provider_model=model_key,
+                runtime_home=str(paths.home),
+            ):
+                cell = _open_benchmark_cell(
+                    execution_mode=execution_mode,
+                    paths=paths,
+                    settings=settings,
+                    embedding_settings=embedding_settings,
+                    budget=budget,
+                )
             case_services = BenchmarkCaseServices(
                 datasets=cell.datasets,
                 artifacts=cell.artifacts,
             )
-            before_dataset_ids = {
-                dataset.id for dataset in cell.datasets.list_datasets()
-            }
-            title = _synthetic_title(case.case_id, model_key, run_id)
-            thread_id = cell.create_thread(title=title, fq_model_key=model_key)
-            _prepare_case(
-                case=case,
-                services=cell.preparation_services,
-            )
+            with trace_recorder.span("benchmark.case.prepare", case_id=case.case_id) as event:
+                before_dataset_ids = {
+                    dataset.id for dataset in cell.datasets.list_datasets()
+                }
+                title = _synthetic_title(case.case_id, model_key, run_id)
+                thread_id = cell.create_thread(title=title, fq_model_key=model_key)
+                event["gen_ai.conversation.id"] = thread_id
+                _prepare_case(
+                    case=case,
+                    services=cell.preparation_services,
+                )
             started_at = time.perf_counter()
             try:
-                cell.execute_submission(
-                    submission=case.build_submission(
-                        thread_id=thread_id,
-                        fq_model_key=model_key,
-                    ),
-                    measurements=measurements,
-                    case=case,
-                    services=case_services,
-                )
+                with trace_recorder.span(
+                    "benchmark.subject.execute",
+                    **{
+                        "gen_ai.operation.name": "invoke_agent",
+                        "gen_ai.request.model": model_key,
+                        "gen_ai.conversation.id": thread_id,
+                    },
+                ) as event:
+                    cell.execute_submission(
+                        submission=case.build_submission(
+                            thread_id=thread_id,
+                            fq_model_key=model_key,
+                        ),
+                        measurements=measurements,
+                        case=case,
+                        services=case_services,
+                    )
+                    event["provider_retry_count"] = measurements.provider_retry_count
+                    event["final_snapshot_seen"] = measurements.final_snapshot_seen
             except BenchmarkBudgetError as exc:
                 run_status = BenchmarkRunStatus.BUDGET_EXCEEDED
                 failure_kind = exc.code
@@ -768,26 +806,29 @@ def _run_model_cell(
             ) - before_dataset_ids
             try:
                 assessment_started_at = time.perf_counter()
-                assessment = case.assess(
-                    context=BenchmarkCaseContext(
-                        snapshot=measurements.snapshot,
-                        source_state=measurements.source_state,
-                        run_dataset_ids=run_dataset_ids,
-                        runtime_home=paths.home,
-                        settings_unchanged=(
-                            _sha256_file(settings_path) == settings_sha256
-                            and (
-                                embedding_settings_path is None
-                                or (
-                                    embedding_settings_sha256 is not None
-                                    and _sha256_file(embedding_settings_path)
-                                    == embedding_settings_sha256
+                with trace_recorder.span("benchmark.case.assess", case_id=case.case_id) as event:
+                    assessment = case.assess(
+                        context=BenchmarkCaseContext(
+                            snapshot=measurements.snapshot,
+                            source_state=measurements.source_state,
+                            run_dataset_ids=run_dataset_ids,
+                            runtime_home=paths.home,
+                            settings_unchanged=(
+                                _sha256_file(settings_path) == settings_sha256
+                                and (
+                                    embedding_settings_path is None
+                                    or (
+                                        embedding_settings_sha256 is not None
+                                        and _sha256_file(embedding_settings_path)
+                                        == embedding_settings_sha256
+                                    )
                                 )
-                            )
-                        ),
-                        services=case_services,
+                            ),
+                            services=case_services,
+                        )
                     )
-                )
+                    event["semantic_check_count"] = len(assessment.semantic_checks)
+                    event["integrity_check_count"] = len(assessment.integrity_checks)
                 assessment_seconds = time.perf_counter() - assessment_started_at
                 subject_metrics = _collect_metrics(
                     harness=cell.harness,
@@ -829,7 +870,8 @@ def _run_model_cell(
             if cell is not None:
                 case_services = None
                 try:
-                    cell.close()
+                    with trace_recorder.span("benchmark.cell.close"):
+                        cell.close()
                 except Exception as exc:
                     if run_status is BenchmarkRunStatus.COMPLETED:
                         run_status = BenchmarkRunStatus.RUNTIME_ERROR
@@ -854,12 +896,18 @@ def _run_model_cell(
                 run_status = BenchmarkRunStatus.MEASUREMENT_ERROR
                 failure_kind = "subject_usage_projection_mismatch"
         try:
-            judge_result = _evaluate_judge(
-                assessment=assessment,
-                run_status=run_status,
-                configuration=judge_configuration,
-                subject_model_key=model_key,
-            )
+            with trace_recorder.span(
+                "benchmark.judge.evaluate",
+                requested=judge_configuration.enabled,
+                provider_model=judge_configuration.model_key or "unconfigured",
+            ) as event:
+                judge_result = _evaluate_judge(
+                    assessment=assessment,
+                    run_status=run_status,
+                    configuration=judge_configuration,
+                    subject_model_key=model_key,
+                )
+                event["judge_status"] = judge_result.status.value
         except Exception:
             judge_result = JudgeResult(
                 required=bool(assessment and assessment.judge_required),
@@ -887,6 +935,10 @@ def _run_model_cell(
         judge=judge_result,
         identity=identity,
         failure_kind=failure_kind,
+        trace=BenchmarkTraceResult(
+            trace_id=trace_recorder.trace_id,
+            events=trace_recorder.events,
+        ),
     )
 
 
@@ -1155,13 +1207,13 @@ def _persist_result(
     result: AgentHarnessBenchmarkResult,
 ) -> BenchmarkRun:
     try:
-        _write_result(output_directory, result)
+        output_path = _write_result(output_directory, result)
     except OSError:
         return BenchmarkRun(result=result, persisted=False)
-    return BenchmarkRun(result=result, persisted=True)
+    return BenchmarkRun(result=result, persisted=True, output_path=output_path)
 
 
-def _write_result(output_directory: Path, result: AgentHarnessBenchmarkResult) -> None:
+def _write_result(output_directory: Path, result: AgentHarnessBenchmarkResult) -> Path:
     output_directory.mkdir(parents=True, exist_ok=True)
     file_name = "-".join(
         (
@@ -1177,6 +1229,7 @@ def _write_result(output_directory: Path, result: AgentHarnessBenchmarkResult) -
         encoding="utf-8",
     )
     temporary.replace(destination)
+    return destination.resolve()
 
 
 def _invalid_result(

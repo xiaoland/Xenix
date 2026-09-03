@@ -13,6 +13,7 @@ from xenix.services.storage.layout import (
     knowledge_root,
 )
 from xenix.services.storage.models import KnowledgeCanonicalGenerationRow
+from xenix.services.storage.repositories import KnowledgeRepository
 
 
 def test_parent_publishes_typed_worker_output_from_private_staging(
@@ -28,6 +29,7 @@ def test_parent_publishes_typed_worker_output_from_private_staging(
         paths=paths,
         session_factory=storage.session_factory,
         artifact_service=ArtifactService(storage.session_factory),
+        knowledge_repository=KnowledgeRepository(),
     )
 
     try:

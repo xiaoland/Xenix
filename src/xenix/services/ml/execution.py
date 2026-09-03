@@ -16,6 +16,10 @@ from .worker_settings import MLWorkerConfig
 
 
 WORKER_BUNDLE_VERSION = "source-v1"
+# Exhaustive set of request-JSON keys that carry local filesystem paths and must
+# be rewritten to staged remote paths before an SSH worker runs. Any new
+# path-bearing field added to a request DTO must be added here, or SSH execution
+# hands the remote host a local-only path.
 PATH_KEYS = {
     "dataset_source_path",
     "trained_model_artifact_path",

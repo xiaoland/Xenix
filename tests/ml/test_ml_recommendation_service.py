@@ -29,7 +29,7 @@ from xenix.services.ml_service import (
 from xenix.services.ml_task_service import MLTaskService
 from xenix.services.storage import StorageBootstrapService
 from xenix.services.storage.models import MLTaskArtifactKind, MLTaskStatus
-from xenix.services.trained_model_metadata import parse_trained_model_metadata
+from xenix.services.ml.trained_model_metadata import parse_trained_model_metadata
 
 
 FIXTURES = FIXTURES_ROOT / "ml_recommendation"

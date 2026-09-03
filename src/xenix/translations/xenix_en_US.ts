@@ -106,8 +106,8 @@
     <message>
         <location filename="../ui/conversation/composer.py" line="185"/>
         <location filename="../ui/conversation/composer.py" line="186"/>
-        <location filename="../ui/conversation/composer.py" line="413"/>
-        <location filename="../ui/conversation/composer.py" line="424"/>
+        <location filename="../ui/conversation/composer.py" line="414"/>
+        <location filename="../ui/conversation/composer.py" line="425"/>
         <source>Attach files</source>
         <translation>Attach files</translation>
     </message>
@@ -124,8 +124,8 @@
     </message>
     <message>
         <location filename="../ui/conversation/composer.py" line="190"/>
-        <location filename="../ui/conversation/composer.py" line="287"/>
-        <location filename="../ui/conversation/composer.py" line="298"/>
+        <location filename="../ui/conversation/composer.py" line="288"/>
+        <location filename="../ui/conversation/composer.py" line="299"/>
         <source>Stop</source>
         <translation>Stop</translation>
     </message>
@@ -140,19 +140,19 @@
         <translation>Release here to add them to the next message</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/composer.py" line="289"/>
-        <location filename="../ui/conversation/composer.py" line="295"/>
-        <location filename="../ui/conversation/composer.py" line="302"/>
+        <location filename="../ui/conversation/composer.py" line="290"/>
+        <location filename="../ui/conversation/composer.py" line="296"/>
+        <location filename="../ui/conversation/composer.py" line="303"/>
         <source>Send</source>
         <translation>Send</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/composer.py" line="300"/>
+        <location filename="../ui/conversation/composer.py" line="301"/>
         <source>Preparing attachments</source>
         <translation>Preparing attachments</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/composer.py" line="415"/>
+        <location filename="../ui/conversation/composer.py" line="416"/>
         <source>Data files (*.csv *.xlsx *.xls)</source>
         <translation>Data files (*.csv *.xlsx *.xls)</translation>
     </message>
@@ -257,14 +257,108 @@
     </message>
 </context>
 <context>
+    <name>DatasetAuditDialog</name>
+    <message>
+        <location filename="../ui/dataset_audit_dialog.py" line="143"/>
+        <source>Dataset: {name} ({dataset_id})</source>
+        <translation>Dataset: {name} ({dataset_id})</translation>
+    </message>
+    <message>
+        <location filename="../ui/dataset_audit_dialog.py" line="146"/>
+        <source>Generation: {generation}</source>
+        <translation>Generation: {generation}</translation>
+    </message>
+    <message>
+        <location filename="../ui/dataset_audit_dialog.py" line="147"/>
+        <source>Recorded operation: {operation}</source>
+        <translation>Recorded operation: {operation}</translation>
+    </message>
+    <message>
+        <location filename="../ui/dataset_audit_dialog.py" line="150"/>
+        <source>Recorded at: {created_at}</source>
+        <translation>Recorded at: {created_at}</translation>
+    </message>
+    <message>
+        <location filename="../ui/dataset_audit_dialog.py" line="156"/>
+        <location filename="../ui/dataset_audit_dialog.py" line="186"/>
+        <source>Inputs</source>
+        <translation>Inputs</translation>
+    </message>
+    <message>
+        <location filename="../ui/dataset_audit_dialog.py" line="158"/>
+        <source>{position}. {name} ({dataset_id})</source>
+        <translation>{position}. {name} ({dataset_id})</translation>
+    </message>
+    <message>
+        <location filename="../ui/dataset_audit_dialog.py" line="164"/>
+        <source>alias {alias}</source>
+        <translation>alias {alias}</translation>
+    </message>
+    <message>
+        <location filename="../ui/dataset_audit_dialog.py" line="168"/>
+        <source>Recorded parameters</source>
+        <translation>Recorded parameters</translation>
+    </message>
+    <message>
+        <location filename="../ui/dataset_audit_dialog.py" line="174"/>
+        <source>Agent-authored explanation</source>
+        <translation>Agent-authored explanation</translation>
+    </message>
+    <message>
+        <location filename="../ui/dataset_audit_dialog.py" line="175"/>
+        <source>Not system-verified.</source>
+        <translation>Not system-verified.</translation>
+    </message>
+    <message>
+        <location filename="../ui/dataset_audit_dialog.py" line="180"/>
+        <source>Session Datasets</source>
+        <translation>Session Datasets</translation>
+    </message>
+    <message>
+        <location filename="../ui/dataset_audit_dialog.py" line="183"/>
+        <source>Dataset</source>
+        <translation>Dataset</translation>
+    </message>
+    <message>
+        <location filename="../ui/dataset_audit_dialog.py" line="184"/>
+        <source>Generation</source>
+        <translation>Generation</translation>
+    </message>
+    <message>
+        <location filename="../ui/dataset_audit_dialog.py" line="185"/>
+        <source>Operation</source>
+        <translation>Operation</translation>
+    </message>
+    <message>
+        <location filename="../ui/dataset_audit_dialog.py" line="187"/>
+        <source>Recorded</source>
+        <translation>Recorded</translation>
+    </message>
+    <message>
+        <location filename="../ui/dataset_audit_dialog.py" line="191"/>
+        <source>No datasets have been produced by this conversation yet.</source>
+        <translation>No datasets have been produced by this conversation yet.</translation>
+    </message>
+    <message>
+        <location filename="../ui/dataset_audit_dialog.py" line="193"/>
+        <source>Refresh</source>
+        <translation>Refresh</translation>
+    </message>
+    <message>
+        <location filename="../ui/dataset_audit_dialog.py" line="194"/>
+        <source>Close</source>
+        <translation>Close</translation>
+    </message>
+</context>
+<context>
     <name>Exceptions</name>
     <message>
-        <location filename="../exceptions.py" line="76"/>
+        <location filename="../exceptions.py" line="82"/>
         <source>Xenix</source>
         <translation>Xenix</translation>
     </message>
     <message>
-        <location filename="../exceptions.py" line="78"/>
+        <location filename="../exceptions.py" line="84"/>
         <source>An unexpected error occurred. Check the log file for details.</source>
         <translation>An unexpected error occurred. Check the log file for details.</translation>
     </message>
@@ -280,6 +374,190 @@
         <location filename="../ui/widgets/file_drop_zone.py" line="38"/>
         <source>Supports .csv, .xlsx, and .xls</source>
         <translation>Supports .csv, .xlsx, and .xls</translation>
+    </message>
+</context>
+<context>
+    <name>JobCenterDialog</name>
+    <message>
+        <location filename="../ui/job_center.py" line="178"/>
+        <source>Jobs could not be loaded.</source>
+        <translation>Jobs could not be loaded.</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="210"/>
+        <source>%1 jobs · %2 active · %3 failed</source>
+        <translation>%1 jobs · %2 active · %3 failed</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="249"/>
+        <source>Reference: %1
+Domain: %2
+Type: %3
+Target: %4
+Status: %5
+Phase: %6
+Updated: %7</source>
+        <translation>Reference: %1
+Domain: %2
+Type: %3
+Target: %4
+Status: %5
+Phase: %6
+Updated: %7</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="262"/>
+        <source>
+Error: %1</source>
+        <translation>
+Error: %1</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="263"/>
+        <source>Job Details</source>
+        <translation>Job Details</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="267"/>
+        <location filename="../ui/job_center.py" line="297"/>
+        <source>Knowledge</source>
+        <translation>Knowledge</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="268"/>
+        <location filename="../ui/job_center.py" line="298"/>
+        <source>Machine learning</source>
+        <translation>Machine learning</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="273"/>
+        <source>Queued</source>
+        <translation>Queued</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="274"/>
+        <source>Running</source>
+        <translation>Running</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="275"/>
+        <source>Succeeded</source>
+        <translation>Succeeded</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="276"/>
+        <source>Failed</source>
+        <translation>Failed</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="277"/>
+        <source>Cancelled</source>
+        <translation>Cancelled</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="282"/>
+        <source>Import</source>
+        <translation>Import</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="283"/>
+        <source>Content preparation</source>
+        <translation>Content preparation</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="284"/>
+        <source>Index build</source>
+        <translation>Index build</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="285"/>
+        <source>Model training</source>
+        <translation>Model training</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="286"/>
+        <source>Parameter tuning</source>
+        <translation>Parameter tuning</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="287"/>
+        <source>Evaluation</source>
+        <translation>Evaluation</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="288"/>
+        <source>Apply model</source>
+        <translation>Apply model</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="294"/>
+        <source>Jobs</source>
+        <translation>Jobs</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="296"/>
+        <source>All services</source>
+        <translation>All services</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="300"/>
+        <source>All statuses</source>
+        <translation>All statuses</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="305"/>
+        <source>Search jobs</source>
+        <translation>Search jobs</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="308"/>
+        <source>Service</source>
+        <translation>Service</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="309"/>
+        <source>Type</source>
+        <translation>Type</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="310"/>
+        <source>Target</source>
+        <translation>Target</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="311"/>
+        <source>Status</source>
+        <translation>Status</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="312"/>
+        <source>Updated</source>
+        <translation>Updated</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="315"/>
+        <source>Details</source>
+        <translation>Details</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="316"/>
+        <source>Cancel</source>
+        <translation>Cancel</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="317"/>
+        <source>Refresh</source>
+        <translation>Refresh</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="318"/>
+        <source>Close</source>
+        <translation>Close</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="319"/>
+        <source>Load more</source>
+        <translation>Load more</translation>
     </message>
 </context>
 <context>
@@ -1272,24 +1550,30 @@ Trigger: %2</translation>
         <translation type="vanished">Downloading Xenix {version}...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="169"/>
+        <location filename="../ui/main_window.py" line="177"/>
         <source>Xenix Native</source>
         <translation>Xenix Native</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="170"/>
+        <location filename="../ui/main_window.py" line="178"/>
         <source>Xenix</source>
         <translation>Xenix</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="171"/>
+        <location filename="../ui/main_window.py" line="179"/>
         <source>Settings</source>
         <translation>Settings</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="172"/>
+        <location filename="../ui/main_window.py" line="180"/>
         <source>Knowledge</source>
         <translation>Knowledge</translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="181"/>
+        <location filename="../ui/windows/auxiliary.py" line="109"/>
+        <source>Jobs</source>
+        <translation>Jobs</translation>
     </message>
     <message>
         <location filename="../ui/history/panel.py" line="221"/>
@@ -1303,14 +1587,19 @@ Trigger: %2</translation>
         <translation>New thread</translation>
     </message>
     <message>
-        <location filename="../ui/windows/auxiliary.py" line="85"/>
+        <location filename="../ui/windows/auxiliary.py" line="90"/>
         <source>Knowledge Workspace</source>
         <translation>Knowledge Workspace</translation>
     </message>
     <message>
-        <location filename="../ui/windows/auxiliary.py" line="86"/>
+        <location filename="../ui/windows/auxiliary.py" line="91"/>
         <source>Knowledge services are not available.</source>
         <translation>Knowledge services are not available.</translation>
+    </message>
+    <message>
+        <location filename="../ui/windows/auxiliary.py" line="110"/>
+        <source>Job services are not available.</source>
+        <translation>Job services are not available.</translation>
     </message>
     <message>
         <location filename="../ui/chat_workspace.py" line="276"/>
@@ -1423,109 +1712,109 @@ Trigger: %2</translation>
 <context>
     <name>SettingsDialog</name>
     <message>
-        <location filename="../ui/settings/dialog.py" line="191"/>
-        <location filename="../ui/settings/dialog.py" line="317"/>
-        <location filename="../ui/settings/dialog.py" line="342"/>
-        <location filename="../ui/settings/provider.py" line="211"/>
-        <location filename="../ui/settings/provider.py" line="233"/>
+        <location filename="../ui/settings/dialog.py" line="187"/>
+        <location filename="../ui/settings/dialog.py" line="313"/>
+        <location filename="../ui/settings/dialog.py" line="338"/>
+        <location filename="../ui/settings/provider.py" line="212"/>
+        <location filename="../ui/settings/provider.py" line="234"/>
         <source>Settings</source>
         <translation>Settings</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="192"/>
+        <location filename="../ui/settings/dialog.py" line="188"/>
         <source>Language</source>
         <translation>Language</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="193"/>
+        <location filename="../ui/settings/dialog.py" line="189"/>
         <source>AI</source>
         <translation>AI</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="196"/>
+        <location filename="../ui/settings/dialog.py" line="192"/>
         <source>Knowledge Base</source>
         <translation>Knowledge Base</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="200"/>
+        <location filename="../ui/settings/dialog.py" line="196"/>
         <source>ML Workers</source>
         <translation>ML Workers</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="149"/>
+        <location filename="../ui/settings/provider.py" line="150"/>
         <source>Global models</source>
         <translation>Global models</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="150"/>
+        <location filename="../ui/settings/provider.py" line="151"/>
         <source>LLM providers</source>
         <translation>LLM providers</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="151"/>
+        <location filename="../ui/settings/provider.py" line="152"/>
         <source>Provider</source>
         <translation>Provider</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="152"/>
+        <location filename="../ui/settings/provider.py" line="153"/>
         <source>Provider key</source>
         <translation>Provider key</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="153"/>
+        <location filename="../ui/settings/provider.py" line="154"/>
         <source>Provider name</source>
         <translation>Provider name</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="154"/>
+        <location filename="../ui/settings/provider.py" line="155"/>
         <source>Dialect</source>
         <translation>Dialect</translation>
     </message>
     <message>
         <location filename="../ui/settings/embedding.py" line="101"/>
-        <location filename="../ui/settings/provider.py" line="155"/>
+        <location filename="../ui/settings/provider.py" line="156"/>
         <source>Base URL</source>
         <translation>Base URL</translation>
     </message>
     <message>
         <location filename="../ui/settings/embedding.py" line="102"/>
-        <location filename="../ui/settings/provider.py" line="156"/>
+        <location filename="../ui/settings/provider.py" line="157"/>
         <source>API key</source>
         <translation>API key</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="157"/>
+        <location filename="../ui/settings/provider.py" line="158"/>
         <source>Models</source>
         <translation>Models</translation>
     </message>
     <message>
         <location filename="../ui/settings/embedding.py" line="109"/>
-        <location filename="../ui/settings/provider.py" line="158"/>
+        <location filename="../ui/settings/provider.py" line="159"/>
         <source>Timeout</source>
         <translation>Timeout</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="159"/>
+        <location filename="../ui/settings/provider.py" line="160"/>
         <source>Streaming</source>
         <translation>Streaming</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="160"/>
+        <location filename="../ui/settings/provider.py" line="161"/>
         <source>Default model</source>
         <translation>Default model</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="161"/>
+        <location filename="../ui/settings/provider.py" line="162"/>
         <source>Turn guard model</source>
         <translation>Turn guard model</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="162"/>
+        <location filename="../ui/settings/provider.py" line="163"/>
         <source>Thread title model</source>
         <translation>Thread title model</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="163"/>
+        <location filename="../ui/settings/provider.py" line="164"/>
         <source>LLM retry attempts</source>
         <translation>LLM retry attempts</translation>
     </message>
@@ -1581,37 +1870,37 @@ Trigger: %2</translation>
         <translation>Rebuild indexes...</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="164"/>
+        <location filename="../ui/settings/provider.py" line="165"/>
         <source>Add</source>
         <translation>Add</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="165"/>
+        <location filename="../ui/settings/provider.py" line="166"/>
         <source>Remove</source>
         <translation>Remove</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="167"/>
+        <location filename="../ui/settings/provider.py" line="168"/>
         <source>OpenAI-compatible</source>
         <translation>OpenAI-compatible</translation>
     </message>
     <message>
-        <location filename="../ui/settings/ml_workers.py" line="64"/>
+        <location filename="../ui/settings/ml_workers.py" line="59"/>
         <source>ML workers</source>
         <translation>ML workers</translation>
     </message>
     <message>
-        <location filename="../ui/settings/ml_workers.py" line="65"/>
+        <location filename="../ui/settings/ml_workers.py" line="60"/>
         <source>Add SSH worker...</source>
         <translation>Add SSH worker...</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="207"/>
+        <location filename="../ui/settings/dialog.py" line="203"/>
         <source>About</source>
         <translation>About</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="208"/>
+        <location filename="../ui/settings/dialog.py" line="204"/>
         <source>Save</source>
         <translation>Save</translation>
     </message>
@@ -1682,22 +1971,22 @@ Trigger: %2</translation>
         <translation>Local PaddleOCR is not installed</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="252"/>
+        <location filename="../ui/settings/dialog.py" line="248"/>
         <source>English</source>
         <translation>English</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="253"/>
+        <location filename="../ui/settings/dialog.py" line="249"/>
         <source>Simplified Chinese</source>
         <translation>Simplified Chinese</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="277"/>
+        <location filename="../ui/settings/dialog.py" line="273"/>
         <source>Language Switch Failed</source>
         <translation>Language Switch Failed</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="278"/>
+        <location filename="../ui/settings/dialog.py" line="274"/>
         <source>Unable to switch the application language.
 
 {details}</source>
@@ -1706,33 +1995,33 @@ Trigger: %2</translation>
 {details}</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="330"/>
-        <location filename="../ui/settings/dialog.py" line="356"/>
+        <location filename="../ui/settings/dialog.py" line="326"/>
+        <location filename="../ui/settings/dialog.py" line="352"/>
         <source>Knowledge Indexes</source>
         <translation>Knowledge Indexes</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="358"/>
+        <location filename="../ui/settings/dialog.py" line="354"/>
         <source>Embedding settings were saved, but the vector rebuild could not be queued.</source>
         <translation>Embedding settings were saved, but the vector rebuild could not be queued.</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="367"/>
+        <location filename="../ui/settings/dialog.py" line="363"/>
         <source>Rebuild text vectors?</source>
         <translation>Rebuild text vectors?</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="370"/>
+        <location filename="../ui/settings/dialog.py" line="366"/>
         <source>This change uses a different embedding space. Existing text vectors cannot be reused for current Knowledge content.</source>
         <translation>This change uses a different embedding space. Existing text vectors cannot be reused for current Knowledge content.</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="375"/>
+        <location filename="../ui/settings/dialog.py" line="371"/>
         <source>Save and rebuild now</source>
         <translation>Save and rebuild now</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="379"/>
+        <location filename="../ui/settings/dialog.py" line="375"/>
         <source>Save; rebuild later</source>
         <translation>Save; rebuild later</translation>
     </message>
@@ -1742,7 +2031,7 @@ Trigger: %2</translation>
         <translation>Knowledge index service is unavailable</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="331"/>
+        <location filename="../ui/settings/dialog.py" line="327"/>
         <location filename="../ui/settings/index_status.py" line="166"/>
         <source>Knowledge index status is unavailable</source>
         <translation>Knowledge index status is unavailable</translation>
@@ -1883,7 +2172,7 @@ Text vectors: %2</translation>
         <translation>Unknown status</translation>
     </message>
     <message>
-        <location filename="../ui/settings/ml_workers.py" line="53"/>
+        <location filename="../ui/settings/ml_workers.py" line="48"/>
         <source>{local_count} local, {ssh_count} SSH, {slots} execution slot(s).</source>
         <translation>{local_count} local, {ssh_count} SSH, {slots} execution slot(s).</translation>
     </message>
@@ -1892,12 +2181,12 @@ Text vectors: %2</translation>
         <translation type="vanished">This provider is managed by a deployment and cannot be removed here.</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="322"/>
+        <location filename="../ui/settings/provider.py" line="339"/>
         <source>Built into packaged app</source>
         <translation>Built into packaged app</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="372"/>
+        <location filename="../ui/settings/provider.py" line="389"/>
         <source>None</source>
         <translation>None</translation>
     </message>
@@ -2631,12 +2920,12 @@ State file: {state_path}</translation>
         <translation>Buy license</translation>
     </message>
     <message>
-        <location filename="../app.py" line="883"/>
+        <location filename="../app.py" line="913"/>
         <source>Unable to start Xenix</source>
         <translation>Unable to start Xenix</translation>
     </message>
     <message>
-        <location filename="../app.py" line="884"/>
+        <location filename="../app.py" line="914"/>
         <source>Xenix could not finish startup.
 
 {error}</source>

@@ -87,6 +87,10 @@ class KnowledgeStorageMaintenance:
                 self._delete_metadata(row.id)
                 corrupt_deleted += 1
 
+            # A metadata row only protects its directory from orphan quarantine
+            # when its stored relative_path is self-consistent (indexes/<row.id>).
+            # A row whose path disagrees with its own id cannot be proven to own
+            # those bytes, so that directory stays eligible for quarantine.
             referenced_paths = {
                 row.relative_path
                 for row in self._list_metadata()

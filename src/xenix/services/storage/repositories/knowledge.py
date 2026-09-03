@@ -15,7 +15,7 @@ from ..models import (
     KnowledgeUnitRow,
     KnowledgeVectorGenerationRow,
 )
-from ...knowledge_projection import (
+from ..knowledge_projection import (
     CORPUS_FINGERPRINT_SCHEMA,
     KnowledgeProjectionIdentity,
     KnowledgeProjectionMetadata,
@@ -135,6 +135,12 @@ class KnowledgeRepository:
         document: KnowledgeDocumentRow,
         units: Sequence[KnowledgeUnitRow],
     ) -> None:
+        """Replace a document's units and their FTS rows in one operation.
+
+        knowledge_unit_fts is a manually-maintained FTS5 shadow table with no
+        triggers and no external-content binding: every unit insert/delete must be
+        mirrored here or keyword search silently returns stale/missing hits.
+        """
         old_ids = list(
             session.exec(
                 select(KnowledgeUnitRow.id).where(KnowledgeUnitRow.document_id == document.id)
@@ -598,6 +604,45 @@ class KnowledgeRepository:
         session.flush()
         session.refresh(row)
         return row
+
+    def list_all_imports(self, session: Session) -> list[KnowledgeImportRow]:
+        return list(
+            session.exec(
+                select(KnowledgeImportRow).order_by(KnowledgeImportRow.created_at.desc())
+            )
+        )
+
+    def get_import_retry_of(
+        self, session: Session, *, retry_of_id: str,
+    ) -> KnowledgeImportRow | None:
+        return session.exec(
+            select(KnowledgeImportRow)
+            .where(KnowledgeImportRow.retry_of == retry_of_id)
+            .order_by(KnowledgeImportRow.created_at.desc())
+        ).first()
+
+    def max_attempt_number(
+        self,
+        session: Session,
+        *,
+        planned_document_id: str,
+        excluding_import_id: str | None = None,
+    ) -> int:
+        from sqlalchemy import func
+        statement = select(func.max(KnowledgeImportRow.attempt_number)).where(
+            KnowledgeImportRow.planned_document_id == planned_document_id
+        )
+        if excluding_import_id is not None:
+            statement = statement.where(KnowledgeImportRow.id != excluding_import_id)
+        return session.exec(statement).first() or 0
+
+    def list_all_documents(self, session: Session) -> list[KnowledgeDocumentRow]:
+        return list(session.exec(select(KnowledgeDocumentRow)))
+
+    def list_all_canonical_generations(
+        self, session: Session,
+    ) -> list[KnowledgeCanonicalGenerationRow]:
+        return list(session.exec(select(KnowledgeCanonicalGenerationRow)))
 
     def create_canonical_generation(
         self,

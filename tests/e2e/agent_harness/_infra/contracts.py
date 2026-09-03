@@ -12,6 +12,7 @@ from .budgets import (
     BenchmarkBudgetSnapshot,
     BenchmarkBudgetStatus,
 )
+from .telemetry import BenchmarkTraceEvent
 
 
 class BenchmarkRunStatus(StrEnum):
@@ -323,6 +324,20 @@ class BenchmarkIdentity:
 
 
 @dataclass(frozen=True)
+class BenchmarkTraceResult:
+    """Correlated lifecycle evidence for debugging one isolated cell."""
+
+    trace_id: str
+    events: tuple[BenchmarkTraceEvent, ...] = ()
+
+    def to_payload(self) -> dict[str, Any]:
+        return {
+            "trace_id": self.trace_id,
+            "events": [event.to_payload() for event in self.events],
+        }
+
+
+@dataclass(frozen=True)
 class AgentHarnessBenchmarkResult:
     case_id: str
     run_id: str
@@ -342,6 +357,7 @@ class AgentHarnessBenchmarkResult:
     judge: JudgeResult = field(default_factory=JudgeResult)
     identity: BenchmarkIdentity = field(default_factory=BenchmarkIdentity)
     failure_kind: str | None = None
+    trace: BenchmarkTraceResult | None = None
     schema_version: int = 5
 
     @property
@@ -383,6 +399,7 @@ class AgentHarnessBenchmarkResult:
             "budget": self.budget.to_payload(),
             "identity": self.identity.to_payload(),
             "failure_kind": self.failure_kind,
+            "trace": self.trace.to_payload() if self.trace is not None else None,
         }
 
 

@@ -11,7 +11,12 @@ from ..services.knowledge_index_service import (
 
 
 class KnowledgeIndexStatusRequest(QObject):
-    """Bridge a service-owned status Future back onto the Qt event loop."""
+    """Bridge a service-owned status Future back onto the Qt event loop.
+
+    generation is a caller-supplied token echoed back in finished so the consumer
+    can discard stale results. finished emits (self, generation, status) where
+    status is a KnowledgeIndexOverview on success and None if the service raised.
+    """
 
     finished = Signal(object, int, object)
 

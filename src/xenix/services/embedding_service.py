@@ -56,6 +56,9 @@ class EmbeddingSettings(BaseModel):
     provider_key: str = "openai"
     dialect: EmbeddingDialect = EmbeddingDialect.OPENAI_COMPATIBLE
     base_url: str = "https://api.openai.com"
+    # repr=False only hides this from repr(); EmbeddingSettingsService.save()
+    # serializes it in plaintext via model_dump_json, so the key is NOT redacted
+    # at rest.
     api_key: str = Field(default="", repr=False)
     model: str = "text-embedding-3-small"
     dimensions: int | None = Field(

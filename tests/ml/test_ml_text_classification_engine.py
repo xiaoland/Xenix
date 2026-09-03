@@ -14,7 +14,6 @@ from xenix.services.ml.models.text_analysis import (
     MultilingualTextClassificationService,
     MultilingualTextClassificationParams,
     MultilingualTextClassifier,
-    TokenizedTextClassificationService,
 )
 from xenix.services.ml.contracts import (
     ApplyInputFile,
@@ -187,10 +186,8 @@ def test_raw_apply_reports_empty_and_oov_rows_without_changing_the_retained_spec
     assert classifier.preparer.specification.specification_digest == before_digest
 
 
-def test_active_and_legacy_keys_have_distinct_persisted_semantics() -> None:
+def test_active_keys_have_distinct_persisted_semantics() -> None:
     assert MultilingualTextClassificationService.key == "text.classification.multilingual_logistic_regression_tfidf"
-    assert TokenizedTextClassificationService.key == "text.classification.logistic_regression_tfidf"
-    assert MultilingualTextClassificationService.key != TokenizedTextClassificationService.key
     assert MultilingualTextClassificationService.supports_hyperparameter_tuning is False
     assert MultilingualTextClassificationService.result_contract is not None
     assert MultilingualTextClassificationService.result_contract.train_result_kinds == ["model", "metrics", "report"]

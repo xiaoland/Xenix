@@ -8,7 +8,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import sessionmaker
@@ -44,12 +44,13 @@ from .knowledge_pipeline import (
     FileProbeResult,
     FormatNormalizer,
     ParserRouter,
-    _find_libreoffice,
 )
 from .knowledge_task_logs import KnowledgeTaskLogEntry, KnowledgeTaskLogStore
+from .storage.repositories import KnowledgeRepository
 from .storage.models import (
     ArtifactKind,
     ArtifactRow,
+    JobDomain,
     KnowledgeCanonicalGenerationRow,
     KnowledgeDocumentRow,
     KnowledgeImportRow,
@@ -57,6 +58,9 @@ from .storage.models import (
     utc_now,
 )
 from .storage.layout import knowledge_root
+
+if TYPE_CHECKING:
+    from .job_scheduler import JobScheduler
 
 _STOP = object()
 LOGGER = logging.getLogger(__name__)
@@ -66,10 +70,23 @@ _TERMINAL_IMPORT_STATUSES = frozenset(
 _SAFE_IMPORT_ERRORS = {
     "knowledge_password_required": "A password is required to continue this import.",
     "knowledge_password_invalid": "The document password was not accepted.",
-    "knowledge_doc_converter_unavailable": "LibreOffice is required to import this DOC file.",
-    "knowledge_doc_conversion_failed": "The DOC file could not be converted.",
-    "knowledge_ppt_converter_unavailable": "LibreOffice is required to import this PPT file.",
-    "knowledge_ppt_conversion_failed": "The PPT file could not be converted.",
+    "knowledge_anydoc_dependency_failed": "The local document parser is unavailable.",
+    "knowledge_anydoc_conversion_failed": "The document could not be parsed.",
+    "knowledge_anydoc_malformed": "The document is malformed.",
+    "knowledge_anydoc_resource_limit": "The document exceeds parser resource limits.",
+    "knowledge_anydoc_unsupported": "The document uses unsupported features.",
+    "knowledge_anydoc_output_invalid": "The document parser returned invalid content.",
+    "knowledge_anydoc_output_limit": "The parsed document exceeds supported limits.",
+    "knowledge_package_invalid": "The document package is invalid.",
+    "knowledge_package_entry_limit": "The document package contains too many entries.",
+    "knowledge_package_entries_ambiguous": "The document package contains ambiguous entries.",
+    "knowledge_package_entry_encrypted": "The document package contains an unsupported encrypted entry.",
+    "knowledge_package_entry_unsafe": "The document package contains an unsafe entry.",
+    "knowledge_package_path_unsafe": "The document package contains an unsafe path.",
+    "knowledge_package_size_invalid": "The document package contains invalid size metadata.",
+    "knowledge_package_entry_too_large": "A document package entry is too large.",
+    "knowledge_package_expansion_limit": "The expanded document package is too large.",
+    "knowledge_package_compression_ratio": "The document package compression ratio is unsafe.",
     "knowledge_format_unsupported": "This file type is not supported by the Knowledge Library.",
     "knowledge_format_mismatch": "The file signature does not match its extension.",
     "knowledge_pdf_invalid": "The PDF is structurally invalid.",
@@ -156,20 +173,24 @@ class KnowledgeImportService:
         paths: AppPaths,
         session_factory: sessionmaker,
         artifact_service: ArtifactService,
+        knowledge_repository: KnowledgeRepository,
         worker_runner: KnowledgeImportWorkerRunner | None = None,
         canonical_ready_notifier: Callable[[str, str, str | None], object] | None = None,
         corpus_changed_notifier: Callable[[str], object] | None = None,
         start_worker: bool = True,
+        scheduler: JobScheduler | None = None,
     ) -> None:
         self._paths = paths
         self._session_factory = session_factory
         self._artifacts = artifact_service
+        self._knowledge_repo = knowledge_repository
         self._store = KnowledgeContentStore(paths)
         self._task_logs = KnowledgeTaskLogStore(paths)
         self._probe = FileProbe()
         self._worker_runner = worker_runner or LocalKnowledgeImportWorkerRunner()
         self._canonical_ready_notifier = canonical_ready_notifier
         self._corpus_changed_notifier = corpus_changed_notifier
+        self._scheduler = scheduler
         self._queue: queue.Queue[str | object] = queue.Queue()
         self._passwords: dict[str, str] = {}
         self._password_lock = threading.Lock()
@@ -179,19 +200,17 @@ class KnowledgeImportService:
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self.cleanup_storage_orphans()
-        pending = self._recover_imports()
-        if start_worker:
-            self._thread = threading.Thread(
-                target=self._worker_main,
-                name="xenix-knowledge-import",
-                daemon=True,
-            )
-            self._thread.start()
-            for import_id in pending:
-                self._queue.put(import_id)
-
-    def preflight_import(self, source_path: Path) -> FileProbeResult:
-        return self._probe.probe(source_path)
+        if scheduler is None:
+            pending = self.recover_pending()
+            if start_worker:
+                self._thread = threading.Thread(
+                    target=self._worker_main,
+                    name="xenix-knowledge-import",
+                    daemon=True,
+                )
+                self._thread.start()
+                for import_id in pending:
+                    self._queue.put(import_id)
 
     def enqueue_file(self, source_path: Path, *, password: str | None = None) -> KnowledgeImportReceipt:
         source = source_path.expanduser().resolve()
@@ -225,12 +244,12 @@ class KnowledgeImportService:
                 source_artifact_id=None,
                 retryable=False,
             )
-            session.add(row)
+            self._knowledge_repo.save_import(session, row)
             session.commit()
         self._remember_source_path(import_id, source)
         self._remember_password(import_id, password)
         self._log_event(import_id, phase="queued", event_code="import_queued")
-        self._queue.put(import_id)
+        self._submit(import_id)
         return KnowledgeImportReceipt(import_id, "queued", False)
 
     def import_file(
@@ -265,7 +284,7 @@ class KnowledgeImportService:
         source_path: Path | None = None,
     ) -> KnowledgeImportReceipt:
         with self._mutation_lock, self._session_factory() as session:
-            previous = session.get(KnowledgeImportRow, import_id)
+            previous = self._knowledge_repo.get_import(session, import_id)
             if previous is None:
                 raise ValidationError("Knowledge import attempt was not found.")
             if previous.status not in {"failed", "needs_attention", "cancelled"} or not previous.retryable:
@@ -273,11 +292,9 @@ class KnowledgeImportService:
                     "Knowledge import attempt is not retryable.",
                     error_code="knowledge_import_not_retryable",
                 )
-            existing_retry = session.exec(
-                select(KnowledgeImportRow)
-                .where(KnowledgeImportRow.retry_of == previous.id)
-                .order_by(KnowledgeImportRow.created_at.desc())
-            ).first()
+            existing_retry = self._knowledge_repo.get_import_retry_of(
+                session, retry_of_id=previous.id,
+            )
             if existing_retry is not None:
                 return KnowledgeImportReceipt(
                     existing_retry.id,
@@ -351,19 +368,19 @@ class KnowledgeImportService:
                 source_artifact_id=previous.source_artifact_id if reuse_snapshot else None,
                 retryable=False,
             )
-            session.add(row)
+            self._knowledge_repo.save_import(session, row)
             session.commit()
             session.refresh(row)
         if source_reference is not None:
             self._remember_source_path(row.id, source_reference)
         self._remember_password(row.id, password)
         self._log_event(row.id, phase="queued", event_code="import_retry_queued")
-        self._queue.put(row.id)
+        self._submit(row.id)
         return KnowledgeImportReceipt(row.id, row.status, False)
 
     def cancel_import(self, import_id: str) -> bool:
         with self._session_factory() as session:
-            row = session.get(KnowledgeImportRow, import_id)
+            row = self._knowledge_repo.get_import(session, import_id)
             if row is None or row.status in _TERMINAL_IMPORT_STATUSES:
                 return False
             row.cancel_requested = True
@@ -374,7 +391,7 @@ class KnowledgeImportService:
                 row.error_summary = _SAFE_IMPORT_ERRORS["knowledge_import_cancelled"]
                 row.retryable = True
             row.updated_at = utc_now()
-            session.add(row)
+            self._knowledge_repo.save_import(session, row)
             session.commit()
             self._log_event(
                 import_id,
@@ -386,11 +403,7 @@ class KnowledgeImportService:
 
     def list_imports(self) -> list[KnowledgeImportView]:
         with self._session_factory() as session:
-            rows = list(
-                session.exec(
-                    select(KnowledgeImportRow).order_by(KnowledgeImportRow.created_at.desc())
-                )
-            )
+            rows = self._knowledge_repo.list_all_imports(session)
         return [
             KnowledgeImportView(
                 import_id=row.id,
@@ -555,19 +568,17 @@ class KnowledgeImportService:
         now = utc_now()
         try:
             with self._session_factory() as session:
-                row = session.get(KnowledgeImportRow, import_id)
+                row = self._knowledge_repo.get_import(session, import_id)
                 if row is None:
                     return
                 if row.cancel_requested:
                     self._mark_cancelled(row, session)
                     return
-                existing = session.exec(
-                    select(KnowledgeDocumentRow).where(
-                        KnowledgeDocumentRow.library_id == row.library_id,
-                        KnowledgeDocumentRow.source_sha256 == row.source_sha256,
-                        KnowledgeDocumentRow.active.is_(True),
-                    )
-                ).first()
+                existing = self._knowledge_repo.get_document_by_source_sha256(
+                    session,
+                    library_id=row.library_id,
+                    source_sha256=row.source_sha256,
+                )
                 if existing is not None:
                     row.planned_document_id = existing.id
                     row.attempt_number = self._next_attempt_number(
@@ -582,7 +593,7 @@ class KnowledgeImportService:
                     row.source_artifact_id = existing.source_artifact_id
                     row.reused_existing = True
                     row.updated_at = now
-                    session.add(row)
+                    self._knowledge_repo.save_import(session, row)
                     session.commit()
                     self._log_event(
                         import_id,
@@ -602,10 +613,7 @@ class KnowledgeImportService:
                     retrieval_generation_id=None,
                     retrieval_status="pending",
                 )
-                session.add(document)
-                # These rows intentionally have no ORM relationships.  Flush each
-                # authority before inserting the row whose fixed FK names it.
-                session.flush()
+                document = self._knowledge_repo.create_document(session, document)
                 generation = KnowledgeCanonicalGenerationRow(
                     id=generation_id,
                     document_id=document.id,
@@ -624,8 +632,7 @@ class KnowledgeImportService:
                     warnings_payload=list(result.warnings),
                     compatibility_state="verified",
                 )
-                session.add(generation)
-                session.flush()
+                self._knowledge_repo.create_canonical_generation(session, generation)
                 row.status = "canonical_ready"
                 row.phase = "completed"
                 row.document_id = document.id
@@ -636,7 +643,7 @@ class KnowledgeImportService:
                 row.error_summary = None
                 row.retryable = False
                 row.updated_at = now
-                session.add(row)
+                self._knowledge_repo.save_import(session, row)
                 session.commit()
         except IntegrityError:
             self._converge_duplicate(import_id)
@@ -664,7 +671,7 @@ class KnowledgeImportService:
             event_code="source_snapshot_started",
         )
         with self._session_factory() as session:
-            row = session.get(KnowledgeImportRow, import_id)
+            row = self._knowledge_repo.get_import(session, import_id)
             if row is None or row.status == "cancelled":
                 return None
             artifact = session.get(ArtifactRow, row.source_artifact_id) if row.source_artifact_id else None
@@ -687,15 +694,15 @@ class KnowledgeImportService:
             authoritative = self._probe.probe(snapshot.path)
             self._raise_if_cancelled(import_id)
             with self._session_factory() as session:
-                row = session.get(KnowledgeImportRow, import_id)
+                row = self._knowledge_repo.get_import(session, import_id)
                 if row is None or row.status == "cancelled":
                     return None
-                existing = session.exec(
-                    select(KnowledgeDocumentRow).where(
-                        KnowledgeDocumentRow.library_id == row.library_id,
-                        KnowledgeDocumentRow.source_sha256 == snapshot.sha256,
-                    )
-                ).first()
+                existing = self._knowledge_repo.get_document_by_source_sha256(
+                    session,
+                    library_id=row.library_id,
+                    source_sha256=snapshot.sha256,
+                    include_inactive=True,
+                )
                 if existing is not None:
                     was_inactive = not existing.active
                     if was_inactive:
@@ -718,7 +725,7 @@ class KnowledgeImportService:
                     row.reused_existing = True
                     row.retryable = False
                     row.updated_at = utc_now()
-                    session.add(row)
+                    self._knowledge_repo.save_import(session, row)
                     session.commit()
                     self._log_event(
                         import_id,
@@ -761,7 +768,7 @@ class KnowledgeImportService:
                 row.source_artifact_id = artifact.id
                 row.phase = "probing"
                 row.updated_at = utc_now()
-                session.add(row)
+                self._knowledge_repo.save_import(session, row)
                 session.commit()
             self._log_event(
                 import_id,
@@ -788,7 +795,7 @@ class KnowledgeImportService:
         self._advance(import_id, status="running", phase="probing")
         self._log_event(import_id, phase="probing", event_code="source_probed")
         with self._session_factory() as session:
-            row = session.get(KnowledgeImportRow, import_id)
+            row = self._knowledge_repo.get_import(session, import_id)
             if row is None or row.status == "cancelled" or not row.source_artifact_id:
                 return None
             identity_values = {
@@ -807,7 +814,7 @@ class KnowledgeImportService:
 
     def _completed_result(self, import_id: str) -> KnowledgeImportResult | None:
         with self._session_factory() as session:
-            row = session.get(KnowledgeImportRow, import_id)
+            row = self._knowledge_repo.get_import(session, import_id)
             if row is None:
                 raise ValidationError("Knowledge import attempt was not found.")
             if row.status in {"queued", "running"}:
@@ -820,7 +827,7 @@ class KnowledgeImportService:
                 )
             canonical_path: str | None = None
             if row.canonical_generation_id:
-                generation = session.get(KnowledgeCanonicalGenerationRow, row.canonical_generation_id)
+                generation = self._knowledge_repo.get_canonical_generation(session, row.canonical_generation_id)
                 if generation is not None:
                     canonical_path = str(self._store.resolve_relative_path(generation.relative_path))
             if canonical_path is None and row.canonical_path:
@@ -841,15 +848,42 @@ class KnowledgeImportService:
                 reused_existing=row.reused_existing,
             )
 
-    def _recover_imports(self) -> list[str]:
+    def _submit(self, import_id: str) -> None:
+        if self._scheduler is not None:
+            self._scheduler.enqueue(JobDomain.KNOWLEDGE, "import", import_id)
+        elif not self._stop.is_set():
+            self._queue.put(import_id)
+
+    def run_import(self, import_id: str) -> None:
+        try:
+            self._process_import(import_id)
+        except Exception as exc:
+            LOGGER.exception(
+                "Knowledge import attempt failed",
+                extra={"event_name": "knowledge.import.failed", "import_id": import_id},
+            )
+            self._record_failure(import_id, exc)
+        finally:
+            self._store.discard_staged_canonical_bundle(import_id)
+
+    def run_unit(self, import_id: str) -> None:
+        self.run_import(import_id)
+
+    def job_outcome(self, import_id: str) -> tuple[str, str | None]:
+        with self._session_factory() as session:
+            row = self._knowledge_repo.get_import(session, import_id)
+            if row is None:
+                return ("failed", "Knowledge import is missing.")
+            return (row.status, row.error_summary)
+
+    def cancel_unit(self, import_id: str) -> None:
+        self.cancel_import(import_id)
+
+    def recover_pending(self) -> list[str]:
         pending: list[str] = []
         with self._session_factory() as session:
-            rows = list(
-                session.exec(
-                    select(KnowledgeImportRow)
-                    .where(KnowledgeImportRow.status.in_(["queued", "running"]))
-                    .order_by(KnowledgeImportRow.created_at)
-                )
+            rows = self._knowledge_repo.list_imports_by_status(
+                session, statuses=["queued", "running"],
             )
             for row in rows:
                 artifact = session.get(ArtifactRow, row.source_artifact_id) if row.source_artifact_id else None
@@ -875,7 +909,7 @@ class KnowledgeImportService:
                     row.error_summary = None
                     pending.append(row.id)
                 row.updated_at = utc_now()
-                session.add(row)
+                self._knowledge_repo.save_import(session, row)
             session.commit()
         return pending
 
@@ -886,9 +920,9 @@ class KnowledgeImportService:
         canonical_paths: list[str] = []
         source_paths: list[str] = []
         with self._session_factory() as session:
-            imports = list(session.exec(select(KnowledgeImportRow)))
-            documents = list(session.exec(select(KnowledgeDocumentRow)))
-            generations = list(session.exec(select(KnowledgeCanonicalGenerationRow)))
+            imports = self._knowledge_repo.list_all_imports(session)
+            documents = self._knowledge_repo.list_all_documents(session)
+            generations = self._knowledge_repo.list_all_canonical_generations(session)
             registered_artifacts = list(session.exec(select(ArtifactRow)))
             source_artifact_ids = {
                 artifact_id
@@ -940,13 +974,13 @@ class KnowledgeImportService:
 
     def _advance(self, import_id: str, *, status: str, phase: str) -> None:
         with self._session_factory() as session:
-            row = session.get(KnowledgeImportRow, import_id)
+            row = self._knowledge_repo.get_import(session, import_id)
             if row is None or row.status == "cancelled":
                 return
             row.status = status
             row.phase = phase
             row.updated_at = utc_now()
-            session.add(row)
+            self._knowledge_repo.save_import(session, row)
             session.commit()
 
     def _handle_worker_event(
@@ -992,7 +1026,7 @@ class KnowledgeImportService:
 
     def _cancel_requested(self, import_id: str) -> bool:
         with self._session_factory() as session:
-            row = session.get(KnowledgeImportRow, import_id)
+            row = self._knowledge_repo.get_import(session, import_id)
             return bool(
                 row is None
                 or row.cancel_requested
@@ -1001,7 +1035,7 @@ class KnowledgeImportService:
 
     def _mark_import_cancelled(self, import_id: str) -> None:
         with self._session_factory() as session:
-            row = session.get(KnowledgeImportRow, import_id)
+            row = self._knowledge_repo.get_import(session, import_id)
             if row is None or row.status in {
                 "canonical_ready",
                 "retrieval_ready",
@@ -1018,20 +1052,19 @@ class KnowledgeImportService:
 
     def _raise_if_cancelled(self, import_id: str) -> None:
         with self._session_factory() as session:
-            row = session.get(KnowledgeImportRow, import_id)
+            row = self._knowledge_repo.get_import(session, import_id)
             if row is not None and row.cancel_requested:
                 self._mark_cancelled(row, session)
                 raise _ImportCancelled
 
-    @staticmethod
-    def _mark_cancelled(row: KnowledgeImportRow, session) -> None:
+    def _mark_cancelled(self, row: KnowledgeImportRow, session) -> None:
         row.status = "cancelled"
         row.phase = "cancelled"
         row.error_code = "knowledge_import_cancelled"
         row.error_summary = _SAFE_IMPORT_ERRORS["knowledge_import_cancelled"]
         row.retryable = True
         row.updated_at = utc_now()
-        session.add(row)
+        self._knowledge_repo.save_import(session, row)
         session.commit()
 
     def _record_failure(self, import_id: str, exc: Exception) -> None:
@@ -1043,14 +1076,10 @@ class KnowledgeImportService:
         needs_attention = code in {
             "knowledge_password_required",
             "knowledge_password_invalid",
-            "knowledge_doc_converter_unavailable",
-            "knowledge_doc_conversion_failed",
-            "knowledge_ppt_converter_unavailable",
-            "knowledge_ppt_conversion_failed",
             "knowledge_source_reselection_required",
         }
         with self._session_factory() as session:
-            row = session.get(KnowledgeImportRow, import_id)
+            row = self._knowledge_repo.get_import(session, import_id)
             if row is None or row.status in {
                 "cancelled",
                 "canonical_ready",
@@ -1064,7 +1093,7 @@ class KnowledgeImportService:
             row.error_summary = _SAFE_IMPORT_ERRORS.get(code, _SAFE_IMPORT_ERRORS["knowledge_import_failed"])
             row.retryable = bool(getattr(exc, "retryable", False) or needs_attention)
             row.updated_at = utc_now()
-            session.add(row)
+            self._knowledge_repo.save_import(session, row)
             session.commit()
         self._log_event(
             import_id,
@@ -1075,16 +1104,14 @@ class KnowledgeImportService:
 
     def _converge_duplicate(self, import_id: str) -> None:
         with self._session_factory() as session:
-            row = session.get(KnowledgeImportRow, import_id)
+            row = self._knowledge_repo.get_import(session, import_id)
             if row is None or not row.source_sha256:
                 return
-            existing = session.exec(
-                select(KnowledgeDocumentRow).where(
-                    KnowledgeDocumentRow.library_id == row.library_id,
-                    KnowledgeDocumentRow.source_sha256 == row.source_sha256,
-                    KnowledgeDocumentRow.active.is_(True),
-                )
-            ).first()
+            existing = self._knowledge_repo.get_document_by_source_sha256(
+                session,
+                library_id=row.library_id,
+                source_sha256=row.source_sha256,
+            )
             if existing is None:
                 raise ValidationError("Concurrent Knowledge publication did not converge.")
             row.planned_document_id = existing.id
@@ -1100,7 +1127,7 @@ class KnowledgeImportService:
             row.source_artifact_id = existing.source_artifact_id
             row.reused_existing = True
             row.updated_at = utc_now()
-            session.add(row)
+            self._knowledge_repo.save_import(session, row)
             session.commit()
         self._log_event(
             import_id,
@@ -1108,22 +1135,18 @@ class KnowledgeImportService:
             event_code="document_reused",
         )
 
-    @staticmethod
     def _next_attempt_number(
+        self,
         session,
         *,
         planned_document_id: str,
         excluding_import_id: str | None = None,
     ) -> int:
-        statement = select(KnowledgeImportRow.attempt_number).where(
-            KnowledgeImportRow.planned_document_id == planned_document_id
-        )
-        if excluding_import_id is not None:
-            statement = statement.where(KnowledgeImportRow.id != excluding_import_id)
-        latest = session.exec(
-            statement.order_by(KnowledgeImportRow.attempt_number.desc())
-        ).first()
-        return int(latest or 0) + 1
+        return self._knowledge_repo.max_attempt_number(
+            session,
+            planned_document_id=planned_document_id,
+            excluding_import_id=excluding_import_id,
+        ) + 1
 
     def _remember_password(self, import_id: str, password: str | None) -> None:
         if password:
@@ -1186,5 +1209,4 @@ __all__ = [
     "KnowledgeImportView",
     "ParserRouter",
     "SUPPORTED_KNOWLEDGE_SUFFIXES",
-    "_find_libreoffice",
 ]

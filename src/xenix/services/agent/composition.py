@@ -20,6 +20,7 @@ if TYPE_CHECKING:
     from ..artifact_service import ArtifactService
     from ..dataset_service import DatasetService
     from ..embedding_service import EmbeddingService, EmbeddingSettingsService
+    from ..job_scheduler import JobScheduler
     from ..knowledge_semantic_service import KnowledgeSemanticService
     from ..llm import LLMService
     from ..knowledge_service import KnowledgeService
@@ -90,6 +91,7 @@ class HeadlessAgentServices:
     embedding_settings: EmbeddingSettingsService
     embedding: EmbeddingService
     knowledge_semantic: KnowledgeSemanticService
+    scheduler: JobScheduler
 
 
 def build_headless_agent_services(
@@ -149,11 +151,17 @@ def build_headless_agent_services(
         paths,
         worker_settings_service=ml_worker_settings,
     )
+    from ..job_scheduler import JobScheduler
+    from ..ml_job_handler import MLJobHandler
+
+    scheduler = JobScheduler(session_factory, [MLJobHandler(ml_task_service)])
+    scheduler.start()
     ml = LazyMLService(
         paths=paths,
         session_factory=session_factory,
         dataset_service=datasets,
         ml_task_service=ml_task_service,
+        scheduler=scheduler,
     )
     artifacts = ArtifactService(session_factory)
     embedding = OpenAICompatibleEmbeddingService(embedding_settings_service)
@@ -175,9 +183,12 @@ def build_headless_agent_services(
         ml_service=ml,
         artifact_service=artifacts,
     )
-    llm_tools = LLMToolRegistry()
+    llm_tools = LLMToolRegistry(
+        paged_results_dir=paths.state / "paged_results",
+    )
     concrete_tools.register_with_llm(llm_tools)
     register_knowledge_lookup_tool(llm_tools, knowledge)
+    llm_tools.collect_garbage(max_age_seconds=7 * 24 * 60 * 60)
 
     skill_catalog = AgentSkillCatalog.from_default_catalog()
     conversation = LLMConversationService(
@@ -218,6 +229,7 @@ def build_headless_agent_services(
         embedding_settings=embedding_settings_service,
         embedding=embedding,
         knowledge_semantic=semantic_knowledge,
+        scheduler=scheduler,
     )
 
 

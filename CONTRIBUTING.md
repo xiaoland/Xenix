@@ -61,6 +61,8 @@
   Environment rules.
 - `pdm run benchmark-agent-harness-check` runs the provider-free safety,
   report-policy, and Judge-calibration checks owned by the Agent benchmark.
+- Every live benchmark summary prints a trace id and absolute JSON report path;
+  inspect its lifecycle events and exception chain before rerunning a paid cell.
 - `pdm run benchmark-agent-harness -- --collect-only -q` and the headed variant
   verify the same live-case catalog without provider calls.
 - A paid Agent benchmark is run only after the matching service selector and

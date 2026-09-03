@@ -78,6 +78,9 @@ def resolve_startup_locale(paths: AppPaths, *, system_locale: str | None = None)
 
 
 class TranslationManager:
+    # QTranslator installs are QApplication-global, not per-manager. Track the
+    # live translator by app id so managers sharing one QApplication (windows,
+    # tests) replace each other's translator instead of leaking stale installs.
     _active_translators: ClassVar[dict[int, QTranslator]] = {}
 
     def __init__(self, app: QApplication, paths: AppPaths) -> None:

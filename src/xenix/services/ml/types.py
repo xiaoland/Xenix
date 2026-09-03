@@ -422,19 +422,31 @@ class ModelServiceBase(ABC):
     @classmethod
     @abstractmethod
     def fit(cls, request: FitTaskRequest, task_dir: Path) -> FitTaskResult:
+        """Train on the request's split; persist model/holdout/report artifacts
+        under task_dir and return FitTaskResult.
+        """
         raise NotImplementedError
 
     @classmethod
     @abstractmethod
     def tune(cls, request: HyperparameterTuningTaskRequest, task_dir: Path) -> HyperparameterTuningTaskResult:
+        """Run hyperparameter search; persist the tuned model and holdout artifacts
+        under task_dir and return HyperparameterTuningTaskResult.
+        """
         raise NotImplementedError
 
     @classmethod
     @abstractmethod
     def evaluate(cls, request: EvaluateTaskRequest, task_dir: Path) -> EvaluateTaskResult:
+        """Load the retained model and holdout artifacts referenced by the request
+        and return metrics and comparison without retraining.
+        """
         raise NotImplementedError
 
     @classmethod
     @abstractmethod
     def apply(cls, request: ApplyTaskRequest, task_dir: Path) -> ApplyTaskResult:
+        """Load the retained model, write predictions under task_dir, and return
+        ApplyTaskResult with the output path and summary.
+        """
         raise NotImplementedError

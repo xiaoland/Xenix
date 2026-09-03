@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from PyInstaller.utils.hooks import collect_all, collect_data_files, collect_dynamic_libs
+from PyInstaller.utils.hooks import copy_metadata, collect_all, collect_data_files, collect_dynamic_libs
 
 
 project_root = Path.cwd()
@@ -22,6 +22,7 @@ knowledge_binaries = []
 knowledge_datas = []
 knowledge_hiddenimports = []
 for package_name in (
+    "anydoc",
     "docling",
     "docling_core",
     "docling_ibm_models",
@@ -36,6 +37,8 @@ for package_name in (
     knowledge_datas += package_datas
     knowledge_binaries += package_binaries
     knowledge_hiddenimports += package_hiddenimports
+
+knowledge_datas += copy_metadata("firecrawl-anydoc")
 
 
 def collect_xenix_worker_source():

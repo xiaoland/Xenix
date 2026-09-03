@@ -34,7 +34,7 @@ from xenix.services.ml_service import (
 from xenix.services.ml_task_service import MLTaskService
 from xenix.services.storage import StorageBootstrapService
 from xenix.services.storage.models import MLTaskArtifactKind, MLTaskStatus
-from xenix.services.trained_model_metadata import parse_trained_model_metadata
+from xenix.services.ml.trained_model_metadata import parse_trained_model_metadata
 
 
 FIXTURE_ROOT = FIXTURES_ROOT / "ml_text_discovery"
@@ -72,11 +72,6 @@ _TOKEN_PATTERN = re.compile(r"[a-z]+|[\u4e00-\u9fff]")
 _ACTIVE_CLUSTER_KEY = "text.clustering.multilingual_kmeans_tfidf"
 _ACTIVE_TOPIC_KEY = "text.topic_modeling.multilingual_lda"
 _ACTIVE_RETRIEVAL_KEY = "text.similarity.multilingual_tfidf_cosine"
-_LEGACY_KEYS = {
-    "text.clustering.kmeans_tfidf",
-    "text.topic_modeling.lda",
-    "text.similarity.tfidf_cosine",
-}
 _COMMON_PARAMS = {
     "preparation_profile": "multilingual_business_v1",
     "phrase_mode": "unigram_bigram",
@@ -676,13 +671,12 @@ def test_apply_fixture_covers_semantic_oov_and_empty_boundaries() -> None:
     assert "unseen@example.com" in masked_entity_text
 
 
-def test_active_catalog_is_raw_text_authority_without_removing_legacy_keys() -> None:
+def test_active_catalog_is_raw_text_authority() -> None:
     keys = set(list_model_keys())
     assert {
         _ACTIVE_CLUSTER_KEY,
         _ACTIVE_TOPIC_KEY,
         _ACTIVE_RETRIEVAL_KEY,
-        *_LEGACY_KEYS,
     } <= keys
 
     expected = {

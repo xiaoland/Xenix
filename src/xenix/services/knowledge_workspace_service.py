@@ -115,10 +115,7 @@ class KnowledgeWorkspaceService:
             if self._ocr is None:
                 ocr = PaddleOcrStatus(PaddleOcrState.NOT_INSTALLED, "service_unavailable")
             else:
-                status_reader = getattr(self._ocr, "status_snapshot", None)
-                if status_reader is None:
-                    status_reader = self._ocr.status
-                ocr = status_reader()
+                ocr = self._ocr.status_snapshot()
                 if ocr.state is PaddleOcrState.CHECKING:
                     ocr = self._ocr.verify_active()
         except Exception:

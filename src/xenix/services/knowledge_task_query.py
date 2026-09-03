@@ -119,6 +119,9 @@ class KnowledgeTaskQueryService:
                 key=lambda item: (item.attempt_number, item.updated_at),
             )
             latest = attempts[-1] if attempts else None
+            # Fold derivation attempts into their import row only when the latest
+            # attempt failed and no earlier attempt succeeded; a prior success keeps
+            # attempts visible so a successful import is never re-attributed.
             prior_success = any(item.status == "succeeded" for item in attempts[:-1])
             if latest is not None and not prior_success:
                 folded_derivation_ids.update(item.id for item in attempts)
@@ -151,6 +154,11 @@ class KnowledgeTaskQueryService:
                     owner="derivation" if derivation_retryable else "import",
                     owner_id=latest.id if derivation_retryable and latest is not None else row.id,
                     import_id=row.id,
+                    error_summary=(
+                        latest.error_summary
+                        if latest is not None and not prior_success
+                        else row.error_summary
+                    ),
                     can_cancel=row.status in {"queued", "running"},
                     can_retry=bool(row.retryable or derivation_retryable),
                     can_view_log=True,
@@ -174,6 +182,7 @@ class KnowledgeTaskQueryService:
                     owner="derivation",
                     owner_id=latest.id,
                     import_id=latest.import_id,
+                    error_summary=latest.error_summary,
                     can_retry=bool(latest.retryable and latest.import_id),
                     can_view_log=False,
                 )

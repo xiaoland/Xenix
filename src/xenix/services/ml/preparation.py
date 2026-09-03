@@ -288,6 +288,14 @@ def _group_hash_positions(
     random_state: int,
     snapshot: DatasetSnapshotFact,
 ) -> tuple[np.ndarray, np.ndarray]:
+    """Deterministic group-safe holdout split.
+
+    Group order is derived from a hash of (strategy, random_state,
+    snapshot_digest, group value) so the split reproduces identically when
+    evaluation recomputes it from the request, independent of row order. The final
+    group is never assigned to holdout so at least one group always remains in
+    training.
+    """
     unique_groups = groups.drop_duplicates().tolist()
     if len(unique_groups) < 2:
         raise ValidationError("Group-safe evaluation requires at least two distinct groups.")

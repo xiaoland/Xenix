@@ -221,6 +221,8 @@ class AgentHarnessBenchmarkController:
                 f"invocation_tokens={result.budget.invocation_reported_subject_tokens}",
                 f"seconds={seconds:.3f}" if seconds is not None else "seconds=unreported",
                 f"persisted={run.persisted}",
+                f"trace_id={result.trace.trace_id if result.trace is not None else 'unavailable'}",
+                f"report={run.output_path if run.output_path is not None else 'unavailable'}",
             )
         )
         terminal_reporter = self.config.pluginmanager.getplugin("terminalreporter")

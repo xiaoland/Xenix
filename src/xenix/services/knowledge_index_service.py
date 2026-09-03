@@ -9,6 +9,7 @@ from collections.abc import Iterable
 from concurrent.futures import Future, ThreadPoolExecutor, wait
 from dataclasses import dataclass
 from enum import StrEnum
+from typing import TYPE_CHECKING
 
 from sqlalchemy.orm import sessionmaker
 
@@ -20,8 +21,11 @@ from .embedding_service import (
     embedding_profile_from_settings,
 )
 from .knowledge_semantic_service import KnowledgeSemanticService
-from .storage.models import KnowledgeIndexTaskRow, utc_now
+from .storage.models import JobDomain, KnowledgeIndexTaskRow, utc_now
 from .storage.repositories.knowledge import KnowledgeRepository
+
+if TYPE_CHECKING:
+    from .job_scheduler import JobScheduler
 
 _STOP = object()
 LOGGER = logging.getLogger(__name__)
@@ -68,12 +72,14 @@ class KnowledgeIndexService:
         embedding_service: EmbeddingService,
         embedding_settings_source: EmbeddingSettingsSource,
         start_worker: bool = True,
+        scheduler: JobScheduler | None = None,
     ) -> None:
         self._session_factory = session_factory
         self._semantic = semantic_service
         self._embedding = embedding_service
         self._embedding_settings = embedding_settings_source
         self._repository = KnowledgeRepository()
+        self._scheduler = scheduler
         self._queue: queue.Queue[str | object] = queue.Queue()
         self._status_executor = ThreadPoolExecutor(
             max_workers=1,
@@ -84,16 +90,17 @@ class KnowledgeIndexService:
         self._status_requests: set[Future[KnowledgeIndexOverview]] = set()
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
-        pending = self._recover_tasks()
-        if start_worker:
-            self._thread = threading.Thread(
-                target=self._worker_main,
-                name="xenix-knowledge-index",
-                daemon=True,
-            )
-            self._thread.start()
-            for task_id in pending:
-                self._queue.put(task_id)
+        if scheduler is None:
+            pending = self.recover_pending()
+            if start_worker:
+                self._thread = threading.Thread(
+                    target=self._worker_main,
+                    name="xenix-knowledge-index",
+                    daemon=True,
+                )
+                self._thread.start()
+                for task_id in pending:
+                    self._queue.put(task_id)
 
     def enqueue_rebuild(
         self,
@@ -134,8 +141,8 @@ class KnowledgeIndexService:
                     created = True
                 session.commit()
                 task_id = row.id
-        if created and not self._stop.is_set():
-            self._queue.put(task_id)
+        if created:
+            self._submit(task_id)
         return task_id
 
     def notify_corpus_changed(self, library_id: str = "global") -> str | None:
@@ -451,7 +458,23 @@ class KnowledgeIndexService:
         with self._status_requests_lock:
             self._status_requests.discard(future)
 
-    def _recover_tasks(self) -> list[str]:
+    def _submit(self, task_id: str) -> None:
+        if self._scheduler is not None:
+            self._scheduler.enqueue(JobDomain.KNOWLEDGE, "index_build", task_id)
+        elif not self._stop.is_set():
+            self._queue.put(task_id)
+
+    def run_unit(self, task_id: str) -> None:
+        self.rebuild_now(task_id)
+
+    def job_outcome(self, task_id: str) -> tuple[str, str | None]:
+        with self._session_factory() as session:
+            row = self._repository.get_index_task(session, task_id)
+            if row is None:
+                return ("failed", "Knowledge index task is missing.")
+            return (row.status, row.error_summary)
+
+    def recover_pending(self) -> list[str]:
         pending: list[str] = []
         with self._session_factory() as session:
             rows = self._repository.list_index_tasks(

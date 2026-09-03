@@ -33,6 +33,7 @@ dependencies = [
     "xlsxwriter>=3.2.0",
     "velopack==1.2.0",
     "docling<3,>=2.114.0",
+    "firecrawl-anydoc==0.2.4",
     "zstandard<1,>=0.23",
     "charset-normalizer<4,>=3.4",
     "lancedb<1,>=0.34",
@@ -68,7 +69,7 @@ typecheck = "mypy"
 dev = { composite = ["agent-skills-generate", "python scripts/run_dev.py"] }
 i18n-extract = "python scripts/update_translations.py"
 i18n-compile = "python scripts/compile_translations.py"
-package = { composite = ["agent-skills-generate", "agent-skills-check", "python scripts/package_app.py"] }
+package = { composite = ["agent-skills-generate", "agent-skills-check", "python scripts/package_app.py"], env = { PYTHONHASHSEED = "0" } }
 build-knowledge-ocr = "python scripts/build_knowledge_ocr_runtime.py"
 smoke = { composite = ["agent-skills-generate", "python scripts/run_dev.py --smoke-test"] }
 smoke-package = "python scripts/verify_packaged_smoke.py"
@@ -110,7 +111,7 @@ markers = [
 target-version = "py314"
 line-length = 120
 src = ["src"]
-extend-exclude = ["ml", "tasks"]
+extend-exclude = ["/ml", "/tasks"]
 
 [tool.ruff.lint]
 select = ["E4", "E7", "E9", "F", "B", "A"]
@@ -162,7 +163,7 @@ files = [
     "src/xenix/services/ml/registry.py",
     "src/xenix/services/ml/types.py",
     "src/xenix/services/ml/worker_settings.py",
-    "src/xenix/services/trained_model_metadata.py",
+    "src/xenix/services/ml/trained_model_metadata.py",
     "src/xenix/ui/semantic_identity.py",
     "src/xenix/ui/diagnostics/capture.py",
     "src/xenix/ui/diagnostics/schema.py",

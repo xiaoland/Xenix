@@ -16,7 +16,7 @@ from .knowledge_service import (
     KnowledgeSemanticIntegrityError,
     KnowledgeSemanticUnavailable,
 )
-from .knowledge_projection import (
+from .storage.knowledge_projection import (
     CORPUS_FINGERPRINT_SCHEMA,
     KnowledgeProjectionIdentity,
     KnowledgeProjectionSnapshot,
@@ -297,6 +297,10 @@ class KnowledgeSemanticService:
                 profile_fingerprint=profile.profile_fingerprint,
             )
 
+            # Embedding runs outside any lock/transaction and spans many network
+            # calls; the corpus/profile may change while it is in flight. Re-freeze
+            # the profile and re-check the projection identity immediately before
+            # publishing so a stale-corpus generation is discarded rather than rowed.
             published = False
             try:
                 current_operation = self._embedding_service.freeze()
