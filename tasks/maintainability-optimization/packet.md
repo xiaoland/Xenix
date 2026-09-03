@@ -110,8 +110,11 @@ Landed (committed on `develop`):
 - **C2 (knowledge→repo)** `76bfd5c`: added `KnowledgeRepository` dependency to
   `KnowledgeImportService`, routing all `session.get`/`session.add`/`select` calls
   through repository methods (+5 new methods).
+- **Soft cycle fix** `24d86bf`: moved `trained_model_metadata.py` into `ml/` package,
+  eliminating the `services → ml → services` soft cycle (module was ML-specific, only
+  consumed by `ml_service`, `ml_task_service`, and `ml/contracts`).
 
-Remaining: lower-value **B** leftovers (`_build_pipeline` cross-class, knowledge
+Remaining: minor **B** leftovers (`_build_pipeline` cross-class, knowledge
 bundle/retry, `_slug`/`_tfidf`), **D3** wordcloud SVG extraction, and compat alias
 cleanup.
 
