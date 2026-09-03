@@ -64,7 +64,12 @@ Use this order:
 4. Choose the smallest intervention.
 5. Restart and verify the failed workflow plus representative retained state.
 
-Prefer an empty isolated `XENIX_APP_HOME` for diagnosis; it changes no existing state. Database quarantine/rebuild loses SQLite-owned registrations and history from the active database but preserves the renamed database for investigation. A full runtime-home reset additionally removes settings, logs, app-owned datasets, artifacts, caches, and local task state. Never include user-owned source files in a runtime reset.
+Prefer `--isolated` (or an empty isolated `XENIX_APP_HOME`) for diagnosis;
+it changes no existing state. Database quarantine/rebuild loses SQLite-owned
+registrations and history from the active database but preserves the renamed
+database for investigation. A full runtime-home reset additionally removes
+settings, logs, app-owned datasets, artifacts, caches, and local task state.
+Never include user-owned source files in a runtime reset.
 
 Knowledge vector maintenance is deliberately narrower than a runtime reset. It may
 reconcile missing or corrupt derived generations, proven unregistered vector

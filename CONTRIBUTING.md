@@ -13,8 +13,11 @@
 - Promote accepted work through one same-repository GitHub PR whose head is
   `develop` and base is `main`. Native CI is scoped to PRs targeting `main`; its
   single stable `Native CI` check is required before merge.
+- A task-specific `feat/* -> main` draft PR is a documented exception for
+  CI acceptance against a clean `main` baseline; it is explicitly authorized
+  per task and never merges. See [`tasks/ui-dx/ci-acceptance.md`](tasks/ui-dx/ci-acceptance.md).
 - Do not locally merge `develop` into `main` and push the result. Do not open
-  feature-branch PRs directly to `main`.
+  ordinary feature-branch PRs directly to `main`.
 - A merged promotion makes its resulting `main` state release-eligible but does not
   release it. Release starts only when an immutable `v<project-version>` tag is
   pushed on an eligible promotion result.
@@ -45,9 +48,17 @@
 - `pdm run typecheck` runs the strict Mypy slice over typed boundary modules.
 - `pdm run check` regenerates/checks Agent Skills, runs Ruff and Mypy, validates
   the native OCR lock, then compiles the Python tree.
+- `pdm run smoke` runs the desktop application in smoke-test mode against the
+  platform default home; combine with `--isolated` to use a fresh temp home.
 - `pdm run i18n-extract` and `pdm run i18n-compile` update Qt translations.
 - `pdm run package` builds the Windows bundle.
 - `pdm run smoke-package` verifies the packaged executable.
+- `pdm run diagnostic-bundle` creates a local support archive (logs, task logs,
+  install id, database summaries) without the raw database.
+- `pdm run release-identity` verifies tag/version/promotion identity before pushing
+  a release tag.
+- `pdm run release-controls-audit` audits repository branch-protection and
+  Environment rules.
 - `pdm run benchmark-agent-harness-check` runs the provider-free safety,
   report-policy, and Judge-calibration checks owned by the Agent benchmark.
 - `pdm run benchmark-agent-harness -- --collect-only -q` and the headed variant
@@ -75,6 +86,14 @@ admitted Qt Widgets state:
 - `pdm run ui-capture -- chat.mixed-timeline --output ui-artifacts/local`
   renders a fixed synthetic state and writes `manifest.json`, `tree.json`, and
   `actual.png`.
+- `pdm run ui-capture-all --output ui-artifacts/scenarios` captures every
+  admitted scenario into a fresh run directory. `--prune-runs` removes only
+  historical Xenix capture run dirs under the output root first. `--verify
+  <run-dir>` checks that every captured scenario has complete artifacts and
+  that the batch is reconciled (expected == captured, no failures).
+- `--isolated` selects a unique fresh temp home for smoke and production runs;
+  the real user home is never read, migrated, or written. Combine with
+  `pdm run smoke` or `pdm run dev`.
 - `main.history-populated` renders the production history panel (not the full
   application). `settings.provider-and-ocr` composes the production provider
   editor and OCR card with in-memory draft/status ports.
@@ -94,6 +113,11 @@ owns. It must construct without a runtime home, database, network adapter,
 update check, OCR runtime, or ML worker. Reuse the same factory from interactive,
 capture, and test paths; do not create a second fixture language or assert pixel
 equality in ordinary widget contracts.
+
+The capture driver applies the scenario's render identity (style, font, locale)
+before the scenario builds its widgets. Tests and the gallery follow the same
+order so that font metrics, translator, and style hints are always resolved
+before widget construction.
 
 On Windows/offscreen the lab registers the installed Segoe UI faces into the
 current Qt process when necessary; it never installs or downloads fonts. A
