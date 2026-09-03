@@ -8,6 +8,7 @@ from xenix.services.agent import AgentHarnessService, SubmitUserTurnInput
 from xenix.services.llm import (
     AgentToolRegistry,
     AgentToolSpec,
+    AppendUserMessageInput,
     LLMConversationService,
     ProviderResponse,
     ProviderToolCall,
@@ -127,3 +128,52 @@ def test_direct_xtt_tool_result_has_one_value_across_storage_provider_and_chatbo
     event = next(event for event in harness.project_chatbot_events(snapshot) if event.tool_name == "data.query")
     assert event.tool_result_value == canonical_xtt
     assert canonical_xtt in event.detail_blocks[0]["text"]
+
+
+def test_paused_thread_admits_new_user_message_after_stop(monkeypatch, tmp_path: Path) -> None:
+    """Stopping during a provider retry must not block the next User Message.
+
+    A user-facing Stop abandons the provisional sampling placeholder, leaving a
+    USER frontier.  The next submission re-enters from that frontier instead of
+    failing with "the existing Client frontier must be sampled first".
+    """
+
+    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
+    context = StorageBootstrapService().initialize(ensure_app_dirs(get_app_paths()))
+    service = LLMConversationService(
+        session_factory=context.session_factory,
+        tool_registry=AgentToolRegistry(),
+    )
+
+    thread = service.create_thread().thread
+    first = service.append_user_message(
+        AppendUserMessageInput(
+            thread_id=thread.id,
+            client_submission_id="sub-1",
+            content_blocks=[{"type": "text", "text": "First"}],
+        )
+    )
+    first_id = first.messages[-1].id
+    pending = service.begin_sampling(thread_id=thread.id, expected_frontier_id=first_id)
+
+    # Simulate Stop: pause the Thread, then discard the provisional placeholder
+    # the way the next provider admit would after a retry loop is interrupted.
+    service.pause_thread(thread.id)
+    service.cancel_sampling(pending.pending_message_id)
+
+    claim = service.claim_user_submission(
+        thread_id=thread.id,
+        expected_frontier_id=first_id,
+        client_submission_id="sub-2",
+    )
+    assert claim.existing_message_id is None
+    second = service.append_user_message(
+        AppendUserMessageInput(
+            thread_id=thread.id,
+            client_submission_id="sub-2",
+            content_blocks=[{"type": "text", "text": "Second"}],
+        ),
+        expected_frontier_id=claim.expected_frontier_id,
+    )
+    assert [message.kind.value for message in second.messages] == ["user", "user"]
+    context.engine.dispose()

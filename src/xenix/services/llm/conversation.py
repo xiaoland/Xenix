@@ -273,7 +273,7 @@ class LLMConversationService(TitleGenerationMixin):
                 self._validate_user_append_messages(
                     snapshot.messages,
                     expected_frontier_id,
-                    allow_paused_tool_result=self._thread_control_locked(thread_id).paused,
+                    allow_paused_frontier=self._thread_control_locked(thread_id).paused,
                 )
                 key = (thread_id, normalized_id)
                 with self._claims_lock:
@@ -318,7 +318,7 @@ class LLMConversationService(TitleGenerationMixin):
                         self._validate_user_append_messages(
                             messages,
                             expected_frontier_id,
-                            allow_paused_tool_result=control.paused,
+                            allow_paused_frontier=control.paused,
                         )
                         canonical_blocks = normalize_message_blocks(input_data.content_blocks)
                         if any(isinstance(block, SourceAttachmentBlock) for block in canonical_blocks):
@@ -1053,7 +1053,7 @@ class LLMConversationService(TitleGenerationMixin):
         messages: list[ConversationMessageRow],
         expected_frontier_id: str | None,
         *,
-        allow_paused_tool_result: bool = False,
+        allow_paused_frontier: bool = False,
     ) -> None:
         if any(row.kind is ConversationMessageKind.PENDING_LLM_SAMPLING for row in messages):
             raise ValidationError("Cannot append a User Message while LLM sampling is pending.")
@@ -1064,12 +1064,17 @@ class LLMConversationService(TitleGenerationMixin):
         tail = messages[-1]
         if expected_frontier_id is not None and tail.id != expected_frontier_id:
             raise ValidationError("The requested User frontier is stale.")
+        # A paused Thread (the user pressed Stop) abandons its current frontier,
+        # so a new User Message may re-enter whether the stop landed during
+        # initial sampling (USER/CLIENT_CONTROL frontier) or tool-result
+        # sampling (TOOL_RESULT frontier).
+        if allow_paused_frontier:
+            return
         if tail.kind in {
             ConversationMessageKind.USER,
             ConversationMessageKind.CLIENT_CONTROL,
+            ConversationMessageKind.TOOL_RESULT,
         }:
-            raise ValidationError("The existing Client frontier must be sampled before another User Message.")
-        if tail.kind is ConversationMessageKind.TOOL_RESULT and not allow_paused_tool_result:
             raise ValidationError("The existing Client frontier must be sampled before another User Message.")
 
     def _admit_provider_request(self, pending_message_id: str) -> None:
