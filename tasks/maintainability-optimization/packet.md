@@ -100,9 +100,15 @@ Landed (committed on `develop`):
   `ml_service._ml_tasks`.
 - **C3 (projection relocation)** `a9b1acc`: `knowledge_projection.py` moved into `storage/`,
   removing the storage→services reverse import.
+- **D1 (thread titles)** `01212e3`: extracted pure title derivation logic to
+  `llm/thread_titles.py`, removing ~100 lines from `conversation.py`.
+- **D2 (finalize dedup)** `5bd7a9f`: merged `_finalize_fit_task`/`_finalize_tuning_task`
+  into `_finalize_training_task` shared helper, -124 lines in `ml_task_service.py`.
+- **D4 (smoke checks)** `0254090`: extracted `_run_smoke_checks` to `smoke_checks.py` module.
 
 Remaining: **C1** (dataset provenance → repositories), **C2** (knowledge import → repository),
-**D** (thread titles / finalize dedup / wordcloud SVG / smoke checks), plus lower-value **B** leftovers.
+**D3** (analysis_graph wordcloud SVG extraction — deferred: large extraction with many
+AnalysisGraphService infrastructure dependencies), plus lower-value **B** leftovers.
 
 ## Open follow-up
 
