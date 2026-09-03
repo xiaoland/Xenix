@@ -144,6 +144,7 @@ class ProviderSettingsEditor(QWidget):
         self._provider_selector.currentIndexChanged.connect(self._on_provider_changed)
         self._add_provider_button.clicked.connect(self._add_provider)
         self._remove_provider_button.clicked.connect(self._remove_provider)
+        self._provider_models_input.textChanged.connect(self._on_models_text_changed)
 
     def retranslate_ui(self) -> None:
         self._global_models_title_label.setText(QCoreApplication.translate("SettingsDialog", "Global models"))
@@ -308,6 +309,22 @@ class ProviderSettingsEditor(QWidget):
         self._provider_selector.setItemData(index, provider.key)
         if index == self._provider_selector.currentIndex():
             self._apply_provider_field_state(provider)
+
+    def _on_models_text_changed(self) -> None:
+        """Keep the global model selectors in sync with the edited models list.
+
+        Editing the provider's Models field changes the available model set, so
+        the Default/Turn-guard/Thread-title selectors must be rebuilt immediately
+        rather than only when the provider is switched or the dialog is reopened.
+        """
+
+        if self._loading_provider or not self._provider_configs:
+            return
+        try:
+            self._store_current_provider_fields()
+        except Exception:
+            return
+        self._refresh_model_selectors_preserving_selection()
 
     def _refresh_provider_field_state(self) -> None:
         index = self._provider_selector.currentIndex()

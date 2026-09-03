@@ -5,7 +5,6 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
-import re
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -33,63 +32,6 @@ MAX_TOOL_FAILURE_MESSAGE_CHARS = 16 * 1024
 TOOL_RESULT_PAGE_SIZE_CHARS = 1024
 TOOL_RESULT_PAGE_LIMIT_CHARS = 4096
 TOOL_RESULT_INLINE_CHARS = 2048
-
-_PUBLIC_ERROR_CODE_PATTERN = re.compile(r"^[a-z][a-z0-9_]{0,127}$")
-_SENSITIVE_DIAGNOSTIC_MARKERS = (
-    "api key",
-    "api-key",
-    "api_key",
-    "apikey",
-    "authorization",
-    "bearer",
-    "credential",
-    "password",
-    "secret",
-    "token",
-)
-_SENSITIVE_DIAGNOSTIC_KEYS = (
-    "credential",
-    "endpoint",
-    "password",
-    "path",
-    "secret",
-    "token",
-    "url",
-    "uri",
-)
-_PUBLIC_VALIDATION_DETAIL_KEYS = frozenset(
-    {
-        "actual_count",
-        "actual_dimensions",
-        "available_modes",
-        "category_count",
-        "color_field",
-        "color_mode",
-        "count_field",
-        "dimensions",
-        "distance_metric",
-        "engine",
-        "expected_count",
-        "expected_dimensions",
-        "field",
-        "field_role",
-        "maximum_dimensions",
-        "maximum_length",
-        "minimum",
-        "mode",
-        "operation",
-        "palette_size",
-        "requested_field",
-        "requested_mode",
-        "schema_keyword",
-        "sql",
-        "status_code",
-        "text_index",
-        "total_terms",
-        "visible_terms",
-        "word_field",
-    }
-)
 
 # A Tool Result is a JSON value, rather than a JSON-object-only payload.  In
 # particular, tabular tools return Xenix Table Text directly as a string.  The
@@ -930,19 +872,10 @@ def canonical_tool_result_value(
         return copy.deepcopy(value)
     if isinstance(value, dict) and value.get("type") == "tool_failure":
         return copy.deepcopy(value)
-    fallback_message = "Tool execution failed."
     legacy_message = legacy_error_summary.strip() if isinstance(legacy_error_summary, str) else ""
-    if not legacy_message or not _diagnostic_value_is_public(legacy_message):
-        legacy_message = fallback_message
-    legacy_details = (
-        copy.deepcopy(value)
-        if value is not None and _diagnostic_value_is_public(value)
-        else None
-    )
-    # Some old failed rows retained a bounded diagnostic payload alongside the
-    # generic summary. Preserve only public structured detail that still fits
-    # the current canonical value bound; this is a read compatibility
-    # conversion, not a mutation or second durable result field.
+    if not legacy_message:
+        legacy_message = "Tool execution failed."
+    legacy_details = copy.deepcopy(value) if value is not None else None
     try:
         return ToolFailure(
             code="legacy_tool_failure",
@@ -957,92 +890,31 @@ def canonical_tool_result_value(
 
 
 def tool_failure_from_exception(exc: Exception) -> ToolFailure:
-    """Project an exception into a provider-safe failure without exposing diagnostics."""
+    """Project an exception into an agent-visible tool failure.
 
-    if not isinstance(exc, ValidationError):
-        return _unexpected_tool_failure()
+    The LLM is the primary consumer of Tool failures and must see the concrete
+    error to self-correct.  Preserve the full exception text and structured
+    repair contract; never collapse a specific failure into a generic sentinel.
+    """
 
-    code = exc.error_code or "tool_validation_failed"
-    message = str(exc).strip() or "Tool input is invalid."
-    details = dict(exc.error_details) if exc.error_details else None
-    hints = tuple(exc.repair_hints)
-    if not _validation_diagnostic_is_public(
-        code=code,
-        message=message,
-        details=details,
-        hints=hints,
-    ):
-        return _invalid_tool_input_failure()
-    try:
-        return ToolFailure(
-            code=code,
-            message=message,
-            details=details,
-            repair_hints=hints,
-            retryable=exc.retryable,
-        )
-    except ValidationError:
-        return _invalid_tool_input_failure()
+    if isinstance(exc, ValidationError):
+        code = exc.error_code or "tool_validation_failed"
+        message = str(exc).strip() or "Tool input is invalid."
+        details = dict(exc.error_details) if exc.error_details else None
+        hints = tuple(exc.repair_hints)
+        try:
+            return ToolFailure(
+                code=code,
+                message=message,
+                details=details,
+                repair_hints=hints,
+                retryable=exc.retryable,
+            )
+        except ValidationError:
+            return ToolFailure(code=code, message=message)
 
-
-def _unexpected_tool_failure() -> ToolFailure:
+    message = str(exc).strip() or type(exc).__name__
     return ToolFailure(
         code="tool_execution_failed",
-        message="Tool execution failed.",
+        message=message,
     )
-
-
-def _invalid_tool_input_failure() -> ToolFailure:
-    return ToolFailure(
-        code="tool_validation_failed",
-        message="Tool input is invalid.",
-        retryable=False,
-    )
-
-
-def _validation_diagnostic_is_public(
-    *,
-    code: str,
-    message: str,
-    details: ToolResultValue | None,
-    hints: tuple[str, ...],
-) -> bool:
-    if not _PUBLIC_ERROR_CODE_PATTERN.fullmatch(code):
-        return False
-    return all(
-        _diagnostic_value_is_public(value)
-        for value in (message, details, list(hints))
-        if value is not None
-    )
-
-
-def _diagnostic_value_is_public(value: ToolResultValue, *, key: str | None = None) -> bool:
-    if key is not None:
-        normalized_key = key.casefold().replace("-", "_")
-        if (
-            normalized_key not in _PUBLIC_VALIDATION_DETAIL_KEYS
-            or any(marker in normalized_key for marker in _SENSITIVE_DIAGNOSTIC_KEYS)
-        ):
-            return False
-    if value is None or isinstance(value, bool | int | float):
-        return True
-    if isinstance(value, str):
-        normalized = value.strip().casefold()
-        if any(marker in normalized for marker in _SENSITIVE_DIAGNOSTIC_MARKERS):
-            return False
-        return not (
-            "://" in normalized
-            or "/" in value
-            or "\\" in value
-            or value.startswith(("~", "."))
-            or (len(value) >= 2 and value[0].isalpha() and value[1] == ":")
-        )
-    if isinstance(value, list | tuple):
-        return all(_diagnostic_value_is_public(item) for item in value)
-    if isinstance(value, dict):
-        return all(
-            isinstance(item_key, str)
-            and _diagnostic_value_is_public(item_value, key=item_key)
-            for item_key, item_value in value.items()
-        )
-    return False

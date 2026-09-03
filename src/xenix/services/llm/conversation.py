@@ -535,8 +535,8 @@ class LLMConversationService(TitleGenerationMixin):
             terminal = terminal_tool_result(outcome)
         except Exception as exc:
             # Project the failure once into the same canonical value consumed
-            # by the provider and Chatbot.  Only explicitly public validation
-            # diagnostics survive; unexpected exceptions stay generic.
+            # by the provider and Chatbot.  The concrete exception message is
+            # preserved so the agent sees what actually failed.
             terminal = terminal_tool_result(tool_failure_from_exception(exc))
 
         if cancel_requested():

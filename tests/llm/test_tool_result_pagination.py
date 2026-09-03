@@ -12,6 +12,7 @@ from xenix.services.llm.tooling import (
     AgentToolSpec,
     ToolExecutionContext,
     ToolSuccess,
+    tool_failure_from_exception,
 )
 
 
@@ -151,3 +152,23 @@ def test_invoke_without_store_rejects_oversized_result(tmp_path: Path) -> None:
             arguments={},
             context=_context(),
         )
+
+
+def test_tool_failure_preserves_unexpected_exception_message() -> None:
+    failure = tool_failure_from_exception(RuntimeError("File C:\\data\\missing.csv was not found."))
+    assert failure.code == "tool_execution_failed"
+    assert failure.message == "File C:\\data\\missing.csv was not found."
+
+
+def test_tool_failure_preserves_validation_details_and_hints() -> None:
+    exc = ValidationError(
+        "Column 'amount' is not numeric.",
+        error_code="data_column_not_numeric",
+        error_details={"field": "amount"},
+        repair_hints=["Select a numeric column."],
+    )
+    failure = tool_failure_from_exception(exc)
+    assert failure.code == "data_column_not_numeric"
+    assert failure.message == "Column 'amount' is not numeric."
+    assert failure.details == {"field": "amount"}
+    assert failure.repair_hints == ("Select a numeric column.",)
