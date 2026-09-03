@@ -23,6 +23,46 @@ their retention and access control are owned by the configured telemetry backend
 
 `config/telemetry.json` stores a randomly generated persistent install id. It is not derived from machine identity, but it correlates activity across runs and therefore remains sensitive.
 
+## UI layout evidence
+
+For source diagnosis, `XENIX_LAYOUT_DEBUG=true` schedules a structured Qt UI
+snapshot after the main layout settles and writes it to the application log. The
+snapshot contains separate QObject-ownership and real `QLayout.itemAt()` trees,
+geometry, size policy, visibility/focus state, semantic identifiers, and render
+structure. Runtime capture omits widget text, combo text, message bodies, and
+field values; it never takes a screenshot. The structured tree retains semantic
+identifiers and per-item references, and for file-attachment chips those
+references are resolved source paths, so the tree is not path-redacted.
+
+Direct tests can explicitly register a synthetic root with the scoped
+`ui_artifacts` fixture. A call failure writes `manifest.json`, `tree.json`,
+`actual.png`, bounded/redacted `qt.log`, and `index.json` below
+`ui-artifacts/<test-id>/`. Passing tests leave no artifact. A fixture-teardown
+failure publishes the snapshot staged before pytest-qt closes its widgets. The
+fixture never scans all top-level windows, the pytest temp tree, a runtime home,
+or an unregistered application window.
+
+Treat even synthetic screenshots as reviewable evidence. Do not register a root
+backed by real user configuration or conversation content, and do not manually
+add line-edit values, combo text, file paths, credentials, or message bodies to
+the schema. Runtime/user screenshots require separate explicit authority and are
+not enabled by the layout-debug switch.
+
+Native CI captures the five admitted Widget Lab scenarios under
+`ui-artifacts/scenarios/` via `pdm run ui-capture-all`, runs the native-window
+smoke in a separate `windows` QPA pytest process, and rebuilds
+`ui-artifacts/index.json`. The index contains only manifest metadata, relative
+artifact paths, render identity, geometry, and file sizes; it does not add widget
+text or user values. GitHub uploads only this allowlisted directory with
+`if: always()` and retains it for 14 days.
+
+The scenario images are capture-only evidence. No expected image or pixel diff
+is authoritative yet. Promote a baseline only after repeated Native CI runs have
+the same Windows runner, Python/PySide/Qt, Fusion style, Segoe UI font, locale,
+DPI/DPR, and viewport identity and a reviewer has accepted the state. At that
+point the baseline-update and comparison command must be added explicitly; do
+not copy a local image into source and silently make it blocking.
+
 ## OTLP Enablement
 
 Standard OpenTelemetry endpoint, protocol, and header variables configure transport. Signal-specific values take precedence over global values. Source runs read them from the developer process. Formal packaging reads them once and embeds them in the frozen release configuration; an installed client ignores ambient `XENIX_OTEL_*`, `OTEL_SDK_DISABLED`, and `OTEL_EXPORTER_*` values.

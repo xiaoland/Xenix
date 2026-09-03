@@ -3,7 +3,7 @@
 ## Admission
 
 This document owns the local evaluation boundary for the Agent Harness
-benchmark. The [LLM conversation boundary](../20-product-tdd/llm-conversation-boundary.md)
+benchmark. The [LLM conversation boundary](../20-prd-tdd/llm-conversation-boundary.md)
 continues to own product conversation topology, authority, and sequences;
 benchmark code observes public outcomes and does not alter that contract.
 

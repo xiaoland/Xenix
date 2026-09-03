@@ -13,8 +13,9 @@ from typing import TYPE_CHECKING, Literal
 
 from PySide6.QtCore import QCoreApplication, QElapsedTimer, QEventLoop, QThread, QUrl
 from PySide6.QtGui import QDesktopServices, QIcon
-from PySide6.QtWidgets import QApplication, QMessageBox
+from PySide6.QtWidgets import QApplication, QMessageBox, QWidget
 
+from .application_services import ApplicationServices
 from .config import APP_NAME, APP_ORGANIZATION, ensure_app_dirs, get_app_paths
 from .exceptions import StorageBootstrapError, install_exception_hooks
 from .i18n import TranslationManager
@@ -407,6 +408,7 @@ def build_main_window(
     show_splash: bool | None = None,
     splash_hold_ms: int = 0,
     flush_startup_observability: bool = False,
+    on_services_ready: Callable[[ApplicationServices], None] | None = None,
 ) -> tuple[QApplication, MainWindow]:
     build_start = time.perf_counter()
     _emit_startup_timing("build_main_window.start")
@@ -606,36 +608,84 @@ def build_main_window(
         _emit_startup_timing("services.construct", step_start)
 
         step_start = time.perf_counter()
+        from .ui.conversation.execution import ThreadedSubmissionExecutor
+        from .ui.history import HarnessHistoryAdapter
+        from .ui.knowledge_workspace import KnowledgeWorkspaceDialog
+        from .ui.settings_dialog import SettingsDialog
+        from .ui.software_update import SoftwareUpdateController
+        from .ui.tool_call_detail_view import ToolCallDetailView
+        from .ui.windows.auxiliary import AuxiliaryWindowCoordinator
+
+        def create_settings(owner: QWidget) -> SettingsDialog:
+            return SettingsDialog(
+                paths=paths,
+                log_path=log_path,
+                db_path=runtime.database_path(paths),
+                translation_manager=translation_manager,
+                llm_service=llm_service,
+                llm_settings_service=llm_settings_service,
+                embedding_settings_service=embedding_settings_service,
+                ml_worker_settings_service=ml_worker_settings_service,
+                update_service=update_service,
+                paddle_ocr_deployment=paddle_ocr_deployment,
+                knowledge_index_service=knowledge_index_service,
+                parent=owner,
+            )
+
+        def create_knowledge(
+            owner: QWidget, open_settings: Callable[[], None]
+        ) -> KnowledgeWorkspaceDialog:
+            return KnowledgeWorkspaceDialog(
+                import_service=knowledge_import_service,
+                derivation_service=knowledge_derivation_service,
+                knowledge_service=agent_services.knowledge,
+                knowledge_index_service=knowledge_index_service,
+                ocr_deployment=paddle_ocr_deployment,
+                task_query_service=knowledge_task_query_service,
+                workspace_service=knowledge_workspace_service,
+                document_lifecycle_service=knowledge_document_lifecycle_service,
+                open_knowledge_settings=open_settings,
+                parent=owner,
+            )
+
+        def create_auxiliary(owner: QWidget) -> AuxiliaryWindowCoordinator:
+            return AuxiliaryWindowCoordinator(
+                owner,
+                settings_factory=create_settings,
+                knowledge_factory=create_knowledge,
+                detail_factory=lambda parent, task_ids: ToolCallDetailView(
+                    ml_service=agent_services.ml, task_ids=task_ids, parent=parent,
+                ),
+                update_controller=(
+                    SoftwareUpdateController(owner, update_service)
+                    if update_service is not None else None
+                ),
+            )
+
         window = MainWindow(
-            paths=paths,
-            log_path=log_path,
-            db_path=runtime.database_path(paths),
-            translation_manager=translation_manager,
+            current_locale=translation_manager.current_locale,
             agent_harness_service=agent_services.harness,
+            conversation_executor=ThreadedSubmissionExecutor(
+                agent_services.harness.submit_user_turn_stream
+            ),
             llm_service=llm_service,
-            llm_settings_service=llm_settings_service,
-            embedding_settings_service=embedding_settings_service,
-            ml_worker_settings_service=ml_worker_settings_service,
             artifact_service=agent_services.artifacts,
             link_router=link_router,
-            dataset_service=agent_services.datasets,
-            ml_service=agent_services.ml,
-            update_service=update_service,
-            knowledge_import_service=knowledge_import_service,
-            knowledge_derivation_service=knowledge_derivation_service,
-            knowledge_service=agent_services.knowledge,
-            knowledge_index_service=knowledge_index_service,
-            paddle_ocr_deployment=paddle_ocr_deployment,
-            knowledge_task_query_service=knowledge_task_query_service,
-            knowledge_workspace_service=knowledge_workspace_service,
-            knowledge_document_lifecycle_service=(
-                knowledge_document_lifecycle_service
-            ),
+            history_port=HarnessHistoryAdapter(agent_services.harness),
+            auxiliary_factory=create_auxiliary,
         )
         _emit_startup_timing("main_window.construct", step_start)
         app.aboutToQuit.connect(shutdown_runtime)
         runtime_shutdown_connected = True
         window.closing.connect(shutdown_runtime)
+        if on_services_ready is not None:
+            on_services_ready(ApplicationServices(
+                agent=agent_services,
+                knowledge_import=knowledge_import_service,
+                knowledge_derivation=knowledge_derivation_service,
+                knowledge_index=knowledge_index_service,
+                knowledge_tasks=knowledge_task_query_service,
+            ))
 
         _update_startup_stage(app, splash, StartupStage.READY)
         _hold_startup_splash(app, splash, splash_hold_ms)

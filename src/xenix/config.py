@@ -29,6 +29,10 @@ def package_root() -> Path:
     return Path(__file__).resolve().parent
 
 
+def default_app_home() -> Path:
+    return _default_app_home()
+
+
 def _default_app_home() -> Path:
     override = os.getenv("XENIX_APP_HOME")
     if override:

@@ -12,9 +12,12 @@ from typing import Any, Callable
 from PySide6.QtCore import QEvent, QEventLoop, QMimeData, QPoint, QPointF, Qt, QUrl
 from PySide6.QtGui import QDragEnterEvent, QDropEvent
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QPushButton
 
+from xenix.application_services import ApplicationServices
 from xenix.config import AppPaths
+from xenix.services.storage.layout import database_path
+from xenix.ui.knowledge_workspace import KnowledgeWorkspaceDialog
 from xenix.services.embedding_service import EmbeddingSettings, EmbeddingSettingsService
 from xenix.services.llm import LLMService, LLMSettings, LLMSettingsService
 
@@ -54,7 +57,7 @@ class _HeadedKnowledgeDerivationAccess:
 
     def status_for_import(self, import_id: str) -> Any:
         self._cell.pump_events()
-        return self._cell.window._knowledge_derivation_service.status_for_import(  # noqa: SLF001
+        return self._cell.runtime_services.knowledge_derivation.status_for_import(  # noqa: SLF001
             import_id
         )
 
@@ -64,7 +67,7 @@ class _HeadedKnowledgeIndexAccess:
         self._cell = cell
 
     def enqueue_rebuild(self, index_kinds: Any, *, trigger: str) -> str:
-        task_id = self._cell.window._knowledge_index_service.enqueue_rebuild(  # noqa: SLF001
+        task_id = self._cell.runtime_services.knowledge_index.enqueue_rebuild(  # noqa: SLF001
             index_kinds,
             trigger=trigger,
         )
@@ -72,7 +75,7 @@ class _HeadedKnowledgeIndexAccess:
         return task_id
 
     def rebuild_now(self, task_id: str) -> Any:
-        service = self._cell.window._knowledge_index_service  # noqa: SLF001
+        service = self._cell.runtime_services.knowledge_index  # noqa: SLF001
 
         def terminal_task() -> Any | None:
             task = next(
@@ -109,6 +112,7 @@ class HeadedBenchmarkCell:
         self.knowledge_index_task_ids: set[str] = set()
         self.app: QApplication
         self.window: Any
+        self.runtime_services: ApplicationServices
 
         LLMSettingsService(paths).save(settings)
         if embedding_settings is not None:
@@ -121,15 +125,16 @@ class HeadedBenchmarkCell:
                 show=True,
                 show_splash=False,
                 flush_startup_observability=True,
+                on_services_ready=self._receive_services,
             )
             self.app.setQuitOnLastWindowClosed(False)
             self.pump_events()
             if not self.window.isVisible():
                 raise HeadedBenchmarkError("headed_main_window_not_visible")
             self._install_bounded_llm_gateway(bounded_llm)
-            self.harness = self.window._agent_harness_service  # noqa: SLF001
-            self.datasets = self.window._dataset_service  # noqa: SLF001
-            self.artifacts = self.window._artifact_service  # noqa: SLF001
+            self.harness = self.runtime_services.agent.harness  # noqa: SLF001
+            self.datasets = self.runtime_services.agent.datasets  # noqa: SLF001
+            self.artifacts = self.runtime_services.agent.artifacts  # noqa: SLF001
             self.preparation_services = BenchmarkCasePreparationServices(
                 knowledge_import=_HeadedKnowledgeImportAccess(self),
                 knowledge_derivation=_HeadedKnowledgeDerivationAccess(self),
@@ -178,19 +183,28 @@ class HeadedBenchmarkCell:
             error_code=error_code,
         )
 
+    def _receive_services(self, services: ApplicationServices) -> None:
+        self.runtime_services = services
+
+    def _button(self, semantic_id: str) -> QPushButton:
+        for button in self.window.findChildren(QPushButton):
+            if button.accessibleIdentifier() == semantic_id:
+                return button
+        raise HeadedBenchmarkError("headed_control_unavailable")
+
     def create_thread(self, *, title: str, fq_model_key: str) -> str:
         QTest.mouseClick(
-            self.window._new_thread_button,  # noqa: SLF001
+            self._button("main.history.new-thread"),  # noqa: SLF001
             Qt.MouseButton.LeftButton,
         )
         self.wait_until(
-            lambda: self.window._agent_thread_id is not None,  # noqa: SLF001
+            lambda: self.window.conversation_thread_id is not None,
             timeout=10.0,
             error_code="headed_thread_creation_failed",
         )
-        thread_id = str(self.window._agent_thread_id)  # noqa: SLF001
+        thread_id = str(self.window.conversation_thread_id)
         snapshot = self.harness.rename_thread(thread_id, title)
-        self.window._refresh_history_sidebar(selected_thread_id=thread_id)  # noqa: SLF001
+        self.window.refresh_history(selected_thread_id=thread_id)  # noqa: SLF001
         self._select_model(fq_model_key)
         if snapshot.thread.id != thread_id:
             raise HeadedBenchmarkError("headed_thread_identity_mismatch")
@@ -199,11 +213,11 @@ class HeadedBenchmarkCell:
     def import_knowledge_file(self, source_path: Path, *, timeout: float) -> Any:
         path = source_path.expanduser().resolve(strict=True)
         QTest.mouseClick(
-            self.window._knowledge_button,  # noqa: SLF001
+            self._button("main.header.knowledge"),  # noqa: SLF001
             Qt.MouseButton.LeftButton,
         )
         workspace = self.wait_for_value(
-            lambda: self.window._knowledge_workspace,  # noqa: SLF001
+            lambda: self.window.findChild(KnowledgeWorkspaceDialog),  # noqa: SLF001
             timeout=10.0,
             error_code="headed_knowledge_workspace_unavailable",
         )
@@ -212,7 +226,7 @@ class HeadedBenchmarkCell:
             timeout=10.0,
             error_code="headed_knowledge_workspace_not_visible",
         )
-        service = self.window._knowledge_import_service  # noqa: SLF001
+        service = self.runtime_services.knowledge_import  # noqa: SLF001
         before_ids = {item.import_id for item in service.list_imports()}
         self._drop_local_files(workspace._documents.viewport(), (path,))  # noqa: SLF001
 
@@ -263,7 +277,7 @@ class HeadedBenchmarkCell:
         services: BenchmarkCaseServices,
     ) -> None:
         thread_id = str(getattr(submission, "thread_id", "") or "")
-        if thread_id != self.window._agent_thread_id:  # noqa: SLF001
+        if thread_id != self.window.conversation_thread_id:
             raise HeadedBenchmarkError("headed_submission_thread_mismatch")
         fq_model_key = str(getattr(submission, "fq_model_key", "") or "")
         self._select_model(fq_model_key)
@@ -280,7 +294,7 @@ class HeadedBenchmarkCell:
                 lambda: (
                     expected_paths.issubset(set(view._attached_files))  # noqa: SLF001
                     and expected_paths.issubset(
-                        set(self.window._composer_attachments)  # noqa: SLF001
+                        set(self.window._chat_workspace.composer_attachments)  # noqa: SLF001
                     )
                 ),
                 timeout=10.0,
@@ -304,8 +318,8 @@ class HeadedBenchmarkCell:
         def record_failure(failure: object) -> None:
             harness_failure.append(failure)
 
-        self.window._harness_stream_event.connect(observe)  # noqa: SLF001
-        self.window._harness_failed.connect(record_failure)  # noqa: SLF001
+        self.window._chat_workspace.harness_stream_event.connect(observe)  # noqa: SLF001
+        self.window._chat_workspace.harness_failed.connect(record_failure)  # noqa: SLF001
         try:
             QTest.mouseClick(view._send_button, Qt.MouseButton.LeftButton)  # noqa: SLF001
             self.wait_until(
@@ -323,15 +337,14 @@ class HeadedBenchmarkCell:
             self.wait_until(
                 lambda: (
                     not view._running  # noqa: SLF001
-                    and self.window._pending_composer_submission is None  # noqa: SLF001
-                    and self.window._active_pending_message_id is None  # noqa: SLF001
+                    and self.window.conversation_idle
                 ),
                 timeout=10.0,
                 error_code="headed_ui_did_not_settle",
             )
         finally:
-            self.window._harness_stream_event.disconnect(observe)  # noqa: SLF001
-            self.window._harness_failed.disconnect(record_failure)  # noqa: SLF001
+            self.window._chat_workspace.harness_stream_event.disconnect(observe)  # noqa: SLF001
+            self.window._chat_workspace.harness_failed.disconnect(record_failure)  # noqa: SLF001
 
         snapshot = measurements.snapshot
         messages = list(getattr(snapshot, "messages", ())) if snapshot is not None else []
@@ -363,7 +376,7 @@ class HeadedBenchmarkCell:
         self._closed = True
         try:
             self._capture_knowledge_integrity()
-            database_path = Path(self.window._db_path)  # noqa: SLF001
+            runtime_database_path = database_path(self.paths)
             self.window.close()
             self.pump_events()
             window_closed = not self.window.isVisible()
@@ -390,7 +403,7 @@ class HeadedBenchmarkCell:
             self.artifacts = None
             self.window = None
             gc.collect()
-            database_ok = self._database_is_readable(database_path)
+            database_ok = self._database_is_readable(runtime_database_path)
             self._checks.append(
                 OutcomeCheck(
                     "headed_runtime_database_readable",
@@ -412,7 +425,7 @@ class HeadedBenchmarkCell:
             raise HeadedBenchmarkError("headed_model_not_available")
         picker.setCurrentIndex(index)
         self.pump_events()
-        thread_id = self.window._agent_thread_id  # noqa: SLF001
+        thread_id = self.window.conversation_thread_id
         if thread_id is None:
             raise HeadedBenchmarkError("headed_thread_not_selected")
         selected = self.harness.get_thread_snapshot(thread_id).thread.selected_fq_model_key
@@ -420,7 +433,7 @@ class HeadedBenchmarkCell:
             raise HeadedBenchmarkError("headed_model_selection_failed")
 
     def _install_bounded_llm_gateway(self, bounded_llm: LLMService) -> None:
-        harness = self.window._agent_harness_service  # noqa: SLF001
+        harness = self.runtime_services.agent.harness  # noqa: SLF001
         conversation = harness._conversation_service  # noqa: SLF001
         targets = (
             (self.window, "_llm_service"),
@@ -469,7 +482,7 @@ class HeadedBenchmarkCell:
     def _capture_knowledge_integrity(self) -> None:
         if not self._knowledge_results:
             return
-        workspace = self.window._knowledge_workspace  # noqa: SLF001
+        workspace = self.window.findChild(KnowledgeWorkspaceDialog)  # noqa: SLF001
         expected_document_ids = {
             result.document_id for result in self._knowledge_results.values()
         }
@@ -503,7 +516,7 @@ class HeadedBenchmarkCell:
             )
         )
 
-        task_query = self.window._knowledge_task_query_service  # noqa: SLF001
+        task_query = self.runtime_services.knowledge_tasks  # noqa: SLF001
         try:
             self.wait_until(
                 lambda: not task_query.summary().has_active_work,

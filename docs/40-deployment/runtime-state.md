@@ -64,7 +64,12 @@ Use this order:
 4. Choose the smallest intervention.
 5. Restart and verify the failed workflow plus representative retained state.
 
-Prefer an empty isolated `XENIX_APP_HOME` for diagnosis; it changes no existing state. Database quarantine/rebuild loses SQLite-owned registrations and history from the active database but preserves the renamed database for investigation. A full runtime-home reset additionally removes settings, logs, app-owned datasets, artifacts, caches, and local task state. Never include user-owned source files in a runtime reset.
+Prefer `--isolated` (or an empty isolated `XENIX_APP_HOME`) for diagnosis;
+it changes no existing state. Database quarantine/rebuild loses SQLite-owned
+registrations and history from the active database but preserves the renamed
+database for investigation. A full runtime-home reset additionally removes
+settings, logs, app-owned datasets, artifacts, caches, and local task state.
+Never include user-owned source files in a runtime reset.
 
 Knowledge vector maintenance is deliberately narrower than a runtime reset. It may
 reconcile missing or corrupt derived generations, proven unregistered vector
@@ -145,6 +150,6 @@ For migration-specific failure paths, use [Local State Evolution](local-state-ev
 
 ## Remote Workers and Support Bundles
 
-After restoring or changing worker settings, revalidate the selected SSH worker before trusting it. Clear remote staged/cache data only after confirming the remote root and that no active task depends on it. Worker authority and local finalization are owned by [Product TDD](../20-product-tdd/README.md); known setup gaps remain recorded in [ADR 0005](../20-product-tdd/adr/0005-ssh-ml-worker-pool.md).
+After restoring or changing worker settings, revalidate the selected SSH worker before trusting it. Clear remote staged/cache data only after confirming the remote root and that no active task depends on it. Worker authority and local finalization are owned by [Product TDD](../20-prd-tdd/README.md); known setup gaps remain recorded in [ADR 0005](../20-prd-tdd/adr/0005-ssh-ml-worker-pool.md).
 
 `pdm run diagnostic-bundle` creates a local support archive without the raw database. Treat it as sensitive: it contains logs, task logs, the persistent install id, and database summaries. Before manual sharing, review the archive, approve the recipient and retention period, and arrange deletion. The script and its tests own the exact manifest.

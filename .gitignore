@@ -13,6 +13,7 @@ __pypackages__/
 .testmondata
 .coverage
 .coverage.*
+/ui-artifacts/
 
 # Build artifacts
 build/
@@ -61,3 +62,7 @@ nul
 
 # Special
 tasks/packaged-startup-latency/artifacts
+
+# SVC local overlays (generated ignore block)
+AGENTS.local.md
+svc.local.json

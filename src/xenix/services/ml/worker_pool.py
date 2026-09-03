@@ -115,6 +115,8 @@ class MLWorkerPool:
         )[0]
 
     def _enabled_workers(self, settings: MLWorkerSettings) -> list[MLWorkerConfig]:
+        # A disabled pool collapses to local-only execution, ignoring per-worker
+        # enabled flags, so Xenix always keeps a local execution fallback.
         if not settings.pool.enabled:
             return [worker for worker in settings.workers if worker.kind is MLWorkerKind.LOCAL]
         workers: list[MLWorkerConfig] = []
