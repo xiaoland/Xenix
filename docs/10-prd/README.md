@@ -30,8 +30,7 @@ supports, and what uncertainty remains.
 2. Ask Xenix to inspect, combine, clean, prepare, summarize, or visualize the
    registered data.
 3. When useful, define data roles and train, tune, or apply a reusable analyzer.
-4. Review explanations in the conversation and open generated datasets, charts,
-   models, reports, and apply results as local artifacts.
+4. Review explanations and derived-dataset lineage in the conversation, inspect the session's Datasets audit when provenance matters, and open generated datasets, charts, models, reports, and apply results as local artifacts.
 5. Configure supported LLM providers and choose the LLM model used by the next
    assistant response without changing sampling already in progress.
 6. Open the Knowledge Workspace, select or drop TXT, DOC/DOCX, PPT/PPTX, RTF, EPUB, ODT/ODP, PDF,

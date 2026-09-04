@@ -235,10 +235,9 @@ Dataset authority; the Chatbot block remains only its read-only UI projection.
 
 - Harness coordination, Tool sequencing, direct ToolResult/XTT continuity, and
   the command/snapshot boundary: `tests/agent/test_agent_harness_first_slice.py`.
-- Agent skill scope and AgentTool projection:
-  `tests/agent/test_agent_skill_tool_scope.py`,
-  `tests/agent/test_agent_ml_tool_projection.py`, and the per-domain projection
-  tests under `tests/agent/`.
+- Agent skill scope and Tool guidance: `tests/agent/test_agent_skill_tool_scope.py` and `tests/agent/test_agent_data_cleaning_guidance.py`.
+- ToolResult paging: `tests/llm/test_tool_result_pagination.py`.
+- Chatbot projection of Dataset audit evidence: `tests/ui/test_chatbot_contract.py`.
 - Knowledge retrieval and the lookup Tool:
   `tests/knowledge/test_knowledge_retrieval.py` and
   `tests/knowledge/test_knowledge_lookup_tool.py`.

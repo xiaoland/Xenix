@@ -66,12 +66,12 @@ agent-skills-generate = "python scripts/agent_skills.py generate"
 knowledge-ocr-lock-check = "python scripts/build_knowledge_ocr_runtime.py --check-lock"
 lint = "ruff check src tests scripts"
 typecheck = "mypy"
-dev = { composite = ["agent-skills-generate", "python scripts/run_dev.py"] }
+dev = { composite = ["agent-skills-generate", "python scripts/run_dev.py {args}"] }
 i18n-extract = "python scripts/update_translations.py"
 i18n-compile = "python scripts/compile_translations.py"
 package = { composite = ["agent-skills-generate", "agent-skills-check", "python scripts/package_app.py"], env = { PYTHONHASHSEED = "0" } }
 build-knowledge-ocr = "python scripts/build_knowledge_ocr_runtime.py"
-smoke = { composite = ["agent-skills-generate", "python scripts/run_dev.py --smoke-test"] }
+smoke = { composite = ["agent-skills-generate", "python scripts/run_dev.py --smoke-test {args}"] }
 smoke-package = "python scripts/verify_packaged_smoke.py"
 velopack = "python scripts/package_velopack.py"
 release-manifest = "python scripts/write_release_manifest.py"
@@ -81,7 +81,6 @@ release-timings = "python scripts/report_native_workflow_timings.py"
 release-package = { composite = ["package", "smoke-package", "velopack", "release-manifest"] }
 release-build = { composite = ["build-knowledge-ocr", "package", "smoke-package", "velopack", "release-manifest"] }
 release-publish = "python scripts/publish_oss_release.py"
-dist = "python scripts/build_distribution_zip.py"
 pytest = "python scripts/run_pytest.py"
 test = { composite = ["i18n-compile", "python scripts/run_pytest.py {args}"] }
 test-affected = { cmd = "python scripts/run_pytest.py --testmon {args}", env = { COVERAGE_CORE = "pytrace" } }

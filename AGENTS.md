@@ -38,3 +38,7 @@ Xenix Native is a desktop machine-learning workbench for non-technical business 
 
 - Commit only after an explicit user command; include only the approved task scope by default.
 - High-risk storage, runtime, packaging, Agent Harness, ML lifecycle, and Chatbot changes start with the nearest local instructions plus the owner above.
+
+## Documentation
+
+- Documentation is written for Agents. Keep each Markdown paragraph or list item as a semantic line; do not hard-wrap prose solely to satisfy a line-length convention.

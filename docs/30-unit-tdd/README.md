@@ -14,14 +14,7 @@ Chatbot events, UI code, and integration tests.
 
 ## Local Seams
 
-- **UI feature ownership:** MainWindow owns conversation navigation/rendering,
-  not Settings/Knowledge service composition. The auxiliary-window coordinator
-  receives feature factories from the application and shuts update/dialog work
-  down before application services. History receives summaries and action ports;
-  opening a thread remains a shell command. Provider editing owns an in-memory
-  draft, while SettingsDialog owns persistence; OCR owns its own generation and
-  shutdown. Runtime/benchmark observers obtain application service handles from
-  the composition callback, never through widget storage or service fields.
+- **UI feature ownership:** `MainWindow` owns shell layout and top-level navigation; `ChatWorkspace` owns conversation coordination and `ThreadDetailView` owns rendering. The shell does not own Settings, Knowledge, Jobs, Dataset Audit, or Tool-detail service composition. The auxiliary-window coordinator receives feature factories from the application and shuts update/dialog work down before application services. History receives summaries and action ports; opening a thread remains a shell command. Provider editing owns an in-memory draft, while SettingsDialog owns persistence; OCR owns its own generation and shutdown. Runtime/benchmark observers obtain application service handles from the composition callback, never through widget storage or service fields.
 - **UI turn presentation:** A pure UI-local controller gates callbacks by the
   active submission generation, tracks append acknowledgement, and admits the
   final snapshot after Stop. It does not own canonical Message state. The
@@ -87,18 +80,10 @@ guards local ownership and sequence traps.
 
 ## Verification
 
-- Harness coordination and direct ToolResult/XTT continuity:
-  `tests/agent/test_agent_harness_first_slice.py` and
-  `tests/agent/test_agent_dataset_audit.py`.
-- Agent skill scope and AgentTool projection:
-  `tests/agent/test_agent_skill_tool_scope.py`,
-  `tests/agent/test_agent_ml_tool_projection.py`,
-  `tests/agent/test_agent_ml_clustering_projection.py`,
-  `tests/agent/test_agent_ml_forecast_projection.py`,
-  `tests/agent/test_agent_ml_recommendation_projection.py`,
-  `tests/agent/test_agent_ml_text_classification_projection.py`,
-  `tests/agent/test_agent_ml_text_discovery_projection.py`, and
-  `tests/agent/test_agent_data_cleaning_guidance.py`.
+- Harness coordination and direct ToolResult/XTT continuity: `tests/agent/test_agent_harness_first_slice.py`.
+- Agent skill scope and Tool guidance: `tests/agent/test_agent_skill_tool_scope.py` and `tests/agent/test_agent_data_cleaning_guidance.py`.
+- ToolResult paging: `tests/llm/test_tool_result_pagination.py`.
+- Conversation shell, callback gating, and Dataset audit presentation: `tests/ui/test_main_window_conversation.py`, `tests/ui/test_auxiliary_windows.py`, `tests/ui/test_chatbot_contract.py`, and `tests/ui_models/`.
 - Knowledge retrieval and the lookup Tool:
   `tests/knowledge/test_knowledge_retrieval.py` and
   `tests/knowledge/test_knowledge_lookup_tool.py`.

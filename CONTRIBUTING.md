@@ -13,11 +13,7 @@
 - Promote accepted work through one same-repository GitHub PR whose head is
   `develop` and base is `main`. Native CI is scoped to PRs targeting `main`; its
   single stable `Native CI` check is required before merge.
-- A task-specific `feat/* -> main` draft PR is a documented exception for
-  CI acceptance against a clean `main` baseline; it is explicitly authorized
-  per task and never merges. See [`tasks/ui-dx/ci-acceptance.md`](tasks/ui-dx/ci-acceptance.md).
-- Do not locally merge `develop` into `main` and push the result. Do not open
-  ordinary feature-branch PRs directly to `main`.
+- Do not locally merge `develop` into `main` and push the result. Do not open feature-branch PRs directly to `main`.
 - A merged promotion makes its resulting `main` state release-eligible but does not
   release it. Release starts only when an immutable `v<project-version>` tag is
   pushed on an eligible promotion result.

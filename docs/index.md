@@ -9,4 +9,4 @@ Durable project knowledge. Root [`AGENTS.md`](../AGENTS.md) owns repository entr
 - [LLM Conversation / Agent Harness unit design memory](30-unit-tdd/README.md)
 - [Trigger-routed packaging, runtime, observability, migration, and recovery](40-deployment/README.md)
 
-Volatile reasoning, evidence, and temporary artifacts belong in `tasks/`; retention is defined by root `AGENTS.md`.
+Volatile reasoning, evidence, and temporary artifacts belong in `tasks/`; they may explain how a change was reached but do not override durable owners or current source and tests.

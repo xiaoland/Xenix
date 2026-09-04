@@ -55,7 +55,7 @@ add line-edit values, combo text, file paths, credentials, or message bodies to
 the schema. Runtime/user screenshots require separate explicit authority and are
 not enabled by the layout-debug switch.
 
-Native CI captures the five admitted Widget Lab scenarios under
+Native CI captures every admitted Widget Lab scenario under
 `ui-artifacts/scenarios/` via `pdm run ui-capture-all`, runs the native-window
 smoke in a separate `windows` QPA pytest process, and rebuilds
 `ui-artifacts/index.json`. The index contains only manifest metadata, relative

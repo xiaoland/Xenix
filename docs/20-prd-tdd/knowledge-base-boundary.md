@@ -191,8 +191,7 @@ activation is methodology, not authorization, and does not grant a new tool scop
   `tests/knowledge/test_knowledge_lookup_tool.py`.
 - Index status, rebuild, and shutdown lifecycle:
   `tests/knowledge/test_knowledge_index_service.py`.
-- Embedding-model change confirmation:
-  `tests/knowledge/test_embedding_change_confirmation.py`.
+- Embedding-model change confirmation: `tests/ui/test_embedding_settings.py`.
 - Native OCR runtime build, archive provenance, and binary boundaries:
   `tests/knowledge/test_knowledge_ocr_runtime.py`.
 - Rule-plus-data Agent behavior:

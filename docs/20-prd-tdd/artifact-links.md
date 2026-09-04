@@ -62,6 +62,4 @@ requests a normal openable artifact. Both retain the same artifact id authority.
 
 ## Verification
 
-URI parsing and activation are covered through the Agent tool projection tests
-under `tests/agent/`, the artifact registration test under `tests/storage/`, and
-the end-to-end Agent artifact-link checks under `tests/e2e/agent_harness/`.
+URI parsing and registration are covered by `tests/storage/test_storage_artifacts.py`; producing ML service paths and end-to-end Agent artifact links are covered under `tests/ml/` and `tests/e2e/agent_harness/`.
