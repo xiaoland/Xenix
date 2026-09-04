@@ -122,7 +122,7 @@ a = Analysis(
         "_polars_runtime_32",
         "_polars_runtime_32._polars_runtime",
     ] + knowledge_hiddenimports,
-    hookspath=[],
+    hookspath=[str(scripts_root / "pyinstaller_hooks")],
     hooksconfig={},
     runtime_hooks=[],
     excludes=[],

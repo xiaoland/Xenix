@@ -332,32 +332,32 @@ This route will stay available after model selection is connected.</source>
 <context>
     <name>DatasetAudit</name>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="198"/>
+        <location filename="../ui/conversation/presentation.py" line="200"/>
         <source>Dataset: `{name}` (`{dataset_id}`)</source>
         <translation>数据集：`{name}`（`{dataset_id}`）</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="201"/>
+        <location filename="../ui/conversation/presentation.py" line="203"/>
         <source>Generation: {generation}</source>
         <translation>代数：{generation}</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="202"/>
+        <location filename="../ui/conversation/presentation.py" line="206"/>
         <source>Recorded operation: `{operation}`</source>
         <translation>记录的操作：`{operation}`</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="205"/>
+        <location filename="../ui/conversation/presentation.py" line="209"/>
         <source>Recorded at: {created_at}</source>
         <translation>记录于：{created_at}</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="211"/>
+        <location filename="../ui/conversation/presentation.py" line="217"/>
         <source>Input {position}: `{name}` (`{dataset_id}`)</source>
         <translation>输入 {position}：`{name}`（`{dataset_id}`）</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="220"/>
+        <location filename="../ui/conversation/presentation.py" line="226"/>
         <source>alias `{alias}`</source>
         <translation>别名 `{alias}`</translation>
     </message>
@@ -1728,18 +1728,18 @@ Trigger: %2</source>
         <translation type="vanished">无法打开产物：{path}</translation>
     </message>
     <message>
-        <location filename="../ui/chat_workspace.py" line="409"/>
-        <location filename="../ui/chat_workspace.py" line="426"/>
+        <location filename="../ui/chat_workspace.py" line="410"/>
+        <location filename="../ui/chat_workspace.py" line="427"/>
         <source>Opening link...</source>
         <translation>正在打开链接...</translation>
     </message>
     <message>
-        <location filename="../ui/chat_workspace.py" line="427"/>
+        <location filename="../ui/chat_workspace.py" line="428"/>
         <source>Open Link</source>
         <translation>打开链接</translation>
     </message>
     <message>
-        <location filename="../ui/chat_workspace.py" line="471"/>
+        <location filename="../ui/chat_workspace.py" line="472"/>
         <source>The submitted message is being prepared and cannot be stopped.</source>
         <translation>已提交的消息正在准备中，无法停止。</translation>
     </message>
@@ -1809,12 +1809,12 @@ Trigger: %2</source>
         <translation>数据集审计服务不可用。</translation>
     </message>
     <message>
-        <location filename="../ui/chat_workspace.py" line="273"/>
+        <location filename="../ui/chat_workspace.py" line="274"/>
         <source>The selected source path is not a file.</source>
         <translation>所选源路径不是文件。</translation>
     </message>
     <message>
-        <location filename="../ui/chat_workspace.py" line="487"/>
+        <location filename="../ui/chat_workspace.py" line="488"/>
         <source>Stopped.</source>
         <translation>已停止。</translation>
     </message>
@@ -2594,37 +2594,37 @@ Text vectors: %2</source>
         <translation type="vanished">业务机器学习工作台</translation>
     </message>
     <message>
-        <location filename="../ui/startup_splash.py" line="254"/>
+        <location filename="../ui/startup_splash.py" line="85"/>
         <source>Starting Xenix...</source>
         <translation>正在启动 Xenix...</translation>
     </message>
     <message>
-        <location filename="../ui/startup_splash.py" line="255"/>
+        <location filename="../ui/startup_splash.py" line="86"/>
         <source>Preparing application data...</source>
         <translation>正在准备应用数据...</translation>
     </message>
     <message>
-        <location filename="../ui/startup_splash.py" line="256"/>
+        <location filename="../ui/startup_splash.py" line="87"/>
         <source>Loading runtime components...</source>
         <translation>正在加载运行时组件...</translation>
     </message>
     <message>
-        <location filename="../ui/startup_splash.py" line="257"/>
+        <location filename="../ui/startup_splash.py" line="88"/>
         <source>Initializing runtime logging...</source>
         <translation>正在初始化运行日志...</translation>
     </message>
     <message>
-        <location filename="../ui/startup_splash.py" line="258"/>
+        <location filename="../ui/startup_splash.py" line="89"/>
         <source>Initializing local database...</source>
         <translation>正在初始化本地数据库...</translation>
     </message>
     <message>
-        <location filename="../ui/startup_splash.py" line="259"/>
+        <location filename="../ui/startup_splash.py" line="90"/>
         <source>Loading workbench...</source>
         <translation>正在加载工作台...</translation>
     </message>
     <message>
-        <location filename="../ui/startup_splash.py" line="260"/>
+        <location filename="../ui/startup_splash.py" line="91"/>
         <source>Ready.</source>
         <translation>准备就绪。</translation>
     </message>
@@ -2655,7 +2655,7 @@ Text vectors: %2</source>
     </message>
     <message>
         <location filename="../ui/conversation/presentation.py" line="177"/>
-        <location filename="../ui/conversation/presentation.py" line="182"/>
+        <location filename="../ui/conversation/presentation.py" line="184"/>
         <source>tool</source>
         <translation>工具</translation>
     </message>
@@ -2665,32 +2665,32 @@ Text vectors: %2</source>
         <translation>正在调用 `{tool_name}`...</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="185"/>
+        <location filename="../ui/conversation/presentation.py" line="187"/>
         <source>`{tool_name}` {status}.</source>
         <translation>`{tool_name}` {status}。</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="333"/>
+        <location filename="../ui/conversation/presentation.py" line="339"/>
         <source>completed</source>
         <translation>已完成</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="335"/>
+        <location filename="../ui/conversation/presentation.py" line="341"/>
         <source>failed</source>
         <translation>失败</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="337"/>
+        <location filename="../ui/conversation/presentation.py" line="343"/>
         <source>cancelled</source>
         <translation>已取消</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="339"/>
+        <location filename="../ui/conversation/presentation.py" line="345"/>
         <source>running</source>
         <translation>运行中</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="341"/>
+        <location filename="../ui/conversation/presentation.py" line="347"/>
         <source>requested</source>
         <translation>已请求</translation>
     </message>
@@ -2833,247 +2833,247 @@ Text vectors: %2</source>
 <context>
     <name>ToolCallItem</name>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="347"/>
+        <location filename="../ui/conversation/presentation.py" line="353"/>
         <source>Running tool...</source>
         <translation>正在运行工具...</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="349"/>
+        <location filename="../ui/conversation/presentation.py" line="355"/>
         <source>Ran tool</source>
         <translation>工具已运行</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="351"/>
+        <location filename="../ui/conversation/presentation.py" line="357"/>
         <source>Cancelled tool run</source>
         <translation>工具运行已取消</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="353"/>
+        <location filename="../ui/conversation/presentation.py" line="359"/>
         <source>Searching knowledge...</source>
         <translation>正在搜索知识...</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="355"/>
+        <location filename="../ui/conversation/presentation.py" line="361"/>
         <source>Searched knowledge</source>
         <translation>已搜索知识</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="357"/>
+        <location filename="../ui/conversation/presentation.py" line="363"/>
         <source>Failed to search knowledge</source>
         <translation>知识搜索失败</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="359"/>
+        <location filename="../ui/conversation/presentation.py" line="365"/>
         <source>Cancelled knowledge search</source>
         <translation>已取消知识搜索</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="361"/>
+        <location filename="../ui/conversation/presentation.py" line="367"/>
         <source>Inspecting dataset...</source>
         <translation>正在检查数据集...</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="363"/>
+        <location filename="../ui/conversation/presentation.py" line="369"/>
         <source>Inspected dataset</source>
         <translation>已检查数据集</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="365"/>
+        <location filename="../ui/conversation/presentation.py" line="371"/>
         <source>Cancelled dataset inspection</source>
         <translation>数据集检查已取消</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="367"/>
+        <location filename="../ui/conversation/presentation.py" line="373"/>
         <source>Integrating data...</source>
         <translation>正在整合数据...</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="369"/>
+        <location filename="../ui/conversation/presentation.py" line="375"/>
         <source>Integrated data</source>
         <translation>数据已整合</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="371"/>
+        <location filename="../ui/conversation/presentation.py" line="377"/>
         <source>Cancelled data integration</source>
         <translation>数据整合已取消</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="373"/>
+        <location filename="../ui/conversation/presentation.py" line="379"/>
         <source>Profiling dataset...</source>
         <translation>正在分析数据集...</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="375"/>
+        <location filename="../ui/conversation/presentation.py" line="381"/>
         <source>Profiled dataset</source>
         <translation>数据集分析完成</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="377"/>
+        <location filename="../ui/conversation/presentation.py" line="383"/>
         <source>Cancelled dataset profile</source>
         <translation>数据集分析已取消</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="379"/>
+        <location filename="../ui/conversation/presentation.py" line="385"/>
         <source>Drawing graph...</source>
         <translation>正在绘制图表...</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="381"/>
+        <location filename="../ui/conversation/presentation.py" line="387"/>
         <source>Drew graph</source>
         <translation>图表已绘制</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="383"/>
+        <location filename="../ui/conversation/presentation.py" line="389"/>
         <source>Cancelled graph drawing</source>
         <translation>图表绘制已取消</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="385"/>
+        <location filename="../ui/conversation/presentation.py" line="391"/>
         <source>Cleaning dataset...</source>
         <translation>正在清洗数据集...</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="387"/>
+        <location filename="../ui/conversation/presentation.py" line="393"/>
         <source>Cleaned dataset</source>
         <translation>数据集已清洗</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="389"/>
+        <location filename="../ui/conversation/presentation.py" line="395"/>
         <source>Cancelled dataset cleaning</source>
         <translation>数据集清洗已取消</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="391"/>
+        <location filename="../ui/conversation/presentation.py" line="397"/>
         <source>Querying dataset...</source>
         <translation>正在查询数据集...</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="393"/>
+        <location filename="../ui/conversation/presentation.py" line="399"/>
         <source>Queried dataset</source>
         <translation>数据集已查询</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="395"/>
+        <location filename="../ui/conversation/presentation.py" line="401"/>
         <source>Cancelled dataset query</source>
         <translation>数据集查询已取消</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="397"/>
+        <location filename="../ui/conversation/presentation.py" line="403"/>
         <source>Transforming dataset...</source>
         <translation>正在转换数据集...</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="399"/>
+        <location filename="../ui/conversation/presentation.py" line="405"/>
         <source>Transformed dataset</source>
         <translation>数据集已转换</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="401"/>
+        <location filename="../ui/conversation/presentation.py" line="407"/>
         <source>Cancelled dataset transformation</source>
         <translation>数据集转换已取消</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="403"/>
+        <location filename="../ui/conversation/presentation.py" line="409"/>
         <source>Selecting features...</source>
         <translation>正在选择特征...</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="405"/>
+        <location filename="../ui/conversation/presentation.py" line="411"/>
         <source>Selected features</source>
         <translation>特征已选择</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="407"/>
+        <location filename="../ui/conversation/presentation.py" line="413"/>
         <source>Cancelled feature selection</source>
         <translation>特征选择已取消</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="409"/>
+        <location filename="../ui/conversation/presentation.py" line="415"/>
         <source>Loading model metadata...</source>
         <translation>正在加载模型元数据...</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="411"/>
+        <location filename="../ui/conversation/presentation.py" line="417"/>
         <source>Loaded model metadata</source>
         <translation>模型元数据已加载</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="413"/>
+        <location filename="../ui/conversation/presentation.py" line="419"/>
         <source>Cancelled model metadata lookup</source>
         <translation>模型元数据查询已取消</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="415"/>
+        <location filename="../ui/conversation/presentation.py" line="421"/>
         <source>Training model...</source>
         <translation>正在训练模型...</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="417"/>
+        <location filename="../ui/conversation/presentation.py" line="423"/>
         <source>Trained model</source>
         <translation>模型已训练</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="419"/>
+        <location filename="../ui/conversation/presentation.py" line="425"/>
         <source>Cancelled model training</source>
         <translation>模型训练已取消</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="421"/>
+        <location filename="../ui/conversation/presentation.py" line="427"/>
         <source>Tuning model...</source>
         <translation>正在调优模型...</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="423"/>
+        <location filename="../ui/conversation/presentation.py" line="429"/>
         <source>Tuned model</source>
         <translation>模型已调优</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="425"/>
+        <location filename="../ui/conversation/presentation.py" line="431"/>
         <source>Model tuning running in background</source>
         <translation>模型调优正在后台运行</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="427"/>
+        <location filename="../ui/conversation/presentation.py" line="433"/>
         <source>Cancelled model tuning</source>
         <translation>模型调优已取消</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="429"/>
+        <location filename="../ui/conversation/presentation.py" line="435"/>
         <source>Applying model...</source>
         <translation>正在应用模型...</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="431"/>
+        <location filename="../ui/conversation/presentation.py" line="437"/>
         <source>Applied model</source>
         <translation>模型已应用</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="433"/>
+        <location filename="../ui/conversation/presentation.py" line="439"/>
         <source>Model training running in background</source>
         <translation>模型训练正在后台运行</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="435"/>
+        <location filename="../ui/conversation/presentation.py" line="441"/>
         <source>Model apply running in background</source>
         <translation>模型应用正在后台运行</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="437"/>
+        <location filename="../ui/conversation/presentation.py" line="443"/>
         <source>Checking model task...</source>
         <translation>正在检查模型任务...</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="439"/>
+        <location filename="../ui/conversation/presentation.py" line="445"/>
         <source>Checked model task</source>
         <translation>模型任务已检查</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="441"/>
+        <location filename="../ui/conversation/presentation.py" line="447"/>
         <source>Cancelled model task check</source>
         <translation>模型任务检查已取消</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="443"/>
+        <location filename="../ui/conversation/presentation.py" line="449"/>
         <source>Cancelled model apply</source>
         <translation>模型应用已取消</translation>
     </message>
@@ -3149,12 +3149,12 @@ Text vectors: %2</source>
 <context>
     <name>UsageOverviewItem</name>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="458"/>
+        <location filename="../ui/conversation/presentation.py" line="464"/>
         <source> ({cached} cached)</source>
         <translation>（{cached} 缓存命中）</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="462"/>
+        <location filename="../ui/conversation/presentation.py" line="468"/>
         <source>↑ {input} · ↓ {output}</source>
         <translation>↑ {input} · ↓ {output}</translation>
     </message>
