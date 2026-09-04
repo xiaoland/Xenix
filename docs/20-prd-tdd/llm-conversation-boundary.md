@@ -59,6 +59,7 @@ Tool modules.
 - Chatbot UI submits intent and renders Chatbot Events. It neither accesses a
   conversation repository nor infers protocol state from storage rows or raw
   Tool payloads.
+- Failures from local UI commands such as opening a link use transient operation feedback outside the timeline. A terminal Harness submission failure uses a dismissible notification outside the timeline that remains until the next submission or Thread selection, while failures already represented by Chatbot Events, including connection retries and Tool failures, remain visible in the conversation UI.
 - Final Messages are durable. A pending sampling Message is the sole
   provisional canonical state. There is no persistent `Turn`, `Run`,
   `ConversationStore`, execution ledger, or automatic cross-process recovery.

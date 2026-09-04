@@ -23,6 +23,7 @@ Chatbot events, UI code, and integration tests.
   work. A closed gate suppresses UI delivery, not service I/O already in flight.
   Before append, a failure preserves Composer input; after append it reloads the
   canonical snapshot and never restores that input for resend.
+- **UI operation feedback:** Failures from link activation, attachment preparation, model selection, or other non-Harness UI commands use an auto-dismissing non-modal notification. A terminal Harness submission failure uses the same notification surface until dismissal, the next submission, or Thread selection; connection retries and Tool failures remain visible in the conversation UI.
 - **Submission:** Harness validates UI input, coordinates source import through
   DatasetService, then asks `LLMConversationService` to append the User
   Message. Dataset blocks are canonical context; source attachments are
