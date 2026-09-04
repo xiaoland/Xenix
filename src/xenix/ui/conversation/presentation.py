@@ -9,6 +9,7 @@ once, then the rest of the Chatbot UI works with ``ChatbotBlock`` values.
 
 from __future__ import annotations
 
+import json
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from enum import StrEnum
@@ -83,6 +84,13 @@ class ChatbotBlock(BaseModel):
     file_path: str = ""
     artifact_id: str = ""
     dataset_id: str = ""
+    name: str = ""
+    operation_name: str = ""
+    generation: int = 0
+    created_at: str = ""
+    inputs: list[dict[str, Any]] = Field(default_factory=list)
+    parameters_payload: dict[str, Any] = Field(default_factory=dict)
+    agent_explanation: str = ""
     is_openable: bool = False
     chatbot_source_projection: bool = False
     chatbot_visible: bool | None = None
@@ -153,6 +161,8 @@ def render_content_blocks(
             # Chatbot attachments.  Harness enrichment supplies a separate
             # UI-only source_attachment block when one can be resolved.
             continue
+        elif block_type == "dataset_audit":
+            parts.append(_dataset_audit_markdown(block))
         elif block_type == "step_confirmation":
             parts.append(block.text)
         elif block_type == "thinking":
@@ -181,6 +191,67 @@ def render_content_blocks(
                 text = f"{text} {error_summary}"
             parts.append(text)
     return "\n\n".join(part for part in parts if part)
+
+
+def _dataset_audit_markdown(block: ChatbotBlock) -> str:
+    lines = [
+        f"### {QCoreApplication.translate('DatasetAudit', 'Dataset audit')}",
+        "",
+        QCoreApplication.translate(
+            "DatasetAudit", "Dataset: `{name}` (`{dataset_id}`)"
+        ).format(name=_markdown_code(block.name), dataset_id=_markdown_code(block.dataset_id)),
+        QCoreApplication.translate("DatasetAudit", "Generation: {generation}").format(
+            generation=block.generation
+        ),
+        QCoreApplication.translate(
+            "DatasetAudit", "Recorded operation: `{operation}`"
+        ).format(operation=_markdown_code(block.operation_name)),
+        QCoreApplication.translate("DatasetAudit", "Recorded at: {created_at}").format(
+            created_at=block.created_at
+        ),
+    ]
+    if block.inputs:
+        lines.extend(["", f"#### {QCoreApplication.translate('DatasetAudit', 'Inputs')}"])
+        for item in block.inputs:
+            position = int(item.get("position", 0)) + 1
+            input_line = QCoreApplication.translate(
+                "DatasetAudit", "Input {position}: `{name}` (`{dataset_id}`)"
+            ).format(
+                position=position,
+                name=_markdown_code(str(item.get("name") or "")),
+                dataset_id=_markdown_code(str(item.get("dataset_id") or "")),
+            )
+            alias = str(item.get("alias") or "").strip()
+            if alias:
+                input_line += " — " + QCoreApplication.translate(
+                    "DatasetAudit", "alias `{alias}`"
+                ).format(alias=_markdown_code(alias))
+            lines.append(f"- {input_line}")
+    if block.agent_explanation.strip():
+        lines.extend(
+            [
+                "",
+                f"#### {QCoreApplication.translate('DatasetAudit', 'Agent-authored explanation')}",
+                f"*{QCoreApplication.translate('DatasetAudit', 'Not system-verified.')}*",
+                "",
+                block.agent_explanation.strip(),
+            ]
+        )
+    if block.parameters_payload:
+        lines.extend(
+            [
+                "",
+                f"#### {QCoreApplication.translate('DatasetAudit', 'Recorded parameters')}",
+                "```json",
+                json.dumps(block.parameters_payload, ensure_ascii=False, indent=2, default=str),
+                "```",
+            ]
+        )
+    return "\n".join(lines)
+
+
+def _markdown_code(value: str) -> str:
+    return value.replace("`", "\\`")
 
 
 def chatbot_block_is_visible(block: ChatbotBlock) -> bool:

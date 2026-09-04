@@ -29,6 +29,41 @@ def test_chat_shell_has_stable_unique_semantic_identities(qtbot: QtBot) -> None:
     assert view.timeline.scroll_to_bottom_button.accessibleName() == view.tr("Scroll to bottom")
 
 
+def test_dataset_audit_block_is_rendered_in_tool_detail() -> None:
+    from xenix.ui.conversation.presentation import coerce_blocks, render_content_blocks
+
+    markdown = render_content_blocks(
+        coerce_blocks(
+            [
+                {
+                    "type": "dataset_audit",
+                    "name": "clean`data",
+                    "dataset_id": "dataset-2",
+                    "operation_name": "clean_dataset",
+                    "generation": 2,
+                    "created_at": "2026-09-03T10:00:00+08:00",
+                    "inputs": [
+                        {
+                            "position": 0,
+                            "name": "raw",
+                            "dataset_id": "dataset-1",
+                            "alias": "source",
+                        }
+                    ],
+                    "parameters_payload": {"drop_nulls": True},
+                    "agent_explanation": "Removed incomplete rows.",
+                }
+            ]
+        )
+    )
+
+    assert "### Dataset audit" in markdown
+    assert "Dataset: `clean\\`data` (`dataset-2`)" in markdown
+    assert "Input 1: `raw` (`dataset-1`) — alias `source`" in markdown
+    assert '"drop_nulls": true' in markdown
+    assert "Removed incomplete rows." in markdown
+
+
 def test_send_action_accessible_name_tracks_visual_state(qtbot: QtBot, tmp_path) -> None:
     view = ThreadDetailView()
     qtbot.addWidget(view)

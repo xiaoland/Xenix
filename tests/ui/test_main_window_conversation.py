@@ -114,6 +114,14 @@ def _submit(view, text: str, attachment: Path | None = None) -> None:
     view.message_submitted.emit(text, paths, "")
 
 
+def test_main_window_exposes_dataset_audit_entry(qtbot: QtBot, ui_artifacts, tmp_path) -> None:
+    window, _harness, _executor = _window(qtbot, ui_artifacts, tmp_path)
+
+    assert window._datasets_button.isVisible()
+    assert window._datasets_button.text() == window.tr("Datasets")
+    assert window._datasets_button.accessibleIdentifier() == "main.header.datasets"
+
+
 def test_pre_ack_failure_preserves_composer_for_retry(qtbot: QtBot, ui_artifacts, tmp_path) -> None:
     window, _harness, executor = _window(qtbot, ui_artifacts, tmp_path)
     view = window._thread_detail_view

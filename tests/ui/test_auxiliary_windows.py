@@ -64,6 +64,19 @@ class _DetailWindow(QWidget):
     pass
 
 
+class _DatasetAuditWindow(QWidget):
+    def __init__(self, parent: QWidget, thread_id: str) -> None:
+        super().__init__(parent)
+        self.thread_ids = [thread_id]
+        self.retranslate_calls = 0
+
+    def set_thread_id(self, thread_id: str) -> None:
+        self.thread_ids.append(thread_id)
+
+    def retranslate_ui(self) -> None:
+        self.retranslate_calls += 1
+
+
 class _UpdateController(QWidget):
     operation_active_changed = Signal(bool)
 
@@ -95,6 +108,7 @@ def test_lazily_creates_windows_wires_updates_and_preserves_parent(qtbot: QtBot)
     settings: list[_SettingsWindow] = []
     knowledge: list[_KnowledgeWindow] = []
     details: list[_DetailWindow] = []
+    dataset_audits: list[_DatasetAuditWindow] = []
     update = _UpdateController()
     coordinator = AuxiliaryWindowCoordinator(
         owner,
@@ -103,6 +117,10 @@ def test_lazily_creates_windows_wires_updates_and_preserves_parent(qtbot: QtBot)
             _KnowledgeWindow(parent, open_settings)
         ) or knowledge[-1],
         detail_factory=lambda parent, _ids: details.append(_DetailWindow(parent)) or details[-1],
+        dataset_audit_factory=lambda parent, thread_id: dataset_audits.append(
+            _DatasetAuditWindow(parent, thread_id)
+        )
+        or dataset_audits[-1],
         update_controller=update,  # type: ignore[arg-type]
     )
     saved: list[None] = []
@@ -112,6 +130,8 @@ def test_lazily_creates_windows_wires_updates_and_preserves_parent(qtbot: QtBot)
     coordinator.show_settings(tab=SettingsTab.KNOWLEDGE_BASE)
     coordinator.show_knowledge()
     coordinator.show_tool_call_detail(task_ids=["task-1"])
+    coordinator.show_dataset_audit(thread_id="thread-1")
+    coordinator.show_dataset_audit(thread_id="thread-2")
 
     assert len(settings) == 1
     assert settings[0].parent() is owner
@@ -120,6 +140,9 @@ def test_lazily_creates_windows_wires_updates_and_preserves_parent(qtbot: QtBot)
     assert len(knowledge) == 1
     assert knowledge[0].parent() is owner
     assert len(details) == 1
+    assert len(dataset_audits) == 1
+    assert dataset_audits[0].parent() is owner
+    assert dataset_audits[0].thread_ids == ["thread-1", "thread-2"]
     settings[0].agent_settings_saved.emit()
     settings[0].software_update_requested.emit()
     assert saved == [None]

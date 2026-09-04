@@ -257,6 +257,39 @@
     </message>
 </context>
 <context>
+    <name>DatasetAudit</name>
+    <message>
+        <location filename="../ui/conversation/presentation.py" line="200"/>
+        <source>Dataset: `{name}` (`{dataset_id}`)</source>
+        <translation>Dataset: `{name}` (`{dataset_id}`)</translation>
+    </message>
+    <message>
+        <location filename="../ui/conversation/presentation.py" line="203"/>
+        <source>Generation: {generation}</source>
+        <translation>Generation: {generation}</translation>
+    </message>
+    <message>
+        <location filename="../ui/conversation/presentation.py" line="206"/>
+        <source>Recorded operation: `{operation}`</source>
+        <translation>Recorded operation: `{operation}`</translation>
+    </message>
+    <message>
+        <location filename="../ui/conversation/presentation.py" line="209"/>
+        <source>Recorded at: {created_at}</source>
+        <translation>Recorded at: {created_at}</translation>
+    </message>
+    <message>
+        <location filename="../ui/conversation/presentation.py" line="217"/>
+        <source>Input {position}: `{name}` (`{dataset_id}`)</source>
+        <translation>Input {position}: `{name}` (`{dataset_id}`)</translation>
+    </message>
+    <message>
+        <location filename="../ui/conversation/presentation.py" line="226"/>
+        <source>alias `{alias}`</source>
+        <translation>alias `{alias}`</translation>
+    </message>
+</context>
+<context>
     <name>DatasetAuditDialog</name>
     <message>
         <location filename="../ui/dataset_audit_dialog.py" line="143"/>
@@ -1550,30 +1583,37 @@ Trigger: %2</translation>
         <translation type="vanished">Downloading Xenix {version}...</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="177"/>
+        <location filename="../ui/main_window.py" line="185"/>
         <source>Xenix Native</source>
         <translation>Xenix Native</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="178"/>
+        <location filename="../ui/main_window.py" line="186"/>
         <source>Xenix</source>
         <translation>Xenix</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="179"/>
+        <location filename="../ui/main_window.py" line="187"/>
         <source>Settings</source>
         <translation>Settings</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="180"/>
+        <location filename="../ui/main_window.py" line="188"/>
         <source>Knowledge</source>
         <translation>Knowledge</translation>
     </message>
     <message>
-        <location filename="../ui/main_window.py" line="181"/>
-        <location filename="../ui/windows/auxiliary.py" line="109"/>
+        <location filename="../ui/main_window.py" line="189"/>
+        <location filename="../ui/windows/auxiliary.py" line="114"/>
         <source>Jobs</source>
         <translation>Jobs</translation>
+    </message>
+    <message>
+        <location filename="../ui/main_window.py" line="190"/>
+        <location filename="../ui/windows/auxiliary.py" line="141"/>
+        <location filename="../ui/windows/auxiliary.py" line="150"/>
+        <source>Datasets</source>
+        <translation>Datasets</translation>
     </message>
     <message>
         <location filename="../ui/history/panel.py" line="221"/>
@@ -1587,19 +1627,29 @@ Trigger: %2</translation>
         <translation>New thread</translation>
     </message>
     <message>
-        <location filename="../ui/windows/auxiliary.py" line="90"/>
+        <location filename="../ui/windows/auxiliary.py" line="95"/>
         <source>Knowledge Workspace</source>
         <translation>Knowledge Workspace</translation>
     </message>
     <message>
-        <location filename="../ui/windows/auxiliary.py" line="91"/>
+        <location filename="../ui/windows/auxiliary.py" line="96"/>
         <source>Knowledge services are not available.</source>
         <translation>Knowledge services are not available.</translation>
     </message>
     <message>
-        <location filename="../ui/windows/auxiliary.py" line="110"/>
+        <location filename="../ui/windows/auxiliary.py" line="115"/>
         <source>Job services are not available.</source>
         <translation>Job services are not available.</translation>
+    </message>
+    <message>
+        <location filename="../ui/windows/auxiliary.py" line="142"/>
+        <source>Open a conversation to inspect its datasets.</source>
+        <translation>Open a conversation to inspect its datasets.</translation>
+    </message>
+    <message>
+        <location filename="../ui/windows/auxiliary.py" line="151"/>
+        <source>Dataset audit services are not available.</source>
+        <translation>Dataset audit services are not available.</translation>
     </message>
     <message>
         <location filename="../ui/chat_workspace.py" line="276"/>
@@ -2393,53 +2443,53 @@ Text vectors: %2</translation>
 <context>
     <name>ThreadDetailView</name>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="120"/>
+        <location filename="../ui/conversation/presentation.py" line="128"/>
         <source>Error: {message}</source>
         <translation>Error: {message}</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="163"/>
+        <location filename="../ui/conversation/presentation.py" line="173"/>
         <source>Thinking...</source>
         <translation>Thinking...</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="167"/>
-        <location filename="../ui/conversation/presentation.py" line="174"/>
+        <location filename="../ui/conversation/presentation.py" line="177"/>
+        <location filename="../ui/conversation/presentation.py" line="184"/>
         <source>tool</source>
         <translation>tool</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="169"/>
+        <location filename="../ui/conversation/presentation.py" line="179"/>
         <source>Calling `{tool_name}`...</source>
         <translation>Calling `{tool_name}`...</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="177"/>
+        <location filename="../ui/conversation/presentation.py" line="187"/>
         <source>`{tool_name}` {status}.</source>
         <translation>`{tool_name}` {status}.</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="268"/>
+        <location filename="../ui/conversation/presentation.py" line="339"/>
         <source>completed</source>
         <translation>completed</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="270"/>
+        <location filename="../ui/conversation/presentation.py" line="341"/>
         <source>failed</source>
         <translation>failed</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="272"/>
+        <location filename="../ui/conversation/presentation.py" line="343"/>
         <source>cancelled</source>
         <translation>cancelled</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="274"/>
+        <location filename="../ui/conversation/presentation.py" line="345"/>
         <source>running</source>
         <translation>running</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="276"/>
+        <location filename="../ui/conversation/presentation.py" line="347"/>
         <source>requested</source>
         <translation>requested</translation>
     </message>
@@ -2570,247 +2620,247 @@ Text vectors: %2</translation>
 <context>
     <name>ToolCallItem</name>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="282"/>
+        <location filename="../ui/conversation/presentation.py" line="353"/>
         <source>Running tool...</source>
         <translation>Running tool...</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="284"/>
+        <location filename="../ui/conversation/presentation.py" line="355"/>
         <source>Ran tool</source>
         <translation>Ran tool</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="286"/>
+        <location filename="../ui/conversation/presentation.py" line="357"/>
         <source>Cancelled tool run</source>
         <translation>Cancelled tool run</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="288"/>
+        <location filename="../ui/conversation/presentation.py" line="359"/>
         <source>Searching knowledge...</source>
         <translation>Searching knowledge...</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="290"/>
+        <location filename="../ui/conversation/presentation.py" line="361"/>
         <source>Searched knowledge</source>
         <translation>Searched knowledge</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="292"/>
+        <location filename="../ui/conversation/presentation.py" line="363"/>
         <source>Failed to search knowledge</source>
         <translation>Failed to search knowledge</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="294"/>
+        <location filename="../ui/conversation/presentation.py" line="365"/>
         <source>Cancelled knowledge search</source>
         <translation>Cancelled knowledge search</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="296"/>
+        <location filename="../ui/conversation/presentation.py" line="367"/>
         <source>Inspecting dataset...</source>
         <translation>Inspecting dataset...</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="298"/>
+        <location filename="../ui/conversation/presentation.py" line="369"/>
         <source>Inspected dataset</source>
         <translation>Inspected dataset</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="300"/>
+        <location filename="../ui/conversation/presentation.py" line="371"/>
         <source>Cancelled dataset inspection</source>
         <translation>Cancelled dataset inspection</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="302"/>
+        <location filename="../ui/conversation/presentation.py" line="373"/>
         <source>Integrating data...</source>
         <translation>Integrating data...</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="304"/>
+        <location filename="../ui/conversation/presentation.py" line="375"/>
         <source>Integrated data</source>
         <translation>Integrated data</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="306"/>
+        <location filename="../ui/conversation/presentation.py" line="377"/>
         <source>Cancelled data integration</source>
         <translation>Cancelled data integration</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="308"/>
+        <location filename="../ui/conversation/presentation.py" line="379"/>
         <source>Profiling dataset...</source>
         <translation>Profiling dataset...</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="310"/>
+        <location filename="../ui/conversation/presentation.py" line="381"/>
         <source>Profiled dataset</source>
         <translation>Profiled dataset</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="312"/>
+        <location filename="../ui/conversation/presentation.py" line="383"/>
         <source>Cancelled dataset profile</source>
         <translation>Cancelled dataset profile</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="314"/>
+        <location filename="../ui/conversation/presentation.py" line="385"/>
         <source>Drawing graph...</source>
         <translation>Drawing graph...</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="316"/>
+        <location filename="../ui/conversation/presentation.py" line="387"/>
         <source>Drew graph</source>
         <translation>Drew graph</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="318"/>
+        <location filename="../ui/conversation/presentation.py" line="389"/>
         <source>Cancelled graph drawing</source>
         <translation>Cancelled graph drawing</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="320"/>
+        <location filename="../ui/conversation/presentation.py" line="391"/>
         <source>Cleaning dataset...</source>
         <translation>Cleaning dataset...</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="322"/>
+        <location filename="../ui/conversation/presentation.py" line="393"/>
         <source>Cleaned dataset</source>
         <translation>Cleaned dataset</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="324"/>
+        <location filename="../ui/conversation/presentation.py" line="395"/>
         <source>Cancelled dataset cleaning</source>
         <translation>Cancelled dataset cleaning</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="326"/>
+        <location filename="../ui/conversation/presentation.py" line="397"/>
         <source>Querying dataset...</source>
         <translation>Querying dataset...</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="328"/>
+        <location filename="../ui/conversation/presentation.py" line="399"/>
         <source>Queried dataset</source>
         <translation>Queried dataset</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="330"/>
+        <location filename="../ui/conversation/presentation.py" line="401"/>
         <source>Cancelled dataset query</source>
         <translation>Cancelled dataset query</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="332"/>
+        <location filename="../ui/conversation/presentation.py" line="403"/>
         <source>Transforming dataset...</source>
         <translation>Transforming dataset...</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="334"/>
+        <location filename="../ui/conversation/presentation.py" line="405"/>
         <source>Transformed dataset</source>
         <translation>Transformed dataset</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="336"/>
+        <location filename="../ui/conversation/presentation.py" line="407"/>
         <source>Cancelled dataset transformation</source>
         <translation>Cancelled dataset transformation</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="338"/>
+        <location filename="../ui/conversation/presentation.py" line="409"/>
         <source>Selecting features...</source>
         <translation>Selecting features...</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="340"/>
+        <location filename="../ui/conversation/presentation.py" line="411"/>
         <source>Selected features</source>
         <translation>Selected features</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="342"/>
+        <location filename="../ui/conversation/presentation.py" line="413"/>
         <source>Cancelled feature selection</source>
         <translation>Cancelled feature selection</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="344"/>
+        <location filename="../ui/conversation/presentation.py" line="415"/>
         <source>Loading model metadata...</source>
         <translation>Loading model metadata...</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="346"/>
+        <location filename="../ui/conversation/presentation.py" line="417"/>
         <source>Loaded model metadata</source>
         <translation>Loaded model metadata</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="348"/>
+        <location filename="../ui/conversation/presentation.py" line="419"/>
         <source>Cancelled model metadata lookup</source>
         <translation>Cancelled model metadata lookup</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="350"/>
+        <location filename="../ui/conversation/presentation.py" line="421"/>
         <source>Training model...</source>
         <translation>Training model...</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="352"/>
+        <location filename="../ui/conversation/presentation.py" line="423"/>
         <source>Trained model</source>
         <translation>Trained model</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="354"/>
+        <location filename="../ui/conversation/presentation.py" line="425"/>
         <source>Cancelled model training</source>
         <translation>Cancelled model training</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="356"/>
+        <location filename="../ui/conversation/presentation.py" line="427"/>
         <source>Tuning model...</source>
         <translation>Tuning model...</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="358"/>
+        <location filename="../ui/conversation/presentation.py" line="429"/>
         <source>Tuned model</source>
         <translation>Tuned model</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="360"/>
+        <location filename="../ui/conversation/presentation.py" line="431"/>
         <source>Model tuning running in background</source>
         <translation>Model tuning running in background</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="362"/>
+        <location filename="../ui/conversation/presentation.py" line="433"/>
         <source>Cancelled model tuning</source>
         <translation>Cancelled model tuning</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="364"/>
+        <location filename="../ui/conversation/presentation.py" line="435"/>
         <source>Applying model...</source>
         <translation>Applying model...</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="366"/>
+        <location filename="../ui/conversation/presentation.py" line="437"/>
         <source>Applied model</source>
         <translation>Applied model</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="368"/>
+        <location filename="../ui/conversation/presentation.py" line="439"/>
         <source>Model training running in background</source>
         <translation>Model training running in background</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="370"/>
+        <location filename="../ui/conversation/presentation.py" line="441"/>
         <source>Model apply running in background</source>
         <translation>Model apply running in background</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="372"/>
+        <location filename="../ui/conversation/presentation.py" line="443"/>
         <source>Checking model task...</source>
         <translation>Checking model task...</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="374"/>
+        <location filename="../ui/conversation/presentation.py" line="445"/>
         <source>Checked model task</source>
         <translation>Checked model task</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="376"/>
+        <location filename="../ui/conversation/presentation.py" line="447"/>
         <source>Cancelled model task check</source>
         <translation>Cancelled model task check</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="378"/>
+        <location filename="../ui/conversation/presentation.py" line="449"/>
         <source>Cancelled model apply</source>
         <translation>Cancelled model apply</translation>
     </message>
@@ -2838,12 +2888,12 @@ Text vectors: %2</translation>
 <context>
     <name>UsageOverviewItem</name>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="393"/>
+        <location filename="../ui/conversation/presentation.py" line="464"/>
         <source> ({cached} cached)</source>
         <translation> ({cached} cached)</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/presentation.py" line="397"/>
+        <location filename="../ui/conversation/presentation.py" line="468"/>
         <source>↑ {input} · ↓ {output}</source>
         <translation>↑ {input} · ↓ {output}</translation>
     </message>
@@ -2920,12 +2970,12 @@ State file: {state_path}</translation>
         <translation>Buy license</translation>
     </message>
     <message>
-        <location filename="../app.py" line="913"/>
+        <location filename="../app.py" line="922"/>
         <source>Unable to start Xenix</source>
         <translation>Unable to start Xenix</translation>
     </message>
     <message>
-        <location filename="../app.py" line="914"/>
+        <location filename="../app.py" line="923"/>
         <source>Xenix could not finish startup.
 
 {error}</source>

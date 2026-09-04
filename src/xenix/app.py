@@ -639,6 +639,7 @@ def build_main_window(
 
         step_start = time.perf_counter()
         from .ui.conversation.execution import ThreadedSubmissionExecutor
+        from .ui.dataset_audit_dialog import DatasetAuditDialog
         from .ui.history import HarnessHistoryAdapter
         from .ui.job_center import JobCenterDialog
         from .ui.knowledge_workspace import KnowledgeWorkspaceDialog
@@ -686,6 +687,13 @@ def build_main_window(
                 parent=owner,
             )
 
+        def create_dataset_audit(owner: QWidget, thread_id: str) -> DatasetAuditDialog:
+            return DatasetAuditDialog(
+                harness=agent_services.harness,
+                thread_id=thread_id,
+                parent=owner,
+            )
+
         def create_auxiliary(owner: QWidget) -> AuxiliaryWindowCoordinator:
             return AuxiliaryWindowCoordinator(
                 owner,
@@ -695,6 +703,7 @@ def build_main_window(
                     ml_service=agent_services.ml, task_ids=task_ids, parent=parent,
                 ),
                 job_center_factory=create_job_center,
+                dataset_audit_factory=create_dataset_audit,
                 update_controller=(
                     SoftwareUpdateController(owner, update_service)
                     if update_service is not None else None
