@@ -6,6 +6,7 @@ from datetime import datetime
 from sqlalchemy.orm import sessionmaker
 from sqlmodel import Session, col, select
 
+from .job_status import knowledge_job_status, ml_job_status
 from .knowledge_task_query import KnowledgeTaskQueryService
 from .storage.models import DatasetRow, JobDomain, JobStatus, MLTaskRow
 
@@ -78,13 +79,11 @@ class JobQueryService:
         return [
             JobItem(
                 reference=f"knowledge:{task.reference}",
-                raw_reference=(
-                    task.import_id if task.kind == "import" else task.owner_id
-                ),
+                raw_reference=(task.import_id if task.kind == "import" else task.owner_id),
                 domain=JobDomain.KNOWLEDGE,
                 kind=task.kind,
                 target=task.target,
-                status=_knowledge_status(task.status),
+                status=knowledge_job_status(task.status),
                 phase=task.phase,
                 updated_at=task.updated_at,
                 error_summary=task.error_summary or task.error_code,
@@ -120,40 +119,13 @@ class JobQueryService:
                 target=(
                     datasets.get(task.dataset_id, task.dataset_id) if task.dataset_id is not None else task.project_id
                 ),
-                status=_ml_status(task.status.value),
+                status=ml_job_status(task.status.value),
                 phase=task.status.value,
                 updated_at=task.updated_at,
                 error_summary=task.error_summary,
             )
             for task in tasks
         ]
-
-
-_KNOWLEDGE_SUCCESS_STATUSES = frozenset(
-    {"succeeded", "canonical_ready", "retrieval_ready", "reused"}
-)
-
-
-def _knowledge_status(status: str) -> JobStatus:
-    if status in {"pending", "queued"}:
-        return JobStatus.QUEUED
-    if status == "running":
-        return JobStatus.RUNNING
-    if status in {"failed", "needs_attention"}:
-        return JobStatus.FAILED
-    if status == "cancelled":
-        return JobStatus.CANCELLED
-    if status in _KNOWLEDGE_SUCCESS_STATUSES:
-        return JobStatus.SUCCEEDED
-    raise ValueError(f"Unrecognized Knowledge task status: {status!r}")
-
-
-def _ml_status(status: str) -> JobStatus:
-    if status == "pending":
-        return JobStatus.QUEUED
-    if status in {"running", "succeeded", "failed", "cancelled"}:
-        return JobStatus(status)
-    raise ValueError(f"Unrecognized ML task status: {status!r}")
 
 
 __all__ = ["JobDomain", "JobItem", "JobQueryService", "JobStatus"]

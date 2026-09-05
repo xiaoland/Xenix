@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from xenix.config import ensure_app_dirs, get_app_paths
 from xenix.services.knowledge_job_handlers import (
+    KnowledgeDerivationHandler,
     KnowledgeImportHandler,
+    KnowledgeIndexHandler,
     _reconcile,
 )
-from xenix.services.storage import StorageBootstrapService
 from xenix.services.storage.models import JobDomain, JobRow, JobStatus
+from xenix.services.job_scheduler import JobScheduler
 from sqlmodel import select
 
 
@@ -31,6 +32,42 @@ class _StubImportService:
         self.cancelled.append(reference)
 
 
+def test_application_knowledge_handlers_coexist_and_recover_their_own_work(storage) -> None:
+    imports, derivation, index = (_StubImportService() for _ in range(3))
+    handlers = [KnowledgeImportHandler(imports), KnowledgeDerivationHandler(derivation), KnowledgeIndexHandler(index)]
+    for service, reference in ((imports, "source"), (derivation, "content"), (index, "search")):
+        service.recover_refs = [reference]
+    # Earlier domain-only dispatch could fail the scheduling row without ever
+    # running the import. Domain recovery must reuse that row, not insert a duplicate.
+    with storage.session_factory() as session:
+        failed = JobRow(domain=JobDomain.KNOWLEDGE, kind="import", reference="source", status=JobStatus.FAILED)
+        session.add(failed)
+        session.commit()
+        original_job_id = failed.id
+    scheduler = JobScheduler(storage.session_factory, [])
+    try:
+        for handler in handlers:
+            scheduler.register_handler(handler)
+        scheduler.start()
+        assert scheduler.wait_idle(5)
+        assert imports.ran == ["source"]
+        assert derivation.ran == ["content"]
+        assert index.ran == ["search"]
+        with storage.session_factory() as session:
+            rows = list(session.exec(select(JobRow)))
+            assert {row.reference: row.kind for row in rows} == {
+                "source": "import",
+                "content": "content_preparation",
+                "search": "index_build",
+            }
+            assert all(row.status is JobStatus.SUCCEEDED for row in rows)
+            assert next(row for row in rows if row.reference == "source").id == original_job_id
+        assert scheduler.capabilities(JobDomain.KNOWLEDGE, "source").can_view_log
+        assert not scheduler.capabilities(JobDomain.KNOWLEDGE, "search").can_cancel
+    finally:
+        scheduler.shutdown()
+
+
 def test_import_handler_maps_needs_attention_to_failed_and_forwards_summary() -> None:
     service = _StubImportService()
     service.statuses["imp-1"] = "needs_attention"
@@ -51,10 +88,7 @@ def test_import_handler_maps_needs_attention_to_failed_and_forwards_summary() ->
     assert handler.capabilities(job).can_cancel is True
 
 
-def test_reconcile_creates_missing_job_rows_and_resets_running(monkeypatch, tmp_path) -> None:
-    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
-    paths = ensure_app_dirs(get_app_paths())
-    storage = StorageBootstrapService().initialize(paths)
+def test_reconcile_creates_missing_job_rows_and_resets_running(storage) -> None:
     with storage.session_factory() as session:
         session.add(
             JobRow(
@@ -65,11 +99,7 @@ def test_reconcile_creates_missing_job_rows_and_resets_running(monkeypatch, tmp_
             )
         )
         session.commit()
-        jobs = list(
-            session.exec(
-                select(JobRow).where(JobRow.domain == JobDomain.KNOWLEDGE)
-            )
-        )
+        jobs = list(session.exec(select(JobRow).where(JobRow.domain == JobDomain.KNOWLEDGE)))
         requeued = _reconcile(
             session,
             jobs,
@@ -79,13 +109,7 @@ def test_reconcile_creates_missing_job_rows_and_resets_running(monkeypatch, tmp_
         session.commit()
 
         assert requeued == ["imp-running", "imp-new"]
-        rows = {
-            row.reference: row
-            for row in session.exec(
-                select(JobRow).where(JobRow.domain == JobDomain.KNOWLEDGE)
-            )
-        }
+        rows = {row.reference: row for row in session.exec(select(JobRow).where(JobRow.domain == JobDomain.KNOWLEDGE))}
         assert rows["imp-running"].status is JobStatus.QUEUED
         assert rows["imp-new"].status is JobStatus.QUEUED
         assert rows["imp-new"].kind == "import"
-    storage.engine.dispose()

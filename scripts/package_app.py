@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import hashlib
 import json
 import os
@@ -287,7 +288,7 @@ def _pyinstaller_environment(
     return child_environment
 
 
-def _run_pyinstaller(project_root: Path) -> None:
+def _run_pyinstaller(project_root: Path, *, dist_dir: Path | None = None) -> None:
     environment = _pyinstaller_environment(
         os.environ,
         python_executable=Path(sys.executable),
@@ -295,15 +296,12 @@ def _run_pyinstaller(project_root: Path) -> None:
         python_base_prefix=Path(sys.base_prefix),
         platform=sys.platform,
     )
+    command = [sys.executable, "-m", "PyInstaller", "--clean", "--noconfirm"]
+    if dist_dir is not None:
+        command.extend(["--distpath", str(dist_dir.resolve())])
+    command.append(str(project_root / "xenix.spec"))
     subprocess.run(
-        [
-            sys.executable,
-            "-m",
-            "PyInstaller",
-            "--clean",
-            "--noconfirm",
-            str(project_root / "xenix.spec"),
-        ],
+        command,
         check=True,
         cwd=project_root,
         env=environment,
@@ -311,6 +309,12 @@ def _run_pyinstaller(project_root: Path) -> None:
 
 
 def main() -> int:
+    parser = argparse.ArgumentParser(description="Build the Windows bundle from the locked project environment.")
+    parser.add_argument(
+        "--dist-dir", type=Path,
+        help="Output root containing xenix/. Use a separate root when a previous bundle is running.",
+    )
+    args = parser.parse_args()
     project_root = Path(__file__).resolve().parents[1]
     subprocess.run(
         [sys.executable, str(project_root / "scripts" / "compile_translations.py")],
@@ -347,7 +351,7 @@ def main() -> int:
         epoch = int(_resolve_build_epoch(project_root))
         os.environ.setdefault("SOURCE_DATE_EPOCH", str(epoch))
         _normalize_mtimes(project_root / "src", epoch)
-        _run_pyinstaller(project_root)
+        _run_pyinstaller(project_root, dist_dir=args.dist_dir)
     finally:
         _remove_generated_knowledge_ocr_catalog(project_root)
         _remove_generated_build_info(project_root)

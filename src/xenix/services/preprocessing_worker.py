@@ -47,9 +47,7 @@ class LocalPreprocessingWorkerRunner:
 
         try:
             if not result_path.exists():
-                raise RuntimeError(
-                    f"Preprocessing worker exited without a result file. Exit code: {process.exitcode}."
-                )
+                raise RuntimeError(f"Preprocessing worker exited without a result file. Exit code: {process.exitcode}.")
             result = json.loads(result_path.read_text(encoding="utf-8"))
             if result.get("ok") is True:
                 worker_result = result.get("result")
@@ -108,18 +106,17 @@ def execute_preprocessing_worker_operation(
         from .data_transform import DataQueryTransformService, DataTransformInput
 
         input_data = DataTransformInput.model_validate(payload.get("input"))
-        result = DataQueryTransformService(paths, worker_runner=InlinePreprocessingWorkerRunner())._transform_in_process(
-            input_data
-        )
+        result = DataQueryTransformService(
+            paths, worker_runner=InlinePreprocessingWorkerRunner()
+        )._transform_in_process(input_data)
         return result.model_dump(mode="json")
 
     if operation == "data.clean":
-        from .data_cleaning import CleanDatasetInput, DataCleaningService
+        from .cleaning.contracts import CleanDatasetInput
+        from .cleaning.engine import clean_dataset
 
         input_data = CleanDatasetInput.model_validate(payload.get("input"))
-        result = DataCleaningService(paths, worker_runner=InlinePreprocessingWorkerRunner())._clean_dataset_in_process(
-            input_data
-        )
+        result = clean_dataset(input_data, paths)
         return result.model_dump(mode="json")
 
     if operation == "data.register_generated_dataset":
@@ -155,9 +152,7 @@ def _register_generated_dataset(payload: dict[str, Any], paths: AppPaths) -> dic
         artifact_service=artifact_service,
     )
 
-    inspection = dataset_service.inspect_source_file(
-        InspectDatasetInput(source_path=str(output_path.resolve()))
-    )
+    inspection = dataset_service.inspect_source_file(InspectDatasetInput(source_path=str(output_path.resolve())))
     inspection_payload = inspection.model_dump(mode="json", exclude={"source_path"})
     dataset = dataset_service.register_dataset(
         RegisterDatasetInput(
@@ -170,7 +165,9 @@ def _register_generated_dataset(payload: dict[str, Any], paths: AppPaths) -> dic
     try:
         export_artifact = dataset_export_service.materialize_dataset_export_artifact(
             dataset.id,
-            metadata_payload=payload.get("metadata_payload") if isinstance(payload.get("metadata_payload"), dict) else None,
+            metadata_payload=payload.get("metadata_payload")
+            if isinstance(payload.get("metadata_payload"), dict)
+            else None,
         )
     except Exception:
         try:

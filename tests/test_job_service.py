@@ -2,9 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-from xenix.config import ensure_app_dirs, get_app_paths
 from xenix.services.job_service import JobDomain, JobQueryService, JobStatus
-from xenix.services.storage import StorageBootstrapService
 from xenix.services.storage.models import (
     DatasetRow,
     DatasetSourceFormat,
@@ -16,10 +14,7 @@ from xenix.services.storage.models import (
 )
 
 
-def test_job_query_projects_and_filters_domain_authorities(monkeypatch, tmp_path) -> None:
-    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
-    paths = ensure_app_dirs(get_app_paths())
-    storage = StorageBootstrapService().initialize(paths)
+def test_job_query_projects_and_filters_domain_authorities(storage) -> None:
     now = datetime.now(timezone.utc)
     with storage.session_factory() as session:
         session.add(ProjectRow(id="project-1", name="Forecasting"))
@@ -72,13 +67,9 @@ def test_job_query_projects_and_filters_domain_authorities(monkeypatch, tmp_path
     assert service.list_jobs(status=JobStatus.RUNNING) == [jobs[0]]
     assert sum(job.active for job in jobs) == 1
     assert sum(job.status is JobStatus.FAILED for job in jobs) == 1
-    storage.engine.dispose()
 
 
-def test_job_query_maps_pending_ml_status_to_queued(monkeypatch, tmp_path) -> None:
-    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
-    paths = ensure_app_dirs(get_app_paths())
-    storage = StorageBootstrapService().initialize(paths)
+def test_job_query_maps_pending_ml_status_to_queued(storage) -> None:
     with storage.session_factory() as session:
         session.add(ProjectRow(id="project-1", name="Forecasting"))
         session.commit()
@@ -98,13 +89,9 @@ def test_job_query_maps_pending_ml_status_to_queued(monkeypatch, tmp_path) -> No
     assert len(jobs) == 1
     assert jobs[0].status is JobStatus.QUEUED
     assert jobs[0].active
-    storage.engine.dispose()
 
 
-def test_job_query_normalizes_completed_knowledge_states(monkeypatch, tmp_path) -> None:
-    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
-    paths = ensure_app_dirs(get_app_paths())
-    storage = StorageBootstrapService().initialize(paths)
+def test_job_query_normalizes_completed_knowledge_states(storage) -> None:
     with storage.session_factory() as session:
         session.add(
             KnowledgeImportRow(
@@ -121,4 +108,3 @@ def test_job_query_normalizes_completed_knowledge_states(monkeypatch, tmp_path) 
 
     assert len(jobs) == 1
     assert jobs[0].status is JobStatus.SUCCEEDED
-    storage.engine.dispose()

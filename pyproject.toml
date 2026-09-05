@@ -63,15 +63,16 @@ distribution = false
 [tool.pdm.scripts]
 agent-skills-check = "python scripts/agent_skills.py check"
 agent-skills-generate = "python scripts/agent_skills.py generate"
+prepare = { composite = ["agent-skills-generate", "i18n-compile"] }
 knowledge-ocr-lock-check = "python scripts/build_knowledge_ocr_runtime.py --check-lock"
 lint = "ruff check src tests scripts"
 typecheck = "mypy"
-dev = { composite = ["agent-skills-generate", "python scripts/run_dev.py {args}"] }
+dev = { composite = ["prepare", "python scripts/run_dev.py {args}"] }
 i18n-extract = "python scripts/update_translations.py"
 i18n-compile = "python scripts/compile_translations.py"
-package = { composite = ["agent-skills-generate", "agent-skills-check", "python scripts/package_app.py"], env = { PYTHONHASHSEED = "0" } }
+package = { composite = ["prepare", "agent-skills-check", "python scripts/package_app.py {args}"], env = { PYTHONHASHSEED = "0" } }
 build-knowledge-ocr = "python scripts/build_knowledge_ocr_runtime.py"
-smoke = { composite = ["agent-skills-generate", "python scripts/run_dev.py --smoke-test {args}"] }
+smoke = { composite = ["prepare", "python scripts/run_dev.py --smoke-test {args}"] }
 smoke-package = "python scripts/verify_packaged_smoke.py"
 velopack = "python scripts/package_velopack.py"
 release-manifest = "python scripts/write_release_manifest.py"
@@ -81,16 +82,17 @@ release-timings = "python scripts/report_native_workflow_timings.py"
 release-package = { composite = ["package", "smoke-package", "velopack", "release-manifest"] }
 release-build = { composite = ["build-knowledge-ocr", "package", "smoke-package", "velopack", "release-manifest"] }
 release-publish = "python scripts/publish_oss_release.py"
-pytest = "python scripts/run_pytest.py"
-test = { composite = ["i18n-compile", "python scripts/run_pytest.py {args}"] }
-test-affected = { cmd = "python scripts/run_pytest.py --testmon {args}", env = { COVERAGE_CORE = "pytrace" } }
-list-affected = { cmd = "python scripts/run_pytest.py --testmon --collect-only {args}", env = { COVERAGE_CORE = "pytrace" } }
+pytest = { composite = ["prepare", "python scripts/run_pytest.py {args}"] }
+test = { composite = ["prepare", "python scripts/run_pytest.py {args}"] }
+test-affected = { composite = ["prepare", "python scripts/run_pytest.py --testmon {args}"], env = { COVERAGE_CORE = "pytrace" } }
+list-affected = { composite = ["prepare", "python scripts/run_pytest.py --testmon --collect-only {args}"], env = { COVERAGE_CORE = "pytrace" } }
 benchmark-agent-harness = "python scripts/run_agent_harness_benchmark.py"
 benchmark-agent-harness-headed = "python scripts/run_agent_harness_headed_benchmark.py"
 benchmark-agent-harness-check = "python scripts/check_agent_harness_benchmark.py"
 benchmark-agent-harness-evaluate = "python scripts/evaluate_agent_harness_reports.py"
 benchmark-agent-harness-calibrate-judge = "python scripts/calibrate_agent_harness_judge.py"
-check = { composite = ["agent-skills-generate", "agent-skills-check", "lint", "typecheck", "knowledge-ocr-lock-check", "python -m compileall src tests scripts"] }
+check = { composite = ["agent-skills-check", "lint", "typecheck", "knowledge-ocr-lock-check", "python -m compileall -q src tests scripts"] }
+verify = { composite = ["check", "test", "smoke --isolated"] }
 diagnostic-bundle = "python scripts/create_diagnostic_bundle.py"
 ui-lab = { cmd = "python -m scripts.ui_lab", env = { PYTHONPATH = "src" } }
 ui-capture = { cmd = "python -m scripts.ui_lab.capture_cli", env = { PYTHONPATH = "src" } }
@@ -126,7 +128,16 @@ python_version = "3.14"
 platform = "win32"
 mypy_path = "src"
 files = [
+    "src/xenix/application_lifetime.py",
+    "src/xenix/application_composition.py",
     "src/xenix/application_services.py",
+    "src/xenix/services/lazy_services.py",
+    "src/xenix/services/job_scheduler.py",
+    "src/xenix/services/job_status.py",
+    "src/xenix/services/knowledge_job_handlers.py",
+    "src/xenix/services/ml_job_handler.py",
+    "src/xenix/services/cleaning/catalog.py",
+    "src/xenix/services/cleaning/contracts.py",
     "src/xenix/ui/history/panel.py",
     "src/xenix/ui/windows/auxiliary.py",
     "src/xenix/ui/settings/contracts.py",

@@ -1,0 +1,23 @@
+{
+  "baseline_commit": "f46caca1dd712a70396aba00f05e2a3b8e445c1b",
+  "cleaning_metadata_sha256_before": "c105cd438fcba1090551c076e2c24e2e92a8a837dd785e65a316b0ee1080185c",
+  "cleaning_metadata_sha256_after": "c105cd438fcba1090551c076e2c24e2e92a8a837dd785e65a316b0ee1080185c",
+  "metadata_selection_cases_equal": 7,
+  "lightweight_boundary_experiment": "Importing data_cleaning loaded neither pandas nor sqlmodel in a fresh interpreter",
+  "original_cleaning_lines": 1676,
+  "refactored_cleaning_lines": 1242,
+  "cleaning_algorithm_functions_ast_equivalent": 36,
+  "build_source_sha256": "c731afb4db2b557530329d7ad1db496f8f2fb9e3d854f84c61324b8e3b4e340b",
+  "build_source_file_count": 218,
+  "checked_document_count": 8,
+  "packaged_new_modules_verified": 9,
+  "build_source_stable": true,
+  "packaged_executable": "dist/refactor-review/xenix/xenix.exe",
+  "verification": {
+    "offline_tests": 299,
+    "strict_typechecked_modules": 51,
+    "verify_exit_code": 0,
+    "package_exit_code": 0,
+    "packaged_smoke_exit_code": 0
+  }
+}

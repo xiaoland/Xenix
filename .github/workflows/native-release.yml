@@ -107,6 +107,7 @@ jobs:
           --require-tag
           --require-promotion
           --repository "${{ github.repository }}"
+      - run: pdm run prepare
       - run: pdm run check
 
       - name: Restore locked OCR inputs

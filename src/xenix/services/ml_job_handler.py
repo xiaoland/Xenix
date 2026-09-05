@@ -4,21 +4,13 @@ from typing import TYPE_CHECKING
 
 from ..exceptions import InvalidStateTransitionError
 from .job_scheduler import JobCapabilities, JobOutcome
-from .storage.models import JobDomain, JobRow, JobStatus, MLTaskStatus
+from .job_status import ml_job_status
+from .storage.models import JobDomain, JobRow, JobStatus
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
 
     from .ml_task_service import MLTaskService
-
-
-_ML_STATUS_TO_JOB: dict[MLTaskStatus, JobStatus] = {
-    MLTaskStatus.PENDING: JobStatus.QUEUED,
-    MLTaskStatus.RUNNING: JobStatus.RUNNING,
-    MLTaskStatus.SUCCEEDED: JobStatus.SUCCEEDED,
-    MLTaskStatus.FAILED: JobStatus.FAILED,
-    MLTaskStatus.CANCELLED: JobStatus.CANCELLED,
-}
 
 
 class MLJobHandler:
@@ -29,6 +21,7 @@ class MLJobHandler:
     """
 
     domain = JobDomain.ML
+    kind = None
 
     def __init__(self, ml_task_service: "MLTaskService") -> None:
         self._ml_task_service = ml_task_service
@@ -48,7 +41,7 @@ class MLJobHandler:
         if finished is None:
             return JobOutcome(JobStatus.SUCCEEDED)
         return JobOutcome(
-            _ML_STATUS_TO_JOB[finished.status],
+            ml_job_status(finished.status.value),
             finished.error_summary,
         )
 
@@ -56,9 +49,7 @@ class MLJobHandler:
         from .ml_task_service import CancelMLTaskInput
 
         try:
-            self._ml_task_service.cancel_ml_task(
-                CancelMLTaskInput(ml_task_id=job.reference)
-            )
+            self._ml_task_service.cancel_ml_task(CancelMLTaskInput(ml_task_id=job.reference))
         except InvalidStateTransitionError:
             # The job already reached a terminal state; nothing to cancel.
             return

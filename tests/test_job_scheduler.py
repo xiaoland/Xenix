@@ -1,223 +1,183 @@
 from __future__ import annotations
 
 import threading
-import time
-from collections.abc import Callable
+from datetime import timedelta
 
+import pytest
 from sqlmodel import select
 
-from xenix.config import ensure_app_dirs, get_app_paths
-from xenix.services.job_scheduler import (
-    JobCapabilities,
-    JobOutcome,
-    JobScheduler,
-)
-from xenix.services.storage import StorageBootstrapService
-from xenix.services.storage.models import JobDomain, JobRow, JobStatus
-
-
-def _wait_until(condition: Callable[[], bool], timeout: float = 5.0) -> bool:
-    deadline = time.perf_counter() + timeout
-    while time.perf_counter() < deadline:
-        if condition():
-            return True
-        time.sleep(0.01)
-    return condition()
+from xenix.services.job_scheduler import JobCapabilities, JobOutcome, JobScheduler
+from xenix.services.storage.models import JobDomain, JobRow, JobStatus, utc_now
 
 
 class FakeHandler:
-    def __init__(self, domain: JobDomain, concurrency_limit: int = 1) -> None:
+    def __init__(self, domain=JobDomain.ML, *, kind=None, replay=False):
         self.domain = domain
-        self.concurrency_limit = concurrency_limit
-        self.recover_result: list[str] = []
-        self.outcomes: dict[str, JobOutcome] = {}
-        self.runs: list[str] = []
-        self.cancels: list[str] = []
-        self.recovered_jobs: list[list[str]] = []
-        self._gate: threading.Event | None = None
-        self._cancel_event: threading.Event | None = None
+        self.kind = kind
+        self.concurrency_limit = 1
+        self.replay = replay
+        self.runs = []
+        self.cancels = []
+        self.recovered_jobs = []
+        self.entered = threading.Event()
+        self.release = threading.Event()
+        self.release.set()
+        self.error = None
 
-    def recover(self, session, jobs: list[JobRow]) -> list[str]:
-        self.recovered_jobs.append([job.reference for job in jobs])
-        return list(self.recover_result)
+    def recover(self, session, jobs):
+        self.recovered_jobs = [job.reference for job in jobs]
+        if not self.replay:
+            return []
+        for job in jobs:
+            job.status = JobStatus.QUEUED
+            session.add(job)
+        return list(self.recovered_jobs)
 
-    def run(self, job: JobRow) -> JobOutcome:
+    def run(self, job):
         self.runs.append(job.reference)
-        if self._gate is not None:
-            while True:
-                if self._cancel_event is not None and self._cancel_event.is_set():
-                    return JobOutcome(JobStatus.CANCELLED)
-                if self._gate.wait(timeout=0.01):
-                    break
-        return self.outcomes.get(job.reference, JobOutcome(JobStatus.SUCCEEDED))
+        self.entered.set()
+        assert self.release.wait(5), "Test did not release the admitted worker"
+        if self.error:
+            raise self.error
+        return JobOutcome(JobStatus.CANCELLED if job.reference in self.cancels else JobStatus.SUCCEEDED)
 
-    def request_cancel(self, job: JobRow) -> None:
+    def request_cancel(self, job):
         self.cancels.append(job.reference)
-        if self._cancel_event is not None:
-            self._cancel_event.set()
+        self.release.set()
 
-    def capabilities(self, job: JobRow) -> JobCapabilities:
+    def capabilities(self, job):
         return JobCapabilities(can_cancel=True)
 
 
-class KnowledgeRecoverHandler(FakeHandler):
-    def recover(self, session, jobs: list[JobRow]) -> list[str]:
-        references = []
-        for job in jobs:
-            if job.status is JobStatus.RUNNING:
-                job.status = JobStatus.QUEUED
-                job.updated_at = job.updated_at
-                session.add(job)
-            references.append(job.reference)
-        return references
+@pytest.fixture
+def scheduler_factory(storage):
+    schedulers = []
+
+    def create(*handlers):
+        scheduler = JobScheduler(storage.session_factory, handlers)
+        schedulers.append((scheduler, handlers))
+        return scheduler
+
+    yield create
+    for scheduler, handlers in reversed(schedulers):
+        for handler in handlers:
+            handler.release.set()
+        scheduler.shutdown()
 
 
-def _bootstrap(monkeypatch, tmp_path):
-    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
-    paths = ensure_app_dirs(get_app_paths())
-    return StorageBootstrapService().initialize(paths)
+def _job(storage, domain, reference):
+    with storage.session_factory() as session:
+        return session.exec(select(JobRow).where(JobRow.domain == domain, JobRow.reference == reference)).one()
 
 
-def _seed_job(session, domain: JobDomain, reference: str, status: JobStatus) -> None:
-    session.add(
-        JobRow(
-            domain=domain,
-            kind="test",
-            reference=reference,
-            status=status,
-            phase=status.value,
+def test_fifo_and_concurrency_share_one_budget_across_kinds(storage, scheduler_factory):
+    first = FakeHandler(JobDomain.KNOWLEDGE, kind="import")
+    second = FakeHandler(JobDomain.KNOWLEDGE, kind="index_build")
+    first.release.clear()
+    scheduler = scheduler_factory(first, second)
+    scheduler.enqueue(JobDomain.KNOWLEDGE, "index_build", "second")
+    scheduler.enqueue(JobDomain.KNOWLEDGE, "import", "first")
+    # Establish FIFO independently of wall-clock speed and randomly generated IDs.
+    with storage.session_factory() as session:
+        job = session.exec(select(JobRow).where(JobRow.reference == "first")).one()
+        job.created_at = utc_now() - timedelta(days=1)
+        session.add(job)
+        session.commit()
+    scheduler.start()
+    assert first.entered.wait(5)
+    assert _job(storage, JobDomain.KNOWLEDGE, "second").status is JobStatus.QUEUED
+    assert not second.entered.is_set()
+    first.release.set()
+    assert scheduler.wait_idle(5)
+    assert first.runs == ["first"]
+    assert second.runs == ["second"]
+    assert _job(storage, JobDomain.KNOWLEDGE, "second").status is JobStatus.SUCCEEDED
+
+
+def test_cancel_is_scoped_to_domain_and_queued_work_never_runs(storage, scheduler_factory):
+    ml = FakeHandler()
+    knowledge = FakeHandler(JobDomain.KNOWLEDGE)
+    scheduler = scheduler_factory(ml, knowledge)
+    scheduler.enqueue(JobDomain.ML, "fit", "same-reference")
+    scheduler.enqueue(JobDomain.KNOWLEDGE, "import", "same-reference")
+    scheduler.request_cancel(JobDomain.ML, "same-reference")
+    scheduler.start()
+    assert scheduler.wait_idle(5)
+    assert ml.runs == []
+    assert ml.cancels == ["same-reference"]
+    assert knowledge.runs == ["same-reference"]
+    assert _job(storage, JobDomain.ML, "same-reference").status is JobStatus.CANCELLED
+    assert _job(storage, JobDomain.KNOWLEDGE, "same-reference").status is JobStatus.SUCCEEDED
+
+
+def test_cancel_running_work_persists_outcome_before_idle(storage, scheduler_factory):
+    handler = FakeHandler()
+    handler.release.clear()
+    scheduler = scheduler_factory(handler)
+    scheduler.start()
+    scheduler.enqueue(JobDomain.ML, "fit", "running")
+    assert handler.entered.wait(5)
+    scheduler.request_cancel(JobDomain.ML, "running")
+    assert scheduler.wait_idle(5)
+    assert _job(storage, JobDomain.ML, "running").status is JobStatus.CANCELLED
+    scheduler.request_cancel(JobDomain.ML, "running")
+    assert handler.cancels == ["running"]
+
+
+def test_recovery_routes_only_owned_kinds_and_preserves_ml_orphans(storage, scheduler_factory):
+    ml = FakeHandler()
+    imports = FakeHandler(JobDomain.KNOWLEDGE, kind="import", replay=True)
+    index = FakeHandler(JobDomain.KNOWLEDGE, kind="index_build", replay=True)
+    with storage.session_factory() as session:
+        session.add_all(
+            [
+                JobRow(domain=JobDomain.ML, kind="fit", reference="ml-old", status=JobStatus.RUNNING),
+                JobRow(domain=JobDomain.KNOWLEDGE, kind="import", reference="import-old", status=JobStatus.RUNNING),
+                JobRow(domain=JobDomain.KNOWLEDGE, kind="index_build", reference="index-old", status=JobStatus.QUEUED),
+            ]
         )
-    )
-    session.commit()
+        session.commit()
+    scheduler = scheduler_factory(ml, imports, index)
+    scheduler.start()
+    scheduler.start()
+    assert scheduler.wait_idle(5)
+    assert ml.runs == []
+    assert imports.recovered_jobs == imports.runs == ["import-old"]
+    assert index.recovered_jobs == index.runs == ["index-old"]
+    assert _job(storage, JobDomain.ML, "ml-old").status is JobStatus.RUNNING
 
 
-def _job_status(storage, domain: JobDomain, reference: str) -> JobStatus:
+def test_new_work_is_not_starved_by_a_thousand_unarmed_orphans(storage, scheduler_factory):
     with storage.session_factory() as session:
-        job = session.exec(
-            select(JobRow).where(
-                JobRow.domain == domain,
-                JobRow.reference == reference,
-            )
-        ).first()
-        return job.status
-
-
-def test_scheduler_dispatches_fifo_within_domain(monkeypatch, tmp_path) -> None:
-    storage = _bootstrap(monkeypatch, tmp_path)
-    handler = FakeHandler(JobDomain.ML)
-    scheduler = JobScheduler(storage.session_factory, [handler])
+        session.add_all(
+            [
+                JobRow(domain=JobDomain.ML, kind="fit", reference=f"orphan-{i}", status=JobStatus.QUEUED)
+                for i in range(1001)
+            ]
+        )
+        session.commit()
+    handler = FakeHandler()
+    scheduler = scheduler_factory(handler)
     scheduler.start()
-    for reference in ("ml-a", "ml-b", "ml-c"):
-        scheduler.enqueue(JobDomain.ML, "fit", reference)
-        time.sleep(0.02)
-
-    assert _wait_until(lambda: len(handler.runs) == 3)
-    assert handler.runs == ["ml-a", "ml-b", "ml-c"]
-    for reference in handler.runs:
-        assert _job_status(storage, JobDomain.ML, reference) is JobStatus.SUCCEEDED
-    scheduler.shutdown()
-    storage.engine.dispose()
+    job_id = scheduler.enqueue(JobDomain.ML, "fit", "new-work")
+    assert scheduler.enqueue(JobDomain.ML, "fit", "new-work") == job_id
+    assert scheduler.wait_idle(5)
+    assert handler.runs == ["new-work"]
+    assert _job(storage, JobDomain.ML, "new-work").status is JobStatus.SUCCEEDED
 
 
-def test_per_domain_concurrency_limit_blocks_second_job(monkeypatch, tmp_path) -> None:
-    storage = _bootstrap(monkeypatch, tmp_path)
-    handler = FakeHandler(JobDomain.ML, concurrency_limit=1)
-    handler._gate = threading.Event()
-    scheduler = JobScheduler(storage.session_factory, [handler])
+def test_handler_failure_is_observable_and_does_not_block_later_work(storage, scheduler_factory, caplog):
+    handler = FakeHandler()
+    handler.error = RuntimeError("domain work failed")
+    scheduler = scheduler_factory(handler)
     scheduler.start()
-    scheduler.enqueue(JobDomain.ML, "fit", "ml-first")
-    scheduler.enqueue(JobDomain.ML, "fit", "ml-second")
-
-    assert _wait_until(lambda: len(handler.runs) == 1)
-    assert handler.runs == ["ml-first"]
-
-    handler._gate.set()
-    assert _wait_until(lambda: len(handler.runs) == 2)
-    assert handler.runs == ["ml-first", "ml-second"]
-    scheduler.shutdown()
-    storage.engine.dispose()
-
-
-def test_cancel_queued_job_never_runs(monkeypatch, tmp_path) -> None:
-    storage = _bootstrap(monkeypatch, tmp_path)
-    handler = FakeHandler(JobDomain.ML)
-    scheduler = JobScheduler(storage.session_factory, [handler])
-    scheduler.enqueue(JobDomain.ML, "fit", "ml-queued")
-
-    scheduler.request_cancel(JobDomain.ML, "ml-queued")
-
-    assert handler.runs == []
-    assert handler.cancels == ["ml-queued"]
-    assert _job_status(storage, JobDomain.ML, "ml-queued") is JobStatus.CANCELLED
-    scheduler.shutdown()
-    storage.engine.dispose()
-
-
-def test_cancel_running_job_reports_cancelled(monkeypatch, tmp_path) -> None:
-    storage = _bootstrap(monkeypatch, tmp_path)
-    handler = FakeHandler(JobDomain.ML)
-    handler._gate = threading.Event()
-    handler._cancel_event = threading.Event()
-    scheduler = JobScheduler(storage.session_factory, [handler])
-    scheduler.start()
-    scheduler.enqueue(JobDomain.ML, "fit", "ml-running")
-
-    assert _wait_until(lambda: len(handler.runs) == 1)
-    scheduler.request_cancel(JobDomain.ML, "ml-running")
-
-    assert _wait_until(
-        lambda: _job_status(storage, JobDomain.ML, "ml-running")
-        is JobStatus.CANCELLED
-    )
-    assert handler.cancels == ["ml-running"]
-    scheduler.shutdown()
-    storage.engine.dispose()
-
-
-def test_register_handler_after_start_recovers_and_dispatches(monkeypatch, tmp_path) -> None:
-    storage = _bootstrap(monkeypatch, tmp_path)
-    ml_handler = FakeHandler(JobDomain.ML)
-    scheduler = JobScheduler(storage.session_factory, [ml_handler])
-    scheduler.start()
-
-    with storage.session_factory() as session:
-        _seed_job(session, JobDomain.KNOWLEDGE, "kb-queued", JobStatus.QUEUED)
-
-    kb_handler = KnowledgeRecoverHandler(JobDomain.KNOWLEDGE)
-    scheduler.register_handler(kb_handler)
-    scheduler.recover_handler(kb_handler)
-
-    assert _wait_until(lambda: len(kb_handler.runs) == 1)
-    assert kb_handler.runs == ["kb-queued"]
-    assert _wait_until(
-        lambda: _job_status(storage, JobDomain.KNOWLEDGE, "kb-queued")
-        is JobStatus.SUCCEEDED
-    )
-    scheduler.shutdown()
-    storage.engine.dispose()
-
-
-def test_recovery_applies_per_domain_policy(monkeypatch, tmp_path) -> None:
-    storage = _bootstrap(monkeypatch, tmp_path)
-    ml_handler = FakeHandler(JobDomain.ML)
-    kb_handler = KnowledgeRecoverHandler(JobDomain.KNOWLEDGE)
-    with storage.session_factory() as session:
-        _seed_job(session, JobDomain.ML, "ml-queued", JobStatus.QUEUED)
-        _seed_job(session, JobDomain.ML, "ml-running", JobStatus.RUNNING)
-        _seed_job(session, JobDomain.KNOWLEDGE, "kb-queued", JobStatus.QUEUED)
-        _seed_job(session, JobDomain.KNOWLEDGE, "kb-running", JobStatus.RUNNING)
-
-    scheduler = JobScheduler(storage.session_factory, [ml_handler, kb_handler])
-    scheduler.start()
-
-    assert _wait_until(lambda: len(kb_handler.runs) == 2)
-    assert set(kb_handler.runs) == {"kb-queued", "kb-running"}
-    assert ml_handler.runs == []
-
-    # ML jobs remain permanent orphans: untouched by recovery and never dispatched.
-    assert _job_status(storage, JobDomain.ML, "ml-queued") is JobStatus.QUEUED
-    assert _job_status(storage, JobDomain.ML, "ml-running") is JobStatus.RUNNING
-    assert _job_status(storage, JobDomain.KNOWLEDGE, "kb-queued") is JobStatus.SUCCEEDED
-    assert _job_status(storage, JobDomain.KNOWLEDGE, "kb-running") is JobStatus.SUCCEEDED
-    scheduler.shutdown()
-    storage.engine.dispose()
+    scheduler.enqueue(JobDomain.ML, "fit", "failure")
+    assert scheduler.wait_idle(5)
+    failed = _job(storage, JobDomain.ML, "failure")
+    assert failed.status is JobStatus.FAILED
+    assert failed.error_summary == "domain work failed"
+    assert "domain work failed" in caplog.text
+    handler.error = None
+    scheduler.enqueue(JobDomain.ML, "fit", "next")
+    assert scheduler.wait_idle(5)
+    assert _job(storage, JobDomain.ML, "next").status is JobStatus.SUCCEEDED

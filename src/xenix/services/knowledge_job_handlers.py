@@ -1,30 +1,25 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol
+
+from sqlmodel import Session, col, select
 
 from .job_scheduler import JobCapabilities, JobOutcome
+from .job_status import knowledge_job_status
 from .storage.models import JobDomain, JobRow, JobStatus, utc_now
 
 if TYPE_CHECKING:
-    from sqlalchemy.orm import Session
-
     from .knowledge_derivation_service import KnowledgeDerivationService
     from .knowledge_import_service import KnowledgeImportService
     from .knowledge_index_service import KnowledgeIndexService
 
 
-_KNOWLEDGE_STATUS_TO_JOB: dict[str, JobStatus] = {
-    "queued": JobStatus.QUEUED,
-    "pending": JobStatus.QUEUED,
-    "running": JobStatus.RUNNING,
-    "succeeded": JobStatus.SUCCEEDED,
-    "canonical_ready": JobStatus.SUCCEEDED,
-    "retrieval_ready": JobStatus.SUCCEEDED,
-    "reused": JobStatus.SUCCEEDED,
-    "failed": JobStatus.FAILED,
-    "needs_attention": JobStatus.FAILED,
-    "cancelled": JobStatus.CANCELLED,
-}
+class KnowledgeJobService(Protocol):
+    def recover_pending(self) -> list[str]: ...
+
+    def run_unit(self, reference: str) -> None: ...
+
+    def job_outcome(self, reference: str) -> tuple[str, str | None]: ...
 
 
 def _reconcile(
@@ -40,14 +35,34 @@ def _reconcile(
     units (e.g. a derivation job created during recovery) get a fresh JobRow.
     """
     requeue = set(requeue_refs)
-    existing = {job.reference for job in jobs}
-    for job in jobs:
-        if job.reference in requeue and job.status is JobStatus.RUNNING:
+    existing_jobs = {job.reference: job for job in jobs}
+    missing = requeue - existing_jobs.keys()
+    if missing:
+        # A prior routing failure can leave a terminal JobRow while the domain
+        # still owns queued work. Reuse its durable identity when the domain
+        # explicitly requests replay instead of violating the unique constraint.
+        existing_jobs.update(
+            {
+                job.reference: job
+                for job in session.exec(
+                    select(JobRow).where(
+                        JobRow.domain == JobDomain.KNOWLEDGE,
+                        JobRow.kind == kind,
+                        col(JobRow.reference).in_(missing),
+                    )
+                )
+            }
+        )
+    for job in existing_jobs.values():
+        if job.reference in requeue:
             job.status = JobStatus.QUEUED
+            job.started_at = None
+            job.finished_at = None
+            job.error_summary = None
             job.updated_at = utc_now()
             session.add(job)
     for reference in requeue_refs:
-        if reference not in existing:
+        if reference not in existing_jobs:
             now = utc_now()
             session.add(
                 JobRow(
@@ -66,36 +81,28 @@ def _reconcile(
 class _KnowledgeHandler:
     domain = JobDomain.KNOWLEDGE
     concurrency_limit = 1
-    _kind: str
+    kind: str
     _can_cancel = False
     _can_view_log = False
 
-    def __init__(self, service: object) -> None:
+    def __init__(self, service: KnowledgeJobService) -> None:
         self._service = service
 
     def recover(self, session: "Session", jobs: list[JobRow]) -> list[str]:
         return _reconcile(
             session,
             jobs,
-            self._service.recover_pending(),  # type: ignore[attr-defined]
-            kind=self._kind,
+            self._service.recover_pending(),
+            kind=self.kind,
         )
 
     def run(self, job: JobRow) -> JobOutcome:
-        try:
-            self._service.run_unit(job.reference)  # type: ignore[attr-defined]
-        except Exception as exc:
-            return JobOutcome(JobStatus.FAILED, str(exc))
-        status, summary = self._service.job_outcome(job.reference)  # type: ignore[attr-defined]
-        return JobOutcome(
-            _KNOWLEDGE_STATUS_TO_JOB.get(status, JobStatus.FAILED),
-            summary,
-        )
+        self._service.run_unit(job.reference)
+        status, summary = self._service.job_outcome(job.reference)
+        return JobOutcome(knowledge_job_status(status), summary)
 
     def request_cancel(self, job: JobRow) -> None:
-        cancel = getattr(self._service, "cancel_unit", None)
-        if cancel is not None:
-            cancel(job.reference)
+        """Only import has a cancellation command; derived work is not cancellable."""
 
     def capabilities(self, job: JobRow) -> JobCapabilities:
         return JobCapabilities(
@@ -105,23 +112,27 @@ class _KnowledgeHandler:
 
 
 class KnowledgeImportHandler(_KnowledgeHandler):
-    _kind = "import"
+    kind = "import"
     _can_cancel = True
     _can_view_log = True
 
     def __init__(self, service: "KnowledgeImportService") -> None:
         super().__init__(service)
+        self._cancel = service.cancel_unit
+
+    def request_cancel(self, job: JobRow) -> None:
+        self._cancel(job.reference)
 
 
 class KnowledgeDerivationHandler(_KnowledgeHandler):
-    _kind = "content_preparation"
+    kind = "content_preparation"
 
     def __init__(self, service: "KnowledgeDerivationService") -> None:
         super().__init__(service)
 
 
 class KnowledgeIndexHandler(_KnowledgeHandler):
-    _kind = "index_build"
+    kind = "index_build"
 
     def __init__(self, service: "KnowledgeIndexService") -> None:
         super().__init__(service)
