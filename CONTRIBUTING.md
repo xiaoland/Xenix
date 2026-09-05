@@ -30,7 +30,7 @@
 ## Development Commands
 
 - Python `3.14.2` is the project and packaged runtime.
-- `pdm install` installs project dependencies.
+- PDM `2.26.6` is the project workflow frontend; `pdm sync --clean -G :all` makes the project-local virtual environment match `pdm.lock`.
 - `pdm run dev` runs the desktop application.
 - `pdm run test` runs the curated acceptance portfolio in one process.
 - `pdm run pytest --direct <pytest selectors/options>` runs a focused selection

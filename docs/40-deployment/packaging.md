@@ -9,13 +9,18 @@ Release operators and packaging engineers use this runbook to build or distribut
 Run the source bundle checks from a clean, synchronized environment:
 
 ```text
+pdm sync --clean -G :all
 pdm run package
 pdm run smoke-package
 ```
 
-`package` produces the PyInstaller Windows bundle. `smoke-package` exercises the packaged executable and selected delayed native/data paths. These commands validate the bundle but do not authorize or publish a release. The tag-driven Velopack, manifest, and OSS procedure is owned by [Windows Distribution](windows-distribution.md).
+`package` produces the PyInstaller Windows bundle. `smoke-package` exercises the packaged executable and selected delayed native/data paths; when a local Knowledge OCR release artifact is present, it restores the small locked golden image if the build cache has been cleaned before exercising that runtime. These commands validate the bundle but do not authorize or publish a release. The tag-driven Velopack, manifest, and OSS procedure is owned by [Windows Distribution](windows-distribution.md).
 
 Packaging embeds build-time inputs: Git commit plus the Pydantic-validated release URL, trial provider, trial lock, purchase URL, and supplied OpenTelemetry settings. Formal release builds require the complete trial configuration; public releases also require HTTPS `RELEASES_OSS_PUBLIC_URL`. Treat embedded provider secrets, lock secrets, and OTLP headers as extractable release credentials. `xenix.release_config.ReleaseConfig` owns names and validation; `scripts/package_app.py` generates one temporary frozen projection and removes it after packaging.
+
+On Windows, `scripts/package_app.py` runs PyInstaller in a child process whose `PATH` contains only the active Python environment, its base interpreter, and Windows system directories. PyInstaller otherwise uses the caller's ambient `PATH` as a fallback DLL source, which makes the bundle depend on unrelated tools installed in the invoking shell. A native dependency that needs another search directory must be collected by its package, hook, or `xenix.spec`; do not add machine-local directories to the packaging shell's `PATH` as a collection mechanism.
+
+The tracked `.python-version`, `pdm.toml`, and `global.json` select the release Python environment and .NET SDK. Release automation installs the declared PDM version and restores the repository-local Velopack tool. The Knowledge OCR builder resolves an explicit `XENIX_CMAKE` override first, then Visual Studio's bundled CMake, and uses ambient `PATH` only as a fallback.
 
 Packaging success proves assembly, not usability. The smoke gate proves only the paths currently exercised by `scripts/verify_packaged_smoke.py`; it is not a guarantee for every optional dependency or workflow. Add the smallest meaningful packaged exercise when a first-party path begins depending on a new compiled extension, native library, metadata file, or package data file.
 

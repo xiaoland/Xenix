@@ -26,8 +26,8 @@ Xenix Native is a desktop machine-learning workbench for non-technical business 
 
 ## Development Workflow
 
-- Runtime and tooling: Python `3.14.2`, PDM, PySide6/Qt Widgets, pytest, and PyInstaller.
-- Install/run: `pdm install`, then `pdm run dev`.
+- Runtime and tooling: Python `3.14.2`, PDM `2.26.6`, PySide6/Qt Widgets, pytest, and PyInstaller.
+- Install/run: `pdm sync --clean -G :all`, then `pdm run dev`.
 - Verify the full manifest topology with `pdm run test`; use `pdm run pytest --direct <pytest selectors/options>` for a focused single-process run. Also run `pdm run check` and `pdm run smoke`; package with `pdm run package` and verify with `pdm run smoke-package`. Use these PDM entries instead of bare `pytest` so repository setup and isolated temp paths apply.
 - Diagnostics: `pdm run diagnostic-bundle`; use GammaRay when available for widget hierarchy, properties, geometry, visibility, and events.
 - Windows runtime home: `%LOCALAPPDATA%\Xenix` (normally `%USERPROFILE%\AppData\Local\Xenix`), overridden by `XENIX_APP_HOME`.

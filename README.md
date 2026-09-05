@@ -7,11 +7,11 @@ Repository routing and knowledge ownership start in [AGENTS.md](AGENTS.md). Fram
 ## Quick Start
 
 ```bash
-pdm install
+pdm sync --clean -G :all
 pdm run dev
 ```
 
-The authoritative Python and dependency constraints are declared in [pyproject.toml](pyproject.toml).
+Use Python 3.14.2 and PDM 2.26.6. The authoritative Python and dependency constraints are declared in [pyproject.toml](pyproject.toml) and [pdm.lock](pdm.lock); project-local environment selection is declared in [pdm.toml](pdm.toml).
 
 Contributor, test, translation, and packaging commands are owned by [CONTRIBUTING.md](CONTRIBUTING.md).
 

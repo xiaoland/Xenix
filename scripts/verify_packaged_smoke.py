@@ -8,6 +8,8 @@ import sys
 import tempfile
 from pathlib import Path
 
+from build_knowledge_ocr_runtime import download_locked, load_lock
+
 
 _SENSITIVE_ENVIRONMENT_FRAGMENTS = (
     "API_KEY",
@@ -141,17 +143,12 @@ def main() -> int:
             if candidate.is_file() and candidate.name == artifact_name:
                 ocr_archive = candidate.resolve()
                 environment["XENIX_KNOWLEDGE_OCR_SMOKE_ARCHIVE"] = str(ocr_archive)
-                golden_image = (
-                    project_root
-                    / "build"
-                    / "knowledge-ocr"
-                    / "downloads"
-                    / "golden_image.png"
+                lock = load_lock()
+                golden_image = download_locked(
+                    "golden_image",
+                    lock.downloads["golden_image"],
+                    project_root / "build" / "knowledge-ocr" / "downloads",
                 )
-                if not golden_image.is_file():
-                    raise RuntimeError(
-                        "Native OCR packaged smoke requires the locked golden image."
-                    )
                 environment["XENIX_KNOWLEDGE_OCR_SMOKE_IMAGE"] = str(
                     golden_image.resolve()
                 )

@@ -154,7 +154,7 @@ def _parse_yaml(frontmatter: str, skill_file: Path) -> dict[str, Any]:
     try:
         import yaml
     except ModuleNotFoundError as exc:
-        raise SystemExit("PyYAML is required for Agent Skill catalog generation. Run `pdm install`.") from exc
+        raise SystemExit("PyYAML is required for Agent Skill catalog generation. Run `pdm sync --clean -G :all`.") from exc
 
     data = yaml.safe_load(frontmatter)
     if not isinstance(data, dict):

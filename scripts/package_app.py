@@ -8,9 +8,8 @@ import re
 import subprocess
 import sys
 import tomllib
+from collections.abc import Mapping
 from pathlib import Path
-
-from PyInstaller.__main__ import run as pyinstaller_run
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SRC_ROOT = PROJECT_ROOT / "src"
@@ -245,6 +244,72 @@ def _generate_agent_skill_catalog(project_root: Path) -> None:
     )
 
 
+def _pyinstaller_environment(
+    environment: Mapping[str, str],
+    *,
+    python_executable: Path,
+    python_prefix: Path,
+    python_base_prefix: Path,
+    platform: str,
+) -> dict[str, str]:
+    child_environment = dict(environment)
+    if platform != "win32":
+        return child_environment
+
+    windows_root = Path(
+        child_environment.get("SystemRoot")
+        or child_environment.get("WINDIR")
+        or r"C:\Windows"
+    )
+    candidates = (
+        python_executable.parent,
+        python_prefix,
+        python_prefix / "DLLs",
+        python_prefix / "Library" / "bin",
+        python_base_prefix,
+        python_base_prefix / "DLLs",
+        python_base_prefix / "Library" / "bin",
+        windows_root / "System32",
+        windows_root,
+    )
+    owned_directories: list[str] = []
+    seen: set[str] = set()
+    for candidate in candidates:
+        if not candidate.is_dir():
+            continue
+        value = str(candidate.resolve())
+        key = os.path.normcase(value)
+        if key in seen:
+            continue
+        seen.add(key)
+        owned_directories.append(value)
+    child_environment["PATH"] = os.pathsep.join(owned_directories)
+    return child_environment
+
+
+def _run_pyinstaller(project_root: Path) -> None:
+    environment = _pyinstaller_environment(
+        os.environ,
+        python_executable=Path(sys.executable),
+        python_prefix=Path(sys.prefix),
+        python_base_prefix=Path(sys.base_prefix),
+        platform=sys.platform,
+    )
+    subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "PyInstaller",
+            "--clean",
+            "--noconfirm",
+            str(project_root / "xenix.spec"),
+        ],
+        check=True,
+        cwd=project_root,
+        env=environment,
+    )
+
+
 def main() -> int:
     project_root = Path(__file__).resolve().parents[1]
     subprocess.run(
@@ -282,13 +347,7 @@ def main() -> int:
         epoch = int(_resolve_build_epoch(project_root))
         os.environ.setdefault("SOURCE_DATE_EPOCH", str(epoch))
         _normalize_mtimes(project_root / "src", epoch)
-        pyinstaller_run(
-            [
-                "--clean",
-                "--noconfirm",
-                str(project_root / "xenix.spec"),
-            ]
-        )
+        _run_pyinstaller(project_root)
     finally:
         _remove_generated_knowledge_ocr_catalog(project_root)
         _remove_generated_build_info(project_root)
