@@ -90,6 +90,7 @@ def test_capture_policy_controls_pixels_and_bounds_redacted_logs(qtbot: QtBot, t
     qtbot.waitUntil(root.isVisible)
     messages = (
         r"failed C:\Users\person\private\report.csv api_key=secret-value",
+        'authorization=Bearer secret-token reason=connection-reset api_key="quoted secret" retry=2',
         "x" * 40_000,
     )
 
@@ -114,8 +115,12 @@ def test_capture_policy_controls_pixels_and_bounds_redacted_logs(qtbot: QtBot, t
     assert (synthetic_dir / "actual.png").stat().st_size > 0
     assert (runtime_dir / "qt.log").stat().st_size <= 32_768
     log = (runtime_dir / "qt.log").read_text(encoding="utf-8")
-    assert "person" not in log
+    assert r"C:\Users\person\private\report.csv" in log
     assert "secret-value" not in log
+    assert "secret-token" not in log
+    assert "quoted secret" not in log
+    assert "reason=connection-reset" in log
+    assert "retry=2" in log
     assert runtime_manifest["redaction"]["widget_text"] == "omitted"
     assert synthetic_manifest["render_environment"]["font"]["family"]
     screenshot = next(file for file in synthetic_manifest["files"] if file["name"] == "actual.png")

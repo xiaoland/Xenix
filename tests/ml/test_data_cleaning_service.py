@@ -13,7 +13,7 @@ from xenix.services.data_cleaning import (
     CleanOperation,
     DataCleaningService,
 )
-from xenix.services.dataset_service import DatasetService, RegisterDatasetInput
+from xenix.services.dataset_service import DatasetService, ExportDatasetCopyInput, RegisterDatasetInput
 from xenix.services.preprocessing_worker import InlinePreprocessingWorkerRunner
 from xenix.exceptions import ValidationError
 
@@ -23,6 +23,37 @@ RAW_FIXTURE = FIXTURE_ROOT / "ordered_validation_raw_v1.csv"
 EXPECTED_FIXTURE = FIXTURE_ROOT / "ordered_validation_expected_v1.csv"
 RAW_SHA256 = "8665e1c600fc0c3e7e649af6b65b13dc2c03e0d588d4a0770819d89a26e970e5"
 EXPECTED_SHA256 = "7e29274c0e6057e3aae83fc04500877f0dc2932fca4423207ab838ab841e767d"
+
+
+@pytest.mark.parametrize("export_suffix", ["csv", "xlsx"])
+def test_cleaning_can_register_and_export_a_result_with_no_remaining_rows(storage, app_paths, tmp_path, export_suffix):
+    source = tmp_path / "negative.csv"
+    source.write_text("unit_count\n-1\n-2\n", encoding="utf-8")
+    original = source.read_bytes()
+    datasets = DatasetService(storage.session_factory, app_paths)
+    parent = datasets.register_dataset(RegisterDatasetInput(source_path=str(source)))
+    cleaned = DataCleaningService(
+        app_paths, worker_runner=InlinePreprocessingWorkerRunner(),
+    ).clean_dataset(CleanDatasetInput(
+        source_path=parent.source_path, name="No valid rows",
+        operations=[CleanOperation(
+            operation="validation.non_negative",
+            params={"column_name": "unit_count", "action": "drop_rows"},
+        )],
+    ))
+    result = datasets.register_dataset(RegisterDatasetInput(
+        source_path=cleaned.output_path, derived_from_dataset_id=parent.id,
+    ))
+    frame = pd.read_parquet(result.source_path)
+    assert frame.empty
+    assert frame.columns.tolist() == ["unit_count"]
+    exported = datasets.export_dataset_copy(ExportDatasetCopyInput(
+        dataset_id=result.id, destination_path=str(tmp_path / f"empty.{export_suffix}"),
+    ))
+    imported = datasets.register_dataset(RegisterDatasetInput(source_path=str(exported)))
+    assert pd.read_parquet(imported.source_path).columns.tolist() == ["unit_count"]
+    assert pd.read_parquet(imported.source_path).empty
+    assert source.read_bytes() == original
 
 
 def test_spawned_cleaning_preserves_source_and_matches_inline_feature_preparation(app_paths, tmp_path):

@@ -41,6 +41,8 @@ field values; it never takes a screenshot. The structured tree retains semantic
 identifiers and per-item references, and for file-attachment chips those
 references are resolved source paths, so the tree is not path-redacted.
 
+The bounded `qt.log` also preserves local paths and diagnostic text after credentials. Credential values following API-key, authorization, or Bearer markers are redacted individually rather than discarding the rest of a log line.
+
 Direct tests can explicitly register a synthetic root with the scoped
 `ui_artifacts` fixture. A call failure writes `manifest.json`, `tree.json`,
 `actual.png`, bounded/redacted `qt.log`, and `index.json` below

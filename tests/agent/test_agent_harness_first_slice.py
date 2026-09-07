@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pytest
+from pydantic import BaseModel, ConfigDict
 
 from xenix.config import ensure_app_dirs, get_app_paths
 from xenix.exceptions import NotFoundError
@@ -15,6 +16,56 @@ from xenix.services.llm import (
     ToolSuccess,
 )
 from xenix.services.storage import StorageBootstrapService
+from xenix.services.llm.tooling import AgentTool
+
+
+def test_harness_returns_invalid_arguments_to_model_for_repair(storage) -> None:
+    class InspectInput(BaseModel):
+        model_config = ConfigDict(extra="forbid")
+        row_limit: int
+
+    executed = []
+    registry = AgentToolRegistry()
+    registry.register(AgentTool(
+        name="data.inspect", provider_name="data_inspect", description="inspect",
+        input_model=InspectInput,
+        implementation=lambda arguments, _context: (
+            executed.append(arguments.row_limit) or ToolSuccess(value={"rows": arguments.row_limit})
+        ),
+    ))
+
+    class RepairingProvider:
+        calls = 0
+
+        def complete(self, messages, _tools):
+            self.calls += 1
+            if self.calls == 2:
+                failure = messages[-1].tool_result_value
+                assert failure["type"] == "tool_failure"
+                assert failure["details"]["validation_errors"][0]["field"] == "row_limit"
+            if self.calls <= 2:
+                return ProviderResponse(tool_calls=[ProviderToolCall(
+                    provider_call_id=f"inspect-{self.calls}", tool_name="data.inspect",
+                    provider_name="data_inspect",
+                    arguments={"row_limit": "invalid" if self.calls == 1 else 3},
+                )])
+            return ProviderResponse(assistant_content_blocks=[{"type": "text", "text": "Done."}])
+
+    provider = RepairingProvider()
+    harness = AgentHarnessService(
+        conversation_service=LLMConversationService(
+            session_factory=storage.session_factory, tool_registry=registry,
+        ),
+        provider=provider,
+    )
+    snapshot = harness.submit_user_turn(SubmitUserTurnInput(text="Inspect three rows"))
+    assert executed == [3]
+    assert provider.calls == 3
+    assert [message.kind.value for message in snapshot.messages] == [
+        "user", "tool_call", "tool_result", "tool_call", "tool_result", "assistant",
+    ]
+    assert snapshot.messages[2].value_payload["type"] == "tool_failure"
+    assert snapshot.messages[4].value_payload == {"rows": 3}
 
 
 class ToolThenTextProvider:

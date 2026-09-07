@@ -100,16 +100,6 @@ class ToolSuccess:
 
     value: ToolResultValue
 
-    def __post_init__(self) -> None:
-        # A concrete Tool may return up to the exchange-level bound. The invoke
-        # boundary re-pages anything above the inline Tool payload bound, so a
-        # large raw value never crosses the LLM boundary un-paged.
-        ensure_bounded_tool_result_value(
-            self.value,
-            label="Tool success value",
-            max_bytes=MAX_EXCHANGE_RESULT_BYTES,
-        )
-
 
 @dataclass(frozen=True)
 class ToolFailure:
@@ -649,21 +639,6 @@ class AgentToolRegistry:
             input_model=tool.input_model,
         )
 
-    def validate_call(
-        self,
-        *,
-        tool_name: str,
-        provider_name: str,
-        arguments: dict[str, Any],
-        scope: ToolScope | None = None,
-    ) -> None:
-        self._admit_call(
-            tool_name=tool_name,
-            provider_name=provider_name,
-            arguments=arguments,
-            scope=scope,
-        )
-
     def _admit_call(
         self,
         *,
@@ -688,7 +663,11 @@ class AgentToolRegistry:
                     "Tool arguments do not match the registered input model.",
                     error_code="llm_tool_arguments_invalid",
                     error_details={
-                        "schema_keyword": _pydantic_error_schema_keyword(exc)
+                        "schema_keyword": _pydantic_error_schema_keyword(exc),
+                        "validation_errors": [
+                            {"field": ".".join(str(part) for part in error["loc"]), "message": error["msg"]}
+                            for error in exc.errors(include_input=False, include_context=False, include_url=False)
+                        ],
                     },
                     retryable=False,
                 ) from None
@@ -702,7 +681,11 @@ class AgentToolRegistry:
             raise ValidationError(
                 "Tool arguments do not match the registered schema.",
                 error_code="llm_tool_arguments_invalid",
-                error_details={"schema_keyword": keyword},
+                error_details={
+                    "schema_keyword": keyword,
+                    "field": ".".join(str(part) for part in validation_error.absolute_path),
+                    "message": validation_error.message,
+                },
                 retryable=False,
             )
         return copy.deepcopy(arguments)
@@ -737,8 +720,6 @@ class AgentToolRegistry:
         text = tool_result_text(value)
         if len(text) <= TOOL_RESULT_INLINE_CHARS:
             return ToolSuccess(value=value)
-        if len(text.encode("utf-8")) > MAX_EXCHANGE_RESULT_BYTES:
-            raise ValidationError("Tool result exceeds the paged result size limit.")
         if self._page_store is None:
             raise ValidationError(
                 "Tool result exceeds the inline payload bound and paged results are unavailable."

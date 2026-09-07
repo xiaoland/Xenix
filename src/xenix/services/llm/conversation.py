@@ -555,7 +555,6 @@ class LLMConversationService(TitleGenerationMixin):
                 exchange.results[staged_call_message_id] = terminal
                 if len(exchange.results) != len(exchange.calls):
                     return None
-                self._validate_exchange_result_budget(exchange)
         except Exception:
             # A complete result set that cannot be committed is no longer a
             # valid live exchange.  Discard its placeholder instead of leaving
@@ -690,12 +689,8 @@ class LLMConversationService(TitleGenerationMixin):
                     continue
                 if not isinstance(item, ToolCallOutputItem):
                     raise ValidationError("LLM output item is unsupported.")
-                self._tool_registry.validate_call(
-                    tool_name=item.tool_name,
-                    provider_name=item.provider_name,
-                    arguments=dict(item.arguments),
-                    scope=exchange.scope,
-                )
+                # Validate at invocation so invalid model arguments become a
+                # ToolResult the model can repair, rather than aborting sampling.
                 call_id = generate_id()
                 calls[call_id] = StagedToolCall(
                     pending_message_id=pending_message_id,

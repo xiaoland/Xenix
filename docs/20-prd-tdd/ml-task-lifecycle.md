@@ -42,6 +42,7 @@ pending -> cancelled
 
 ## Result and Failure Contract
 
+- Text-discovery evaluation recomputes metrics from the retained analyzer and source Dataset. FIT diagnostics are historical evidence, not an exact-equality gate for new metrics; the source snapshot and evidence type must still match.
 - Remote directories are execution/cache state. Results become authoritative only
   after they are downloaded, normalized, finalized locally, and registered by the
   owning service.

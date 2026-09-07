@@ -25,6 +25,7 @@ storage libraries are owned by source, migrations, configuration, and tests.
 ## Identity and Consistency
 
 - Dataset registrations reference service-owned tabular materializations.
+- A table with columns and zero rows is a valid Dataset, including a cleaning result that removed every row. Registration and export preserve its schema; operations that require samples enforce that requirement at execution.
 - Importing an attachment materializes one or more service-owned datasets and
   records original-file provenance with the Dataset import. It does not create
   an Artifact-to-Conversation relationship or make the user-selected source

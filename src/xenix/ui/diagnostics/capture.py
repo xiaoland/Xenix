@@ -32,7 +32,10 @@ class CapturePolicy(StrEnum):
 QT_LOG_MAX_BYTES = 32_768
 QT_LOG_MAX_RECORDS = 200
 QT_LOG_MAX_LINE_CHARS = 2_000
-_WINDOWS_PATH = re.compile(r"(?i)\b[A-Z]:[\\/][^\s\"']+")
+_CREDENTIAL = re.compile(
+    r"(?i)(\b(?:api[_-]key|authorization)\s*=\s*(?:bearer\s+)?|\bbearer\s+)"
+    r"(?:\"[^\"]*\"|'[^']*'|\S+)"
+)
 
 
 # The only files a capture may publish. Anything else left behind by an earlier
@@ -163,13 +166,8 @@ def _write_json(path: Path, value: object) -> None:
 
 
 def _redact_log_line(value: str) -> str:
-    redacted = value.replace(str(Path.home()), "<home>")
-    redacted = _WINDOWS_PATH.sub("<path>", redacted)
-    for prefix in ("api_key=", "api-key=", "authorization=", "bearer "):
-        index = redacted.casefold().find(prefix)
-        if index >= 0:
-            redacted = redacted[: index + len(prefix)] + "<redacted>"
-    return redacted
+    # Paths and text after a credential are needed to diagnose the failure.
+    return _CREDENTIAL.sub(r"\1<redacted>", value)
 
 
 def _bounded_qt_log(messages: tuple[str, ...]) -> str:

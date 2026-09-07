@@ -108,7 +108,7 @@ def test_inline_boundary_is_2048_chars(tmp_path: Path) -> None:
 
 def test_invoke_pages_oversized_result_and_reads_next_page(tmp_path: Path) -> None:
     registry = _registry(tmp_path)
-    large = "x" * 5000
+    large = "中文" * 600_000
     registry.register(
         AgentToolSpec(name="data.big", provider_name="data_big", description="big"),
         lambda _args, _ctx: ToolSuccess(value=large),
@@ -137,6 +137,15 @@ def test_invoke_pages_oversized_result_and_reads_next_page(tmp_path: Path) -> No
     assert page.value["text"] == large[1024:2048]
     assert page.value["has_more"] is True
     assert page.value["total_chars"] == len(large)
+
+    tail = registry.invoke(
+        tool_name="result.page",
+        provider_name="result_page",
+        arguments={"result_id": value["result_id"], "offset": len(large) - 10, "limit": 1024},
+        context=_context(),
+    )
+    assert tail.value["text"] == large[-10:]
+    assert tail.value["has_more"] is False
 
 
 def test_invoke_without_store_rejects_oversized_result(tmp_path: Path) -> None:

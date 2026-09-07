@@ -248,6 +248,12 @@ def test_active_service_adapters_fit_evaluate_apply_and_materialize_local_tables
             ),
             tmp_path / service.key / "fit",
         )
+        # Historical FIT diagnostics may gain fields between versions. EVALUATE
+        # must publish metrics recomputed from the retained analyzer and source.
+        evidence_path = Path(str(fit.holdout_artifact_path))
+        evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
+        evidence["facts"]["historical_diagnostic"] = {"library_version": "previous"}
+        evidence_path.write_text(json.dumps(evidence), encoding="utf-8")
         evaluated = service.evaluate(
             EvaluateTaskRequest(
                 task_id=f"evaluate-{service.key}",

@@ -67,6 +67,7 @@ Tool modules.
   an Assistant Message when the provider emitted one. A ToolResult directly
   identifies its ToolCall; neither Artifact nor observability becomes
   conversation provenance.
+- Tool identity, scope, and typed arguments are validated at invocation. Invalid model arguments become a canonical failed ToolResult with field-level details, allowing the next sample to repair the call; they do not abort sampling before the ToolResult exists.
 - A ToolResult stores one bounded direct JSON value. Tabular Tools choose XTT
   before returning; known and normalized failures use the typed `ToolFailure`
   value. Provider adapters only encode that value for their wire protocol, and
@@ -79,6 +80,7 @@ Tool modules.
   `result.page` Tool reads later pages by character range. The store is a bounded
   replay surface, not a second semantic authority or conversation record; it is
   cleaned on Thread deletion and by age-based GC at startup.
+- The inline and exchange budgets apply to the returned value or page handle, not to the complete result before paging. Large successful results remain available through the page store without a separate raw-result byte cap.
 - DatasetService owns materialized data and original-source provenance. After a
   snapshot is loaded, Harness may derive an ephemeral source attachment for
   Chatbot display. That presentation is not canonical content, provider input,

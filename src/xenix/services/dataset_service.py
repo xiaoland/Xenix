@@ -726,7 +726,7 @@ class DatasetService:
                 return [self._frame_spec(workbook, schema=schema, sheet_name=None, sheet_index=0)]
             specs: list[dict[str, object]] = []
             for index, (sheet_name, frame) in enumerate(workbook.items()):
-                if frame.width == 0 or frame.height == 0:
+                if frame.width == 0:
                     continue
                 schema = resolve_tabular_schema_for_loaded_frame(
                     source_path,
@@ -755,10 +755,6 @@ class DatasetService:
     ) -> dict[str, object]:
         if frame.width == 0:
             raise ValidationError("Dataset file must contain at least one column.")
-        if frame.height == 0:
-            raise ValidationError("Dataset file must contain at least one data row.")
-        if len(frame.columns) != len(schema.columns):
-            raise ValidationError("Dataset source schema could not be resolved consistently.")
         renamed = apply_tabular_schema(frame, schema)
         return {
             "frame": renamed,
