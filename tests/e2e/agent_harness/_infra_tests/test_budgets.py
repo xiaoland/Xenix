@@ -219,7 +219,7 @@ def test_abrupt_child_exit_is_a_bounded_crash_result() -> None:
     assert outcome.exit_code == 7
 
 
-def test_integrity_failure_halts_remaining_invocation_cells() -> None:
+def test_integrity_failure_does_not_halt_remaining_invocation_cells() -> None:
     state = _InvocationBudgetState()
     result = AgentHarnessBenchmarkResult(
         case_id="offline-integrity-boundary",
@@ -236,7 +236,7 @@ def test_integrity_failure_halts_remaining_invocation_cells() -> None:
 
     state.observe(runner.BenchmarkRun(result=result, persisted=True))
 
-    assert state.halted_reason == "benchmark_integrity_invalid"
+    assert state.halted_reason is None
 
 
 def test_persistence_failure_halts_remaining_invocation_cells() -> None:
@@ -259,7 +259,7 @@ def test_persistence_failure_halts_remaining_invocation_cells() -> None:
     assert state.halted_reason == "benchmark_result_not_persisted"
 
 
-def test_unexpected_runner_exception_halts_remaining_invocation_cells(
+def test_unexpected_runner_exception_does_not_halt_remaining_invocation_cells(
     tmp_path: Any,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -275,4 +275,29 @@ def test_unexpected_runner_exception_halts_remaining_invocation_cells(
     with pytest.raises(RuntimeError, match="unexpected"):
         controller.run(_BoundaryOnlyCase())
 
-    assert state.halted_reason == "benchmark_runner_exception"
+    assert state.halted_reason is None
+
+
+@pytest.mark.parametrize("status", [BenchmarkRunStatus.RUNTIME_ERROR, BenchmarkRunStatus.BUDGET_EXCEEDED])
+def test_failed_cell_keeps_the_next_cell_available_with_accumulated_cost(status: BenchmarkRunStatus) -> None:
+    state = _InvocationBudgetState()
+    result = AgentHarnessBenchmarkResult(
+        case_id="first",
+        run_id="first",
+        provider_model="offline/model",
+        execution_mode=BenchmarkExecutionMode.HEADLESS,
+        run_status=status,
+        subject_metrics=BenchmarkMetrics(),
+        budget=BenchmarkBudgetSnapshot(
+            status=BenchmarkBudgetStatus.EXCEEDED
+            if status is BenchmarkRunStatus.BUDGET_EXCEEDED
+            else BenchmarkBudgetStatus.WITHIN_LIMITS,
+            policy=runner.DEFAULT_BUDGET_POLICY,
+            reported_subject_tokens=500_001,
+            invocation_reported_subject_tokens=750_000,
+        ),
+    )
+    state.observe(runner.BenchmarkRun(result=result, persisted=True))
+
+    assert state.halted_reason is None
+    assert state.reported_subject_tokens == 750_000

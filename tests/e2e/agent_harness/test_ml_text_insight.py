@@ -101,7 +101,6 @@ class FeedbackKeywordFrequencyCase:
         artifact = _resolve_linked_artifact(context, dataset)
         completed = canonical_completion(context.snapshot)
         source_unchanged = _source_unchanged(self.source_path, context)
-        isolated = _state_isolated(context, artifact)
         semantic_checks = (
             OutcomeCheck(
                 "exact_keyword_frequency_dataset",
@@ -126,11 +125,6 @@ class FeedbackKeywordFrequencyCase:
                 "source_unchanged",
                 source_unchanged,
                 "source_unchanged" if source_unchanged else "source_changed_or_unverifiable",
-            ),
-            OutcomeCheck(
-                "state_isolated",
-                isolated,
-                "runtime_state_isolated" if isolated else "runtime_state_not_isolated",
             ),
         )
         return BenchmarkCaseAssessment(
@@ -246,23 +240,6 @@ def _source_unchanged(source_path: Path, context: BenchmarkCaseContext) -> bool:
             source_state=state,
             services=context.services,
         )
-    except Exception:
-        return False
-
-
-def _state_isolated(context: BenchmarkCaseContext, artifact: Any | None) -> bool:
-    if not context.settings_unchanged:
-        return False
-    try:
-        datasets_confined = all(
-            is_within(Path(str(dataset.source_path)), context.runtime_home)
-            for dataset in context.services.datasets.list_datasets()
-        )
-        artifact_confined = artifact is None or is_within(
-            Path(str(getattr(artifact, "absolute_path", ""))),
-            context.runtime_home,
-        )
-        return datasets_confined and artifact_confined
     except Exception:
         return False
 

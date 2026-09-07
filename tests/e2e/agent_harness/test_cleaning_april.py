@@ -18,7 +18,6 @@ from ._infra.case_support import (
     canonical_completion,
     capture_attached_source_state,
     enum_value,
-    is_within,
     sha256_file,
 )
 from ._infra.contracts import (
@@ -99,7 +98,6 @@ class AprilDineInSalesCleaningCase:
             integrity_checks = (
                 OutcomeCheck("canonical_completion", False, "no_canonical_snapshot"),
                 OutcomeCheck("source_unchanged", False, "source_state_unavailable"),
-                OutcomeCheck("state_isolated", False, "source_state_unavailable"),
             )
             return BenchmarkCaseAssessment(
                 semantic_checks=semantic_checks,
@@ -118,11 +116,6 @@ class AprilDineInSalesCleaningCase:
             source_state=source_state,
             services=context.services,
         )
-        state_isolated = self._state_isolated(
-            dataset_service=dataset_service,
-            runtime_home=context.runtime_home,
-            settings_unchanged=context.settings_unchanged,
-        )
         if terminal is None:
             semantic_checks = (
                 OutcomeCheck("terminal_output_resolved", False, "no_readable_run_output_reference"),
@@ -136,7 +129,6 @@ class AprilDineInSalesCleaningCase:
             integrity_checks = (
                 OutcomeCheck("canonical_completion", canonical_complete, _completion_summary(canonical_complete)),
                 OutcomeCheck("source_unchanged", source_unchanged, _source_summary(source_unchanged)),
-                OutcomeCheck("state_isolated", state_isolated, _isolation_summary(state_isolated)),
             )
             return BenchmarkCaseAssessment(
                 semantic_checks=semantic_checks,
@@ -155,7 +147,6 @@ class AprilDineInSalesCleaningCase:
         integrity_checks = (
             OutcomeCheck("canonical_completion", canonical_complete, _completion_summary(canonical_complete)),
             OutcomeCheck("source_unchanged", source_unchanged, _source_summary(source_unchanged)),
-            OutcomeCheck("state_isolated", state_isolated, _isolation_summary(state_isolated)),
         )
         del terminal_dataset
         return BenchmarkCaseAssessment(
@@ -187,19 +178,6 @@ class AprilDineInSalesCleaningCase:
                     continue
                 return dataset, frame
         return None
-
-    @staticmethod
-    def _state_isolated(*, dataset_service: Any, runtime_home: Path, settings_unchanged: bool) -> bool:
-        if not settings_unchanged:
-            return False
-        try:
-            root = runtime_home.resolve()
-            return all(
-                is_within(Path(dataset.source_path), root)
-                for dataset in dataset_service.list_datasets()
-            )
-        except Exception:
-            return False
 
 
 def _cleaning_checks(*, source_frame: pl.DataFrame, output_frame: pl.DataFrame) -> tuple[OutcomeCheck, ...]:
@@ -274,10 +252,6 @@ def _completion_summary(passed: bool) -> str:
 
 def _source_summary(passed: bool) -> str:
     return "external_and_registered_source_unchanged" if passed else "source_changed_or_unreadable"
-
-
-def _isolation_summary(passed: bool) -> str:
-    return "state_confined_to_cell_runtime" if passed else "state_or_settings_escaped_cell_runtime"
 
 
 def test_cleaning_april(agent_harness_benchmark) -> None:

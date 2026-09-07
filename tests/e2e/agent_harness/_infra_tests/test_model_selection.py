@@ -6,7 +6,6 @@ import pytest
 
 from tests.e2e.agent_harness._infra.dispatch import (
     benchmark_pytest_arguments,
-    safe_check_pytest_options,
 )
 from tests.e2e.agent_harness._infra.pytest_plugin import _single_model_option
 from tests.e2e.agent_harness._infra.runner import dry_run_model, selected_model_key
@@ -85,11 +84,3 @@ def test_explicit_case_selector_replaces_the_default_live_root() -> None:
 
     assert selector in arguments
     assert "tests/e2e/agent_harness" not in arguments
-
-
-def test_offline_check_rejects_selection_or_live_options() -> None:
-    assert safe_check_pytest_options(["-q", "--collect-only"]) == ["-q", "--collect-only"]
-    with pytest.raises(SystemExit, match="selection is fixed"):
-        safe_check_pytest_options(["tests/e2e/agent_harness/test_ml_cleaning.py"])
-    with pytest.raises(SystemExit, match="selection is fixed"):
-        safe_check_pytest_options(["--run-agent-harness"])

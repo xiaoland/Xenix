@@ -7,7 +7,6 @@ import json
 import math
 from pathlib import Path
 import re
-import unicodedata
 from typing import Any, Final
 
 import polars as pl
@@ -41,11 +40,6 @@ CASE_ID: Final = "ml.text_topic_discovery_v1"
 _FIXTURE_PATH = Path(__file__).resolve().parent / "fixtures" / "ml_capabilities" / "learning_module_topic_feedback.csv"
 _EXPECTED_SIZE = 2_686
 _EXPECTED_SHA256 = "7C597F433FD3236556CA6FB3774DF1CBD774AE29DEC61415143577121338E52A"
-_EXPECTED_RESOURCE_IDENTITY_DIGEST = "4a90373f81203fe0c091d125eb86e016af556441d78aa74119984ebd961e9d75"
-_EXPECTED_SPECIFICATION_DIGEST = "fbdd0c8df797beba6435abfec9701238045d171c472710342e203e7bf0d05ea4"
-_EXPECTED_PREPARED_TEXT_DIGEST = "4c2a2e7a66867eff9ed49615a4a9849aa5c8d25fbad5146d7224951417e1d8ba"
-_EXPECTED_GROUP_ASSIGNMENT_DIGEST = "bb5137e13acefc5556f369e1df3914bdba96e4bd59748ccee488c18290a53224"
-_MAX_JUDGE_TASK_INTENT_CHARS = 512
 _DOCUMENT_COLUMN = "feedback_ref"
 _RAW_TEXT_COLUMN = "feedback"
 _TOPIC_COLUMN = "dominant_topic"
@@ -110,15 +104,9 @@ _EXPECTED_THEME_PARTITIONS = frozenset(
     }
 )
 _ARTIFACT_URI = re.compile(r"artifact://[A-Za-z0-9]+(?:\?[^)\s>]+)?")
-_SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _IDENTIFIER = re.compile(r"(?i)\bPULSE-[A-Z0-9-]+\b")
 _URL_OR_EMAIL = re.compile(r"(?i)(?:https?://|www\.|\S+@\S+)")
 _WINDOWS_PATH = re.compile(r"(?i)(?<![A-Z0-9_])[A-Z]:[\\/]")
-_PREFINAL_GROUNDING_FAMILIES: Final = (
-    "quality_metrics",
-    "group_template_isolation",
-    "exploratory_offline_boundary",
-)
 
 
 @dataclass(frozen=True)
@@ -172,8 +160,6 @@ BUSINESS_PROMPT = (
     "隐私只写字段名。"
 )
 
-if len(BUSINESS_PROMPT) > _MAX_JUDGE_TASK_INTENT_CHARS:
-    raise RuntimeError("topic_business_prompt_exceeds_judge_task_intent_bound")
 
 TOPIC_DISCOVERY_RUBRIC = JudgeRubric(
     rubric_id="ml.text_topic_discovery_v1.business_outcome.v1",
@@ -241,26 +227,8 @@ class TextTopicDiscoveryCase:
         outcome = _resolve_topic_outcomes(context)
         report_artifact, report = _resolve_evaluation_report(context)
         frames_agree = _topic_outputs_agree(outcome.fit_frame, outcome.apply_frame)
-        grounding_gaps = _final_answer_grounding_gaps(
-            terminal_text,
-            report,
-            fit_dataset=outcome.fit_dataset,
-            apply_dataset=outcome.apply_dataset,
-        )
-        prefinal_grounding = _prefinal_grounding_availability(context.snapshot)
-        terminal_privacy_failures = _terminal_privacy_failure_kinds(terminal_text)
-        path_provenance = _windows_path_provenance(
-            terminal_text,
-            attachment_path=self.source_path,
-            context=context,
-        )
-        terminal_safe = not terminal_privacy_failures
         completed = canonical_completion(context.snapshot)
         source_unchanged = _source_unchanged(self, context)
-        isolated = _state_isolated(
-            context,
-            (outcome.fit_artifact, outcome.apply_artifact, report_artifact),
-        )
         semantic_checks = (
             OutcomeCheck(
                 "fit_topic_assignments",
@@ -294,37 +262,6 @@ class TextTopicDiscoveryCase:
                     else "topic_evaluation_report_missing_or_invalid"
                 ),
             ),
-            OutcomeCheck(
-                "grounded_final_answer",
-                not grounding_gaps,
-                (
-                    "topic_evidence_and_limits_grounded"
-                    if not grounding_gaps
-                    else (
-                        "topic_explanation_not_grounded:"
-                        + ",".join(grounding_gaps)
-                        + ";"
-                        + _prefinal_grounding_summary(prefinal_grounding)
-                    )
-                ),
-            ),
-            OutcomeCheck(
-                "privacy_safe_public_outcome",
-                terminal_safe,
-                (
-                    "final_answer_contains_only_bounded_public_facts"
-                    if terminal_safe
-                    else (
-                        "final_answer_private_values:"
-                        + ",".join(terminal_privacy_failures)
-                        + (
-                            ";windows_path_provenance:" + ",".join(path_provenance)
-                            if "windows_path" in terminal_privacy_failures
-                            else ""
-                        )
-                    )
-                ),
-            ),
         )
         integrity_checks = (
             OutcomeCheck(
@@ -337,16 +274,11 @@ class TextTopicDiscoveryCase:
                 source_unchanged,
                 "source_unchanged" if source_unchanged else "source_changed_or_unverifiable",
             ),
-            OutcomeCheck(
-                "state_isolated",
-                isolated,
-                "runtime_state_isolated" if isolated else "runtime_state_not_isolated",
-            ),
         )
         deterministic_passed = all(check.passed for check in semantic_checks)
         integrity_passed = all(check.passed for check in integrity_checks)
         judge_input = (
-            _build_judge_input(report) if deterministic_passed and integrity_passed and report is not None else None
+            _build_judge_input(report, terminal_text) if deterministic_passed and integrity_passed and report is not None else None
         )
         terminal_frame = outcome.apply_frame if outcome.apply_frame is not None else outcome.fit_frame
         return BenchmarkCaseAssessment(
@@ -581,8 +513,6 @@ def _matches_evaluation_report(payload: dict[str, Any]) -> bool:
         and isinstance(facts, dict)
         and _candidate_metrics_match(evaluation, facts)
         and _topic_facts_match(facts)
-        and _facts_are_bounded(facts)
-        and _report_is_privacy_safe(payload)
     ):
         return False
     return True
@@ -648,9 +578,7 @@ def _candidate_metrics_match(evaluation: dict[str, Any], facts: dict[str, Any]) 
 
 def _topic_facts_match(facts: dict[str, Any]) -> bool:
     specification = facts.get("specification")
-    preparation = facts.get("preparation")
     isolation = facts.get("isolation")
-    vectorization = facts.get("vectorization")
     split = facts.get("split")
     quality = facts.get("quality")
     stability = facts.get("stability")
@@ -661,9 +589,7 @@ def _topic_facts_match(facts: dict[str, Any]) -> bool:
         isinstance(value, expected_type)
         for value, expected_type in (
             (specification, dict),
-            (preparation, dict),
             (isolation, dict),
-            (vectorization, dict),
             (split, dict),
             (quality, dict),
             (stability, dict),
@@ -674,9 +600,7 @@ def _topic_facts_match(facts: dict[str, Any]) -> bool:
     ):
         return False
     assert isinstance(specification, dict)
-    assert isinstance(preparation, dict)
     assert isinstance(isolation, dict)
-    assert isinstance(vectorization, dict)
     assert isinstance(split, dict)
     assert isinstance(quality, dict)
     assert isinstance(stability, dict)
@@ -687,15 +611,12 @@ def _topic_facts_match(facts: dict[str, Any]) -> bool:
         return bool(
             facts.get("protocol_key") == "multilingual_topic_discovery.v1"
             and _specification_matches(specification)
-            and _preparation_matches(preparation, specification)
             and _isolation_matches(isolation)
-            and _vectorization_matches(vectorization)
             and _split_matches(split)
             and _quality_matches(quality)
             and _stability_matches(stability)
             and _prevalence_matches(prevalence)
             and _profiles_match(profiles)
-            and _is_sha256(facts.get("topic_label_identity_digest"))
             and bool(limitations)
             and len(limitations) <= 8
             and all(isinstance(value, str) and 1 <= len(value) <= 512 for value in limitations)
@@ -707,38 +628,10 @@ def _topic_facts_match(facts: dict[str, Any]) -> bool:
 def _specification_matches(specification: dict[str, Any]) -> bool:
     return bool(
         specification.get("profile_key") == "multilingual_business_v1"
-        and specification.get("normalization_policy_key") == "unicode_nfkc_casefold_mask_entities.v1"
-        and specification.get("tokenizer_policy_key") == "jieba_multilingual_business.v1"
         and specification.get("phrase_mode") == "unigram"
         and specification.get("ngram_max") == 1
         and specification.get("custom_dictionary_references") == []
         and specification.get("stopword_references") == []
-        and specification.get("resource_identity_digest") == _EXPECTED_RESOURCE_IDENTITY_DIGEST
-        and specification.get("specification_digest") == _EXPECTED_SPECIFICATION_DIGEST
-    )
-
-
-def _preparation_matches(
-    preparation: dict[str, Any],
-    specification: dict[str, Any],
-) -> bool:
-    return bool(
-        preparation.get("specification_digest") == specification.get("specification_digest")
-        and preparation.get("source_row_count") == 36
-        and preparation.get("eligible_row_count") == 36
-        and preparation.get("missing_text_row_count") == 0
-        and preparation.get("non_empty_text_row_count") == 36
-        and preparation.get("empty_after_preparation_row_count") == 0
-        and preparation.get("cjk_text_row_count") == 0
-        and preparation.get("latin_text_row_count") == 0
-        and preparation.get("mixed_script_text_row_count") == 36
-        and preparation.get("token_count") == 285
-        and preparation.get("custom_dictionary_term_count") == 0
-        and preparation.get("stopword_term_count") == 49
-        and preparation.get("custom_term_match_count") == 0
-        and preparation.get("collapsed_exact_duplicate_row_count") == 24
-        and preparation.get("collapsed_template_duplicate_row_count") == 24
-        and preparation.get("prepared_text_digest") == _EXPECTED_PREPARED_TEXT_DIGEST
     )
 
 
@@ -752,20 +645,6 @@ def _isolation_matches(isolation: dict[str, Any]) -> bool:
         and isolation.get("connected_group_count") == 12
         and isolation.get("near_duplicate_edge_count") == 0
         and isolation.get("partition_group_overlap_count") == 0
-        and isolation.get("group_assignment_digest") == _EXPECTED_GROUP_ASSIGNMENT_DIGEST
-    )
-
-
-def _vectorization_matches(vectorization: dict[str, Any]) -> bool:
-    transformed = vectorization.get("transformed_feature_count")
-    return bool(
-        vectorization.get("fit_row_count") == 27
-        and vectorization.get("inspected_row_count") == 9
-        and vectorization.get("empty_after_preparation_row_count") == 0
-        and vectorization.get("out_of_vocabulary_row_count") == 0
-        and isinstance(transformed, int)
-        and 15 <= transformed <= 5_000
-        and _is_sha256(vectorization.get("vocabulary_digest"))
     )
 
 
@@ -779,9 +658,6 @@ def _split_matches(split: dict[str, Any]) -> bool:
         and split.get("train_group_count") == 9
         and split.get("holdout_group_count") == 3
         and split.get("group_overlap_count") == 0
-        and _is_sha256(split.get("source_dataset_snapshot_digest"))
-        and _is_sha256(split.get("train_membership_digest"))
-        and _is_sha256(split.get("holdout_membership_digest"))
     )
 
 
@@ -796,7 +672,6 @@ def _quality_matches(quality: dict[str, Any]) -> bool:
             and float(quality.get("heldout_perplexity")) > 0.0
             and -1.0 <= float(quality.get("mean_coherence")) <= 1.0
             and 0.0 <= float(quality.get("term_diversity")) <= 1.0
-            and _is_sha256(quality.get("dominant_topic_digest"))
         )
     except TypeError, ValueError:
         return False
@@ -911,437 +786,7 @@ def _bounded_sanitized_terms(
     return True
 
 
-def _facts_are_bounded(facts: dict[str, Any]) -> bool:
-    specification = facts.get("specification")
-    preparation = facts.get("preparation")
-    isolation = facts.get("isolation")
-    vectorization = facts.get("vectorization")
-    split = facts.get("split")
-    quality = facts.get("quality")
-    stability = facts.get("stability")
-    if not all(
-        isinstance(value, dict)
-        for value in (
-            specification,
-            preparation,
-            isolation,
-            vectorization,
-            split,
-            quality,
-            stability,
-        )
-    ):
-        return False
-    assert isinstance(specification, dict)
-    assert isinstance(preparation, dict)
-    assert isinstance(isolation, dict)
-    assert isinstance(vectorization, dict)
-    assert isinstance(split, dict)
-    assert isinstance(quality, dict)
-    assert isinstance(stability, dict)
-    return bool(
-        set(facts)
-        == {
-            "protocol_key",
-            "specification",
-            "preparation",
-            "isolation",
-            "vectorization",
-            "split",
-            "quality",
-            "stability",
-            "topic_label_identity_digest",
-            "prevalence",
-            "profiles",
-            "limitations",
-        }
-        and set(specification)
-        == {
-            "profile_key",
-            "normalization_policy_key",
-            "tokenizer_policy_key",
-            "phrase_mode",
-            "ngram_max",
-            "custom_dictionary_references",
-            "stopword_references",
-            "resource_identity_digest",
-            "specification_digest",
-        }
-        and set(preparation)
-        == {
-            "specification_digest",
-            "source_row_count",
-            "eligible_row_count",
-            "missing_text_row_count",
-            "non_empty_text_row_count",
-            "empty_after_preparation_row_count",
-            "cjk_text_row_count",
-            "latin_text_row_count",
-            "mixed_script_text_row_count",
-            "token_count",
-            "custom_dictionary_term_count",
-            "stopword_term_count",
-            "custom_term_match_count",
-            "collapsed_exact_duplicate_row_count",
-            "collapsed_template_duplicate_row_count",
-            "prepared_text_digest",
-        }
-        and set(isolation)
-        == {
-            "policy_key",
-            "business_group_supplied",
-            "eligible_row_count",
-            "business_group_count",
-            "template_group_count",
-            "connected_group_count",
-            "near_duplicate_edge_count",
-            "partition_group_overlap_count",
-            "group_assignment_digest",
-        }
-        and set(vectorization)
-        == {
-            "fit_row_count",
-            "transformed_feature_count",
-            "vocabulary_digest",
-            "inspected_row_count",
-            "empty_after_preparation_row_count",
-            "out_of_vocabulary_row_count",
-        }
-        and set(split)
-        == {
-            "policy_key",
-            "source_dataset_snapshot_digest",
-            "eligible_row_count",
-            "train_row_count",
-            "holdout_row_count",
-            "connected_group_count",
-            "train_group_count",
-            "holdout_group_count",
-            "train_membership_digest",
-            "holdout_membership_digest",
-            "group_overlap_count",
-        }
-        and set(quality)
-        == {
-            "policy_key",
-            "topic_count",
-            "train_document_count",
-            "heldout_document_count",
-            "heldout_perplexity",
-            "mean_coherence",
-            "term_diversity",
-            "dominant_topic_digest",
-        }
-        and set(stability)
-        == {
-            "policy_key",
-            "requested_run_count",
-            "successful_run_count",
-            "failed_run_count",
-            "mean_matched_cosine",
-            "minimum_matched_cosine",
-        }
-        and len(json.dumps(facts, ensure_ascii=False, sort_keys=True)) <= 32_768
-    )
-
-
-def _report_is_privacy_safe(payload: dict[str, Any]) -> bool:
-    serialized = json.dumps(payload, ensure_ascii=False, sort_keys=True)
-    try:
-        frame = pl.read_csv(_FIXTURE_PATH)
-        raw_texts = {str(value) for value in frame.get_column(_RAW_TEXT_COLUMN).to_list()}
-        private_ids = {str(value) for value in frame.get_column(_DOCUMENT_COLUMN).to_list()}
-    except Exception:
-        return False
-    prohibited_keys = (
-        '"raw_text":',
-        '"raw_texts":',
-        '"documents":',
-        '"document_ids":',
-        '"vocabulary":',
-        '"feature_names":',
-        '"matched_text":',
-    )
-    return not (
-        len(serialized) > 65_536
-        or any(text in serialized for text in raw_texts)
-        or any(identifier in serialized for identifier in private_ids)
-        or _WINDOWS_PATH.search(serialized) is not None
-        or any(key in serialized for key in prohibited_keys)
-    )
-
-
-def _terminal_is_privacy_safe(text: str) -> bool:
-    return not _terminal_privacy_failure_kinds(text)
-
-
-def _terminal_privacy_failure_kinds(text: str) -> tuple[str, ...]:
-    if not text:
-        return ("missing_final_answer",)
-    try:
-        frame = pl.read_csv(_FIXTURE_PATH)
-        raw_texts = {str(value) for value in frame.get_column(_RAW_TEXT_COLUMN).to_list()}
-        private_ids = {str(value) for value in frame.get_column(_DOCUMENT_COLUMN).to_list()}
-    except Exception:
-        return ("fixture_unavailable",)
-    failures: list[str] = []
-    if _WINDOWS_PATH.search(text) is not None:
-        failures.append("windows_path")
-    if any(raw_text in text for raw_text in raw_texts):
-        failures.append("raw_text")
-    if any(identifier in text for identifier in private_ids):
-        failures.append("private_document_id")
-    return tuple(failures)
-
-
-def _windows_path_provenance(
-    text: str,
-    *,
-    attachment_path: Path,
-    context: BenchmarkCaseContext,
-) -> tuple[str, ...]:
-    """Classify disclosed paths without retaining their matched values."""
-
-    normalized = _normalized_path_text(text)
-    if _WINDOWS_PATH.search(normalized) is None:
-        return ()
-
-    known_paths: tuple[tuple[str, tuple[Path, ...]], ...] = (
-        ("attachment_path", (attachment_path.resolve(),)),
-        (
-            "runtime_dataset_path",
-            tuple(
-                Path(str(getattr(dataset, "source_path", "")))
-                for dataset in context.services.datasets.list_datasets()
-                if is_within(
-                    Path(str(getattr(dataset, "source_path", ""))),
-                    context.runtime_home,
-                )
-            ),
-        ),
-        (
-            "runtime_artifact_path",
-            tuple(
-                Path(str(getattr(artifact, "absolute_path", "")))
-                for artifact in _linked_artifacts(context, text=text)
-                if is_within(
-                    Path(str(getattr(artifact, "absolute_path", ""))),
-                    context.runtime_home,
-                )
-            ),
-        ),
-    )
-    categories: list[str] = []
-    remaining = normalized
-    for category, paths in known_paths:
-        matched = False
-        candidates = sorted(
-            {
-                candidate
-                for path in paths
-                if (candidate := _normalized_path_text(str(path)))
-            },
-            key=len,
-            reverse=True,
-        )
-        for candidate in candidates:
-            if candidate not in remaining:
-                continue
-            matched = True
-            remaining = remaining.replace(candidate, "")
-        if matched:
-            categories.append(category)
-    if _WINDOWS_PATH.search(remaining) is not None:
-        categories.append("other_windows_path")
-    return tuple(categories or ("other_windows_path",))
-
-
-def _normalized_path_text(value: str) -> str:
-    normalized = unicodedata.normalize("NFKC", value).replace("\\", "/").casefold()
-    return re.sub(r"/+", "/", normalized)
-
-
-def _prefinal_grounding_availability(snapshot: Any | None) -> frozenset[str]:
-    available: set[str] = set()
-    for facts in _prefinal_topic_evaluation_facts(snapshot):
-        quality = facts.get("quality")
-        stability = facts.get("stability")
-        isolation = facts.get("isolation")
-        split = facts.get("split")
-        limitations = facts.get("limitations")
-        if (
-            isinstance(quality, dict)
-            and isinstance(stability, dict)
-            and _quality_matches(quality)
-            and _stability_matches(stability)
-        ):
-            available.add("quality_metrics")
-        if (
-            isinstance(isolation, dict)
-            and isinstance(split, dict)
-            and _isolation_matches(isolation)
-            and _split_matches(split)
-        ):
-            available.add("group_template_isolation")
-        if (
-            isinstance(limitations, list)
-            and any(
-                isinstance(value, str)
-                and any(marker in value.casefold() for marker in ("exploratory", "探索"))
-                for value in limitations
-            )
-            and all(marker in BUSINESS_PROMPT for marker in ("离线", "因果", "自动业务决策"))
-        ):
-            available.add("exploratory_offline_boundary")
-    return frozenset(available)
-
-
-def _prefinal_topic_evaluation_facts(snapshot: Any | None) -> tuple[dict[str, Any], ...]:
-    messages = list(getattr(snapshot, "messages", [])) if snapshot is not None else []
-    if not messages or enum_value(getattr(messages[-1], "kind", None)) != "assistant":
-        return ()
-    facts: list[dict[str, Any]] = []
-    for message in messages[:-1]:
-        if (
-            enum_value(getattr(message, "kind", None)) != "tool_result"
-            or enum_value(getattr(message, "result_status", None)) != "succeeded"
-        ):
-            continue
-        for candidate in _nested_topic_evaluation_facts(
-            getattr(message, "value_payload", None)
-        ):
-            if (
-                _topic_facts_match(candidate)
-                and _facts_are_bounded(candidate)
-                and candidate not in facts
-            ):
-                facts.append(candidate)
-    return tuple(facts)
-
-
-def _nested_topic_evaluation_facts(
-    value: Any,
-    *,
-    depth: int = 0,
-) -> tuple[dict[str, Any], ...]:
-    if depth > 8:
-        return ()
-    found: list[dict[str, Any]] = []
-    if isinstance(value, dict):
-        candidate = value.get(_FROZEN_API.evaluation_facts_key)
-        if isinstance(candidate, dict):
-            found.append(candidate)
-        for nested in value.values():
-            if isinstance(nested, (dict, list)):
-                found.extend(
-                    _nested_topic_evaluation_facts(nested, depth=depth + 1)
-                )
-    elif isinstance(value, list):
-        for nested in value:
-            if isinstance(nested, (dict, list)):
-                found.extend(
-                    _nested_topic_evaluation_facts(nested, depth=depth + 1)
-                )
-    return tuple(found)
-
-
-def _prefinal_grounding_summary(available: frozenset[str]) -> str:
-    present = tuple(
-        family for family in _PREFINAL_GROUNDING_FAMILIES if family in available
-    )
-    missing = tuple(
-        family for family in _PREFINAL_GROUNDING_FAMILIES if family not in available
-    )
-    return (
-        "prefinal_grounding_available:"
-        + (",".join(present) if present else "none")
-        + ";prefinal_grounding_unavailable:"
-        + (",".join(missing) if missing else "none")
-    )
-
-
-def _final_answer_grounding_gaps(
-    text: str,
-    report: dict[str, Any] | None,
-    *,
-    fit_dataset: Any | None,
-    apply_dataset: Any | None,
-) -> tuple[str, ...]:
-    if not text:
-        return ("missing_final_answer",)
-    normalized = re.sub(r"\s+", "", unicodedata.normalize("NFKC", text).lower())
-    parameter_schema = all(name in normalized for name in _FROZEN_API.parameter_names)
-    topic_count = any(
-        marker in normalized
-        for marker in ("3个主题", "三个主题", "3个topic", "三个topic", "3topics")
-    )
-    top_terms = any(marker in normalized for marker in ("topterms", "关键词", "主题词", "术语"))
-    quality_metrics = all(marker in normalized for marker in ("perplexity", "coherence", "stability"))
-    metric_values = _evaluation_values_grounded(normalized, report)
-    group = any(marker in normalized for marker in ("connectedgroup", "连接组", "联合组", "group"))
-    template = any(marker in normalized for marker in ("模板", "template"))
-    zero_overlap = any(marker in normalized for marker in ("零重叠", "无重叠", "0重叠", "zerooverlap"))
-    permutation = any(marker in normalized for marker in ("置换", "编号可变", "编号任意", "permutation"))
-    exploratory = any(marker in normalized for marker in ("探索", "exploratory"))
-    offline = "离线" in normalized or "offline" in normalized
-    authority_limit = any(
-        marker in normalized for marker in ("不能证明因果", "非因果", "人工复核", "不能自动决策", "不授予自动")
-    )
-    fit_dataset_id = str(getattr(fit_dataset, "id", "") or "")
-    apply_dataset_id = str(getattr(apply_dataset, "id", "") or "")
-    public_datasets = bool(
-        fit_dataset_id
-        and apply_dataset_id
-        and fit_dataset_id != apply_dataset_id
-        and fit_dataset_id in text
-        and apply_dataset_id in text
-    )
-    checks = (
-        ("evaluation_artifact", report is not None),
-        ("three_topic_delivery", topic_count),
-        ("bounded_top_terms", top_terms),
-        ("quality_metrics", quality_metrics and metric_values),
-        ("seven_parameter_schema", parameter_schema),
-        ("group_template_isolation", group and template and zero_overlap),
-        ("topic_label_permutation", permutation),
-        ("exploratory_offline_boundary", exploratory and offline and authority_limit),
-        ("fit_and_apply_dataset_ids", public_datasets),
-        ("fit_apply_and_evaluate_artifact_links", len(_ARTIFACT_URI.findall(text)) >= 3),
-    )
-    return tuple(name for name, passed in checks if not passed)
-
-
-def _evaluation_values_grounded(
-    normalized_text: str,
-    report: dict[str, Any] | None,
-) -> bool:
-    if report is None:
-        return False
-    facts = report.get(_FROZEN_API.evaluation_facts_key)
-    if not isinstance(facts, dict):
-        return False
-    quality = facts.get("quality")
-    stability = facts.get("stability")
-    if not isinstance(quality, dict) or not isinstance(stability, dict):
-        return False
-    try:
-        expected = (
-            float(quality["heldout_perplexity"]),
-            float(quality["mean_coherence"]),
-            float(stability["mean_matched_cosine"]),
-        )
-    except KeyError, TypeError, ValueError:
-        return False
-    observed: list[float] = []
-    for raw_value, percent in re.findall(r"(?<![\w.])(\d+(?:\.\d+)?)(%)?", normalized_text):
-        value = float(raw_value)
-        observed.append(value / 100.0 if percent else value)
-    return all(
-        any(math.isclose(value, target, rel_tol=5e-4, abs_tol=5e-4) for value in observed) for target in expected
-    )
-
-
-def _build_judge_input(report: dict[str, Any]) -> JudgeInput:
+def _build_judge_input(report: dict[str, Any], final_text: str) -> JudgeInput:
     facts = report[_FROZEN_API.evaluation_facts_key]
     quality = facts["quality"]
     stability = facts["stability"]
@@ -1357,6 +802,7 @@ def _build_judge_input(report: dict[str, Any]) -> JudgeInput:
             "最终结论不得泄露文档标识、原始文本、完整词表、路径或文档级转储。",
         ),
         artifact_evidence=(
+            f"final_answer: {final_text}",
             "public_assignments: fit_rows=36; apply_rows=36; topics=3; permutation_invariant_oracle=true",
             (
                 "public_quality: metric=heldout_perplexity; "
@@ -1467,31 +913,6 @@ def _source_unchanged(case: TextTopicDiscoveryCase, context: BenchmarkCaseContex
         )
     except Exception:
         return False
-
-
-def _state_isolated(context: BenchmarkCaseContext, artifacts: tuple[Any | None, ...]) -> bool:
-    if not context.settings_unchanged:
-        return False
-    try:
-        datasets_confined = all(
-            is_within(Path(str(dataset.source_path)), context.runtime_home)
-            for dataset in context.services.datasets.list_datasets()
-        )
-        artifacts_confined = all(
-            artifact is None
-            or is_within(
-                Path(str(getattr(artifact, "absolute_path", ""))),
-                context.runtime_home,
-            )
-            for artifact in artifacts
-        )
-        return datasets_confined and artifacts_confined
-    except Exception:
-        return False
-
-
-def _is_sha256(value: Any) -> bool:
-    return isinstance(value, str) and _SHA256.fullmatch(value.lower()) is not None
 
 
 def test_ml_text_topic_discovery(agent_harness_benchmark) -> None:

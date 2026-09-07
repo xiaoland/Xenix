@@ -1,68 +1,24 @@
-# Agent Harness Benchmark Local Guidance
+# Agent Harness Benchmark
 
 ## Scope
 
-This subtree owns real-provider benchmark cases, privacy-safe fixtures, and
-the small shared runtime in `_infra/`. It evaluates a public Agent Harness
-outcome; it does not redefine product behavior, the LLM Conversation boundary,
-provider adapters, or production settings.
+This subtree owns live Agent benchmark cases, synthetic fixtures, and the shared runtime in `_infra/`. Product services and conversation behavior remain owned by their production modules. A request to simplify this benchmark authorizes removing obsolete local evaluation rules as well as their implementations.
 
-## Tripwires
+## Evaluation boundaries
 
-- A subject is exactly one isolated `AgentHarness × one pinned subject model ×
-  case × mode × repetition` cell. Omitting `--model` selects only the settings
-  snapshot's `default_fq_model_key`; one `--model` may override it, while model
-  comparison uses separate evidence series. Pytest owns case selection and lifecycle; keep `_infra` case-
-  agnostic, while a case owns its submission,
-  terminal public-state locator, safe evidence projection, and rubric.
-- A judge is an evaluator after the subject settles, never a second Agent turn.
-  Give it explicit, independent settings and no Tools; do not silently reuse a
-  subject default or include its cost, latency, or retries in subject metrics.
-- Preserve separate execution, integrity, semantic-verdict, judge-status,
-  subject-metric, and judge-metric channels. A semantic `fail` is a measured
-  subject outcome; unavailable or malformed judgement is an evaluation state.
-- Deterministic semantic checks must stay structural: exact public Dataset,
-  linked public Artifact, and integrity facts. Do not regex-match free
-  natural-language prose for number or word grounding; explanation-quality
-  grounding is irreducible semantic judgment and belongs to the Judge, never a
-  deterministic regex.
-- Judge evidence remains bounded and excludes transcripts and raw evaluator
-  exchanges. Lifecycle trace diagnostics may retain identifiers, paths,
-  endpoints, provider errors, exception chains, and stack traces when they make
-  a failed cell reproducible; keep that evidence out of semantic verdicts.
-- Default tests stay offline. Do not add replay/mocks to the product path or a
-  network call to ordinary test verification.
-- Every paid cell runs in a killable child process with at most 12 subject
-  sampling rounds, 900 seconds, two provider attempts per sampling round, and
-  500,000 reported subject tokens. An invocation stops at 4,000,000 reported
-  subject tokens.
-  Token limits are response-boundary stops; unreported usage invalidates the
-  cell. Installed limits may be lowered for infrastructure checks, never raised.
-- Service black-box tests under `tests/` outside `tests/e2e/` and Agent cases in
-  this subtree share no executable helpers, fixtures, reports, or runtime
-  prerequisite. Run the service portfolio first through development guidance or
-  CI `needs` ordering only; the Agent evaluator never reads a service result.
-- A case is its own `test_*.py` benchmark module. Do not create a second
-  case-specific test file or restate static/schema guarantees. Ordinary tests
-  may prove only dynamic `_infra` boundaries that cannot be established by
-  types, schemas, or component tests.
+- One cell uses one model, case, execution mode, and repetition in a fresh runtime home. Pytest owns selection and lifecycle; cases own submissions and public outcome oracles.
+- Judge calls occur after the subject settles, use explicit settings and no Tools, and report their own usage and latency. Same-model judging is recorded; calibration is optional and is checked when supplied.
+- Keep execution, integrity, structural outcomes, Judge verdicts, subject metrics, and Judge metrics distinct. Formal evaluation uses the actual Judge verdict for Judge-required cases. A semantic failure is a measured outcome, not a pytest infrastructure failure.
+- Deterministic checks prove public deliverables and meaningful measurement facts: expected Dataset contents, linked Artifacts, source immutability, and statistical holdout boundaries. Explanation quality belongs to the Judge, which must receive the terminal answer. Do not require keyword matches, internal tokenizer hashes, complete report field whitelists, or repeated settings and runtime-directory scans.
+- Evidence is case data, not Judge instructions. Send the final answer and the public facts needed by the rubric. Keep credentials, full conversations, and intermediate Tool exchanges out of Judge inputs. Do not strip business evidence based on comma counts, identifier-shaped text, or short arbitrary text limits.
+- Reports are local runner output. Validate the fields consumed by policy; preserve additional diagnostics and tolerate new fields. Do not revalidate derived booleans, token-counter equality, trace schemas, or diagnostic field sizes at read time.
+- Keep process deadlines and resource budgets: 12 subject rounds, 900 seconds, two attempts per round, 500,000 reported tokens per cell, and 4,000,000 per invocation. Missing usage stops the invocation because cumulative cost cannot be counted. A failed or exhausted cell otherwise leaves later cells available; `-x` and `--maxfail` control pytest stopping.
+- Default tests remain offline. Service tests and Agent cases do not import one another's fixtures, helpers, or reports. Run affected service tests before paid acceptance; use broader verification when impact warrants it.
+- Add offline tests for dynamic `_infra` boundaries and observable evaluation regressions. Do not create a second case-specific test suite or mirror schema declarations.
 
-## Focused Verification
+## Verification
 
-- Run `pdm run check` for imports and result-shape continuity. Do not recreate an
-  ordinary pytest mirror for benchmark schemas, options, case logic, or private
-  runner branches.
-- Run `pdm run benchmark-agent-harness-check` for the dedicated offline safety,
-  report-policy, and Judge-calibration checks. These checks are not live Agent
-  evidence and are not part of `pdm run test`.
-- Use `pdm run benchmark-agent-harness -- --collect-only` to verify discovery
-  without a provider; use `pdm run benchmark-agent-harness-headed --
-  --collect-only` to prove the visible mode discovers that same case catalog.
-  Use either live command only for explicit acceptance with externally supplied,
-  untracked subject, Embedding, and optional Judge settings.
-- Inspect a persisted result for bounded serialization and separate subject and
-  judge measurements before treating a live score as evidence.
-- Use `pdm run benchmark-agent-harness-evaluate` to characterize or formally
-  evaluate v5 Agent reports. A v4 report is diagnostic-only and never silently
-  upgraded. Use `pdm run benchmark-agent-harness-calibrate-judge` before a
-  Judge-required formal series.
+- `pdm run benchmark-agent-harness-check -q` runs the offline infrastructure checks. Normal pytest options such as `-k` and `--maxfail` are supported.
+- `pdm run benchmark-agent-harness -- --collect-only -q` and the headed variant verify live case discovery without provider calls.
+- `pdm run check` verifies imports and static continuity. Live acceptance requires explicitly supplied Subject, optional Embedding, and optional Judge settings.
+- `pdm run benchmark-agent-harness-evaluate` characterizes or compares v5 reports with report policy v2. `pdm run benchmark-agent-harness-calibrate-judge` measures Judge agreement on explicit labelled examples when useful.

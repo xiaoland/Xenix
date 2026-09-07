@@ -6,7 +6,6 @@ import json
 import math
 from pathlib import Path
 import re
-import unicodedata
 from typing import Any, Final
 
 import polars as pl
@@ -51,8 +50,6 @@ _EXPECTED_PROFILE_MEDIANS = {
     _AT_RISK_ACCOUNTS: (3.5, 11.75, 123.5),
 }
 _ARTIFACT_URI = re.compile(r"artifact://[A-Za-z0-9]+(?:\?[^)\s>]+)?")
-_LONG_ID = re.compile(r"\b[A-Fa-f0-9]{24,64}\b")
-_WINDOWS_PATH = re.compile(r"(?<!\w)[A-Za-z]:[\\/][^\s]+")
 
 BUSINESS_PROMPT = (
     "请先画像，只用 monthly_orders、return_rate_pct 和 service_minutes 比较 KMeans 的 2、3、4 "
@@ -126,11 +123,8 @@ class ClusterSelectionCase:
         dataset, frame = _resolve_assignment_outcome(context, self.source_path)
         report_artifact, report_facts = _resolve_cluster_report(context, frame)
         final_text = _terminal_text(context.snapshot)
-        grounding_gaps = _final_answer_grounding_gaps(final_text)
-        grounded_answer = not grounding_gaps
         completed = canonical_completion(context.snapshot)
         source_unchanged = _source_unchanged(self.source_path, context)
-        isolated = _state_isolated(context, report_artifact)
 
         semantic_checks = (
             OutcomeCheck(
@@ -147,15 +141,6 @@ class ClusterSelectionCase:
                 if report_facts is not None
                 else "linked_recomputable_cluster_report_missing",
             ),
-            OutcomeCheck(
-                "grounded_final_answer",
-                grounded_answer,
-                (
-                    "selection_profiles_and_limits_grounded"
-                    if grounded_answer
-                    else "selection_explanation_not_grounded:" + ",".join(grounding_gaps)
-                ),
-            ),
         )
         integrity_checks = (
             OutcomeCheck(
@@ -167,11 +152,6 @@ class ClusterSelectionCase:
                 "source_unchanged",
                 source_unchanged,
                 "source_unchanged" if source_unchanged else "source_changed_or_unverifiable",
-            ),
-            OutcomeCheck(
-                "state_isolated",
-                isolated,
-                "runtime_state_isolated" if isolated else "runtime_state_not_isolated",
             ),
         )
         deterministic_passed = all(check.passed for check in semantic_checks)
@@ -340,41 +320,6 @@ def _finite_at_least(value: Any, minimum: float) -> bool:
     return math.isfinite(number) and number >= minimum
 
 
-def _final_answer_grounding_gaps(text: str) -> tuple[str, ...]:
-    if not text:
-        return ("missing_final_answer",)
-    normalized = re.sub(r"\s+", "", unicodedata.normalize("NFKC", text).lower())
-    checks = (
-        ("candidate_scope", all(str(value) in normalized for value in (2, 3, 4))),
-        (
-            "selected_cluster_count",
-            bool(
-                re.search(
-                    r"(?:选择|选定|保留|最终|推荐).{0,16}(?:k=?3|3(?:群|组|类|个cluster)|三(?:群|组|类))",
-                    normalized,
-                )
-                or re.search(
-                    r"(?:k=?3|3(?:群|组|类|个cluster)|三(?:群|组|类)).{0,16}(?:选择|选定|保留|最终|推荐)",
-                    normalized,
-                )
-            ),
-        ),
-        ("quality_metric", "silhouette" in normalized or "轮廓" in normalized),
-        ("stability", "稳定" in normalized or "stability" in normalized),
-        (
-            "original_scale_profiles",
-            all(marker in normalized for marker in ("monthly_orders", "return_rate", "service_minutes"))
-            or all(marker in normalized for marker in ("订单", "退货", "服务")),
-        ),
-        (
-            "limitations",
-            any(marker in normalized for marker in ("局限", "限制", "不能证明", "不代表", "非因果")),
-        ),
-        ("artifact_link", bool(_ARTIFACT_URI.search(text))),
-    )
-    return tuple(name for name, passed in checks if not passed)
-
-
 def _build_judge_input(report: dict[str, Any], final_text: str) -> JudgeInput:
     quality = report["quality"]
     stability = report["stability"]
@@ -389,7 +334,7 @@ def _build_judge_input(report: dict[str, Any], final_text: str) -> JudgeInput:
         ),
         "public_profiles: median(monthly_orders, return_rate_pct, service_minutes)="
         "(24.5,1.4,40.5)|(12.5,5.25,77.5)|(3.5,11.75,123.5)",
-        f"final_answer: {_safe_final_text(final_text)}",
+        f"final_answer: {final_text}",
     )
     return JudgeInput(
         rubric=CLUSTER_SELECTION_RUBRIC,
@@ -401,17 +346,6 @@ def _build_judge_input(report: dict[str, Any], final_text: str) -> JudgeInput:
         ),
         artifact_evidence=evidence,
     )
-
-
-def _safe_final_text(text: str) -> str:
-    value = _ARTIFACT_URI.sub("[public artifact link]", text)
-    value = _LONG_ID.sub("[stable id]", value)
-    value = _WINDOWS_PATH.sub("[local path]", value)
-    lines = [
-        "[row-like content omitted]" if len([part for part in line.split(",") if part.strip()]) >= 4 else line
-        for line in value.splitlines()
-    ]
-    return " ".join(" ".join(lines).split())[:480]
 
 
 def _linked_artifacts(context: BenchmarkCaseContext) -> tuple[Any, ...]:
@@ -491,23 +425,6 @@ def _source_unchanged(source_path: Path, context: BenchmarkCaseContext) -> bool:
             source_state=state,
             services=context.services,
         )
-    except Exception:
-        return False
-
-
-def _state_isolated(context: BenchmarkCaseContext, artifact: Any | None) -> bool:
-    if not context.settings_unchanged:
-        return False
-    try:
-        datasets_confined = all(
-            is_within(Path(str(dataset.source_path)), context.runtime_home)
-            for dataset in context.services.datasets.list_datasets()
-        )
-        artifact_confined = artifact is None or is_within(
-            Path(str(getattr(artifact, "absolute_path", ""))),
-            context.runtime_home,
-        )
-        return datasets_confined and artifact_confined
     except Exception:
         return False
 

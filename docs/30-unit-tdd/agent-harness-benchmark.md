@@ -1,202 +1,68 @@
 # Agent Harness Benchmark
 
-## Admission
+This document owns benchmark evaluation and interpretation. The [LLM conversation boundary](../20-prd-tdd/llm-conversation-boundary.md) owns production behavior; benchmark changes do not change the product's conversation or Tool contracts.
 
-This document owns the local evaluation boundary for the Agent Harness
-benchmark. The [LLM conversation boundary](../20-prd-tdd/llm-conversation-boundary.md)
-continues to own product conversation topology, authority, and sequences;
-benchmark code observes public outcomes and does not alter that contract.
+## Execution and ownership
 
-## Subject and Case Boundary
+`tests/e2e/agent_harness/` contains the live cases and their fixtures. Each `test_*.py` module owns one business task, submission, public-state oracle, and optional Judge rubric. Shared execution and report interpretation live in `_infra/`; pytest controls selection and lifecycle.
 
-A subject is one isolated `AgentHarness × one pinned subject model × case ×
-execution mode × repetition` cell. It uses the real provider path, then observes the settled public product
-state. The runner is case-agnostic. `headless` submits through the public Harness
-service directly; `headed` drives the same submission through the visible desktop
-UI. Execution mode is recorded in result schema v5 and does not change the case,
-oracle, Judge, or subject model.
+A cell is one `AgentHarness × subject model × case × execution mode × repetition`. Omitting `--model` selects the configured default; one override is allowed. Headless mode submits through the Harness service, and headed mode drives the visible desktop. Both use a fresh temporary runtime home and the real provider path.
 
-Omitting `--model` selects exactly the external settings snapshot's
-`default_fq_model_key`; one `--model` value may override it. Comparable
-baseline, improvement, and ablation series keep that model and settings hash
-fixed and vary the recorded Harness variant. A different model starts a
-separate evidence series rather than expanding one invocation into a model
-matrix.
+Subject and Embedding settings are loaded once and copied into the cell. Their hashes describe the configuration used; changing an external settings file later does not invalidate an already running snapshot. A case may prepare public Knowledge state before subject timing starts.
 
-`tests/e2e/agent_harness/` is the end-to-end benchmark home. Each `test_*.py` case
-module is both the case definition and its explicitly collected pytest item;
-pytest selects and controls the case matrix. Shared runner, contracts, judge,
-and the deliberately small pytest fixture live in `_infra/`. There is no case
-registry and no second case-specific test implementation.
+```mermaid
+flowchart LR
+    P[Pytest selection] --> C[Isolated cell]
+    C --> O[Public Dataset / Artifact / answer]
+    O --> D[Structural checks]
+    O --> J[Optional Judge]
+    D --> R[v5 report]
+    J --> R
+    C --> T[Metrics and lifecycle trace]
+    T --> R
+    R --> E[Report policy v2]
+```
 
-A case owns its business intent, fixture validation, submission, terminal
-output location, privacy-reviewed evidence projection, and rubric identity.
-It must not require a prescribed Tool trace, exact Assistant wording, chart
-grammar, or golden output. It may grade the semantic content of the terminal
-answer when that is the user's requested deliverable. The regional-sales graph
-case, for example, accepts an
-appropriate presentation form rather than bars, a title, or a particular axis
-layout.
+## What the benchmark measures
 
-A case may prepare isolated product state through a narrow public-service seam.
-Preparation runs once per cell after the production graph and Thread exist, but
-before subject timing begins. The rainy-season case uses this seam to index its
-rule in the cell's global Knowledge Library; it does not add a per-Thread
-enablement state or alter the production conversation boundary. In headed mode,
-the adapter realizes that same intent through the Knowledge Workspace file-drop
-surface and its real background task queue.
+Cases verify meaningful public outcomes, such as an exact cleaned Dataset, linked output Artifact, ranking results, or a statistical evaluation on disjoint training and holdout data. Source immutability remains a measurement check. Headed cases also record actual UI submission, rendering, Knowledge task completion, and shutdown facts.
 
-Knowledge-plus-data cases judge the Agent's final answer surfaces: terminal Assistant
-content and the public Datasets, Artifacts, or charts it actually delivered. Tool
-Calls and ToolResults are execution telemetry, not semantic pass criteria; they may
-diagnose a failure but cannot make a case pass. The rainy-season case therefore
-requires the exact derived Dataset linked to the attached source without inspecting
-whether or how the Agent called `knowledge.lookup`; it also checks the terminal answer
-for the governing rule and the exact SKU/quantity actions without prescribing wording
-or formatting. Cases whose answer is primarily insight or advice evaluate the
-terminal answer against bounded fixture facts and an explicit rubric, using the Judge
-only when deterministic checks cannot express the semantic requirement.
+Cases do not repeat service validation of tokenizer fingerprints, prepared-text digests, report field whitelists, or serialization sizes. Isolation is established when constructing the cell; every case need not rescan all registered paths. Output locators still verify that the referenced Artifact is readable and belongs to the cell.
 
-## Evidence and Judge Boundary
+A Judge evaluates explanations against case facts and the rubric. It receives the terminal answer, not a precomputed claim that the answer passed keyword checks. Phrasing, long answers, comma-separated numbers, and additional report metadata do not invalidate business evidence. SVG projection uses visible text and accessibility labels and excludes hidden elements; it does not treat comma counts as proof of raw-row disclosure.
 
-Each judge-enabled case supplies only a bounded packet of user intent,
-independent fixture facts, final public Dataset/Artifact semantics, and—only
-when the rubric grades it—the terminal Assistant answer. For a text-only judge,
-graph evidence is a semantic projection such as visible text and accessibility
-labels, not pixels or raw SVG. It may assess task fulfilment, factual grounding,
-and semantic comprehensibility, but not visual aesthetics.
+Judge inputs consist of case facts and requested final output, never settings, credentials, full transcripts, or intermediate Tool exchanges. Final-output text may itself contain public links or local locators; it is not scanned as a substitute for evaluating the requested outcome. Evidence is delimited as data. The Judge has no Tools, uses explicitly configured settings, and records latency, retries, and usage separately from the subject.
 
-Evidence is untrusted content. It must be delimited and treated as data, and
-must exclude transcripts, intermediate Assistant content, Tool arguments/results,
-raw fixture rows, raw artifacts, internal identifiers, paths, provider metadata,
-and credentials. A terminal answer included for a matching rubric is a bounded
-final-output projection, never the conversation transcript. Persist only bounded
-verdict scores and reason codes; discard raw judge prompts, responses, and errors.
+Judge responses need usable verdicts, rubric scores, and reason codes. Markdown JSON fences, additional fields, and repeated valid reason codes are tolerated. Missing scores or invalid verdicts remain an evaluation error. Same-model judging is recorded as `same_model`; it does not prevent measurement or acceptance.
 
-The judge is a rubric-based, pointwise evaluator after the subject cell has
-settled. Its configuration is explicit and separate from the subject matrix;
-same-model judging is allowed only when recorded as non-independent. A judge
-uses no Tools and is not another participant in the Agent turn.
+## Resource limits and failures
 
-## Result Interpretation
+Each live cell runs in a killable spawn child with a 900-second deadline, at most 12 subject sampling rounds, and two provider attempts per round. Optional title and completion-guard models are disabled in the effective settings so their requests do not escape subject accounting.
 
-Execution, integrity, semantic verdict, judge status, subject metrics, and
-judge metrics are independent result channels. Integrity covers fixture and
-settings fingerprints, isolated-runtime confinement, and safe serialization.
-An integrity breach invalidates the measurement instead of becoming a model
-quality result.
+Reported subject tokens are limited to 500,000 per cell and 4,000,000 per pytest invocation. Token enforcement happens at response boundaries: count the completed response and stop before a later request. Missing usage stops further cells because invocation cost cannot be counted; round and time limits remain independent.
 
-Headed integrity additionally proves that the real MainWindow was visible,
-source attachments were accepted through the composer drop surface, the terminal
-Assistant message was rendered, imported Knowledge appeared in the Workspace,
-Knowledge tasks settled, window-owned services shut down, and the isolated SQLite
-database remained readable. These are execution facts only. The case still grades
-the final answer, Dataset, and Artifact outcomes and never passes because the UI
-journey itself completed.
+A runtime error, failed integrity check, or exhausted cell does not automatically cancel unrelated remaining cases. Pytest `-x` and `--maxfail` control that choice. The invocation stops when its aggregate token limit is reached, accounting is unavailable, output cannot be persisted, or the user interrupts it.
 
-A semantic `fail` is a valid subject outcome. Missing terminal output may be
-such a failure; insufficient final evidence is `inconclusive`. An evaluator
-uses `fail` only for positive evidence of an irrelevant or materially
-contradictory outcome, not merely because another score dimension is weak.
-Missing judge configuration, provider failure, or malformed judgement is a
-judge-status state and must not be collapsed into a semantic failure or
-success.
+## Reports and acceptance
 
-Subject measurements include the Harness turn's latency, token usage, messages,
-Tool calls/results, retries, and derived outputs. Judge latency, usage, and
-retries are evaluation metadata and never contribute to subject performance.
+Schema v5 retains separate execution status, integrity, structural outcome, Judge status/verdict, subject metrics, Judge metrics, budget, identity, and trace. Structural success alone does not imply that a Judge-required answer passed. Provider errors and malformed judgements remain Judge states; they are not converted into semantic success or failure.
 
-Each persisted cell also carries a vendor-neutral lifecycle trace correlated by
-`trace_id`. Completed phase events record span identity, relative start,
-duration, status, structured attributes, and the complete exception cause chain
-with stack traces. The standard phase vocabulary covers cell open/close, case
-preparation and assessment, subject execution, and Judge evaluation. These are
-debug evidence, not semantic pass criteria. CLI output includes both the trace
-id and absolute report path so a terminal failure can be joined directly to its
-JSON evidence. Attribute names follow OpenTelemetry GenAI conventions where a
-stable term exists; the report remains usable without an OTLP backend.
+The report reader validates only fields consumed by policy, preserves additional metadata, and leaves diagnostics readable as they evolve. It does not demand exact keys throughout the report, recompute stored projection flags, compare independent token counters, cap trace sizes, or require a clean working tree. Schema v4 remains diagnostic-only.
 
-## Paid Cell Safety
+`agent-harness-report-policy-v2` characterizes one headless measurement without creating a gate. Formal acceptance uses three headless repetitions and one headed repetition. Structural prerequisites and integrity must pass in all four. For Judge-required cases, at least two headless Judge verdicts must pass, the third may be partial, and the headed Judge verdict must pass. A required Judge must complete; for cases without a Judge, all structural verdicts must pass.
 
-Every live cell runs in its own spawn child process. The parent terminates its
-process tree at 900 seconds and records `budget_exceeded` without a semantic
-verdict. A benchmark-only wrapper around the real `LLMService` admits at most
-12 subject sampling rounds and clamps provider retry attempts to two; optional
-title and completion-guard models are disabled in the effective snapshot so
-their cost cannot escape the subject channel.
+Comparable reports retain the same case, subject model, fixture, effective settings, optional Embedding/Judge settings, resource policy, and Judge rubric/model. A cohort also shares its Harness variant. Commit, dirty state, case source hash, runtime hash, original settings-file hash, and invocation ID remain diagnostic identity; they do not block developer comparisons. When intentionally changing evaluation semantics, describe that change alongside any comparison: a relaxed oracle is not evidence of a better model.
 
-Reported subject tokens stop at 500,000 per cell and 4,000,000 per pytest
-invocation. These are response-boundary limits because arbitrary
-OpenAI-compatible providers do not supply a portable pre-request token
-reservation. The current normalized response is counted atomically; no later
-request is admitted after the boundary is reached. Missing usage invalidates
-the cell. Persisted schema v5 records the installed policy, observed counts,
-budget status, effective settings hash, case/runtime identity, invocation ID,
-Harness variant, and lifecycle trace. Trace diagnostics may retain runtime paths
-and provider exception detail needed to reproduce a failure; they remain
-separate from Judge evidence and acceptance inputs. The
-runtime identity binds Python/platform, the dependency lock, and the shared
-benchmark execution code so a changed evaluator seam cannot silently enter a
-comparison cohort.
+Calibration is optional. When supplied through `--calibration`, a passing report must match the Judge model, settings, subject, and rubric. The calibration command runs at most four hand-labelled packets three times with per-request process deadlines and normal provider retries. Suite names are independent labels; notes and extra fields are allowed, and only the selected rubric is imported. An inconclusive example may contain incomplete evidence. Derived calibration pass flags are computed from observations; duplicate or missing repetitions cannot count as complete calibration.
 
-## Report Acceptance and Calibration
+Each cell's trace preserves lifecycle spans, timings, paths, attributes, exception chains, and stack traces needed for diagnosis. CLI summaries print the trace ID and absolute JSON report path. Traces remain diagnostic evidence and never determine a semantic score merely because their format changed.
 
-The live runner produces measurements. The independent Agent-only report
-policy decides whether v5 reports form a valid characterization or formal
-series; it has no service-report input. A single headless repetition is a
-non-gating characterization. Formal evidence requires three comparable
-headless repetitions and, after their acceptance, one headed repetition.
-Execution, integrity, deterministic prerequisites, budgets, Judge status, and
-subject/Judge metrics remain separate. Legacy v4 reports stay readable for
-diagnosis but are never silently qualified or compared as v5 evidence.
+## Contributor commands
 
-A Judge-required formal series uses an explicit, independent Judge model and a
-calibration report bound to the exact settings and rubric hashes. Calibration
-uses at most four clear hand-labelled packets with three repetitions each.
-Raw prompts, responses, errors, transcripts, and fixture rows are discarded;
-only bounded expected/observed verdicts, reason codes, metrics, and hashes may
-persist.
+- `pdm run benchmark-agent-harness-check -q` runs the dedicated offline infrastructure tests; use normal pytest options, for example `-k report_policy`.
+- `pdm run benchmark-agent-harness -- --collect-only -q` and `pdm run benchmark-agent-harness-headed -- --collect-only -q` verify discovery without provider calls.
+- `pdm run benchmark-agent-harness -- <case selector> --llm-settings <path>` runs an explicit paid series. Add Judge settings when its rubric requires judgement; the headed command selects visible execution.
+- `pdm run benchmark-agent-harness-evaluate characterize <report>` reads one measurement. `formal <reports...>` and `compare --baseline <reports...> --candidate <reports...>` apply the acceptance/comparison policy; calibration arguments are optional.
+- `pdm run benchmark-agent-harness-calibrate-judge` evaluates an explicit calibration suite when Judge agreement needs investigation.
 
-## Offline and Live Policy
-
-The ordinary `pdm run test` service portfolio is deterministic and offline. It does not collect
-the benchmark case directory, open headed benchmark windows, or call a provider.
-Static analysis and benchmark source own schema and option continuity; no ordinary
-pytest case duplicates benchmark case logic, result schemas, types, or Tool checks.
-
-Use `pdm run benchmark-agent-harness -- --collect-only` to prove discovery
-without provider access. A live run is an explicit
-`pdm run benchmark-agent-harness -- [pytest options]` action with external,
-untracked subject and judge settings; normal pytest selection (`-k` or a node
-id) selects its case. A live report must retain the separate channels above
-without secrets or raw evidence. Calibrate a configured judge before using
-scores for comparison; disagreement with clear fixtures is a signal to refine
-the case evidence or rubric, not to add Tool-trajectory assertions.
-
-Use `pdm run benchmark-agent-harness-headed -- --collect-only` for offline headed
-discovery and `pdm run benchmark-agent-harness-headed -- [pytest options]` for
-explicit visible E2E acceptance. Headed execution requires an interactive desktop
-and uses the same external, untracked Subject, Embedding, and optional Judge
-settings as headless execution. Every cell gets a fresh `XENIX_APP_HOME`; real
-fixture files enter through Qt drop events, and no mock/replay provider is admitted.
-
-Run `pdm run benchmark-agent-harness-check` for dedicated offline benchmark
-infrastructure checks. Use `pdm run benchmark-agent-harness-calibrate-judge`
-for an explicitly configured live Judge suite, and
-`pdm run benchmark-agent-harness-evaluate` for characterization, formal
-acceptance, or Harness-variant comparison.
-
-Service black-box integration tests live only under `tests/`; Agent benchmark
-cases and assets live only under `tests/e2e/agent_harness/`. Neither tree
-imports, invokes, or consumes reports from the other. Development guidance and
-the manual paid workflow run the explicitly matched service selector and then
-`pdm run test` first solely to avoid spending on an unqualified product path.
-The service selector is a dispatch input, not an Agent runtime input. The CI
-edge passes job success only—no fixture, artifact, verdict, or report. Headed
-acceptance remains local and interactive.
-
-## Change Guidance
-
-Read `tests/e2e/agent_harness/AGENTS.md` before changing the benchmark.
-Source and focused dynamic-infrastructure tests own exact fields, request
-shapes, and pytest options.
+The ordinary service portfolio stays offline and does not collect these cases. Service tests and Agent cases share no executable helpers, fixture data, or reports. Run the affected service checks before paid acceptance and broaden verification only when impact warrants it; CI may enforce its own service-job ordering.

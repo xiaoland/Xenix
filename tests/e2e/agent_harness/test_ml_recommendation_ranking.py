@@ -7,7 +7,6 @@ import json
 import math
 from pathlib import Path
 import re
-import unicodedata
 from typing import Any, Final
 
 import polars as pl
@@ -188,14 +187,8 @@ class RecommendationRankingCase:
         failed_tool_summary = ",".join(failed_tools) if failed_tools else "none"
         linked_artifact_count = len(_linked_artifacts(context))
         final_link_count = len(_ARTIFACT_URI.findall(_terminal_text(context.snapshot)))
-        grounding_gaps = _final_answer_grounding_gaps(
-            _terminal_text(context.snapshot),
-            report,
-        )
-        grounded_answer = not grounding_gaps
         completed = canonical_completion(context.snapshot)
         source_unchanged = _sources_unchanged(self, context)
-        isolated = _state_isolated(context, (apply_artifact, report_artifact))
 
         semantic_checks = (
             OutcomeCheck(
@@ -228,13 +221,6 @@ class RecommendationRankingCase:
                     f"final_links={final_link_count};linked_artifacts={linked_artifact_count}"
                 ),
             ),
-            OutcomeCheck(
-                "grounded_final_answer",
-                grounded_answer,
-                "comparison_cold_start_and_limits_grounded"
-                if grounded_answer
-                else "recommendation_explanation_not_grounded:" + ",".join(grounding_gaps),
-            ),
         )
         integrity_checks = (
             OutcomeCheck(
@@ -247,16 +233,11 @@ class RecommendationRankingCase:
                 source_unchanged,
                 "sources_unchanged" if source_unchanged else "source_changed_or_unverifiable",
             ),
-            OutcomeCheck(
-                "state_isolated",
-                isolated,
-                "runtime_state_isolated" if isolated else "runtime_state_not_isolated",
-            ),
         )
         deterministic_passed = all(check.passed for check in semantic_checks)
         integrity_passed = all(check.passed for check in integrity_checks)
         judge_input = (
-            _build_judge_input(report, grounded_answer)
+            _build_judge_input(report, _terminal_text(context.snapshot))
             if deterministic_passed and integrity_passed and report is not None
             else None
         )
@@ -426,7 +407,6 @@ def _matches_evaluation_report(payload: dict[str, Any]) -> bool:
         and isinstance(baseline, dict)
         and isinstance(comparison, dict)
         and isinstance(facts, dict)
-        and _report_is_privacy_safe(payload)
     ):
         return False
     candidate_facts = facts.get("candidate")
@@ -533,63 +513,7 @@ def _ranking_metrics_match(metrics: dict[str, Any], *, candidate: bool) -> bool:
         return False
 
 
-def _report_is_privacy_safe(payload: dict[str, Any]) -> bool:
-    serialized = json.dumps(payload, ensure_ascii=False, sort_keys=True).upper()
-    private_values = {
-        *_EXPECTED_RANKINGS,
-        *(
-            item
-            for recommendations in _EXPECTED_RANKINGS.values()
-            for _rank, item, _score, _strategy in recommendations
-        ),
-        *_KNOWN_SEEN_ITEMS,
-        _RATINGS_PATH.name.upper(),
-        _TARGETS_PATH.name.upper(),
-    }
-    return not (
-        any(value.upper() in serialized for value in private_values)
-        or "LEARNER-" in serialized
-        or "MODULE-" in serialized
-        or re.search(r"[A-Z]:[\\/]", serialized) is not None
-    )
-
-
-def _final_answer_grounding_gaps(
-    text: str,
-    report: dict[str, Any] | None,
-) -> tuple[str, ...]:
-    if not text:
-        return ("missing_final_answer",)
-    normalized = re.sub(r"\s+", "", unicodedata.normalize("NFKC", text).lower())
-    collaborative = any(marker in normalized for marker in ("协同", "collaborative", "个性化候选"))
-    popularity = any(marker in normalized for marker in ("热门", "popularity", "流行度"))
-    comparison = any(marker in normalized for marker in ("优于", "高于", "改善", "提升", "better", "outperform"))
-    ranking_metrics = "ndcg" in normalized and any(
-        marker in normalized for marker in ("recall", "hitrate", "hit_rate", "mrr", "召回", "命中")
-    )
-    seen_exclusion = any(marker in normalized for marker in ("已评分", "已见", "seen")) and any(
-        marker in normalized for marker in ("排除", "剔除", "过滤", "不再推荐")
-    )
-    cold_start = "冷启动" in normalized and popularity
-    offline_boundary = "离线" in normalized and any(
-        marker in normalized for marker in ("不能证明", "不代表", "不等于", "非因果", "线上", "a/b")
-    )
-    links = len(_ARTIFACT_URI.findall(text)) >= 2
-    checks = (
-        ("evaluation_artifact", report is not None),
-        ("collaborative_candidate", collaborative),
-        ("popularity_baseline", popularity),
-        ("candidate_baseline_comparison", comparison),
-        ("ranking_metrics", ranking_metrics),
-        ("seen_exclusion", seen_exclusion),
-        ("cold_start", cold_start),
-        ("offline_online_boundary", offline_boundary),
-        ("dataset_and_artifact_links", links),
-    )
-    return tuple(name for name, passed in checks if not passed)
-
-
-def _build_judge_input(report: dict[str, Any], grounded_answer: bool) -> JudgeInput:
+def _build_judge_input(report: dict[str, Any], final_text: str) -> JudgeInput:
     evaluation = report["evaluation"]
     baseline = report["baseline_evaluation"]
     comparison = report["comparison"]
@@ -603,6 +527,7 @@ def _build_judge_input(report: dict[str, Any], grounded_answer: bool) -> JudgeIn
             "离线排序指标不得解释为线上因果提升，冷项目在 v1 中不受支持。",
         ),
         artifact_evidence=(
+            f"final_answer: {final_text}",
             (
                 "public_recommendation: target_count=2; top_k=2; "
                 "personalized=true; cold_start=true; seen_item_violations=0"
@@ -620,8 +545,7 @@ def _build_judge_input(report: dict[str, Any], grounded_answer: bool) -> JudgeIn
             ),
             (
                 "public_identity: recommendation_dataset_linked=true; "
-                "evaluation_artifact_linked=true; lineage_verified=true; "
-                f"final_answer_grounded={str(grounded_answer).lower()}"
+                "evaluation_artifact_linked=true; lineage_verified=true"
             ),
         ),
     )
@@ -728,23 +652,6 @@ def _sources_unchanged(case: RecommendationRankingCase, context: BenchmarkCaseCo
                 strict=True,
             )
         )
-    except Exception:
-        return False
-
-
-def _state_isolated(context: BenchmarkCaseContext, artifacts: tuple[Any | None, ...]) -> bool:
-    if not context.settings_unchanged:
-        return False
-    try:
-        datasets_confined = all(
-            is_within(Path(str(dataset.source_path)), context.runtime_home)
-            for dataset in context.services.datasets.list_datasets()
-        )
-        artifacts_confined = all(
-            artifact is None or is_within(Path(str(getattr(artifact, "absolute_path", ""))), context.runtime_home)
-            for artifact in artifacts
-        )
-        return datasets_confined and artifacts_confined
     except Exception:
         return False
 

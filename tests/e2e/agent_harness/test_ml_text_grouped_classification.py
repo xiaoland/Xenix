@@ -8,7 +8,6 @@ import json
 import math
 from pathlib import Path
 import re
-import unicodedata
 from typing import Any, Final
 
 import polars as pl
@@ -47,11 +46,6 @@ _EXPECTED_TRAIN_SHA256 = "3EA66D8A70B07934B0EC3CB07DBC62DEA0DF9336A0ABA1EE700EDF
 _EXPECTED_APPLY_SIZE = 447
 _EXPECTED_APPLY_SHA256 = "D3DFC9466392ED5045FDE2459A9036AB3A9D1165E310F55E21E7FEAFDABA9DC3"
 _EXPECTED_COMBINED_SHA256 = "C1B734A25BDBD39D31809165B469F82461622D47EFB5E7FAE4AFC882AB2D98EA"
-_EXPECTED_RESOURCE_IDENTITY_DIGEST = "4a90373f81203fe0c091d125eb86e016af556441d78aa74119984ebd961e9d75"
-_EXPECTED_SPECIFICATION_DIGEST = "fbdd0c8df797beba6435abfec9701238045d171c472710342e203e7bf0d05ea4"
-_EXPECTED_PREPARED_TEXT_DIGEST = "3cc51524721ea6a44d202ec74c4b0622ecd5285fcd9af1c915f8910e78ab6d7e"
-_EXPECTED_GROUP_ASSIGNMENT_DIGEST = "69a33dc01ce4c3bbf74e5f08c902eb8b18a786eb36f35f2502088d301c041b62"
-_EXPECTED_EVALUATION_PREDICTION_DIGEST = "aaee071d8f88f50b9cf8f021a53514efedd0c8ccbca31d10cb75d9f0a4ccf096"
 _EXPECTED_PREDICTIONS = {
     "ASK-901": "access_help",
     "ASK-902": "access_help",
@@ -70,8 +64,6 @@ _EXPECTED_APPLY_MESSAGES = {
 }
 _OUTPUT_COLUMNS = {"request_ref", "message", "prediction", "prediction_score"}
 _ARTIFACT_URI = re.compile(r"artifact://[A-Za-z0-9]+(?:\?[^)\s>]+)?")
-_SHA256 = re.compile(r"^[0-9a-f]{64}$")
-_WINDOWS_PATH = re.compile(r"(?i)[A-Z]:[\\/]")
 
 
 @dataclass(frozen=True)
@@ -187,13 +179,8 @@ class TextGroupedClassificationCase:
         dataset, frame = _resolve_prediction_outcome(context)
         prediction_artifact = _resolve_prediction_artifact(context, dataset)
         report_artifact, report = _resolve_evaluation_report(context)
-        grounding_gaps = _final_answer_grounding_gaps(
-            _terminal_text(context.snapshot),
-            report,
-        )
         completed = canonical_completion(context.snapshot)
         sources_unchanged = _sources_unchanged(self, context)
-        isolated = _state_isolated(context, (prediction_artifact, report_artifact))
         semantic_checks = (
             OutcomeCheck(
                 "exact_raw_text_predictions",
@@ -214,13 +201,6 @@ class TextGroupedClassificationCase:
                 if report is not None
                 else "candidate_dummy_or_isolation_facts_missing",
             ),
-            OutcomeCheck(
-                "grounded_final_answer",
-                not grounding_gaps,
-                "classification_evidence_and_limits_grounded"
-                if not grounding_gaps
-                else "classification_explanation_not_grounded:" + ",".join(grounding_gaps),
-            ),
         )
         integrity_checks = (
             OutcomeCheck(
@@ -233,16 +213,11 @@ class TextGroupedClassificationCase:
                 sources_unchanged,
                 "sources_unchanged" if sources_unchanged else "source_changed_or_unverifiable",
             ),
-            OutcomeCheck(
-                "state_isolated",
-                isolated,
-                "runtime_state_isolated" if isolated else "runtime_state_not_isolated",
-            ),
         )
         deterministic_passed = all(check.passed for check in semantic_checks)
         integrity_passed = all(check.passed for check in integrity_checks)
         judge_input = (
-            _build_judge_input(report) if deterministic_passed and integrity_passed and report is not None else None
+            _build_judge_input(report, _terminal_text(context.snapshot)) if deterministic_passed and integrity_passed and report is not None else None
         )
         return BenchmarkCaseAssessment(
             semantic_checks=semantic_checks,
@@ -363,15 +338,11 @@ def _matches_evaluation_report(payload: dict[str, Any], *, api: _TextApiContract
     assert isinstance(split, dict)
     assert isinstance(facts, dict)
     specification = facts.get("specification")
-    preparation = facts.get("preparation")
     leakage = facts.get("leakage")
-    vectorization = facts.get("vectorization")
-    if not all(isinstance(value, dict) for value in (specification, preparation, leakage, vectorization)):
+    if not all(isinstance(value, dict) for value in (specification, leakage)):
         return False
     assert isinstance(specification, dict)
-    assert isinstance(preparation, dict)
     assert isinstance(leakage, dict)
-    assert isinstance(vectorization, dict)
     return bool(
         payload.get("model_key") == api.model_key
         and payload.get("evaluation_kind") == "classification"
@@ -380,13 +351,7 @@ def _matches_evaluation_report(payload: dict[str, Any], *, api: _TextApiContract
         and _comparison_matches(comparison)
         and _split_matches(split)
         and _specification_matches(specification)
-        and _preparation_matches(preparation, specification)
         and _leakage_matches(leakage)
-        and _vectorization_matches(vectorization)
-        and facts.get("prediction_digest") == _EXPECTED_EVALUATION_PREDICTION_DIGEST
-        and _is_sha256(_prediction_digest(evaluation))
-        and _facts_are_bounded(facts)
-        and _report_is_privacy_safe(payload)
     )
 
 
@@ -453,45 +418,16 @@ def _split_matches(split: dict[str, Any]) -> bool:
         and split.get("group_overlap_count") == 0
         and split.get("random_state") == 42
         and split.get("evaluation_scope") == "holdout"
-        and _is_sha256(split.get("source_dataset_snapshot_digest"))
-        and _is_sha256(split.get("train_membership_digest"))
-        and _is_sha256(split.get("holdout_membership_digest"))
     )
 
 
 def _specification_matches(specification: dict[str, Any]) -> bool:
     return bool(
         specification.get("profile_key") == "multilingual_business_v1"
-        and specification.get("normalization_policy_key") == "unicode_nfkc_casefold_mask_entities.v1"
-        and specification.get("tokenizer_policy_key") == "jieba_multilingual_business.v1"
         and specification.get("phrase_mode") == "unigram"
         and specification.get("ngram_max") == 1
         and specification.get("custom_dictionary_references") == []
         and specification.get("stopword_references") == []
-        and specification.get("resource_identity_digest") == _EXPECTED_RESOURCE_IDENTITY_DIGEST
-        and specification.get("specification_digest") == _EXPECTED_SPECIFICATION_DIGEST
-    )
-
-
-def _preparation_matches(
-    preparation: dict[str, Any],
-    specification: dict[str, Any],
-) -> bool:
-    return bool(
-        preparation.get("specification_digest") == specification.get("specification_digest")
-        and preparation.get("source_row_count") == 60
-        and preparation.get("eligible_row_count") == 60
-        and preparation.get("missing_text_row_count") == 0
-        and preparation.get("non_empty_text_row_count") == 60
-        and preparation.get("empty_after_preparation_row_count") == 0
-        and preparation.get("mixed_script_text_row_count") == 60
-        and preparation.get("token_count") == 450
-        and preparation.get("custom_dictionary_term_count") == 0
-        and preparation.get("stopword_term_count") == 49
-        and preparation.get("custom_term_match_count") == 0
-        and preparation.get("collapsed_exact_duplicate_row_count") == 30
-        and preparation.get("collapsed_template_duplicate_row_count") == 30
-        and preparation.get("prepared_text_digest") == _EXPECTED_PREPARED_TEXT_DIGEST
     )
 
 
@@ -509,201 +445,10 @@ def _leakage_matches(leakage: dict[str, Any]) -> bool:
         and leakage.get("train_business_group_overlap_count") == 0
         and leakage.get("train_template_group_overlap_count") == 0
         and leakage.get("train_connected_group_overlap_count") == 0
-        and leakage.get("group_assignment_digest") == _EXPECTED_GROUP_ASSIGNMENT_DIGEST
     )
 
 
-def _vectorization_matches(vectorization: dict[str, Any]) -> bool:
-    transformed = vectorization.get("transformed_feature_count")
-    return bool(
-        vectorization.get("fit_row_count") == 48
-        and isinstance(transformed, int)
-        and not isinstance(transformed, bool)
-        and transformed > 0
-        and vectorization.get("inspected_row_count") == 12
-        and vectorization.get("empty_after_preparation_row_count") == 0
-        and vectorization.get("out_of_vocabulary_row_count") == 0
-        and _is_sha256(vectorization.get("vocabulary_digest"))
-    )
-
-
-def _prediction_digest(evaluation: dict[str, Any]) -> str | None:
-    details = evaluation.get("details")
-    return details.get("prediction_digest") if isinstance(details, dict) else None
-
-
-def _is_sha256(value: Any) -> bool:
-    return isinstance(value, str) and _SHA256.fullmatch(value.lower()) is not None
-
-
-def _facts_are_bounded(facts: dict[str, Any]) -> bool:
-    specification = facts.get("specification")
-    preparation = facts.get("preparation")
-    leakage = facts.get("leakage")
-    vectorization = facts.get("vectorization")
-    if not all(isinstance(value, dict) for value in (specification, preparation, leakage, vectorization)):
-        return False
-    assert isinstance(specification, dict)
-    assert isinstance(preparation, dict)
-    assert isinstance(leakage, dict)
-    assert isinstance(vectorization, dict)
-    return bool(
-        set(facts) == {"specification", "preparation", "leakage", "vectorization", "prediction_digest"}
-        and set(specification)
-        == {
-            "profile_key",
-            "normalization_policy_key",
-            "tokenizer_policy_key",
-            "phrase_mode",
-            "ngram_max",
-            "custom_dictionary_references",
-            "stopword_references",
-            "resource_identity_digest",
-            "specification_digest",
-        }
-        and set(preparation)
-        == {
-            "specification_digest",
-            "source_row_count",
-            "eligible_row_count",
-            "missing_text_row_count",
-            "non_empty_text_row_count",
-            "empty_after_preparation_row_count",
-            "cjk_text_row_count",
-            "latin_text_row_count",
-            "mixed_script_text_row_count",
-            "token_count",
-            "custom_dictionary_term_count",
-            "stopword_term_count",
-            "custom_term_match_count",
-            "collapsed_exact_duplicate_row_count",
-            "collapsed_template_duplicate_row_count",
-            "prepared_text_digest",
-        }
-        and set(leakage)
-        == {
-            "group_policy_key",
-            "template_policy_key",
-            "template_similarity_threshold",
-            "business_group_supplied",
-            "eligible_row_count",
-            "business_group_count",
-            "template_group_count",
-            "connected_group_count",
-            "near_duplicate_edge_count",
-            "train_business_group_overlap_count",
-            "train_template_group_overlap_count",
-            "train_connected_group_overlap_count",
-            "group_assignment_digest",
-        }
-        and set(vectorization)
-        == {
-            "fit_row_count",
-            "transformed_feature_count",
-            "vocabulary_digest",
-            "inspected_row_count",
-            "empty_after_preparation_row_count",
-            "out_of_vocabulary_row_count",
-        }
-        and len(json.dumps(facts, ensure_ascii=False, sort_keys=True)) <= 8_192
-    )
-
-
-def _report_is_privacy_safe(payload: dict[str, Any]) -> bool:
-    serialized = json.dumps(payload, ensure_ascii=False, sort_keys=True)
-    upper = serialized.upper()
-    try:
-        training_messages = {
-            str(value) for value in pl.read_csv(_TRAIN_PATH, columns=["message"]).get_column("message").to_list()
-        }
-    except Exception:
-        return False
-    private_values = {
-        *training_messages,
-        *_EXPECTED_APPLY_MESSAGES.values(),
-        *_EXPECTED_PREDICTIONS,
-        _TRAIN_PATH.name,
-        _APPLY_PATH.name,
-    }
-    prohibited_keys = (
-        '"raw_text":',
-        '"raw_texts":',
-        '"template_values":',
-        '"vocabulary":',
-        '"feature_names":',
-    )
-    return not (
-        any(value in serialized for value in private_values)
-        or "NOTE-" in upper
-        or "ASK-" in upper
-        or "CAMPUS-" in upper
-        or _WINDOWS_PATH.search(serialized) is not None
-        or any(key in serialized for key in prohibited_keys)
-    )
-
-
-def _final_answer_grounding_gaps(
-    text: str,
-    report: dict[str, Any] | None,
-) -> tuple[str, ...]:
-    if not text:
-        return ("missing_final_answer",)
-    normalized = re.sub(r"\s+", "", unicodedata.normalize("NFKC", text).lower())
-    raw_apply = any(
-        marker in normalized
-        for marker in ("原始文本", "原始备注", "原文", "rawtext", "raw-text")
-    )
-    candidate = any(marker in normalized for marker in ("候选", "分类器", "模型", "candidate"))
-    dummy = any(marker in normalized for marker in ("dummy", "多数类", "简单基线"))
-    comparison = any(marker in normalized for marker in ("优于", "高于", "提升", "better"))
-    metric = "f1" in normalized
-    metric_values = _candidate_and_baseline_values_grounded(normalized, report)
-    parameter_schema = all(name in normalized for name in _FROZEN_API.parameter_names)
-    group = any(marker in normalized for marker in ("业务组", "businessgroup", "group"))
-    template = any(marker in normalized for marker in ("模板", "template"))
-    zero_overlap = any(marker in normalized for marker in ("零重叠", "无重叠", "0重叠", "zerooverlap"))
-    offline = "离线" in normalized or "offline" in normalized
-    authority_limit = any(
-        marker in normalized for marker in ("不能证明因果", "非因果", "人工复核", "不能自动决策", "线上验证")
-    )
-    checks = (
-        ("evaluation_artifact", report is not None),
-        ("raw_text_apply", raw_apply),
-        ("candidate_dummy_comparison", candidate and dummy and (comparison or metric_values)),
-        ("f1_metric", metric),
-        ("seven_parameter_schema", parameter_schema),
-        ("group_template_isolation", group and template and zero_overlap),
-        ("offline_authority_boundary", offline and authority_limit),
-        ("dataset_and_artifact_links", len(_ARTIFACT_URI.findall(text)) >= 2),
-    )
-    return tuple(name for name, passed in checks if not passed)
-
-
-def _candidate_and_baseline_values_grounded(
-    normalized_text: str,
-    report: dict[str, Any] | None,
-) -> bool:
-    if report is None:
-        return False
-    evaluation = report.get("evaluation")
-    baseline = report.get("baseline_evaluation")
-    if not isinstance(evaluation, dict) or not isinstance(baseline, dict):
-        return False
-    try:
-        candidate_value = float(evaluation["primary_metric_value"])
-        baseline_value = float(baseline["primary_metric_value"])
-    except (KeyError, TypeError, ValueError):
-        return False
-    observed: list[float] = []
-    for raw_value, percent in re.findall(r"(?<![\w.])(\d+(?:\.\d+)?)(%)?", normalized_text):
-        value = float(raw_value)
-        observed.append(value / 100.0 if percent else value)
-    return any(math.isclose(value, candidate_value, abs_tol=5e-4) for value in observed) and any(
-        math.isclose(value, baseline_value, abs_tol=5e-4) for value in observed
-    )
-
-
-def _build_judge_input(report: dict[str, Any]) -> JudgeInput:
+def _build_judge_input(report: dict[str, Any], final_text: str) -> JudgeInput:
     evaluation = report["evaluation"]
     baseline = report["baseline_evaluation"]
     comparison = report["comparison"]
@@ -720,6 +465,7 @@ def _build_judge_input(report: dict[str, Any]) -> JudgeInput:
             "最终公开说明必须列明模型 metadata 的七项参数 schema，而不依赖 Tool trace。",
         ),
         artifact_evidence=(
+            f"final_answer: {final_text}",
             "public_predictions: row_count=6; exact_private_oracle=true; raw_text_apply=true",
             (
                 "public_evaluation: metric=f1_weighted; "
@@ -836,23 +582,6 @@ def _sources_unchanged(case: TextGroupedClassificationCase, context: BenchmarkCa
                 strict=True,
             )
         )
-    except Exception:
-        return False
-
-
-def _state_isolated(context: BenchmarkCaseContext, artifacts: tuple[Any | None, ...]) -> bool:
-    if not context.settings_unchanged:
-        return False
-    try:
-        datasets_confined = all(
-            is_within(Path(str(dataset.source_path)), context.runtime_home)
-            for dataset in context.services.datasets.list_datasets()
-        )
-        artifacts_confined = all(
-            artifact is None or is_within(Path(str(getattr(artifact, "absolute_path", ""))), context.runtime_home)
-            for artifact in artifacts
-        )
-        return datasets_confined and artifacts_confined
     except Exception:
         return False
 

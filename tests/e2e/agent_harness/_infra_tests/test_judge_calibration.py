@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
 from pathlib import Path
 from typing import Any
 
@@ -73,9 +74,14 @@ def test_calibration_is_bounded_repeated_and_persists_no_evidence(
     serialized = destination.read_text(encoding="utf-8")
     assert "private evaluator evidence" not in serialized
     assert load_calibration_report(destination) == report
+    payload = json.loads(serialized)
+    payload["diagnostics"] = {"new_field": True}
+    payload["observations"][0]["passed"] = False
+    destination.write_text(json.dumps(payload), encoding="utf-8")
+    assert load_calibration_report(destination) == report
 
 
-def test_calibration_fails_closed_on_one_mismatch(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_calibration_records_verdict_disagreement(monkeypatch: pytest.MonkeyPatch) -> None:
     outcomes = iter(
         (
             _judge_outcome(SemanticVerdict.FAIL),
@@ -102,7 +108,7 @@ def test_calibration_fails_closed_on_one_mismatch(monkeypatch: pytest.MonkeyPatc
     assert not report.observations[0].passed
 
 
-def test_calibration_rejects_unbounded_suite_and_same_model_before_dispatch(
+def test_calibration_limits_paid_packets_and_records_same_model(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     dispatched = False
@@ -110,7 +116,12 @@ def test_calibration_rejects_unbounded_suite_and_same_model_before_dispatch(
     def unexpected_call(*_args: Any, **_kwargs: Any) -> IsolatedCallOutcome:
         nonlocal dispatched
         dispatched = True
-        return _judge_outcome(SemanticVerdict.PASS)
+        return IsolatedCallOutcome(
+            status=IsolatedCallStatus.COMPLETED,
+            value=JudgeResult(
+                status=JudgeStatus.COMPLETED, verdict=SemanticVerdict.PASS, independence=JudgeIndependence.SAME_MODEL
+            ),
+        )
 
     monkeypatch.setattr(judge_calibration, "run_isolated_call", unexpected_call)
     packets = tuple(_packet(f"packet-{index}", "safe") for index in range(5))
@@ -123,16 +134,17 @@ def test_calibration_rejects_unbounded_suite_and_same_model_before_dispatch(
             judge_model="judge/model",
             subject_model="subject/model",
         )
-    with pytest.raises(JudgeCalibrationError, match="judge_calibration_model_not_independent"):
-        run_judge_calibration(
-            suite_symbol="tests.e2e.agent_harness.test_example:calibrations",
-            packets=(_packet("clear-pass", "safe"),),
-            settings=LLMSettings(),
-            judge_settings_sha256="a" * 64,
-            judge_model="same/model",
-            subject_model="same/model",
-        )
     assert not dispatched
+    report = run_judge_calibration(
+        suite_symbol="tests.e2e.agent_harness.test_example:calibrations",
+        packets=(_packet("clear-pass", "evidence"),),
+        settings=LLMSettings(),
+        judge_settings_sha256="a" * 64,
+        judge_model="same/model",
+        subject_model="same/model",
+    )
+    assert dispatched
+    assert report.passed
 
 
 def _packet(fixture_id: str, evidence: str) -> _Packet:

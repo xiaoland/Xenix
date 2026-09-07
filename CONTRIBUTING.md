@@ -35,11 +35,11 @@
 - `pdm run diagnostic-bundle` creates a local support archive (logs, task logs, install id, database summaries) without the raw database.
 - `pdm run release-identity` verifies tag/version/promotion identity before pushing a release tag.
 - `pdm run release-controls-audit` audits repository branch-protection and Environment rules.
-- `pdm run benchmark-agent-harness-check` runs the provider-free safety, report-policy, and Judge-calibration checks owned by the Agent benchmark.
+- `pdm run benchmark-agent-harness-check` runs the offline execution, report-policy, and Judge-calibration checks owned by the Agent benchmark; normal pytest filters such as `-k` are supported.
 - Every live benchmark summary prints a trace id and absolute JSON report path; inspect its lifecycle events and exception chain before rerunning a paid cell.
 - `pdm run benchmark-agent-harness -- --collect-only -q` and the headed variant verify the same live-case catalog without provider calls.
-- A paid Agent benchmark is run only after the matching service selector and `pdm run test` pass. The commands remain independently executable: benchmark code never imports service tests or reads their reports. Omit `--model` to use the one configured default model, or supply exactly one override. The manual workflow requires both selectors but passes only job success—not test data or reports—across the service-to-Agent ordering edge.
-- `pdm run benchmark-agent-harness-calibrate-judge` qualifies an explicit Judge suite; `pdm run benchmark-agent-harness-evaluate` evaluates or compares privacy-bounded v5 Agent reports.
+- Run the affected service tests before a paid Agent benchmark; use the complete portfolio when impact warrants it. The commands remain independently executable: benchmark code never imports service tests or reads their reports. Omit `--model` to use the one configured default model, or supply exactly one override. The manual workflow requires both selectors but passes only job success—not test data or reports—across the service-to-Agent ordering edge.
+- `pdm run benchmark-agent-harness-calibrate-judge` optionally measures Judge agreement on labelled examples; `pdm run benchmark-agent-harness-evaluate` evaluates v5 Agent reports using report policy v2. Calibration and a clean working tree are not prerequisites. Extra diagnostic fields are allowed; real outcome checks and resource limits remain in force. See [the benchmark guide](docs/30-unit-tdd/agent-harness-benchmark.md) for comparison semantics.
 
 Use the smallest verification set that proves the affected contract. Run `pdm run test` and `pdm run check` when the change has repository-wide or uncertain impact.
 

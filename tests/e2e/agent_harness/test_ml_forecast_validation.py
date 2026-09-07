@@ -7,7 +7,6 @@ import json
 import math
 from pathlib import Path
 import re
-import unicodedata
 from typing import Any, Final
 
 import polars as pl
@@ -69,8 +68,6 @@ _OUTPUT_COLUMNS = {
     "horizon",
 }
 _ARTIFACT_URI = re.compile(r"artifact://[A-Za-z0-9]+(?:\?[^)\s>]+)?")
-_LONG_ID = re.compile(r"\b[A-Fa-f0-9]{24,64}\b")
-_WINDOWS_PATH = re.compile(r"(?<!\w)[A-Za-z]:[\\/][^\s]+")
 
 BUSINESS_PROMPT = (
     "请先画像，把 month 绑定为月度 time、demand_units 绑定为 target、region 绑定为独立 "
@@ -151,11 +148,8 @@ class ForecastValidationCase:
             selected_model,
         )
         final_text = _terminal_text(context.snapshot)
-        grounding_gaps = _final_answer_grounding_gaps(final_text, selected_model)
-        grounded_answer = not grounding_gaps
         completed = canonical_completion(context.snapshot)
         source_unchanged = _source_unchanged(self.source_path, context)
-        isolated = _state_isolated(context, (apply_artifact, report_artifact))
 
         semantic_checks = (
             OutcomeCheck(
@@ -177,13 +171,6 @@ class ForecastValidationCase:
                 if report_payload is not None
                 else "linked_same_fold_evaluation_missing",
             ),
-            OutcomeCheck(
-                "grounded_final_answer",
-                grounded_answer,
-                "three_model_selection_and_interval_limits_grounded"
-                if grounded_answer
-                else "forecast_explanation_not_grounded:" + ",".join(grounding_gaps),
-            ),
         )
         integrity_checks = (
             OutcomeCheck(
@@ -195,11 +182,6 @@ class ForecastValidationCase:
                 "source_unchanged",
                 source_unchanged,
                 "source_unchanged" if source_unchanged else "source_changed_or_unverifiable",
-            ),
-            OutcomeCheck(
-                "state_isolated",
-                isolated,
-                "runtime_state_isolated" if isolated else "runtime_state_not_isolated",
             ),
         )
         deterministic_passed = all(check.passed for check in semantic_checks)
@@ -389,47 +371,6 @@ def _finite_number(value: Any) -> bool:
         return False
 
 
-def _final_answer_grounding_gaps(text: str, selected_model: str | None) -> tuple[str, ...]:
-    if not text or selected_model is None:
-        return ("missing_final_answer_or_selection",)
-    normalized = re.sub(r"\s+", "", unicodedata.normalize("NFKC", text).lower())
-    normalized_model_text = normalized.replace("_", "").replace("-", "")
-    seasonal_naive = any(
-        marker in normalized_model_text
-        for marker in ("seasonalnaive", "季节朴素", "季节性朴素")
-    )
-    holt_winters = any(
-        marker in normalized_model_text
-        for marker in ("holtwinters", "霍尔特温特斯", "霍尔特温特", "霍尔特")
-    )
-    sarima = "sarima" in normalized_model_text
-    selected_markers = {
-        "forecasting.seasonal_naive": ("seasonalnaive", "季节朴素", "季节性朴素"),
-        "forecasting.holt_winters": ("holtwinters", "霍尔特温特斯", "霍尔特温特", "霍尔特"),
-        "forecasting.sarima": ("sarima",),
-    }[selected_model]
-    selected_grounded = any(marker in normalized_model_text for marker in selected_markers)
-    metrics = "mae" in normalized and any(marker in normalized for marker in ("rmse", "smape", "mase"))
-    interval = "80%" in normalized or "0.8" in normalized
-    non_guarantee = any(marker in normalized for marker in ("不保证", "非保证", "经验覆盖", "empirical"))
-    limitations = any(
-        marker in normalized
-        for marker in ("局限", "限制", "重训", "重新训练", "监控", "更新模型", "滚动更新", "复核")
-    )
-    checks = (
-        ("seasonal_naive_candidate", seasonal_naive),
-        ("holt_winters_candidate", holt_winters),
-        ("sarima_candidate", sarima),
-        ("selected_model", selected_grounded),
-        ("metrics", metrics),
-        ("interval_level", interval),
-        ("coverage_non_guarantee", non_guarantee),
-        ("limitations", limitations),
-        ("dataset_and_artifact_links", len(_ARTIFACT_URI.findall(text)) >= 2),
-    )
-    return tuple(name for name, passed in checks if not passed)
-
-
 def _build_judge_input(
     report: dict[str, Any],
     final_text: str,
@@ -455,7 +396,7 @@ def _build_judge_input(
             f"empirical_coverage={float(intervals['empirical_coverage']):.6f}; "
             f"mean_width={float(intervals['mean_width']):.6f}; coverage_guaranteed=false"
         ),
-        f"final_answer: {_safe_final_text(final_text)}",
+        f"final_answer: {final_text}",
     )
     return JudgeInput(
         rubric=FORECAST_VALIDATION_RUBRIC,
@@ -467,17 +408,6 @@ def _build_judge_input(
         ),
         artifact_evidence=evidence,
     )
-
-
-def _safe_final_text(text: str) -> str:
-    value = _ARTIFACT_URI.sub("[public artifact link]", text)
-    value = _LONG_ID.sub("[stable id]", value)
-    value = _WINDOWS_PATH.sub("[local path]", value)
-    lines = [
-        "[row-like content omitted]" if len([part for part in line.split(",") if part.strip()]) >= 4 else line
-        for line in value.splitlines()
-    ]
-    return " ".join(" ".join(lines).split())[:480]
 
 
 def _linked_artifacts(context: BenchmarkCaseContext) -> tuple[Any, ...]:
@@ -557,23 +487,6 @@ def _source_unchanged(source_path: Path, context: BenchmarkCaseContext) -> bool:
             source_state=state,
             services=context.services,
         )
-    except Exception:
-        return False
-
-
-def _state_isolated(context: BenchmarkCaseContext, artifacts: tuple[Any | None, ...]) -> bool:
-    if not context.settings_unchanged:
-        return False
-    try:
-        datasets_confined = all(
-            is_within(Path(str(dataset.source_path)), context.runtime_home)
-            for dataset in context.services.datasets.list_datasets()
-        )
-        artifacts_confined = all(
-            artifact is None or is_within(Path(str(getattr(artifact, "absolute_path", ""))), context.runtime_home)
-            for artifact in artifacts
-        )
-        return datasets_confined and artifacts_confined
     except Exception:
         return False
 

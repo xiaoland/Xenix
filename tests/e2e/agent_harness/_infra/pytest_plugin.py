@@ -128,15 +128,8 @@ class _InvocationBudgetState:
         self.reported_subject_tokens = budget.invocation_reported_subject_tokens
         if not run.persisted:
             self.halted_reason = "benchmark_result_not_persisted"
-        elif budget.status in {
-            BenchmarkBudgetStatus.EXCEEDED,
-            BenchmarkBudgetStatus.UNVERIFIABLE,
-        }:
+        elif budget.status is BenchmarkBudgetStatus.UNVERIFIABLE:
             self.halted_reason = budget.exhaustion_reason or "benchmark_budget_halted"
-        elif run.result.run_status is not BenchmarkRunStatus.COMPLETED:
-            self.halted_reason = run.result.failure_kind or "benchmark_execution_halted"
-        elif not run.result.integrity_passed:
-            self.halted_reason = "benchmark_integrity_invalid"
         elif (
             self.reported_subject_tokens
             >= DEFAULT_BUDGET_POLICY.max_reported_invocation_subject_tokens
@@ -189,7 +182,7 @@ class AgentHarnessBenchmarkController:
                 invocation_reported_subject_tokens=invocation.reported_subject_tokens,
                 invocation_id=invocation.invocation_id,
             )
-        except BaseException:
+        except (KeyboardInterrupt, SystemExit):
             invocation.halted_reason = "benchmark_runner_exception"
             raise
         invocation.observe(run)

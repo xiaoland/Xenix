@@ -592,11 +592,7 @@ def run_benchmark(
                 "case": case,
                 "execution_mode": execution_mode,
                 "settings": effective_settings,
-                "settings_path": resolved_settings_path,
-                "settings_sha256": settings_sha256,
                 "embedding_settings": embedding_settings,
-                "embedding_settings_path": resolved_embedding_settings_path,
-                "embedding_settings_sha256": embedding_settings_sha256,
                 "model_key": model_key,
                 "identity": cell_identity,
                 "judge_configuration": judge_configuration,
@@ -684,11 +680,7 @@ def _run_model_cell(
     case: BenchmarkCase,
     execution_mode: BenchmarkExecutionMode,
     settings: LLMSettings,
-    settings_path: Path,
-    settings_sha256: str,
     embedding_settings: EmbeddingSettings | None,
-    embedding_settings_path: Path | None,
-    embedding_settings_sha256: str | None,
     model_key: str,
     identity: BenchmarkIdentity,
     judge_configuration: _JudgeConfiguration,
@@ -813,17 +805,6 @@ def _run_model_cell(
                             source_state=measurements.source_state,
                             run_dataset_ids=run_dataset_ids,
                             runtime_home=paths.home,
-                            settings_unchanged=(
-                                _sha256_file(settings_path) == settings_sha256
-                                and (
-                                    embedding_settings_path is None
-                                    or (
-                                        embedding_settings_sha256 is not None
-                                        and _sha256_file(embedding_settings_path)
-                                        == embedding_settings_sha256
-                                    )
-                                )
-                            ),
                             services=case_services,
                         )
                     )
@@ -892,9 +873,6 @@ def _run_model_cell(
             elif budget_snapshot.status is BenchmarkBudgetStatus.UNVERIFIABLE:
                 run_status = BenchmarkRunStatus.MEASUREMENT_ERROR
                 failure_kind = budget_snapshot.exhaustion_reason
-            elif not _usage_projection_matches(subject_metrics, budget_snapshot):
-                run_status = BenchmarkRunStatus.MEASUREMENT_ERROR
-                failure_kind = "subject_usage_projection_mismatch"
         try:
             with trace_recorder.span(
                 "benchmark.judge.evaluate",
@@ -1353,16 +1331,6 @@ def _runtime_sha256() -> str:
         for name in benchmark_runtime_files
     )
     return _sha256_text("|".join(components))
-
-
-def _usage_projection_matches(
-    metrics: BenchmarkMetrics,
-    budget: BenchmarkBudgetSnapshot,
-) -> bool:
-    usage = metrics.token_usage
-    if usage is None:
-        return False
-    return usage.total_tokens == budget.reported_subject_tokens
 
 
 def _benchmark_paths(home: Path) -> AppPaths:

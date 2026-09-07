@@ -149,14 +149,20 @@ def test_response_boundary_equality_remains_a_valid_measurement(tmp_path: Path) 
     assert evaluate_characterization((report,)).qualified
 
 
-def test_report_rejects_subject_budget_projection_drift(tmp_path: Path) -> None:
-    payload = _result(run_id="projection-drift").to_payload()
+def test_local_report_evolution_does_not_invalidate_measurement(tmp_path: Path) -> None:
+    payload = _result(run_id="extended-report").to_payload()
+    # Storage and request instrumentation may report different counter scopes.
     payload["budget"]["reported_subject_tokens"] = 121
-    path = tmp_path / "projection-drift.json"
+    payload["trace"] = {"new_diagnostic_format": "x" * 1_100_000}
+    payload["new_metadata"] = {"note": "diagnostic only"}
+    payload["identity"].update(repository_dirty=True, runtime_sha256="changed", repository_commit=None)
+    path = tmp_path / "extended-report.json"
     path.write_text(json.dumps(payload), encoding="utf-8")
 
-    with pytest.raises(ReportPolicyError, match="subject_budget_projection_invalid"):
-        load_agent_report(path)
+    report = load_agent_report(path)
+
+    assert evaluate_characterization((report,)).qualified
+    assert report.payload["trace"] == payload["trace"]
 
 
 def test_formal_acceptance_allows_distinct_budgeted_invocations(
@@ -183,9 +189,7 @@ def test_formal_acceptance_allows_distinct_budgeted_invocations(
     )
     calibration = _calibration_report()
 
-    assert len(
-        {report.payload["identity"]["invocation_id"] for report in reports}
-    ) == 4
+    assert len({report.payload["identity"]["invocation_id"] for report in reports}) == 4
 
     accepted = evaluate_formal_acceptance(reports, calibrations=(calibration,))
     uncalibrated = evaluate_formal_acceptance(reports)
@@ -200,8 +204,25 @@ def test_formal_acceptance_allows_distinct_budgeted_invocations(
 
     assert accepted.accepted
     assert accepted.gate_eligible
-    assert "judge_calibration_missing_or_mismatched" in uncalibrated.reason_codes
-    assert "judge_not_independent" in non_independent.reason_codes
+    assert uncalibrated.accepted
+    assert non_independent.accepted
+    mismatched = evaluate_formal_acceptance(
+        reports, calibrations=(replace(calibration, judge_settings_sha256=_HASH_A),)
+    )
+    assert "judge_calibration_missing_or_mismatched" in mismatched.reason_codes
+
+    # Structural success must not hide the Judge's assessment of the answer.
+    failed_judge = dict(reports[-1].payload)
+    failed_judge["judge"] = dict(failed_judge["judge"], verdict="fail")
+    rejected = evaluate_formal_acceptance((*reports[:-1], replace(reports[-1], payload=failed_judge)))
+    assert not rejected.accepted
+    assert "headed_semantic_not_passed" in rejected.reason_codes
+
+    different_rubric = dict(reports[-1].payload)
+    different_rubric["judge"] = dict(different_rubric["judge"], rubric_sha256=_HASH_A)
+    mixed = evaluate_formal_acceptance((*reports[:-1], replace(reports[-1], payload=different_rubric)))
+    assert not mixed.accepted
+    assert "cohort_judge_rubric_sha256_mismatch" in mixed.reason_codes
 
 
 def test_comparison_allows_commit_and_variant_changes_but_not_effective_settings_drift(
@@ -220,6 +241,15 @@ def test_comparison_allows_commit_and_variant_changes_but_not_effective_settings
         ),
     )
 
+    candidate_payload = dict(candidate[0].payload)
+    candidate_payload["identity"] = dict(
+        candidate_payload["identity"],
+        repository_dirty=True,
+        runtime_sha256=_HASH_F,
+        case_definition_sha256=_HASH_E,
+        settings_sha256=_HASH_A,
+    )
+    candidate = (replace(candidate[0], payload=candidate_payload),)
     comparison = compare_report_cohorts(baseline, candidate)
     assert comparison.comparable
     assert comparison.passed

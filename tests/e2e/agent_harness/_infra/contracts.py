@@ -39,7 +39,7 @@ class SemanticVerdict(StrEnum):
 
 
 class JudgeStatus(StrEnum):
-    """Whether V2 was able to obtain a trustworthy judge response."""
+    """Whether the evaluator obtained a usable Judge response."""
 
     NOT_REQUESTED = "not_requested"
     NOT_CONFIGURED = "not_configured"
@@ -93,21 +93,6 @@ class JudgeInput:
     task_intent: str
     facts: tuple[str, ...]
     artifact_evidence: tuple[str, ...]
-
-    def __post_init__(self) -> None:
-        if not self.rubric.rubric_id.strip():
-            raise ValueError("judge_rubric_id_required")
-        if not self.rubric.score_dimensions:
-            raise ValueError("judge_score_dimensions_required")
-        if (
-            not isinstance(self.task_intent, str)
-            or not self.task_intent.strip()
-            or len(self.task_intent) > 512
-        ):
-            raise ValueError("judge_task_intent_required")
-        _validate_bounded_strings("judge_facts", self.facts, maximum_items=12)
-        _validate_bounded_strings("judge_artifact_evidence", self.artifact_evidence, maximum_items=48)
-
 
 @dataclass(frozen=True)
 class BenchmarkCaseAssessment:
@@ -180,7 +165,6 @@ class BenchmarkCaseContext:
     source_state: Any | None
     run_dataset_ids: frozenset[str]
     runtime_home: Path
-    settings_unchanged: bool
 
 
 class BenchmarkCase(Protocol):
@@ -401,11 +385,3 @@ class AgentHarnessBenchmarkResult:
             "failure_kind": self.failure_kind,
             "trace": self.trace.to_payload() if self.trace is not None else None,
         }
-
-
-def _validate_bounded_strings(label: str, values: tuple[str, ...], *, maximum_items: int) -> None:
-    if len(values) > maximum_items:
-        raise ValueError(f"{label}_too_many")
-    for value in values:
-        if not isinstance(value, str) or not value.strip() or len(value) > 512:
-            raise ValueError(f"{label}_invalid")

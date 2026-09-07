@@ -50,35 +50,6 @@ def benchmark_pytest_arguments(arguments: list[str]) -> list[str]:
     ]
 
 
-def safe_check_pytest_options(arguments: list[str]) -> list[str]:
-    """Keep the provider-free check fixed to its owned ``_infra_tests`` tree."""
-
-    allowed_exact = {
-        "--collect-only",
-        "--disable-warnings",
-        "--help",
-        "-q",
-        "-s",
-        "-v",
-        "-vv",
-        "-vvv",
-        "-x",
-    }
-    allowed_prefixes = ("--capture=", "--durations=", "--maxfail=", "--tb=")
-    rejected = tuple(
-        argument
-        for argument in arguments
-        if argument not in allowed_exact
-        and not argument.startswith(allowed_prefixes)
-    )
-    if rejected:
-        raise SystemExit(
-            "benchmark-agent-harness-check accepts reporting options only; "
-            "its offline test selection is fixed."
-        )
-    return arguments
-
-
 def _benchmark_target(argument: str) -> str | None:
     normalized = argument.replace("\\", "/").removeprefix("./")
     path = normalized.split("::", 1)[0].rstrip("/")

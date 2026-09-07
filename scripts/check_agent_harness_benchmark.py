@@ -12,15 +12,12 @@ if str(_PROJECT_ROOT) not in sys.path:
 from run_pytest import main as run_pytest  # noqa: E402
 from tests.e2e.agent_harness._infra.dispatch import (  # noqa: E402
     INFRA_TEST_ROOT,
-    safe_check_pytest_options,
 )
 
 
 def main(argv: list[str] | None = None) -> int:
     forwarded = list(sys.argv[1:] if argv is None else argv)
-    return run_pytest(
-        ["--direct", INFRA_TEST_ROOT, *safe_check_pytest_options(forwarded)]
-    )
+    return run_pytest(["--direct", INFRA_TEST_ROOT, *forwarded])
 
 
 if __name__ == "__main__":

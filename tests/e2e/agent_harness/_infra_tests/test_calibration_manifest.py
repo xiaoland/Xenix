@@ -27,11 +27,7 @@ from tests.e2e.agent_harness.test_ml_text_topic_discovery import (
 )
 
 
-_MANIFEST_PATH = (
-    Path(__file__).resolve().parents[1]
-    / "fixtures"
-    / "ml_formal_judge_calibrations.json"
-)
+_MANIFEST_PATH = Path(__file__).resolve().parents[1] / "fixtures" / "ml_formal_judge_calibrations.json"
 _EXPECTED_RUBRICS = (
     CLUSTER_SELECTION_RUBRIC,
     FORECAST_VALIDATION_RUBRIC,
@@ -47,9 +43,7 @@ def test_formal_manifest_resolves_each_authoritative_rubric() -> None:
         suite = load_calibration_manifest_suite(_MANIFEST_PATH, suite_id=suite_id)
 
         assert suite.suite_id == rubric.rubric_id
-        assert suite.suite_symbol == (
-            f"manifest:ml-formal-judge-calibrations-v1:{rubric.rubric_id}"
-        )
+        assert suite.suite_symbol == (f"manifest:ml-formal-judge-calibrations-v1:{rubric.rubric_id}")
         assert len(suite.packets) == 4
         assert {packet.expected_verdict for packet in suite.packets} == {
             SemanticVerdict.PASS,
@@ -61,17 +55,20 @@ def test_formal_manifest_resolves_each_authoritative_rubric() -> None:
         assert all(packet.judge_input.task_intent for packet in suite.packets)
 
 
-def test_manifest_rejects_rubric_identity_drift(tmp_path: Path) -> None:
+def test_selected_suite_supports_labels_notes_and_inconclusive_evidence(tmp_path: Path) -> None:
     payload = json.loads(_MANIFEST_PATH.read_text(encoding="utf-8"))
-    payload["suites"][0]["suite_id"] = "drifted.rubric.v1"
-    manifest = tmp_path / "drifted.json"
+    payload["notes"] = "Local calibration notes"
+    payload["suites"][0]["suite_id"] = "review-sample"
+    payload["suites"][0]["packets"][-1]["artifact_evidence"] = ["The answer is incomplete."]
+    payload["suites"][1]["rubric_symbol"] = "tests.e2e.agent_harness.test_future:RUBRIC"
+    manifest = tmp_path / "review.json"
     manifest.write_text(json.dumps(payload), encoding="utf-8")
 
-    with pytest.raises(
-        JudgeCalibrationError,
-        match="calibration_manifest_rubric_identity_mismatch",
-    ):
-        load_calibration_manifest_suite(manifest, suite_id="drifted.rubric.v1")
+    suite = load_calibration_manifest_suite(manifest, suite_id="review-sample")
+
+    assert suite.packets[0].judge_input.rubric is CLUSTER_SELECTION_RUBRIC
+    assert suite.packets[-1].expected_verdict is SemanticVerdict.INCONCLUSIVE
+    assert suite.packets[-1].judge_input.artifact_evidence == ("The answer is incomplete.",)
 
 
 def test_manifest_rejects_non_case_symbol_before_loading_it(tmp_path: Path) -> None:
