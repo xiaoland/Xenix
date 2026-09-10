@@ -276,19 +276,23 @@ def register_agent_skill_tools(
 def agent_skill_activated_skill_names(snapshot: Any) -> set[str]:
     """Project successfully activated Skills from canonical conversation data."""
 
-    activation_call_ids = {
-        message.id for message in snapshot.messages if getattr(message, "tool_id", None) == "agent.skill.activate"
+    activation_calls = {
+        message.id: message for message in snapshot.messages if getattr(message, "tool_id", None) == "agent.skill.activate"
     }
     activated: set[str] = set()
     for message in snapshot.messages:
-        if getattr(message, "tool_call_message_id", None) not in activation_call_ids:
+        call = activation_calls.get(getattr(message, "tool_call_message_id", None))
+        if call is None:
             continue
         status = getattr(message, "result_status", None)
         if getattr(status, "value", status) != "succeeded":
             continue
-        payload = getattr(message, "value_payload", None)
-        if isinstance(payload, dict) and isinstance(payload.get("skill_name"), str):
-            activated.add(payload["skill_name"])
+        # Successful invocation validates the requested name. Its result may be
+        # paged, so activation identity belongs to the paired canonical call.
+        arguments = getattr(call, "arguments_payload", None) or {}
+        name = arguments.get("name")
+        if isinstance(name, str):
+            activated.add(name.strip())
     return activated
 
 
@@ -303,7 +307,7 @@ def agent_skill_tool_scope_names(snapshot: Any) -> tuple[str, ...] | None:
     """Project relevant Tool names after a known Skill becomes active."""
 
     active = agent_skill_activated_skill_names(snapshot)
-    if not active or any(name not in _AGENT_SKILL_TOOL_NAMES for name in active):
+    if not active.intersection(_AGENT_SKILL_TOOL_NAMES):
         return _AGENT_SKILL_INITIAL_TOOL_NAMES
     names = list(_AGENT_SKILL_COMMON_TOOL_NAMES)
     for skill_name, skill_tools in _AGENT_SKILL_TOOL_NAMES.items():

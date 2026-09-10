@@ -77,14 +77,9 @@ _OUTPUT_COLUMNS = {
 _ARTIFACT_URI = re.compile(r"artifact://[A-Za-z0-9]+(?:\?[^)\s>]+)?")
 
 BUSINESS_PROMPT = (
-    "两份附件分别是企业学习模块的显式评分历史和本次目标学习者。请先画像评分尺度，"
-    "再查看 recommendation.collaborative_top_k 的角色与参数 schema。使用 viewer_id、"
-    "module_id、rating、rated_at 绑定用户、项目、评分和时间；以 4 分为正向门槛，"
-    "top_k=2，用户最少 3 次、模块最少 2 名学习者评分。请完成同一真值上的个性化候选"
-    "与 popularity baseline 评价，保留完整历史训练的 analyzer，并对目标学习者附件"
-    "生成推荐。交付公共推荐 Dataset、推荐结果 Artifact 和评价 Artifact 的可打开链接；"
-    "最终说明候选相对热门基线的离线证据、已评分模块排除、冷启动策略，以及离线结果"
-    "不能证明线上因果提升的限制。"
+    "附件是学习模块的评分历史和本次目标学习者。4 分及以上表示喜欢。"
+    "请为每位目标学习者推荐两个尚未评分的模块；新学习者也需要合理推荐。"
+    "请交付推荐表和评估报告，说明个性化推荐相比直接推荐热门模块是否有优势，以及证据的局限。"
 )
 
 RECOMMENDATION_RANKING_RUBRIC = JudgeRubric(
@@ -358,8 +353,7 @@ def _matches_recommendations(frame: pl.DataFrame) -> bool:
             if not (
                 actual[0] == wanted[0]
                 and actual[1] == wanted[1]
-                and math.isclose(actual[2], wanted[2], rel_tol=1e-9, abs_tol=1e-9)
-                and actual[3] == wanted[3]
+                and bool(actual[3])
             ):
                 return False
     known_items = {item for _rank, item, _score, _strategy in observed[_KNOWN_USER]}
@@ -440,20 +434,15 @@ def _matches_evaluation_report(payload: dict[str, Any]) -> bool:
         and baseline.get("primary_metric_name") == "ndcg_at_k"
         and isinstance(candidate_metrics, dict)
         and isinstance(baseline_metrics, dict)
-        and _ranking_metrics_match(candidate_metrics, candidate=True)
-        and _ranking_metrics_match(baseline_metrics, candidate=False)
+        and _ranking_metrics_match(candidate_metrics)
+        and _ranking_metrics_match(baseline_metrics)
     ):
         return False
     if not (
         comparison.get("primary_metric_name") == "ndcg_at_k"
         and comparison.get("direction") == "max"
         and comparison.get("verdict") == "candidate_better"
-        and math.isclose(float(comparison.get("candidate_value")), 0.9, abs_tol=1e-9)
-        and math.isclose(
-            float(comparison.get("baseline_value")),
-            0.26309297535714576,
-            abs_tol=1e-9,
-        )
+        and float(comparison.get("candidate_value")) > float(comparison.get("baseline_value"))
     ):
         return False
     if not (
@@ -489,27 +478,10 @@ def _matches_evaluation_report(payload: dict[str, Any]) -> bool:
     )
 
 
-def _ranking_metrics_match(metrics: dict[str, Any], *, candidate: bool) -> bool:
-    expected = (
-        {
-            "ndcg_at_k": 0.9,
-            "recall_at_k": 0.9,
-            "hit_rate_at_k": 0.9,
-            "mrr_at_k": 0.9,
-        }
-        if candidate
-        else {
-            "ndcg_at_k": 0.26309297535714576,
-            "recall_at_k": 0.3,
-            "hit_rate_at_k": 0.3,
-            "mrr_at_k": 0.25,
-        }
-    )
+def _ranking_metrics_match(metrics: dict[str, Any]) -> bool:
     try:
-        return expected.keys() <= metrics.keys() and all(
-            math.isclose(float(metrics[name]), value, abs_tol=1e-9) for name, value in expected.items()
-        )
-    except TypeError, ValueError:
+        return all(0.0 <= float(metrics[name]) <= 1.0 for name in ("ndcg_at_k", "recall_at_k", "hit_rate_at_k", "mrr_at_k"))
+    except (KeyError, TypeError, ValueError):
         return False
 
 

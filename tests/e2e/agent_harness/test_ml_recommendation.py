@@ -69,10 +69,9 @@ class ItemSimilarityRecommendationCase:
         return SubmitUserTurnInput(
             thread_id=thread_id,
             text=(
-                "请根据 user_id、item_id、rating 评分行为构建 item-similarity 推荐。基础商品"
-                "和候选商品都至少需要 3 条评分，相似度门槛设为 0.20，每个商品最多返回 2 个"
-                "结果。请为 SKU-A 生成按 rank 排序、可继续使用的相似商品数据集，给出可打开"
-                "的链接，并在最终答复中按顺序列出两个推荐商品。"
+                "我们想给 SKU-A 的顾客推荐两个相似商品。请根据附件评分记录选出候选，"
+                "评分不足 3 条的商品暂不考虑。请交付按推荐顺序排列的结果表，给出可打开"
+                "的链接。结果表包含 base_item、rank、recommended_item 列，并在最终答复中按顺序列出两个推荐商品。"
             ),
             source_attachments=[SourceAttachmentInput(file_path=str(self.source_path.resolve()))],
             fq_model_key=fq_model_key,
@@ -145,24 +144,16 @@ def _resolve_outcome(context: BenchmarkCaseContext) -> tuple[Any | None, pl.Data
 
 
 def _matches_expected(frame: pl.DataFrame) -> bool:
-    required = {"base_item", "rank", "recommended_item", "similarity", "common_user_count"}
-    if frame.height != len(_EXPECTED_RECOMMENDATIONS) or not required.issubset(frame.columns):
+    required = {"base_item", "rank", "recommended_item"}
+    if frame.height != 2 or not required.issubset(frame.columns):
         return False
     try:
         rows = sorted(frame.to_dicts(), key=lambda row: int(row["rank"]))
-        observed = tuple(
-            (
-                int(row["rank"]),
-                str(row["recommended_item"]).strip(),
-                float(row["similarity"]),
-                int(row["common_user_count"]),
-            )
-            for row in rows
-            if str(row["base_item"]).strip() == "SKU-A"
-        )
+        observed = tuple((int(row["rank"]), str(row["recommended_item"]).strip())
+                         for row in rows if str(row["base_item"]).strip() == "SKU-A")
     except (KeyError, TypeError, ValueError):
         return False
-    return observed == _EXPECTED_RECOMMENDATIONS
+    return observed == tuple((rank, item) for rank, item, _score, _count in _EXPECTED_RECOMMENDATIONS)
 
 
 def _resolve_linked_artifact(context: BenchmarkCaseContext, dataset: Any | None) -> Any | None:

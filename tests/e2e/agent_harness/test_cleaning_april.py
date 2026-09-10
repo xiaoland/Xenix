@@ -32,7 +32,7 @@ from ._infra.contracts import (
 CASE_ID = "cleaning.april_dine_in_sales"
 EXPECTED_FILE_SIZE = 116_459_191
 EXPECTED_SHA256 = "6B902DE50277E727FE936FFC4FE072B4D8B1C3D60A7D85413E114B72C4140E31"
-EXPECTED_SHAPE = (485_790, 50)
+EXPECTED_SHAPE = (485_789, 50)
 _DATASET_ID_LINE = re.compile(r"^dataset_id:\s*([A-Za-z0-9_-]+)\s*$", re.MULTILINE)
 
 
@@ -192,19 +192,39 @@ def _cleaning_checks(*, source_frame: pl.DataFrame, output_frame: pl.DataFrame) 
         )
 
     expected_headers = tuple(_cell_text(value) for value in source_frame.row(1))
-    header_promoted = tuple(output_frame.columns) == expected_headers
+    normalized_name = lambda name: re.sub(r"[\W_]+", "", name).removesuffix("元")
+    output_names = {normalized_name(name): name for name in output_frame.columns}
+    header_promoted = (
+        len(output_names) == len(expected_headers)
+        and set(output_names) == {normalized_name(name) for name in expected_headers}
+    )
+    if header_promoted:
+        output_frame = output_frame.select([
+            pl.col(output_names[normalized_name(name)]).alias(name) for name in expected_headers
+        ])
+    # The final 合计 is a report aggregate, not an additional sale. Compare
+    # business values after lossless type normalization, not their export text.
+    first = source_frame.columns[0]
+    business_frame = source_frame.slice(2).filter((pl.col(first) != "合计").fill_null(True))
+    business_frame.columns = list(expected_headers)
     output_hashes = _row_hashes(output_frame)
-    source_business_hashes = _row_hashes(source_frame.slice(2))
-    report_row_hash = _row_hashes(source_frame.slice(0, 1))[0]
-    header_row_hash = _row_hashes(source_frame.slice(1, 1))[0]
-    output_hash_set = set(output_hashes.to_list())
+    business_rows_preserved = bool(
+        header_promoted
+        and _normalization_preserves_values(business_frame)
+        and _normalization_preserves_values(output_frame)
+        and _row_hashes(business_frame).unique().sort().equals(output_hashes.unique().sort())
+    )
+    first_values = output_frame.get_column(output_frame.columns[0]).cast(pl.String)
+    report_removed = not first_values.eq(_cell_text(source_frame.row(0)[0])).any()
+    header_removed = not first_values.eq(expected_headers[0]).any()
+    total_removed = not first_values.eq("合计").any()
     duplicates_removed = output_hashes.n_unique() == output_frame.height
-    expected_shape = (int(output_frame.height), int(output_frame.width)) == EXPECTED_SHAPE
-    business_rows_preserved = source_business_hashes.unique().sort().equals(output_hashes.unique().sort())
+    expected_shape = output_frame.shape == EXPECTED_SHAPE
     return (
-        OutcomeCheck("header_promoted", header_promoted, "expected_headers" if header_promoted else "headers_not_promoted"),
-        OutcomeCheck("report_row_removed", report_row_hash not in output_hash_set, "report_row_absent" if report_row_hash not in output_hash_set else "report_row_retained"),
-        OutcomeCheck("header_row_removed", header_row_hash not in output_hash_set, "header_row_absent" if header_row_hash not in output_hash_set else "header_row_retained"),
+        OutcomeCheck("header_promoted", header_promoted, "equivalent_headers" if header_promoted else "headers_not_promoted"),
+        OutcomeCheck("report_row_removed", report_removed, "report_row_absent" if report_removed else "report_row_retained"),
+        OutcomeCheck("header_row_removed", header_removed, "header_row_absent" if header_removed else "header_row_retained"),
+        OutcomeCheck("total_row_removed", total_removed, "total_row_absent" if total_removed else "total_row_retained"),
         OutcomeCheck("exact_duplicates_removed", duplicates_removed, "no_exact_duplicates" if duplicates_removed else "exact_duplicates_retained"),
         OutcomeCheck("expected_shape", expected_shape, "expected_terminal_shape" if expected_shape else "unexpected_terminal_shape"),
         OutcomeCheck("business_rows_preserved", business_rows_preserved, "business_rows_match" if business_rows_preserved else "business_rows_differ"),
@@ -218,9 +238,32 @@ def _row_hashes(frame: pl.DataFrame) -> pl.Series:
     return normalized.hash_rows()
 
 
+def _cell_text_expression(column: str) -> pl.Expr:
+    text = pl.col(column).cast(pl.String, strict=False).str.strip_chars()
+    return pl.when(text.is_in(["", "--"])).then(None).otherwise(text)
+
+
 def _normalized_value_expression(column: str) -> pl.Expr:
-    text = pl.col(column).cast(pl.Utf8, strict=False).str.strip_chars()
-    return pl.when(pl.col(column).is_null() | text.is_in(["", "--"])).then(None).otherwise(text)
+    text = _cell_text_expression(column)
+    if column.endswith("(元)") or column.endswith("数量"):
+        return text.cast(pl.Float64, strict=False)
+    if column == "营业日期":
+        dated = text.str.replace_all("/", "-")
+        return pl.coalesce(
+            dated.str.to_date("%Y-%m-%d", strict=False),
+            dated.str.to_datetime("%Y-%m-%d %H:%M:%S%.f", strict=False).dt.date(),
+        )
+    if column in {"点菜时间", "下单时间", "接单/结账/退菜时间"}:
+        return text.str.replace_all("/", "-").str.to_datetime("%Y-%m-%d %H:%M:%S%.f", strict=False)
+    return text
+
+
+def _normalization_preserves_values(frame: pl.DataFrame) -> bool:
+    lost = frame.select([
+        (_cell_text_expression(column).is_not_null() & _normalized_value_expression(column).is_null()).any().alias(column)
+        for column in frame.columns
+    ])
+    return not any(lost.row(0))
 
 
 def _result_dataset_ids(value: Any) -> tuple[str, ...]:

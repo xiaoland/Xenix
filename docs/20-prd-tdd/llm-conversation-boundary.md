@@ -68,12 +68,14 @@ Tool modules.
   identifies its ToolCall; neither Artifact nor observability becomes
   conversation provenance.
 - Tool identity, scope, and typed arguments are validated at invocation. Invalid model arguments become a canonical failed ToolResult with field-level details, allowing the next sample to repair the call; they do not abort sampling before the ToolResult exists.
+- Skill activation is derived from the successful canonical ToolCall's arguments and paired terminal status, independently of whether its result was paged. The built-in `result.page` remains available in every tool scope and returns the requested page directly without repaging its envelope.
+- Completed training and tuning Tools return the public Artifact handles for their settled tasks alongside evaluation facts, so delivering an evaluation report does not require a second status query. Pending work remains discoverable through `model.task.query`.
 - A ToolResult stores one bounded direct JSON value. Tabular Tools choose XTT
   before returning; known and normalized failures use the typed `ToolFailure`
   value. Provider adapters only encode that value for their wire protocol, and
   Chatbot projection only copies/renders it; neither owns a raw-result fallback
   or a second semantic result representation.
-- A ToolResult whose serialized value exceeds the inline bound is materialized
+- A ToolResult whose serialized JSON exceeds the canonical 64 KiB payload bound is materialized
   once into a filesystem-backed paged store (`state/paged_results/`) and the
   boundary returns a bounded paged handle (`result_id`, `total_chars`, `page_size`,
   `offset`, first page, `has_more`) instead of truncating or failing. The generic

@@ -95,7 +95,7 @@ class RainySeasonRestockCase:
         return SubmitUserTurnInput(
             thread_id=thread_id,
             text=(
-                "请用 semantic 模式检索知识库中与‘季节性采购边界’含义相关的经验，"
+                "雨季快到了，请结合知识库中有关季节性采购的经验，"
                 "并基于这份库存表创建需要补货的商品清单。"
                 "新数据集只保留需要补货的商品，并包含 SKU 和补货数量。"
                 "最终答复请简要说明采用的补货规则，并列出需要补货的 SKU 与数量。"

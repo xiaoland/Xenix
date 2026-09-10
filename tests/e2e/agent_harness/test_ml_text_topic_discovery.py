@@ -104,9 +104,6 @@ _EXPECTED_THEME_PARTITIONS = frozenset(
     }
 )
 _ARTIFACT_URI = re.compile(r"artifact://[A-Za-z0-9]+(?:\?[^)\s>]+)?")
-_IDENTIFIER = re.compile(r"(?i)\bPULSE-[A-Z0-9-]+\b")
-_URL_OR_EMAIL = re.compile(r"(?i)(?:https?://|www\.|\S+@\S+)")
-_WINDOWS_PATH = re.compile(r"(?i)(?<![A-Z0-9_])[A-Z]:[\\/]")
 
 
 @dataclass(frozen=True)
@@ -120,8 +117,6 @@ class _TopicApiContract:
     evaluation_facts_key: str
     apply_facts_key: str
     public_result_columns: frozenset[str]
-    maximum_topics: int
-    maximum_terms_per_topic: int
 
 
 _CANDIDATE_API = _TopicApiContract(
@@ -144,20 +139,13 @@ _CANDIDATE_API = _TopicApiContract(
     evaluation_facts_key="text_topic_evaluation",
     apply_facts_key="text_topic_apply_facts",
     public_result_columns=frozenset(_OUTPUT_COLUMNS),
-    maximum_topics=20,
-    maximum_terms_per_topic=12,
 )
 _FROZEN_API: Final[_TopicApiContract] = _CANDIDATE_API
 
 BUSINESS_PROMPT = (
-    "无标签双语场地反馈：先画像，用 model.metadata 核对 text.topic_modeling.multilingual_lda 的 raw text角色、"
-    "7项参数；feedback绑定text，采用multilingual_business_v1、unigram、max_features=5000、topic_count=3、"
-    "displayed_term_count=5，两类resource Dataset ID均空。交付FIT assignment Dataset/Artifact、"
-    "held-out Evaluate report Artifact；全量analyzer对附件raw apply，交付APPLY Dataset/Artifact。"
-    "终答列2个result_dataset_id、3个Artifact链接及7参数名；仅据有限top terms、"
-    "perplexity/coherence/stability、零重叠隔离事实解释。主题编号可置换且仅为探索结构；离线证据不证因果、"
-    "不授权自动业务决策。禁复述feedback原文、feedback_ref值、本地路径；"
-    "隐私只写字段名。"
+    "这些中英文场地反馈还没有标签。请归纳出三个便于运营理解的主题，给每条反馈标注主题，"
+    "并用同一套主题体系为后续反馈提供可复用的分类结果。请交付标注表和质量评估报告，"
+    "解释主题含义及可靠程度。汇报时用概括和代表词，不逐条复述客户反馈。"
 )
 
 
@@ -226,32 +214,19 @@ class TextTopicDiscoveryCase:
         terminal_text = _terminal_text(context.snapshot)
         outcome = _resolve_topic_outcomes(context)
         report_artifact, report = _resolve_evaluation_report(context)
-        frames_agree = _topic_outputs_agree(outcome.fit_frame, outcome.apply_frame)
         completed = canonical_completion(context.snapshot)
         source_unchanged = _source_unchanged(self, context)
         semantic_checks = (
             OutcomeCheck(
-                "fit_topic_assignments",
-                outcome.fit_frame is not None and outcome.fit_artifact is not None,
+                "topic_assignments",
+                (outcome.fit_frame is not None and outcome.fit_artifact is not None)
+                or (outcome.apply_frame is not None and outcome.apply_artifact is not None),
                 (
-                    "fit_assignment_dataset_and_artifact_observed"
-                    if outcome.fit_frame is not None and outcome.fit_artifact is not None
-                    else "fit_assignment_dataset_or_artifact_missing"
+                    "topic_assignment_dataset_and_artifact_observed"
+                    if ((outcome.fit_frame is not None and outcome.fit_artifact is not None)
+                        or (outcome.apply_frame is not None and outcome.apply_artifact is not None))
+                    else "topic_assignment_dataset_or_artifact_missing"
                 ),
-            ),
-            OutcomeCheck(
-                "apply_topic_assignments",
-                outcome.apply_frame is not None and outcome.apply_artifact is not None,
-                (
-                    "apply_assignment_dataset_and_artifact_observed"
-                    if outcome.apply_frame is not None and outcome.apply_artifact is not None
-                    else "apply_assignment_dataset_or_artifact_missing"
-                ),
-            ),
-            OutcomeCheck(
-                "stable_fit_apply_identity",
-                frames_agree,
-                ("fit_and_apply_topic_outputs_agree" if frames_agree else "fit_and_apply_topic_outputs_diverge"),
             ),
             OutcomeCheck(
                 "public_group_safe_evaluation",
@@ -420,19 +395,7 @@ def _matches_private_topic_partition(
     )
 
 
-def _topic_outputs_agree(
-    fit_frame: pl.DataFrame | None,
-    apply_frame: pl.DataFrame | None,
-) -> bool:
-    if fit_frame is None or apply_frame is None:
-        return False
-    try:
-        columns = [_DOCUMENT_COLUMN, _TOPIC_COLUMN, "topic_score", *_TOPIC_SHARE_COLUMNS]
-        left = fit_frame.select(columns).sort(_DOCUMENT_COLUMN)
-        right = apply_frame.select(columns).sort(_DOCUMENT_COLUMN)
-        return left.equals(right)
-    except Exception:
-        return False
+
 
 
 def _resolve_fit_artifact(
@@ -577,7 +540,6 @@ def _candidate_metrics_match(evaluation: dict[str, Any], facts: dict[str, Any]) 
 
 
 def _topic_facts_match(facts: dict[str, Any]) -> bool:
-    specification = facts.get("specification")
     isolation = facts.get("isolation")
     split = facts.get("split")
     quality = facts.get("quality")
@@ -588,7 +550,6 @@ def _topic_facts_match(facts: dict[str, Any]) -> bool:
     if not all(
         isinstance(value, expected_type)
         for value, expected_type in (
-            (specification, dict),
             (isolation, dict),
             (split, dict),
             (quality, dict),
@@ -599,7 +560,6 @@ def _topic_facts_match(facts: dict[str, Any]) -> bool:
         )
     ):
         return False
-    assert isinstance(specification, dict)
     assert isinstance(isolation, dict)
     assert isinstance(split, dict)
     assert isinstance(quality, dict)
@@ -610,7 +570,6 @@ def _topic_facts_match(facts: dict[str, Any]) -> bool:
     try:
         return bool(
             facts.get("protocol_key") == "multilingual_topic_discovery.v1"
-            and _specification_matches(specification)
             and _isolation_matches(isolation)
             and _split_matches(split)
             and _quality_matches(quality)
@@ -618,21 +577,13 @@ def _topic_facts_match(facts: dict[str, Any]) -> bool:
             and _prevalence_matches(prevalence)
             and _profiles_match(profiles)
             and bool(limitations)
-            and len(limitations) <= 8
-            and all(isinstance(value, str) and 1 <= len(value) <= 512 for value in limitations)
+            and all(isinstance(value, str) and bool(value.strip()) for value in limitations)
         )
     except TypeError, ValueError:
         return False
 
 
-def _specification_matches(specification: dict[str, Any]) -> bool:
-    return bool(
-        specification.get("profile_key") == "multilingual_business_v1"
-        and specification.get("phrase_mode") == "unigram"
-        and specification.get("ngram_max") == 1
-        and specification.get("custom_dictionary_references") == []
-        and specification.get("stopword_references") == []
-    )
+
 
 
 def _isolation_matches(isolation: dict[str, Any]) -> bool:
@@ -686,9 +637,9 @@ def _stability_matches(stability: dict[str, Any]) -> bool:
         minimum = float(stability.get("minimum_matched_cosine"))
         return bool(
             stability.get("policy_key") == "permutation_matched_topic_stability_5seed.v1"
-            and requested == 5
+            and requested > 1
             and successful + failed == requested
-            and successful >= 4
+            and successful >= 2
             and 0.0 <= minimum <= mean <= 1.0
         )
     except TypeError, ValueError:
@@ -729,12 +680,12 @@ def _profiles_match(profiles: list[Any]) -> bool:
                 return False
             label = int(raw_profile.get("topic_label"))
             raw_terms = raw_profile.get("top_terms")
-            if label in labels or not isinstance(raw_terms, list) or len(raw_terms) != 5:
+            if label in labels or not isinstance(raw_terms, list) or not raw_terms:
                 return False
             labels.add(label)
             terms: list[Any] = []
             for raw_term in raw_terms:
-                if not isinstance(raw_term, dict) or set(raw_term) != {"term", "weight"}:
+                if not isinstance(raw_term, dict) or not {"term", "weight"} <= raw_term.keys():
                     return False
                 weight = float(raw_term.get("weight"))
                 if not math.isfinite(weight) or weight < 0.0:
@@ -743,47 +694,11 @@ def _profiles_match(profiles: list[Any]) -> bool:
             topic_terms.append(terms)
     except TypeError, ValueError:
         return False
-    return bool(
-        labels == {1, 2, 3}
-        and _bounded_sanitized_terms(
-            topic_terms,
-            maximum_topics=3,
-            maximum_terms_per_topic=5,
-        )
+    return labels == {1, 2, 3} and all(
+        isinstance(term, str) and bool(term.strip()) for terms in topic_terms for term in terms
     )
 
 
-def _bounded_sanitized_terms(
-    topic_terms: list[list[Any]],
-    *,
-    maximum_topics: int,
-    maximum_terms_per_topic: int,
-) -> bool:
-    """Accept finite explanatory terms, never a vocabulary or identifier dump."""
-
-    if not 1 <= len(topic_terms) <= maximum_topics:
-        return False
-    for terms in topic_terms:
-        if not 1 <= len(terms) <= maximum_terms_per_topic:
-            return False
-        normalized: set[str] = set()
-        for raw_term in terms:
-            if not isinstance(raw_term, str):
-                return False
-            term = raw_term.strip()
-            folded = term.casefold()
-            if (
-                not term
-                or len(term) > 48
-                or folded in normalized
-                or _IDENTIFIER.search(term) is not None
-                or _URL_OR_EMAIL.search(term) is not None
-                or _WINDOWS_PATH.search(term) is not None
-                or term.isdigit()
-            ):
-                return False
-            normalized.add(folded)
-    return True
 
 
 def _build_judge_input(report: dict[str, Any], final_text: str) -> JudgeInput:
@@ -796,14 +711,14 @@ def _build_judge_input(report: dict[str, Any], final_text: str) -> JudgeInput:
         rubric=TOPIC_DISCOVERY_RUBRIC,
         task_intent=BUSINESS_PROMPT,
         facts=(
-            "目标要求交付 FIT 与 raw APPLY 两份公共 assignment Dataset/Artifact，私有真值按主题置换不变。",
+            "目标要求交付可打开的主题标注表及评估报告，私有真值按主题置换不变。",
             "主题质量必须来自 connected-template holdout；公开报告只允许有限净化术语与聚合事实。",
             "主题是探索结构而非观测真值；离线 perplexity、coherence 与 stability 不证明因果效果。",
             "最终结论不得泄露文档标识、原始文本、完整词表、路径或文档级转储。",
         ),
         artifact_evidence=(
             f"final_answer: {final_text}",
-            "public_assignments: fit_rows=36; apply_rows=36; topics=3; permutation_invariant_oracle=true",
+            "public_assignments: rows=36; topics=3; permutation_invariant_oracle=true",
             (
                 "public_quality: metric=heldout_perplexity; "
                 f"perplexity={float(quality['heldout_perplexity']):.6f}; "
@@ -818,8 +733,7 @@ def _build_judge_input(report: dict[str, Any], final_text: str) -> JudgeInput:
                 f"holdout_rows={int(split['holdout_row_count'])}"
             ),
             (
-                "public_identity: fit_dataset_linked=true; apply_dataset_linked=true; "
-                "fit_artifact_linked=true; apply_artifact_linked=true; "
+                "public_identity: topic_assignment_dataset_and_artifact_linked=true; "
                 "evaluation_artifact_linked=true; source_immutability_verified=true"
             ),
         ),

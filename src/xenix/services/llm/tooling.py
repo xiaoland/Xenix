@@ -31,7 +31,6 @@ MAX_EXCHANGE_RESULT_BYTES = 1024 * 1024
 MAX_TOOL_FAILURE_MESSAGE_CHARS = 16 * 1024
 TOOL_RESULT_PAGE_SIZE_CHARS = 1024
 TOOL_RESULT_PAGE_LIMIT_CHARS = 4096
-TOOL_RESULT_INLINE_CHARS = 2048
 
 # A Tool Result is a JSON value, rather than a JSON-object-only payload.  In
 # particular, tabular tools return Xenix Table Text directly as a string.  The
@@ -625,7 +624,7 @@ class AgentToolRegistry:
         return [
             tool.spec.model_copy(deep=True)
             for tool in self._tools.values()
-            if names is None or tool.spec.name in names
+            if names is None or tool.spec.name in names or tool.spec.name == "result.page"
         ]
 
     def get(self, name: str) -> RegisteredTool:
@@ -652,7 +651,7 @@ class AgentToolRegistry:
             raise ValidationError(
                 f"Provider tool name '{provider_name}' does not match '{tool_name}'."
             )
-        if scope is not None and scope.tool_names and tool_name not in scope.tool_names:
+        if scope is not None and scope.tool_names and tool_name not in scope.tool_names and tool_name != "result.page":
             raise ValidationError(f"Tool '{tool_name}' is outside the advertised scope.")
         ensure_bounded_json(arguments, label=f"Tool call '{tool_name}' arguments")
         if tool.input_model is not None:
@@ -710,6 +709,10 @@ class AgentToolRegistry:
         if isinstance(outcome, ToolFailure):
             return outcome
         value = outcome.value if isinstance(outcome, ToolSuccess) else outcome
+        if tool_name == "result.page":
+            # The page reader already bounds its text. Paging its envelope again
+            # would replace the original cursor and make forward progress fail.
+            return ToolSuccess(value=value)
         return self._bound_success(value, context)
 
     def _bound_success(
@@ -717,9 +720,11 @@ class AgentToolRegistry:
         value: ToolResultValue,
         context: ToolExecutionContext,
     ) -> ToolSuccess:
-        text = tool_result_text(value)
-        if len(text) <= TOOL_RESULT_INLINE_CHARS:
+        # Use the canonical message budget; a second, much smaller character
+        # limit fragments ordinary instructions and metadata across LLM rounds.
+        if len(canonical_json_bytes(value)) <= MAX_TOOL_PAYLOAD_BYTES:
             return ToolSuccess(value=value)
+        text = tool_result_text(value)
         if self._page_store is None:
             raise ValidationError(
                 "Tool result exceeds the inline payload bound and paged results are unavailable."

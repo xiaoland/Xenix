@@ -68,6 +68,70 @@ def test_harness_returns_invalid_arguments_to_model_for_repair(storage) -> None:
     assert snapshot.messages[4].value_payload == {"rows": 3}
 
 
+def test_paged_skill_activation_unlocks_tools_and_survives_history_reload(storage, tmp_path):
+    from dataclasses import replace
+    from xenix.services.agent.composition import (
+        agent_skill_activated_skill_names, agent_skill_context_messages,
+        agent_skill_tool_scope_names, register_agent_skill_tools,
+    )
+    from xenix.services.agent.skill_catalog import AgentSkillCatalog
+
+    registry = AgentToolRegistry(paged_results_dir=tmp_path / "pages")
+    catalog = AgentSkillCatalog([
+        replace(skill, body=skill.body + "\nExtended instructions. " * 4000)
+        for skill in AgentSkillCatalog.from_default_catalog().list_skills()
+    ])
+    executed = []
+    for name in ("data.query", "data.transform"):
+        registry.register(
+            AgentToolSpec(name=name, provider_name=name.replace(".", "_"), description=name),
+            lambda _args, context: executed.append(context.tool_call_message_id) or ToolSuccess({"ok": True}),
+        )
+    conversation = LLMConversationService(
+        session_factory=storage.session_factory, tool_registry=registry,
+        context_messages_provider=lambda snapshot: agent_skill_context_messages(catalog, snapshot),
+    )
+    register_agent_skill_tools(registry, catalog, activated_skill_names_provider=lambda thread_id:
+        agent_skill_activated_skill_names(conversation.get_thread_snapshot(thread_id)))
+
+    class Provider:
+        calls = 0
+        page_id = None
+
+        def complete(self, messages, tools):
+            self.calls += 1
+            names = {tool.name for tool in tools}
+            assert "result.page" in names
+            if self.calls == 1:
+                assert "data.query" not in names
+                name, arguments = "agent.skill.activate", {"name": "xenix-data-analysis"}
+            elif self.calls == 2:
+                assert {"data.query", "data.transform"} <= names
+                page = messages[-1].tool_result_value
+                self.page_id = page["result_id"]
+                name, arguments = "result.page", {"result_id": self.page_id, "offset": 1024, "limit": 4096}
+            elif self.calls == 3:
+                assert messages[-1].tool_result_value["result_id"] == self.page_id
+                assert messages[-1].tool_result_value["offset"] == 1024
+                name, arguments = "data.query", {}
+            else:
+                return ProviderResponse(assistant_content_blocks=[{"type": "text", "text": "Done."}])
+            return ProviderResponse(tool_calls=[ProviderToolCall(
+                provider_call_id=f"call-{self.calls}", tool_name=name,
+                provider_name=name.replace(".", "_"), arguments=arguments,
+            )])
+
+    harness = AgentHarnessService(
+        conversation_service=conversation, provider=Provider(),
+        tool_name_scope_provider=agent_skill_tool_scope_names,
+    )
+    snapshot = harness.submit_user_turn(SubmitUserTurnInput(text="分析数据"))
+    reloaded = conversation.get_thread_snapshot(snapshot.thread.id)
+    assert agent_skill_activated_skill_names(reloaded) == {"xenix-data-analysis"}
+    assert "data.transform" in agent_skill_tool_scope_names(reloaded)
+    assert executed == [snapshot.messages[-3].id]
+
+
 class ToolThenTextProvider:
     def __init__(self) -> None:
         self.calls = 0

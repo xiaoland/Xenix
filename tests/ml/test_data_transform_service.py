@@ -9,6 +9,7 @@ from xenix.config import ensure_app_dirs, get_app_paths
 from xenix.exceptions import ValidationError
 from xenix.services.data_transform import (
     DataQueryInput,
+    DataTransformInput,
     DataQueryTransformService,
     DatasetSqlBinding,
 )
@@ -81,3 +82,21 @@ def test_csv_binding_is_rejected(
                 limit=1,
             )
         )
+
+
+def test_materialize_comparison_metrics_without_a_dummy_source_join(monkeypatch, tmp_path):
+    service = _make_service(monkeypatch, tmp_path)
+    source = tmp_path / "observations.parquet"
+    pd.DataFrame({"value": [1, 2]}).to_parquet(source)
+    before = source.read_bytes()
+    sql = "SELECT * FROM (VALUES (2, 0.65), (3, 0.79)) AS metrics(segments, silhouette)"
+
+    queried = service.query(DataQueryInput(bindings=[_binding(source)], sql=sql))
+    result = service.transform(DataTransformInput(bindings=[_binding(source)], sql=sql, name="comparison"))
+
+    assert queried.total_row_count == 2
+    frame = pd.read_parquet(result.output_path)
+    assert frame["segments"].tolist() == [row["segments"] for row in queried.rows]
+    assert frame["silhouette"].astype(float).tolist() == pytest.approx([row["silhouette"] for row in queried.rows])
+    assert result.validation_summary["referenced_bindings"] == []
+    assert source.read_bytes() == before

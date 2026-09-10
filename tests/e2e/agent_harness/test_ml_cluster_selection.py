@@ -52,12 +52,9 @@ _EXPECTED_PROFILE_MEDIANS = {
 _ARTIFACT_URI = re.compile(r"artifact://[A-Za-z0-9]+(?:\?[^)\s>]+)?")
 
 BUSINESS_PROMPT = (
-    "请先画像，只用 monthly_orders、return_rate_pct 和 service_minutes 比较 KMeans 的 2、3、4 "
-    "群方案；account_id 只保留作业务标识，不能作为特征。请先读取 clustering.kmeans 的参数 "
-    "schema，再为三个候选填写有界的浅层参数，不要自行改随机种子或底层优化器。请根据同口径"
-    "质量、稳定性、空基线和群组规模证据选择方案，生成保留原始四列并新增 cluster_id 的公共 "
-    "Dataset，并给出可打开的画像/评估 Artifact。最终用原始尺度解释各群、选择依据、内部指标"
-    "局限和下一步业务验证建议。"
+    "我们想按下单、退货和服务需求给这些客户分群，方便制定不同的运营方案。"
+    "请比较分成 2 到 4 群的效果，推荐合适的方案，并说明各群特点、选择依据和使用局限。"
+    "account_id 是客户编号。请交付保留原始记录和群组标签的数据集，以及可打开的评估报告。"
 )
 
 CLUSTER_SELECTION_RUBRIC = JudgeRubric(
@@ -266,9 +263,9 @@ def _matches_cluster_report(facts: dict[str, Any], frame: pl.DataFrame) -> bool:
         and quality.get("evaluated_row_count") == 18
         and quality.get("noise_row_count") == 0
         and _finite_at_least(quality.get("silhouette"), 0.75)
-        and stability.get("run_count") == 5
+        and int(stability.get("run_count", 0)) > 1
         and _finite_at_least(stability.get("mean_adjusted_rand_index"), 0.9)
-        and baseline.get("run_count") == 16
+        and int(baseline.get("run_count", 0)) > 0
         and _finite_at_least(baseline.get("candidate_margin"), 0.1)
         and sorted(item.get("row_count") for item in sizes if isinstance(item, dict)) == [6, 6, 6]
         and bool(limitations)
@@ -340,7 +337,7 @@ def _build_judge_input(report: dict[str, Any], final_text: str) -> JudgeInput:
         rubric=CLUSTER_SELECTION_RUBRIC,
         task_intent=BUSINESS_PROMPT,
         facts=(
-            "候选范围是 KMeans k=2/3/4，确定性公共结果选择 k=3。",
+            "业务要求比较 2 至 4 个群组；当前交付的三个群组符合私有成员划分真值。",
             "三个群各 6 个账户；画像只使用原尺度聚合，不把 account_id 当特征。",
             "轮廓、稳定性和空基线都是内部证据，不能证明外部有效性或因果解释。",
         ),

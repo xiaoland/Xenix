@@ -72,9 +72,8 @@ class ServiceTicketCleaningCase:
         return SubmitUserTurnInput(
             thread_id=thread_id,
             text=(
-                "这批履约记录需要进入周报。请先去掉完全重复记录，再剔除 parcel_count "
-                "为负数的记录，把 state 去除首尾空格并统一为小写，最后用其余有效记录的 "
-                "parcel_count 中位数补齐缺失值。请保留原来的四列，生成可继续使用的数据集并"
+                "这批履约记录需要进入周报，请整理成可用的数据。重复记录不应重复计数，包裹数不能为负数，"
+                "状态文本需去掉首尾空格并统一小写，缺失包裹数按有效记录中位数补齐。请保留原来的四列，生成数据集并"
                 "给出可打开的链接；最终简要汇报结果行数和中位数补充值。"
             ),
             source_attachments=[SourceAttachmentInput(file_path=str(self.source_path.resolve()))],

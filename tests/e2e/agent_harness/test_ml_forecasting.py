@@ -49,7 +49,6 @@ _EXPECTED_FORECAST = {
     "2026-04-13": 110.0,
     "2026-04-20": 140.0,
 }
-_EXPECTED_METHOD = "seasonal_naive_lag4"
 
 
 pytestmark = pytest.mark.agent_harness_live
@@ -77,10 +76,8 @@ class SeasonalNaiveForecastCase:
         return SubmitUserTurnInput(
             thread_id=thread_id,
             text=(
-                "请使用 4 周季节朴素法生成未来 4 周需求预测：每个未来周直接采用 4 周前"
-                "的实际 demand_units。结果只保留 forecast_week、forecast_units 和 method 三列，"
-                "其中 method 写为 seasonal_naive_lag4。请生成可继续使用的数据集并给出可打开"
-                "的链接，最终说明采用的是明确公式的数据变换，而不是原生预测模型。"
+                "这份需求数据有四周一轮的规律。请按延续最近一轮需求的口径，给出未来四周的备货参考。"
+                "结果表列名为 forecast_week、forecast_units、method，提供可打开的链接，并说明这种估算的局限。"
             ),
             source_attachments=[SourceAttachmentInput(file_path=str(self.source_path.resolve()))],
             fq_model_key=fq_model_key,
@@ -160,7 +157,7 @@ def _matches_expected(frame: pl.DataFrame) -> bool:
     try:
         for row in frame.to_dicts():
             week = str(row["forecast_week"])[:10]
-            if str(row["method"]).strip().lower() != _EXPECTED_METHOD:
+            if not str(row["method"]).strip():
                 return False
             observed[week] = float(row["forecast_units"])
     except (KeyError, TypeError, ValueError):

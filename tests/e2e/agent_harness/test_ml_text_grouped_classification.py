@@ -99,14 +99,9 @@ _CANDIDATE_API = _TextApiContract(
 _FROZEN_API: Final[_TextApiContract] = _CANDIDATE_API
 
 BUSINESS_PROMPT = (
-    "附件一是双语备注训练表，附件二是待分类原始备注。先画像并用 model.metadata 核对 "
-    "text.classification.multilingual_logistic_regression_tfidf 的角色和 7 项参数。将 message "
-    "绑定 text、queue 绑定 target、account_batch 绑定可选 group；使用 unigram、max_features=5000、"
-    "minimum_document_frequency=1、class_weight=balanced，两个 resource Dataset ID 列表均为空。"
-    "训练候选，取得同一 group-safe holdout 上与 dummy baseline 比较的 Evaluate 报告，再用保留的"
-    "全量 analyzer 处理附件二。交付公共 predictions Dataset/Artifact 和 Evaluate report Artifact "
-    "链接。最终列明候选与 dummy 的 F1、业务组与模板零重叠及全部 7 个参数名；说明这是 raw apply，"
-    "且离线证据非因果、自动决策前仍需人工复核。"
+    "第一份附件是已经分配处理队列的中英文备注，第二份是待分配的新备注。"
+    "请据此预测新备注应进入哪个队列，交付预测表和评估报告。account_batch 表示同批业务记录，"
+    "同批记录可能很相似，请避免把这种重复当作模型效果。说明效果是否优于简单猜测，以及人工复核建议。"
 )
 
 TEXT_CLASSIFICATION_RUBRIC = JudgeRubric(
@@ -337,11 +332,9 @@ def _matches_evaluation_report(payload: dict[str, Any], *, api: _TextApiContract
     assert isinstance(comparison, dict)
     assert isinstance(split, dict)
     assert isinstance(facts, dict)
-    specification = facts.get("specification")
     leakage = facts.get("leakage")
-    if not all(isinstance(value, dict) for value in (specification, leakage)):
+    if not isinstance(leakage, dict):
         return False
-    assert isinstance(specification, dict)
     assert isinstance(leakage, dict)
     return bool(
         payload.get("model_key") == api.model_key
@@ -350,44 +343,21 @@ def _matches_evaluation_report(payload: dict[str, Any], *, api: _TextApiContract
         and _baseline_metrics_match(baseline)
         and _comparison_matches(comparison)
         and _split_matches(split)
-        and _specification_matches(specification)
         and _leakage_matches(leakage)
     )
 
 
 def _candidate_metrics_match(evaluation: dict[str, Any]) -> bool:
-    metrics = evaluation.get("metrics")
-    if not isinstance(metrics, dict):
-        return False
     try:
-        return bool(
-            evaluation.get("primary_metric_name") == "f1_weighted"
-            and math.isclose(float(evaluation.get("primary_metric_value")), 1.0, abs_tol=1e-12)
-            and all(
-                math.isclose(float(metrics.get(name)), 1.0, abs_tol=1e-12)
-                for name in ("accuracy", "balanced_accuracy", "f1_macro", "f1_weighted")
-            )
-        )
-    except TypeError, ValueError:
+        return evaluation.get("primary_metric_name") == "f1_weighted" and 0.0 <= float(evaluation.get("primary_metric_value")) <= 1.0
+    except (TypeError, ValueError):
         return False
 
 
 def _baseline_metrics_match(baseline: dict[str, Any]) -> bool:
-    metrics = baseline.get("metrics")
-    if not isinstance(metrics, dict):
-        return False
     try:
-        return bool(
-            baseline.get("primary_metric_name") == "f1_weighted"
-            and math.isclose(
-                float(baseline.get("primary_metric_value")),
-                1.0 / 6.0,
-                abs_tol=1e-12,
-            )
-            and math.isclose(float(metrics.get("accuracy")), 1.0 / 3.0, abs_tol=1e-12)
-            and math.isclose(float(metrics.get("f1_weighted")), 1.0 / 6.0, abs_tol=1e-12)
-        )
-    except TypeError, ValueError:
+        return baseline.get("primary_metric_name") == "f1_weighted" and 0 <= float(baseline.get("primary_metric_value")) <= 1.0
+    except (TypeError, ValueError):
         return False
 
 
@@ -396,52 +366,32 @@ def _comparison_matches(comparison: dict[str, Any]) -> bool:
         return bool(
             comparison.get("primary_metric_name") == "f1_weighted"
             and comparison.get("direction") == "max"
-            and comparison.get("verdict") == "candidate_better"
-            and math.isclose(float(comparison.get("candidate_value")), 1.0, abs_tol=1e-12)
-            and math.isclose(float(comparison.get("baseline_value")), 1.0 / 6.0, abs_tol=1e-12)
+            and float(comparison.get("candidate_value")) > float(comparison.get("baseline_value"))
         )
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return False
 
 
 def _split_matches(split: dict[str, Any]) -> bool:
-    return bool(
-        split.get("policy_key") == "classification.group_hash_holdout.v1"
-        and split.get("requested_strategy") == "group_hash_holdout.v1"
-        and split.get("realized_strategy") == "group_hash_holdout.v1"
-        and split.get("eligible_row_count") == 60
-        and split.get("train_row_count") == 48
-        and split.get("holdout_row_count") == 12
-        and split.get("eligible_group_count") == 10
-        and split.get("train_group_count") == 8
-        and split.get("holdout_group_count") == 2
-        and split.get("group_overlap_count") == 0
-        and split.get("random_state") == 42
-        and split.get("evaluation_scope") == "holdout"
-    )
+    try:
+        return bool(
+            split.get("eligible_row_count") == 60
+            and 0 < int(split.get("train_row_count")) < 60
+            and 0 < int(split.get("holdout_row_count")) < 60
+            and split.get("group_overlap_count") == 0
+            and split.get("evaluation_scope") == "holdout"
+        )
+    except (TypeError, ValueError):
+        return False
 
 
-def _specification_matches(specification: dict[str, Any]) -> bool:
-    return bool(
-        specification.get("profile_key") == "multilingual_business_v1"
-        and specification.get("phrase_mode") == "unigram"
-        and specification.get("ngram_max") == 1
-        and specification.get("custom_dictionary_references") == []
-        and specification.get("stopword_references") == []
-    )
+
 
 
 def _leakage_matches(leakage: dict[str, Any]) -> bool:
     return bool(
-        leakage.get("group_policy_key") == "business_template_connected_union.v1"
-        and leakage.get("template_policy_key") == "masked_token_jaccard.v1"
-        and math.isclose(float(leakage.get("template_similarity_threshold")), 0.8, abs_tol=1e-12)
-        and leakage.get("business_group_supplied") is True
+        leakage.get("business_group_supplied") is True
         and leakage.get("eligible_row_count") == 60
-        and leakage.get("business_group_count") == 10
-        and leakage.get("template_group_count") == 30
-        and leakage.get("connected_group_count") == 10
-        and leakage.get("near_duplicate_edge_count") == 0
         and leakage.get("train_business_group_overlap_count") == 0
         and leakage.get("train_template_group_overlap_count") == 0
         and leakage.get("train_connected_group_overlap_count") == 0
@@ -462,7 +412,6 @@ def _build_judge_input(report: dict[str, Any], final_text: str) -> JudgeInput:
             "目标要求直接处理双语原始文本，并交付六行确定性分类结果。",
             "候选与多数类 dummy 必须使用同一 group-safe holdout，且业务组、模板与联合组均零重叠。",
             "离线分类证据不能解释为因果效果，也不授予无人值守的自动决策权限。",
-            "最终公开说明必须列明模型 metadata 的七项参数 schema，而不依赖 Tool trace。",
         ),
         artifact_evidence=(
             f"final_answer: {final_text}",

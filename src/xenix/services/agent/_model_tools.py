@@ -20,6 +20,8 @@ from ..ml_service import (
 )
 from ..storage.models import (
     MLTaskArtifactKind,
+    MLTaskRow,
+    TrainedModelRow,
 )
 from ..llm.tooling import (
     ToolExecutionContext,
@@ -179,13 +181,7 @@ class ModelTools:
                 ),
             )
         tasks, trained_models = training_result
-        payload = {
-            "dataset_id": dataset_id,
-            "task_ids": [task.id for task in tasks],
-            "trained_model_ids": [model.id for model in trained_models],
-            "results": [task.result_payload for task in tasks],
-        }
-        return ToolSuccess(value=payload)
+        return self._training_completion(dataset_id, tasks, trained_models)
 
     def _model_hyper_train(
         self,
@@ -230,13 +226,31 @@ class ModelTools:
                 ),
             )
         tasks, trained_models = training_result
-        payload = {
+        return self._training_completion(dataset_id, tasks, trained_models)
+
+    def _training_completion(
+        self, dataset_id: str, tasks: list[MLTaskRow], trained_models: list[TrainedModelRow],
+    ) -> ToolSuccess:
+        # Evaluation has already settled. Return its public handles alongside
+        # the facts so delivering a report does not require another status call.
+        artifacts = [
+            {
+                "ml_task_id": task.id,
+                "artifact_id": artifact.artifact_id,
+                "kind": artifact.artifact_kind.value,
+                "uri": f"artifact://{artifact.artifact_id}",
+            }
+            for task in tasks
+            for artifact in self._ml_service.get_task_details(task.id).artifacts
+            if artifact.artifact_id
+        ]
+        return ToolSuccess(value={
             "dataset_id": dataset_id,
             "task_ids": [task.id for task in tasks],
             "trained_model_ids": [model.id for model in trained_models],
             "results": [task.result_payload for task in tasks],
-        }
-        return ToolSuccess(value=payload)
+            "artifacts": artifacts,
+        })
 
     def _model_apply(
         self,

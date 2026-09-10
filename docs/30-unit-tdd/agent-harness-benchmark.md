@@ -25,7 +25,11 @@ flowchart LR
 
 ## What the benchmark measures
 
+Subject prompts supply business goals, input semantics, necessary business rules, and deliverables. They do not reveal activation sequences, Tool names, model keys, schema-reading steps, or parameter recipes. Business-specific values such as a forecast horizon, rating threshold, or output column names remain legitimate constraints. The September 2026 goal-oriented revision removes those procedural hints; its outcomes are not directly comparable to earlier guided runs. Topic discovery requires one usable assignment output and evaluation, not two copies produced by prescribed FIT/APPLY calls; forecasting no longer requires a preselected winning model or exactly three backtest windows.
+
 Cases verify meaningful public outcomes, such as an exact cleaned Dataset, linked output Artifact, ranking results, or a statistical evaluation on disjoint training and holdout data. Source immutability remains a measurement check. Headed cases also record actual UI submission, rendering, Knowledge task completion, and shutdown facts.
+
+The April sales case excludes the export's grand-total row from business records and compares losslessly normalized dates, quantities, amounts, and header punctuation; it still rejects changed or missing business rows. Keyword frequency preserves the required business-word counts while permitting neutral words to be retained or treated as stopwords. Neither case silently requires a particular cleaning or tokenizer implementation.
 
 Cases do not repeat service validation of tokenizer fingerprints, prepared-text digests, report field whitelists, or serialization sizes. Isolation is established when constructing the cell; every case need not rescan all registered paths. Output locators still verify that the referenced Artifact is readable and belongs to the cell.
 
@@ -56,6 +60,8 @@ Comparable reports retain the same case, subject model, fixture, effective setti
 Calibration is optional. When supplied through `--calibration`, a passing report must match the Judge model, settings, subject, and rubric. The calibration command runs at most four hand-labelled packets three times with per-request process deadlines and normal provider retries. Suite names are independent labels; notes and extra fields are allowed, and only the selected rubric is imported. An inconclusive example may contain incomplete evidence. Derived calibration pass flags are computed from observations; duplicate or missing repetitions cannot count as complete calibration.
 
 Each cell's trace preserves lifecycle spans, timings, paths, attributes, exception chains, and stack traces needed for diagnosis. CLI summaries print the trace ID and absolute JSON report path. Traces remain diagnostic evidence and never determine a semantic score merely because their format changed.
+
+The local `benchmark.subject.outcome` trace records the final text, Tool calls and arguments, failed results, and output Dataset identities before the temporary runtime closes. This makes incomplete delivery and repair attempts reviewable; those diagnostic exchanges are not added to Judge inputs.
 
 ## Contributor commands
 

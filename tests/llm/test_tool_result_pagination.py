@@ -10,6 +10,7 @@ from xenix.services.llm.tool_result_page_store import ToolResultPageStore
 from xenix.services.llm.tooling import (
     AgentToolRegistry,
     AgentToolSpec,
+    MAX_TOOL_PAYLOAD_BYTES,
     ToolExecutionContext,
     ToolSuccess,
     tool_failure_from_exception,
@@ -77,15 +78,17 @@ def test_invoke_returns_small_result_inline(tmp_path: Path) -> None:
     assert outcome.value == {"ok": True}
 
 
-def test_inline_boundary_is_2048_chars(tmp_path: Path) -> None:
+def test_inline_budget_counts_serialized_unicode_bytes(tmp_path: Path) -> None:
     registry = _registry(tmp_path)
+    # JSON quotes take two bytes; each Chinese code point takes three.
+    text = "中" * ((MAX_TOOL_PAYLOAD_BYTES - 2) // 3)
     registry.register(
         AgentToolSpec(name="data.inline", provider_name="data_inline", description="inline"),
-        lambda _args, _ctx: ToolSuccess(value="x" * 2048),
+        lambda _args, _ctx: ToolSuccess(value=text),
     )
     registry.register(
         AgentToolSpec(name="data.paged", provider_name="data_paged", description="paged"),
-        lambda _args, _ctx: ToolSuccess(value="y" * 2049),
+        lambda _args, _ctx: ToolSuccess(value=text + "中"),
     )
     inline = registry.invoke(
         tool_name="data.inline",
@@ -94,7 +97,7 @@ def test_inline_boundary_is_2048_chars(tmp_path: Path) -> None:
         context=_context(),
     )
     assert isinstance(inline, ToolSuccess)
-    assert inline.value == "x" * 2048
+    assert inline.value == text
 
     paged = registry.invoke(
         tool_name="data.paged",
@@ -152,7 +155,7 @@ def test_invoke_without_store_rejects_oversized_result(tmp_path: Path) -> None:
     registry = AgentToolRegistry()
     registry.register(
         AgentToolSpec(name="data.big", provider_name="data_big", description="big"),
-        lambda _args, _ctx: ToolSuccess(value="x" * 3000),
+        lambda _args, _ctx: ToolSuccess(value="x" * MAX_TOOL_PAYLOAD_BYTES),
     )
     with pytest.raises(ValidationError):
         registry.invoke(

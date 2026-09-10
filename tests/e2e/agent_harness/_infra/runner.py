@@ -27,6 +27,7 @@ from xenix.services.knowledge_index_service import KnowledgeIndexService
 from xenix.services.llm import FrozenLLMSettingsSource, LLMService, LLMSettings
 from xenix.services.ml.worker_settings import MLWorkerSettingsService
 from xenix.services.storage import StorageBootstrapService
+from xenix.services.storage.repositories import KnowledgeRepository
 
 from .contracts import (
     AgentHarnessBenchmarkResult,
@@ -213,6 +214,7 @@ class _HeadlessBenchmarkCell:
         self._knowledge_import = None
         self._knowledge_derivation = None
         self._knowledge_index = None
+        self._scheduler = None
         try:
             self._storage = StorageBootstrapService().initialize(paths)
             llm = _BoundedLLMService(FrozenLLMSettingsSource(settings), budget)
@@ -230,6 +232,7 @@ class _HeadlessBenchmarkCell:
                     paths.logs / LLM_USAGE_JOURNAL_FILE_NAME
                 ),
             )
+            self._scheduler = services.scheduler
             self._knowledge_index = KnowledgeIndexService(
                 session_factory=self._storage.session_factory,
                 semantic_service=services.knowledge_semantic,
@@ -245,6 +248,7 @@ class _HeadlessBenchmarkCell:
                 paths=paths,
                 session_factory=self._storage.session_factory,
                 artifact_service=services.artifacts,
+                knowledge_repository=KnowledgeRepository(),
                 canonical_ready_notifier=self._knowledge_derivation.enqueue_generation,
             )
             self.harness = services.harness
@@ -284,6 +288,8 @@ class _HeadlessBenchmarkCell:
         if self._closed:
             return
         self._closed = True
+        if self._scheduler is not None:
+            self._scheduler.shutdown()
         if self._knowledge_import is not None:
             self._knowledge_import.shutdown()
         if self._knowledge_derivation is not None:
@@ -796,6 +802,32 @@ def _run_model_cell(
             run_dataset_ids = frozenset(
                 dataset.id for dataset in cell.datasets.list_datasets()
             ) - before_dataset_ids
+            with trace_recorder.span("benchmark.subject.outcome") as event:
+                messages = list(getattr(measurements.snapshot, "messages", []))
+                results = {
+                    message.tool_call_message_id: message
+                    for message in messages
+                    if getattr(message, "tool_call_message_id", None)
+                }
+                event["final_text"] = str(getattr(messages[-1], "text", "") or "") if messages else ""
+                event["tool_calls"] = [
+                    {
+                        "name": message.tool_id,
+                        "arguments": message.arguments_payload,
+                        "status": getattr(results.get(message.id), "result_status", None),
+                        "failure": (
+                            results[message.id].value_payload
+                            if getattr(results.get(message.id), "result_status", None) == "failed"
+                            else None
+                        ),
+                    }
+                    for message in messages if getattr(message, "tool_id", None)
+                ]
+                event["datasets"] = [
+                    {"id": dataset.id, "name": dataset.name}
+                    for dataset in cell.datasets.list_datasets()
+                    if dataset.id in run_dataset_ids
+                ]
             try:
                 assessment_started_at = time.perf_counter()
                 with trace_recorder.span("benchmark.case.assess", case_id=case.case_id) as event:

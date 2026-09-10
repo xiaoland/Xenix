@@ -527,6 +527,7 @@ class LLMConversationService(TitleGenerationMixin):
                 arguments=call.arguments,
                 context=ToolExecutionContext(
                     thread_id=exchange.thread_id,
+                    tool_call_message_id=staged_call_message_id,
                     dataset_ids=exchange.scope.dataset_ids,
                     cancel_requested=cancel_requested,
                 ),

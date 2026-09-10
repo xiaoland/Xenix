@@ -77,10 +77,13 @@ class AgentSkillCatalog:
             for skill in self.list_skills()
         ]
         content = (
-            "Xenix Agent Skills are prompt instructions only, never plugins, scripts, filesystem access, or external "
-            "extensions. For a matching inactive skill, call "
-            f"`{AGENT_SKILL_ACTIVATE_TOOL_NAME}` before proceeding; do not activate unrelated skills and follow its "
-            "returned instructions. After activation, read only a listed needed resource with "
+            "Xenix provides built-in data preparation, analysis, and modeling tools through Agent Skills. "
+            "Tools are disclosed progressively: activate a matching skill to make its tools available on the next "
+            "request. An absent tool in the current list does not mean the application lacks that capability. "
+            "For a matching inactive skill, call "
+            f"`{AGENT_SKILL_ACTIVATE_TOOL_NAME}` before proceeding and follow its returned instructions. "
+            "When a result is paged, use `result.page` to read the remaining instructions. "
+            "After activation, read a listed needed resource with "
             f"`{AGENT_SKILL_READ_REFERENCE_TOOL_NAME}` or `{AGENT_SKILL_READ_ASSET_TOOL_NAME}`.\n"
             "<available_agent_skills>"
             f"{json.dumps(entries, ensure_ascii=False, separators=(',', ':'))}"
@@ -116,7 +119,7 @@ class AgentSkillCatalog:
             provider_name=AGENT_SKILL_ACTIVATE_PROVIDER_NAME,
             description=(
                 "Activate one built-in Xenix Agent Skill when the user task matches its description. "
-                "This returns prompt instructions only; it does not execute scripts or read arbitrary files."
+                "Returns its instructions and makes the skill's data or modeling tools available on the next request."
             ),
             input_model=AgentSkillActivateInput,
             implementation=activate,

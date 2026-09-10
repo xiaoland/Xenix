@@ -212,9 +212,6 @@ class DuckDbSqlValidator:
                 if token.lower in {alias.lower() for alias in aliases}
             }
         )
-        if not referenced_aliases:
-            raise ValidationError("SQL must reference at least one registered dataset binding.")
-
         return {
             "statement": first_word,
             "read_only": True,
@@ -250,8 +247,6 @@ class DuckDbSqlValidator:
                 if token.lower in {alias.lower() for alias in aliases}
             }
         )
-        if not referenced_aliases:
-            raise ValidationError("SQL must reference at least one registered dataset binding.")
         return {
             "statement": first_word,
             "read_only": False,

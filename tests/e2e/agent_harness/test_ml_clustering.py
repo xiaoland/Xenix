@@ -75,8 +75,8 @@ class CustomerSegmentationCase:
         return SubmitUserTurnInput(
             thread_id=thread_id,
             text=(
-                "请仅按 visits 和 avg_order_value，使用 KMeans 将这些账户分成 2 个群组。"
-                "请生成保留原始三列并新增 cluster_id 的可继续使用结果，给出可打开的链接，"
+                "请按访问频次和平均客单值把这些账户分成两个运营群组。"
+                "请生成保留原始记录并带有 cluster_id 群组标签列的结果表，给出可打开的链接，"
                 "并简要说明两个群组在访问频次和平均客单值上的业务差异。"
             ),
             source_attachments=[SourceAttachmentInput(file_path=str(self.source_path.resolve()))],

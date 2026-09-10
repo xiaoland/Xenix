@@ -6,6 +6,7 @@ This subtree owns live Agent benchmark cases, synthetic fixtures, and the shared
 
 ## Evaluation boundaries
 
+- Subject submissions describe a business goal, source meaning, necessary business rules, and deliverables. Do not prescribe Tool calls, schema inspection, activation, parameter dictionaries, internal model keys, or a step-by-step solution. Outcome oracles must not secretly require those removed instructions; diagnostic service-contract experiments belong outside the business benchmark.
 - One cell uses one model, case, execution mode, and repetition in a fresh runtime home. Pytest owns selection and lifecycle; cases own submissions and public outcome oracles.
 - Judge calls occur after the subject settles, use explicit settings and no Tools, and report their own usage and latency. Same-model judging is recorded; calibration is optional and is checked when supplied.
 - Keep execution, integrity, structural outcomes, Judge verdicts, subject metrics, and Judge metrics distinct. Formal evaluation uses the actual Judge verdict for Judge-required cases. A semantic failure is a measured outcome, not a pytest infrastructure failure.

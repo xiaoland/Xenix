@@ -76,8 +76,8 @@ class FeedbackKeywordFrequencyCase:
         return SubmitUserTurnInput(
             thread_id=thread_id,
             text=(
-                "请使用 zh_business_v1 对 feedback 分词并在分词结果中保留 ticket_id，"
-                "再汇总全部 token 的出现次数。请生成只含 token、count 两列的可继续使用数据集，"
+                "请统计这些客户反馈中各个有意义词语的出现次数，帮助我们了解关注重点。"
+                "请交付词语和频次的汇总表（列名 token、count），"
                 "给出可打开的链接，并在最终答复中指出并列出现最多的词及其次数。"
             ),
             source_attachments=[SourceAttachmentInput(file_path=str(self.source_path.resolve()))],
@@ -151,7 +151,7 @@ def _resolve_outcome(context: BenchmarkCaseContext) -> tuple[Any | None, pl.Data
 
 
 def _matches_expected(frame: pl.DataFrame) -> bool:
-    if frame.height != len(_EXPECTED_COUNTS) or set(frame.columns) != {"token", "count"}:
+    if set(frame.columns) != {"token", "count"}:
         return False
     observed: dict[str, int] = {}
     try:
@@ -159,7 +159,14 @@ def _matches_expected(frame: pl.DataFrame) -> bool:
             observed[str(row["token"]).strip().lower()] = int(row["count"])
     except (KeyError, TypeError, ValueError):
         return False
-    return observed == _EXPECTED_COUNTS and sum(observed.values()) == 12
+    # Neutral words may be retained or treated as stopwords; the business
+    # request does not prescribe the tokenizer's private stopword list.
+    allowed = _EXPECTED_COUNTS | {"这次": 1, "整体": 1, "正常": 1}
+    return (
+        frame.height == len(observed)
+        and all(observed.get(word) == count for word, count in _EXPECTED_COUNTS.items())
+        and all(allowed.get(word) == count for word, count in observed.items())
+    )
 
 
 def _resolve_linked_artifact(context: BenchmarkCaseContext, dataset: Any | None) -> Any | None:

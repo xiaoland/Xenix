@@ -55,7 +55,6 @@ _MODEL_KEYS = frozenset(
         "forecasting.sarima",
     }
 )
-_EXPECTED_SELECTED_MODEL = "forecasting.holt_winters"
 _OUTPUT_COLUMNS = {
     "region",
     "forecast_time",
@@ -70,15 +69,9 @@ _OUTPUT_COLUMNS = {
 _ARTIFACT_URI = re.compile(r"artifact://[A-Za-z0-9]+(?:\?[^)\s>]+)?")
 
 BUSINESS_PROMPT = (
-    "请先画像，把 month 绑定为月度 time、demand_units 绑定为 target、region 绑定为独立 "
-    "group；先确认时间键无重复、无缺期且两个区域截止期一致。请用 model.metadata 浏览 "
-    "forecasting，并分别读取 forecasting.seasonal_naive、forecasting.holt_winters 和 "
-    "forecasting.sarima 的 param_schema。请为三者填写相同的 6 个月 horizon、12 个月季节周期、"
-    "monthly 频率、80% 区间和 3 个滚动窗口，在同一折叠上比较 MAE/RMSE/sMAPE/MASE；不要"
-    "发明 SARIMA orders、优化器参数或扩大搜索预算。根据公共评估证据选择保留模型，再仅用"
-    "horizon=6 做未来 apply，生成两个区域 2026 年 1—6 月的公共预测 Dataset。最终链接未来"
-    "预测 Artifact 和所选模型的评估 Artifact，并说明三模型结果、选择依据、区间非保证、使用"
-    "限制和重训建议。"
+    "请根据这份各地区月度需求历史，为两个区域分别预测 2026 年 1—6 月的需求，"
+    "提供 80% 预测区间。请比较适合这类数据的预测方案，用历史回测支持选择，"
+    "交付可继续使用的预测表和评估报告，并说明预测的不确定性及采购使用建议。"
 )
 
 FORECAST_VALIDATION_RUBRIC = JudgeRubric(
@@ -250,9 +243,9 @@ def _matching_forecast_model(frame: pl.DataFrame) -> str | None:
             model_keys.add(model_key)
     except KeyError, TypeError, ValueError:
         return None
-    if observed_keys != expected_keys or model_keys != {_EXPECTED_SELECTED_MODEL}:
+    if observed_keys != expected_keys or len(model_keys) != 1:
         return None
-    return _EXPECTED_SELECTED_MODEL
+    return next(iter(model_keys))
 
 
 def _date_value(value: Any) -> str:
@@ -333,12 +326,12 @@ def _matches_evaluation_report(payload: dict[str, Any], selected_model: str) -> 
         split.get("frequency") == "monthly"
         and split.get("seasonal_period") == 12
         and split.get("horizon") == 6
-        and split.get("rolling_windows") == 3
+        and int(split.get("rolling_windows", 0)) > 0
         and split.get("group_count") == 2
         and split.get("observation_count") == 168
         and split.get("future_overlap_count") == 0
         and isinstance(split.get("folds"), list)
-        and len(split["folds"]) == 3
+        and len(split["folds"]) == split["rolling_windows"]
         and isinstance(split.get("fold_identity_digest"), str)
         and bool(split["fold_identity_digest"])
     ):
@@ -402,7 +395,7 @@ def _build_judge_input(
         rubric=FORECAST_VALIDATION_RUBRIC,
         task_intent=BUSINESS_PROMPT,
         facts=(
-            "业务要求三种原生方法在同一月度滚动折叠、horizon 和指标口径上比较。",
+            "业务要求比较适合的预测方案；历史回测需使用一致的预测跨度和指标口径。",
             "未来结果必须是两个区域乘六个月的 12 行公共 Dataset，并链接评估与预测 Artifact。",
             "residual_quantile.v1 区间是训练侧经验校准，coverage_guaranteed=false。",
         ),
