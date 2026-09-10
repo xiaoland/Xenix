@@ -1,6 +1,6 @@
 # Visualization and Vega-Lite Reference
 
-Use this file before calling `analysis.graph` with a Vega-Lite `spec`. The graph tool receives a compact Vega-Lite specification for a registered, chart-ready dataset. Xenix injects the selected dataset into the Vega-Lite spec; do not add or edit `data` or `datasets`.
+Optional examples for `analysis.graph` with a Vega-Lite `spec`. The graph tool receives a compact Vega-Lite specification for a registered, chart-ready dataset. Xenix injects the selected dataset into the Vega-Lite spec; do not add or edit `data` or `datasets`.
 
 Use `wordcloud_spec`, not Vega-Lite, for word clouds.
 

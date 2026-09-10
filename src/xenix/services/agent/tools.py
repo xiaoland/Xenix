@@ -288,8 +288,7 @@ class AgentToolRegistry:
                 "Return typed, bounded quality facts for one registered Dataset with scope=whole_dataset. "
                 "The read-only result includes ordered field structure, missingness, cardinality, bounded "
                 "numeric/date summaries, correlations, and explicit truncation. It returns no sample rows, "
-                "category/group values, identifier values, Dataset, or Artifact. Use one focused data.query "
-                "only when a material business-role ambiguity remains after this profile."
+                "category/group values, identifier values, Dataset, or Artifact. data.query can inspect values."
             ),
             input_model=AnalysisProfileInput,
             handler=self._analysis_tools._analysis_profile,
@@ -325,12 +324,9 @@ class AgentToolRegistry:
                 "operations to one registered dataset. Operations execute strictly left-to-right against the "
                 "current intermediate dataset; each operation sees every earlier change. Use advertised "
                 "validation operations for supported row checks or rejection, including non-negative, min/max, "
-                "not-null, allowed-values, and regex rules. Use data.transform for a filter only when no atomic "
-                "data.clean operation can express its predicate. Stateful imputation, encoding, and scaling here fit "
-                "the whole Dataset and are not holdout-safe learned model preparation. Prefer zero-based "
-                "column_index or column_indexes from analysis.profile; make one focused data.query only when "
-                "exact values are materially required. Use data.clean.metadata only for unfamiliar operations "
-                "or parameters. "
+                "not-null, allowed-values, and regex rules. SQL transformations are also available through data.transform. "
+                "Stateful imputation, encoding, and scaling here fit "
+                "the whole Dataset. Column names or zero-based indexes identify fields in the current table. "
                 "After missing.drop_high_missing_columns or encoding.one_hot, use names or a new "
                 "data.query/data.clean call before using indexes."
             ),
@@ -381,8 +377,7 @@ class AgentToolRegistry:
                 "At least one input source is required. If both are present, bindings wins. "
                 "When column_reference=indexes, each bound relation exposes zero-based c0, c1, ... SQL "
                 "columns instead of source names; use this for punctuation-heavy or Unicode headers. "
-                "During a cleaning pass, emit at most one data.query call per model response; batch related "
-                "evidence in one compact query and wait for its result before any focused follow-up. "
+                "CSV dates may be strings; cast explicitly for date comparisons or arithmetic. "
                 "Returns bounded rows and does not create a derived dataset or artifact."
             ),
             input_model=DataQueryToolInput,
@@ -397,15 +392,12 @@ class AgentToolRegistry:
             provider_name="data_transform",
             description=(
                 "Create a new derived dataset from bounded DuckDB SQL over registered datasets. "
-                "For cleaning filters, use an advertised atomic data.clean validation operation when it can "
-                "express the rule; use data.transform only for unsupported predicates or for SQL-derived columns, "
-                "joins, aggregates, reshaping, and grain changes. "
+                "Supports filters, calculated columns, joins, aggregates, reshaping, and grain changes. "
                 "Use dataset_id for one input aliased as input, or bindings for explicit aliases. "
                 "At least one input source is required. If both are present, bindings wins. "
                 "When column_reference=indexes, each bound relation exposes zero-based c0, c1, ... SQL "
                 "columns instead of source names; use this for punctuation-heavy or Unicode headers. "
-                "For multi-statement scripts, create or leave a final TEMP relation named output; "
-                "Xenix materializes SELECT * FROM output."
+                "A script's final SELECT becomes the result; scripts without a final query use the TEMP relation output."
             ),
             input_model=DataTransformToolInput,
             handler=self._data_tools._data_transform,
@@ -419,7 +411,7 @@ class AgentToolRegistry:
             provider_name="data_feature_select",
             description=(
                 "Bind registered dataset columns to semantic roles required by a model/analyzer. "
-                "Prefer per-role zero-based column_indexes from data.query; Xenix resolves them against the "
+                "Accepts column names or zero-based column_indexes; Xenix resolves them against the "
                 "current dataset schema and persists canonical names."
             ),
             input_model=DataFeatureSelectInput,
@@ -432,7 +424,7 @@ class AgentToolRegistry:
             provider_name="model_metadata",
             description=(
                 "Browse a lightweight model directory by model_family, or inspect one chosen model's role "
-                "and parameter schema with model_key."
+                "and parameter schema with model_key. include_details=true includes schemas for all family candidates."
             ),
             input_model=ModelMetadataInput,
             handler=self._model_tools._model_metadata,
@@ -444,8 +436,7 @@ class AgentToolRegistry:
             provider_name="model_train",
             description=(
                 "Train and evaluate one or more models for a persisted dataset column role binding. "
-                "Use model.metadata with model_family to browse candidates, then inspect one model_key for "
-                "parameter detail."
+                "Completed results include evaluation facts, retained model IDs, and public Artifact links."
             ),
             input_model=ModelTrainInput,
             handler=self._model_tools._model_train,
@@ -459,8 +450,7 @@ class AgentToolRegistry:
             provider_name="model_hyper_train",
             description=(
                 "Run hyperparameter training for one or more models. "
-                "Use model.metadata with model_family to browse candidates, then inspect one model_key with "
-                "include_param_grid_schema=true."
+                "model.metadata can describe supported parameter grids with include_param_grid_schema=true."
             ),
             input_model=ModelHyperTrainInput,
             handler=self._model_tools._model_hyper_train,
@@ -472,7 +462,8 @@ class AgentToolRegistry:
             provider_name="model_apply",
             description=(
                 "Apply a retained model to registered dataset/artifact inputs or inline rows, "
-                "or pass horizon alone to create a native future forecast."
+                "or pass horizon alone to create a native future forecast. Completed results include "
+                "result_dataset_id and a public Artifact link; pending work returns task IDs."
             ),
             input_model=ModelApplyInput,
             handler=self._model_tools._model_apply,

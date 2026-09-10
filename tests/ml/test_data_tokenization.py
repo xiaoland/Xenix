@@ -12,6 +12,7 @@ from pydantic import ValidationError as PydanticValidationError
 from xenix.config import AppPaths
 from xenix.exceptions import ValidationError
 from xenix.services.data_tokenization import DataTokenizationService
+from xenix.services.llm.xenix_table_text import render_xenix_table_tool_result
 from xenix.services.data_tokenization_contracts import (
     StagedTextResourceInput,
     TextPreparationInput,
@@ -97,6 +98,15 @@ def test_multilingual_profile_retains_safe_spec_and_bilingual_quality(tmp_path: 
     assert "number" in output.loc[0, "token_text"]
     assert "url" in output.loc[1, "token_text"]
     assert result.report["empty_token_row_count"] == 1
+    delivered = render_xenix_table_tool_result(
+        tool_name="data.tokenize", status="succeeded",
+        payload={"dataset_id": "tokens", "artifact_id": "workbook", "tokenization_report": result.report,
+                 "inspection": {"preview_columns": [], "preview_rows": [], "row_count": result.report["output_row_count"]}},
+    )
+    assert delivered is not None
+    assert f"token_count: {result.report['token_count']}" in delivered
+    assert "dictionary-dataset" in delivered
+    assert "preparation_quality:" in delivered
     specification = result.report["preparation_specification"]
     assert isinstance(specification, dict)
     assert specification["profile_key"] == "multilingual_business_v1"

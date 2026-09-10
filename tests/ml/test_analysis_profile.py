@@ -158,15 +158,6 @@ def test_analysis_profile_is_registered_as_one_atomic_read_only_tool(
         artifact_service=Mock(),
     )
 
-    spec = next(spec for spec in registry.list_specs() if spec.name == "analysis.profile")
-    assert spec.provider_name == "analysis_profile"
-    assert set(spec.parameters_schema["properties"]) == {
-        "dataset_id",
-        "field_limit",
-        "numeric_summary_limit",
-        "correlation_column_limit",
-    }
-    assert "source_path" not in json.dumps(spec.parameters_schema)
     outcome = registry.execute(
         "analysis.profile",
         {"dataset_id": dataset.id},

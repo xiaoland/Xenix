@@ -411,7 +411,7 @@ class DataTransformInput(AgentToolInput):
     sql: RequiredString = Field(
         description=(
             "DuckDB SQL script. It may use SELECT/CTE or bounded temporary-table steps, "
-            "but must leave a final relation named output."
+            "and returns the final SELECT, or the relation output when there is no final query."
         )
     )
     column_reference: Literal["names", "indexes"] = Field(
@@ -487,6 +487,10 @@ ModelFamilyValue = Literal[
 
 
 class ModelMetadataInput(AgentToolInput):
+    include_details: bool = Field(
+        default=False,
+        description="Include role and parameter schemas for all candidates in a family in one call.",
+    )
     model_key: RequiredString | None = Field(
         default=None,
         description=(
@@ -505,7 +509,7 @@ class ModelMetadataInput(AgentToolInput):
     include_param_grid_schema: bool = Field(
         default=False,
         description=(
-            "Only use with model_key. When true, also return param_grid_schema for "
+            "When true, also return details and param_grid_schema for "
             "hyperparameter tuning."
         ),
     )

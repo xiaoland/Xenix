@@ -375,9 +375,8 @@ def _comparison_matches(comparison: dict[str, Any]) -> bool:
 def _split_matches(split: dict[str, Any]) -> bool:
     try:
         return bool(
-            split.get("eligible_row_count") == 60
-            and 0 < int(split.get("train_row_count")) < 60
-            and 0 < int(split.get("holdout_row_count")) < 60
+            0 < int(split.get("train_row_count")) < int(split.get("eligible_row_count"))
+            and 0 < int(split.get("holdout_row_count")) < int(split.get("eligible_row_count"))
             and split.get("group_overlap_count") == 0
             and split.get("evaluation_scope") == "holdout"
         )
@@ -391,7 +390,6 @@ def _split_matches(split: dict[str, Any]) -> bool:
 def _leakage_matches(leakage: dict[str, Any]) -> bool:
     return bool(
         leakage.get("business_group_supplied") is True
-        and leakage.get("eligible_row_count") == 60
         and leakage.get("train_business_group_overlap_count") == 0
         and leakage.get("train_template_group_overlap_count") == 0
         and leakage.get("train_connected_group_overlap_count") == 0

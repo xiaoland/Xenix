@@ -105,6 +105,7 @@ class HeadedBenchmarkCell:
         bounded_llm: LLMService,
     ) -> None:
         self.paths = paths
+        self.llm = bounded_llm
         self._previous_app_home = os.environ.get("XENIX_APP_HOME")
         self._closed = False
         self._checks: list[OutcomeCheck] = []

@@ -304,14 +304,11 @@ def _append_json_metadata(lines: list[str], key: str, value: Any) -> None:
 def _append_tokenization_metadata(lines: list[str], report: Any) -> None:
     if not isinstance(report, dict):
         return
-    for key in (
-        "output",
-        "source_row_count",
-        "output_row_count",
-        "tokenized_row_count",
-        "empty_token_row_count",
-    ):
-        _append_metadata(lines, key, report.get(key))
+    for key, value in report.items():
+        if isinstance(value, (dict, list)):
+            _append_json_metadata(lines, key, value)
+        else:
+            _append_metadata(lines, key, value)
 
 
 def _query_columns(value: Any) -> list[dict[str, str]] | None:

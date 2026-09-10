@@ -7,9 +7,6 @@ from pathlib import Path
 
 from ...exceptions import NotFoundError, ValidationError
 from ..ml.registry import get_model_catalog_entry, list_model_catalog
-from ..ml.contracts import (
-    ApplyTaskResult,
-)
 from ..ml.types import ModelFamily
 from ..ml_service import (
     ApplySourceInput,
@@ -115,15 +112,12 @@ class ModelTools:
             ),
         )
         include_param_grid_schema = input_data.include_param_grid_schema
-        include_param_schema = detail_query or include_param_grid_schema
-        if not detail_query:
-            include_param_schema = False
-            include_param_grid_schema = False
+        include_details = detail_query or input_data.include_details or include_param_grid_schema
         models = [
             model_catalog_payload(
                 entry,
-                detail_query=detail_query,
-                include_param_schema=include_param_schema,
+                detail_query=include_details,
+                include_param_schema=include_details,
                 include_param_grid_schema=include_param_grid_schema,
             )
             for entry in catalog_entries
@@ -300,12 +294,19 @@ class ModelTools:
             raise ValidationError(
                 "The completed apply task has no public Artifact reference. Re-run apply."
             )
-        typed_result = ApplyTaskResult.model_validate(details.task.result_payload or {})
+        # Finalization adds Dataset handles and facts beyond the worker result schema.
+        # Preserve that completed result rather than parsing it back into a worker DTO.
+        result = {
+            key: value for key, value in (details.task.result_payload or {}).items()
+            if key not in {"output_file_path", "canonical_output_path"}
+        }
         return ToolSuccess(
             value={
                 "ml_task_id": task_id,
                 "artifact_id": output_artifact.artifact_id,
-                "result": typed_result.model_dump(mode="json"),
+                "uri": f"artifact://{output_artifact.artifact_id}",
+                "result_dataset_id": result.get("result_dataset_id"),
+                "result": result,
             },
         )
 

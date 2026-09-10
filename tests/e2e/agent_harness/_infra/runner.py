@@ -25,6 +25,7 @@ from xenix.services.knowledge_derivation_service import KnowledgeDerivationServi
 from xenix.services.knowledge_import_service import KnowledgeImportService
 from xenix.services.knowledge_index_service import KnowledgeIndexService
 from xenix.services.llm import FrozenLLMSettingsSource, LLMService, LLMSettings
+from xenix.services.llm.messages import ToolCallOutputItem
 from xenix.services.ml.worker_settings import MLWorkerSettingsService
 from xenix.services.storage import StorageBootstrapService
 from xenix.services.storage.repositories import KnowledgeRepository
@@ -138,6 +139,7 @@ class _BoundedLLMService(LLMService):
     ) -> None:
         super().__init__(settings_source)
         self._budget = budget
+        self.sampling_responses: list[dict[str, Any]] = []
 
     def complete(
         self,
@@ -192,9 +194,30 @@ class _BoundedLLMService(LLMService):
 
     def _observe_response(self, response: Any) -> None:
         usage = LLMTokenUsage.from_payload(getattr(response, "usage_payload", None))
+        self.sampling_responses.append({
+            "round": self._budget.snapshot().sampling_rounds_admitted,
+            "reported_tokens": usage.total_tokens if usage is not None else None,
+            "tool_calls": [
+                {"provider_call_id": item.provider_call_id, "name": item.tool_name}
+                for item in response.output_items if isinstance(item, ToolCallOutputItem)
+            ],
+        })
         self._budget.observe_subject_response(
             usage.total_tokens if usage is not None else None
         )
+
+
+def _delivery_diagnostics(value: Any) -> dict[str, Any]:
+    """Keep completion evidence locally without copying intermediate tables into reports."""
+    facts: dict[str, Any] = {"serialized_bytes": len(json.dumps(value, ensure_ascii=False).encode("utf-8"))}
+    if isinstance(value, dict):
+        for key in ("timed_out", "task_ids", "ml_task_id", "dataset_id", "result_dataset_id", "artifact_id", "uri"):
+            if key in value:
+                facts[key] = value[key]
+        result = value.get("result")
+        if isinstance(result, dict):
+            facts["result"] = _delivery_diagnostics(result)
+    return facts
 
 
 class _HeadlessBenchmarkCell:
@@ -218,6 +241,7 @@ class _HeadlessBenchmarkCell:
         try:
             self._storage = StorageBootstrapService().initialize(paths)
             llm = _BoundedLLMService(FrozenLLMSettingsSource(settings), budget)
+            self.llm = llm
             worker_settings = MLWorkerSettingsService(paths)
             embedding_settings_service = EmbeddingSettingsService(paths)
             if embedding_settings is not None:
@@ -803,6 +827,7 @@ def _run_model_cell(
                 dataset.id for dataset in cell.datasets.list_datasets()
             ) - before_dataset_ids
             with trace_recorder.span("benchmark.subject.outcome") as event:
+                event["sampling_responses"] = cell.llm.sampling_responses
                 messages = list(getattr(measurements.snapshot, "messages", []))
                 results = {
                     message.tool_call_message_id: message
@@ -813,8 +838,12 @@ def _run_model_cell(
                 event["tool_calls"] = [
                     {
                         "name": message.tool_id,
+                        "provider_call_id": message.provider_call_id,
                         "arguments": message.arguments_payload,
                         "status": getattr(results.get(message.id), "result_status", None),
+                        "delivery": _delivery_diagnostics(
+                            getattr(results.get(message.id), "value_payload", None)
+                        ),
                         "failure": (
                             results[message.id].value_payload
                             if getattr(results.get(message.id), "result_status", None) == "failed"

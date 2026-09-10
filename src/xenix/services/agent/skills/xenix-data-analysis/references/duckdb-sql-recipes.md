@@ -1,6 +1,6 @@
 # DuckDB SQL Recipes for `data.query`
 
-Use this file before writing `data.query` or `data.transform` calls. These are templates. Replace `{{column}}` placeholders with exact column names observed through `data.query`.
+Optional SQL examples for `data.query` and `data.transform`. Replace placeholders with known source column names. CSV date columns may be VARCHAR; use an explicit CAST for date comparisons and arithmetic.
 
 For SQL table names, follow the tool contract:
 
@@ -8,7 +8,7 @@ For SQL table names, follow the tool contract:
 - with multiple datasets, pass `bindings` and use each `bindings[].alias` as the table name;
 - do not use the dataset display name or file name as the SQL table name unless you explicitly set it as a binding alias.
 
-## Safety and style
+## SQL syntax
 
 - Use read-only `SELECT` queries and CTEs.
 - Quote unusual column names with double quotes: `"月收入"`.

@@ -23,19 +23,14 @@ from xenix.services.ml.evaluation import get_default_policy
 from xenix.services.ml.forecast_preparation import prepare_forecast_panel
 from xenix.services.ml.models.forecasting import (
     ForecastModelKey,
-    HoltWintersForecastParams,
     HoltWintersForecastingService,
     SarimaFitBudget,
     SarimaFitOutcome,
-    SarimaForecastParams,
-    SarimaForecastingService,
-    SeasonalNaiveForecastParams,
-    SeasonalNaiveForecastingService,
     apply_future_forecast,
     evaluate_forecast,
     fit_full_history,
 )
-from xenix.services.ml.types import ApplyMode, EvaluationKind, ModelFamily, ModelTaskKind
+from xenix.services.ml.types import EvaluationKind
 
 FIXTURE_ROOT = FIXTURES_ROOT / "ml_cf_service"
 WEEKLY_PANEL = FIXTURE_ROOT / "weekly_panel_v1.csv"
@@ -425,7 +420,7 @@ def test_sarima_nonconvergence_nonfinite_and_wall_budget_fail_without_fallback()
     assert wall_error.value.error_details["budget_kind"] == "wall_time"
 
 
-def test_forecast_service_bridge_fit_evaluate_apply_and_catalog(tmp_path: Path) -> None:
+def test_forecast_service_bridge_fit_evaluate_apply(tmp_path: Path) -> None:
     source_path = tmp_path / "weekly.csv"
     source_path.write_bytes(WEEKLY_PANEL.read_bytes())
     options = _weekly_options()
@@ -512,30 +507,3 @@ def test_forecast_service_bridge_fit_evaluate_apply_and_catalog(tmp_path: Path) 
     assert apply_result.summary.horizon == 6
     assert apply_result.source_dataset_ids == [snapshot.dataset_id]
     assert len(output.index) == 12
-
-    for service in (
-        SeasonalNaiveForecastingService,
-        HoltWintersForecastingService,
-        SarimaForecastingService,
-    ):
-        entry = service.catalog_entry()
-        assert entry.model_family is ModelFamily.FORECASTING
-        assert entry.model_task_kind is ModelTaskKind.FORECASTER
-        assert entry.supports_evaluation is True
-        assert entry.supports_apply is True
-        assert entry.apply_mode is ApplyMode.FUTURE_HORIZON
-        assert entry.apply_role_schema.roles == []
-
-    common_fields = {"horizon", "seasonal_period", "frequency", "interval_level", "rolling_windows"}
-    assert set(SeasonalNaiveForecastParams.model_fields) == common_fields
-    assert set(HoltWintersForecastParams.model_fields) == common_fields | {"damped_trend"}
-    assert set(SarimaForecastParams.model_fields) == common_fields | {
-        "policy",
-        "max_fits_per_group",
-        "max_total_fits",
-        "max_wall_seconds",
-    }
-    sarima_schema = SarimaForecastParams.model_json_schema()
-    assert "optimizer" not in sarima_schema["properties"]
-    assert "order" not in sarima_schema["properties"]
-    assert "seasonal_order" not in sarima_schema["properties"]

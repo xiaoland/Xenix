@@ -25,7 +25,7 @@ from tests.e2e.agent_harness._infra.contracts import (
 )
 from tests.e2e.agent_harness._infra.pytest_plugin import _InvocationBudgetState
 from xenix.services.llm import FrozenLLMSettingsSource, LLMService, LLMSettings
-from xenix.services.llm.providers import ProviderResponse
+from xenix.services.llm.providers import ProviderResponse, ProviderToolCall
 
 
 def _sleep_longer_than_watchdog(*, seconds: float) -> None:
@@ -108,6 +108,23 @@ def test_thirteenth_sampling_round_is_rejected() -> None:
     assert snapshot.exhaustion_reason == "sampling_round_limit_exceeded"
 
 
+def test_round_diagnostics_group_calls_and_distinguish_pending_from_completed():
+    service, budget = _bounded_service()
+    budget.begin_sampling_round()
+    service._observe_response(ProviderResponse(
+        tool_calls=[ProviderToolCall(provider_call_id="a", tool_name="model.metadata"),
+                    ProviderToolCall(provider_call_id="b", tool_name="analysis.profile")],
+        usage_payload={"total_tokens": 15},
+    ))
+    assert len(service.sampling_responses) == 1
+    assert [call["provider_call_id"] for call in service.sampling_responses[0]["tool_calls"]] == ["a", "b"]
+    pending = runner._delivery_diagnostics({"timed_out": True, "task_ids": ["apply"]})
+    completed = runner._delivery_diagnostics({"result": {"result_dataset_id": "forecast"}, "artifact_id": "report"})
+    assert pending["timed_out"] is True
+    assert completed["result"]["result_dataset_id"] == "forecast"
+    assert completed["artifact_id"] == "report"
+
+
 def test_reported_response_at_500k_boundary_halts_the_next_round(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -121,6 +138,7 @@ def test_reported_response_at_500k_boundary_halts_the_next_round(
     assert snapshot.status is BenchmarkBudgetStatus.WITHIN_LIMITS
     assert snapshot.reported_subject_tokens == 500_000
     assert snapshot.provider_attempts_dispatched == 1
+    assert service.sampling_responses == [{"round": 1, "reported_tokens": 500_000, "tool_calls": []}]
     assert snapshot.exhaustion_reason is None
     with pytest.raises(BenchmarkBudgetError, match="subject_token_limit_reached"):
         service.complete(messages=[], tools=[])

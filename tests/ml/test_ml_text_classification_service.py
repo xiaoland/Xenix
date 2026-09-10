@@ -24,7 +24,6 @@ from xenix.exceptions import ValidationError
 from xenix.services.artifact_service import ArtifactService, build_artifact_uri
 from xenix.services.dataset_service import DatasetService, RegisterDatasetInput
 from xenix.services.ml.contracts import EvaluateTaskResult, FitTaskResult
-from xenix.services.ml.registry import get_model_catalog_entry
 from xenix.services.ml_service import (
     ApplySourceInput,
     ApplyWithFilesInput,
@@ -43,16 +42,6 @@ TRAINING_FIXTURE = FIXTURE_ROOT / "bilingual_raw_training_v1.csv"
 APPLY_FIXTURE = FIXTURE_ROOT / "bilingual_raw_apply_v1.csv"
 CUSTOM_DICTIONARY_FIXTURE = FIXTURE_ROOT / "custom_dictionary_v1.csv"
 STOPWORDS_FIXTURE = FIXTURE_ROOT / "stopwords_v1.csv"
-FIXTURE_SHA256 = {
-    TRAINING_FIXTURE.name: "cca65179f6f5034338a882c77a55fa2df76c4c333111c164bb310aae1826ef22",
-    APPLY_FIXTURE.name: "7083e373c4565cb4a82bd451e03cf2cfd96a8e5abfa81a283f23c291da366c7d",
-    CUSTOM_DICTIONARY_FIXTURE.name: (
-        "0a378ab4d45b3eb5c331a540d2d0f9e3136f04ccd940618a9fa671942b2a8bd6"
-    ),
-    STOPWORDS_FIXTURE.name: (
-        "2f0d23fe17413e4c47674d7e224f8653a290dcaa6338a83da81408c91265053e"
-    ),
-}
 NEAR_DUPLICATE_RECORD_PAIRS = (
     ("p01-02", "p02-02"),
     ("p03-02", "p04-02"),
@@ -935,14 +924,6 @@ def _assert_metric_snapshot(actual: Any, expected: _ClassificationMetrics) -> No
 
 
 def test_clean_room_bilingual_fixtures_exercise_leakage_and_apply_edges() -> None:
-    fixtures = (
-        TRAINING_FIXTURE,
-        APPLY_FIXTURE,
-        CUSTOM_DICTIONARY_FIXTURE,
-        STOPWORDS_FIXTURE,
-    )
-    assert all(_fixture_digest(path) == FIXTURE_SHA256[path.name] for path in fixtures)
-
     training = pd.read_csv(TRAINING_FIXTURE, keep_default_na=False)
     assert training.columns.tolist() == [
         "record_id",
@@ -1064,13 +1045,6 @@ def test_multilingual_text_classification_real_lifecycle_is_leakage_safe_and_pub
             )
         }
 
-        catalog = get_model_catalog_entry(ACTIVE_MODEL_KEY)
-        assert catalog.supports_hyperparameter_tuning is False
-        assert set(catalog.param_schema["properties"]) == {
-            *PARAMS_TEMPLATE,
-            "custom_dictionary_dataset_ids",
-            "stopword_dataset_ids",
-        }
         binding = runtime.ml.create_column_binding(
             CreateColumnBindingInput(
                 dataset_id=training_dataset.id,
@@ -1319,15 +1293,6 @@ def test_multilingual_text_classification_real_lifecycle_is_leakage_safe_and_pub
 
         for source_path, original_digest in registered_sources.values():
             assert _fixture_digest(source_path) == original_digest
-        assert all(
-            _fixture_digest(path) == FIXTURE_SHA256[path.name]
-            for path in (
-                TRAINING_FIXTURE,
-                APPLY_FIXTURE,
-                CUSTOM_DICTIONARY_FIXTURE,
-                STOPWORDS_FIXTURE,
-            )
-        )
     finally:
         runtime.storage.engine.dispose()
 

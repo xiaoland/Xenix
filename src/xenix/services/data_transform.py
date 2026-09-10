@@ -251,7 +251,7 @@ class DuckDbSqlValidator:
             "statement": first_word,
             "read_only": False,
             "single_statement": False,
-            "requires_output_relation": "output",
+            "result_selection": "final_query_or_output_relation",
             "bindings": aliases,
             "referenced_bindings": referenced_aliases,
         }
@@ -457,10 +457,14 @@ class DataQueryTransformService:
                         temp_dir=Path(temp_dir),
                         column_reference=input_data.column_reference,
                     )
-                    if validation_summary["statement"] in {"select", "with"}:
-                        connection.execute(f"CREATE TEMP TABLE output AS {sql}")
+                    statements = connection.extract_statements(sql)
+                    for statement in statements[:-1]:
+                        connection.execute(statement)
+                    final = statements[-1]
+                    if final.type == duckdb.StatementType.SELECT:
+                        connection.execute(f"CREATE OR REPLACE TEMP TABLE output AS {final.query}")
                     else:
-                        connection.execute(sql)
+                        connection.execute(final)
                     try:
                         columns = self._output_columns(connection)
                         row_count = self._output_row_count(connection)
@@ -470,7 +474,7 @@ class DataQueryTransformService:
                         )
                     except duckdb.CatalogException as exc:
                         raise ValidationError(
-                            "Transform SQL scripts must leave a final relation named output."
+                            "Transform SQL must end in a SELECT query or leave a relation named output."
                         ) from exc
                 self._validate_transform_output(temp_output_path)
                 shutil.move(temp_output_path, output_path)

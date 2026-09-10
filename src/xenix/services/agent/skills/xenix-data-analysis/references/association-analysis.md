@@ -141,5 +141,3 @@ Use business language:
 - “出现 A 的记录中，B 也出现的比例较高。”
 - “lift 大于 1 表示它们的共同出现强于随机独立情况下的预期。”
 - “关联不等于因果，也不代表必须推荐。”
-
-High-risk domains such as medical, finance, education placement, and compliance review require human validation.

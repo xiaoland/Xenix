@@ -42,6 +42,8 @@ pending -> cancelled
 
 ## Result and Failure Contract
 
+- Completed Agent train, tune, and apply results deliver their public output references directly, including finalized Dataset identifiers and Artifact links. Apply also delivers the generated column names and types. Consumers can use these outputs without querying the task again. Worker result schemas describe execution output, not the richer service-finalized result; tool adapters must preserve finalization facts. Task queries remain available for pending work and additional details.
+
 - Text-discovery evaluation recomputes metrics from the retained analyzer and source Dataset. FIT diagnostics are historical evidence, not an exact-equality gate for new metrics; the source snapshot and evidence type must still match.
 - Remote directories are execution/cache state. Results become authoritative only
   after they are downloaded, normalized, finalized locally, and registered by the

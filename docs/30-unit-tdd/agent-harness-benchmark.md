@@ -61,7 +61,7 @@ Calibration is optional. When supplied through `--calibration`, a passing report
 
 Each cell's trace preserves lifecycle spans, timings, paths, attributes, exception chains, and stack traces needed for diagnosis. CLI summaries print the trace ID and absolute JSON report path. Traces remain diagnostic evidence and never determine a semantic score merely because their format changed.
 
-The local `benchmark.subject.outcome` trace records the final text, Tool calls and arguments, failed results, and output Dataset identities before the temporary runtime closes. This makes incomplete delivery and repair attempts reviewable; those diagnostic exchanges are not added to Judge inputs.
+The local `benchmark.subject.outcome` trace records the final text, Tool calls and arguments, failed results, response-to-tool-call grouping via provider call IDs, per-response reported tokens, completion handles and result sizes, and output Dataset identities before the temporary runtime closes. This makes incomplete delivery and repair attempts reviewable; those diagnostic exchanges are not added to Judge inputs.
 
 ## Contributor commands
 

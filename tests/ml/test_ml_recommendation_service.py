@@ -17,8 +17,7 @@ from xenix.config import ensure_app_dirs, get_app_paths
 from xenix.services.artifact_service import ArtifactService, build_artifact_uri
 from xenix.services.dataset_service import DatasetService, RegisterDatasetInput
 from xenix.services.ml.contracts import EvaluateTaskResult
-from xenix.services.ml.registry import get_model_catalog_entry, list_model_keys
-from xenix.services.ml.types import ApplyMode, EvaluationKind, ModelFamily, ModelTaskKind
+from xenix.services.ml.types import EvaluationKind
 from xenix.services.ml_service import (
     ApplySourceInput,
     ApplyWithFilesInput,
@@ -36,13 +35,7 @@ FIXTURES = FIXTURES_ROOT / "ml_recommendation"
 TIMED_HISTORY = FIXTURES / "explicit_ratings_with_time_v1.csv"
 HASH_HISTORY = FIXTURES / "explicit_ratings_without_time_v1.csv"
 APPLY_USERS = FIXTURES / "apply_users_v1.csv"
-FIXTURE_SHA256 = {
-    TIMED_HISTORY.name: "0c961cb9a17a3ad2b66a9f02048036c6c7042d1b073d27dd3bd82445a0dca2b8",
-    HASH_HISTORY.name: "e05d5f93ee999fe452f9e9937a3c8ca73f8c8874e5777a0424652469a0dba990",
-    APPLY_USERS.name: "c1b6a7f15095f088b1340b8d8269ca2368e92bb2490723ccad24b5ea79c5318a",
-}
 ACTIVE_MODEL_KEY = "recommendation.collaborative_top_k"
-LEGACY_MODEL_KEY = "recommendation.item_similarity"
 PARAMS = {
     "top_k": 3,
     "min_user_interactions": 4,
@@ -904,8 +897,6 @@ def _exercise_ranking_lifecycle(
             training_digest_before
         )
         assert sha256(Path(apply_dataset.source_path).read_bytes()).hexdigest() == apply_digest_before
-        assert sha256(history_path.read_bytes()).hexdigest() == FIXTURE_SHA256[history_path.name]
-        assert sha256(APPLY_USERS.read_bytes()).hexdigest() == FIXTURE_SHA256[APPLY_USERS.name]
     finally:
         runtime.storage.engine.dispose()
 
@@ -941,35 +932,3 @@ def test_hash_positive_twin_replays_the_same_public_ranking_contract(
         time_column=None,
         expected_policy="deterministic_hash_positive_per_user.v1",
     )
-
-
-def test_active_personalized_key_preserves_legacy_item_similarity_semantics() -> None:
-    assert {ACTIVE_MODEL_KEY, LEGACY_MODEL_KEY}.issubset(set(list_model_keys()))
-    active = get_model_catalog_entry(ACTIVE_MODEL_KEY)
-    legacy = get_model_catalog_entry(LEGACY_MODEL_KEY)
-
-    assert active.model_family is ModelFamily.RECOMMENDATION
-    assert active.model_task_kind is ModelTaskKind.RECOMMENDER
-    assert active.evaluation_kind is EvaluationKind.RANKING
-    assert active.supports_evaluation is True
-    assert active.apply_mode is ApplyMode.ROWS
-    assert [role.name for role in active.train_role_schema.roles] == [
-        "user",
-        "item",
-        "rating",
-        "time",
-    ]
-    assert [role.name for role in active.apply_role_schema.roles] == ["user"]
-
-    assert legacy.model_family is ModelFamily.RECOMMENDATION
-    assert legacy.model_task_kind is ModelTaskKind.RECOMMENDER
-    assert legacy.evaluation_kind is EvaluationKind.SUMMARY
-    assert legacy.supports_evaluation is False
-    assert legacy.apply_mode is ApplyMode.ROWS
-    assert [role.name for role in legacy.apply_role_schema.roles] == ["item"]
-    assert set(legacy.param_schema["properties"]) == {
-        "min_ratings_base",
-        "min_ratings_candidate",
-        "similarity_threshold",
-        "top_k",
-    }

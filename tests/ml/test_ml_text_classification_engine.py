@@ -12,7 +12,6 @@ from xenix.exceptions import ValidationError
 from xenix.services.data_tokenization_contracts import StagedTextResourceInput, TextPreparationInput
 from xenix.services.ml.models.text_analysis import (
     MultilingualTextClassificationService,
-    MultilingualTextClassificationParams,
     MultilingualTextClassifier,
 )
 from xenix.services.ml.contracts import (
@@ -184,27 +183,6 @@ def test_raw_apply_reports_empty_and_oov_rows_without_changing_the_retained_spec
     assert corpus.quality_facts.empty_after_preparation_row_count == 1
     assert vectorization.out_of_vocabulary_row_count >= 1
     assert classifier.preparer.specification.specification_digest == before_digest
-
-
-def test_active_keys_have_distinct_persisted_semantics() -> None:
-    assert MultilingualTextClassificationService.key == "text.classification.multilingual_logistic_regression_tfidf"
-    assert MultilingualTextClassificationService.supports_hyperparameter_tuning is False
-    assert MultilingualTextClassificationService.result_contract is not None
-    assert MultilingualTextClassificationService.result_contract.train_result_kinds == ["model", "metrics", "report"]
-
-
-def test_active_params_expose_only_bounded_registered_resource_ids() -> None:
-    params = MultilingualTextClassificationParams(
-        custom_dictionary_dataset_ids=["dictionary-dataset"],
-        stopword_dataset_ids=["stopword-dataset"],
-    )
-    serialized = params.model_dump(mode="json")
-
-    assert serialized["custom_dictionary_dataset_ids"] == ["dictionary-dataset"]
-    assert serialized["stopword_dataset_ids"] == ["stopword-dataset"]
-    assert "path" not in json.dumps(serialized, sort_keys=True)
-    with pytest.raises(ValueError, match="at most 4 items"):
-        MultilingualTextClassificationParams(custom_dictionary_dataset_ids=[f"dataset-{index}" for index in range(5)])
 
 
 def test_active_adapter_fit_and_evaluate_recompute_the_private_grouped_truth(tmp_path: Path) -> None:

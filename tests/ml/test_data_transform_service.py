@@ -100,3 +100,19 @@ def test_materialize_comparison_metrics_without_a_dummy_source_join(monkeypatch,
     assert frame["silhouette"].astype(float).tolist() == pytest.approx([row["silhouette"] for row in queried.rows])
     assert result.validation_summary["referenced_bindings"] == []
     assert source.read_bytes() == before
+
+
+@pytest.mark.parametrize("sql", [
+    "CREATE TEMP TABLE totals AS SELECT SUM(value) AS total FROM input; SELECT total, ';' AS label FROM totals;",
+    "SELECT 42; CREATE TEMP TABLE output AS SELECT SUM(value) AS total FROM input; SELECT total, ';' AS label FROM output;",
+    "CREATE TEMP TABLE output AS SELECT SUM(value) AS total, ';' AS label FROM input;",
+])
+def test_transform_materializes_final_query_or_explicit_output(monkeypatch, tmp_path, sql):
+    service = _make_service(monkeypatch, tmp_path)
+    source = tmp_path / "source.parquet"
+    pd.DataFrame({"value": [1, 2]}).to_parquet(source)
+    before = source.read_bytes()
+    result = service.transform(DataTransformInput(bindings=[_binding(source)], sql=sql, name="totals"))
+    assert pd.read_parquet(result.output_path).to_dict("records") == [{"total": 3, "label": ";"}]
+    assert result.row_count == 1
+    assert source.read_bytes() == before

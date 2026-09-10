@@ -667,6 +667,11 @@ class MLTaskService:
         payload = result.model_dump(mode="json")
         payload["canonical_output_path"] = str(canonical_path)
         payload["result_dataset_id"] = dataset_row.id
+        with duckdb.connect(database=":memory:") as connection:
+            schema = connection.execute(
+                "DESCRIBE SELECT * FROM read_parquet(?)", [str(result_dataset_path)]
+            ).fetchall()
+        payload["columns"] = [{"name": column[0], "type": column[1]} for column in schema]
         payload["row_count"] = result.summary.row_count
         payload["input_file_count"] = result.summary.input_file_count
         payload["prediction_column_name"] = result.summary.prediction_column_name

@@ -1,6 +1,6 @@
 # Preprocessing Tool Contract
 
-Use this file before mapping data preparation work to Xenix tools. Xenix Agent has no script runtime. Every full-data operation must be expressed through product tools.
+Tool contracts and examples for data preparation. Xenix Agent has no script runtime. Every full-data operation must be expressed through product tools.
 
 ## Tool Responsibilities
 
@@ -19,12 +19,7 @@ Use for read-only inspection and quality checks:
 - target/feature profiling before role binding;
 - validating a derived result only when the Tool Result carries warnings or omitted facts, or a business decision needs values the bounded report does not report.
 
-Do not use destructive SQL. Prefer CTEs. `data.query` results are replayed as Xenix Table Text: read the metadata first, then the preview table or records block.
-Start with `analysis.profile`; do not issue a broad schema/sample query merely
-to repeat facts the profile already returned. When a material cleaning
-decision still needs values absent from that profile, make one focused query
-for only the relevant columns and evidence, then wait for its result.
-
+Do not use destructive SQL. Prefer CTEs. `data.query` results are replayed as Xenix Table Text: metadata describes the returned table or records.
 When headers contain spaces, punctuation, or Unicode typography, set
 `column_reference: "indexes"`. In that one query, each bound relation exposes
 zero-based SQL aliases `c0`, `c1`, ... instead of source names; use
@@ -34,11 +29,7 @@ zero-based SQL aliases `c0`, `c1`, ... instead of source names; use
 
 Use only when multiple registered datasets should be vertically appended into one generated dataset. The current tool accepts `dataset_ids` and an optional `name`; it does not accept join keys, join type, or column conflict rules.
 
-Before using it, confirm:
-
-- rows from all inputs share the same or intentionally compatible grain;
-- stacking rows is the intended operation;
-- column differences are acceptable for the generated combined table.
+Append combines rows at compatible grain and aligns their columns.
 
 Do not use `data.integrate` for horizontal joins. For joins, feature construction, reshaping, or grain changes, use `data.transform` with multiple `bindings`.
 
@@ -70,11 +61,7 @@ Dataset. Each operation sees every earlier change. Therefore a validation row
 rejection before median fill makes the median fit only the retained rows,
 whereas reversing those operations fits the median before rejection.
 
-When an advertised validation operation can express a row check or rejection,
-it is the cleaning owner: `validation.non_negative`, `validation.min`,
-`validation.max`, `validation.not_null`, `validation.allowed_values`, and
-`validation.regex`. Use `data.transform` for a filter only when its predicate
-cannot be expressed by an atomic cleaning operation.
+Validation operations and SQL filters are alternative ways to express row rules.
 
 `analysis.profile` returns stable zero-based indexes for the ordered source
 fields. Prefer those indexes for `column_index` or `column_indexes`; do not run
@@ -125,7 +112,7 @@ Use for SQL-derived datasets:
 - grouping or aggregating to a new grain;
 - preparing model-ready or chart-ready derived datasets.
 
-`data.transform` materializes a derived dataset. Use `dataset_id` for one input aliased as `input`, or `bindings` for multiple inputs with explicit SQL aliases. Use `data.query` first when only diagnostic evidence is needed.
+`data.transform` materializes a derived dataset. Use `dataset_id` for one input aliased as `input`, or `bindings` for multiple inputs with explicit SQL aliases. `data.query` computes without creating a derived Dataset.
 
 `data.transform` also accepts `column_reference: "indexes"` with the same
 query-local `c0`, `c1`, ... aliases. Give output columns explicit business
@@ -142,30 +129,7 @@ Use before modeling to create a durable role-binding snapshot. Bind:
 
 Do not include identifiers, post-outcome fields, target duplicates, or sensitive/prohibited fields as predictive features.
 
-Prefer each role's zero-based `column_indexes` from a source-schema
-`SELECT * FROM input` query; projected/renamed result positions are not source
+Prefer each role's zero-based `column_indexes` from the source schema; projected/renamed result positions are not source
 indexes. Xenix resolves them against the current dataset schema and persists
 canonical names. Use `columns` only as a fallback and never mix names with
 indexes in one role.
-
-## Planning Pattern
-
-1. `analysis.profile` for bounded structure and quality facts.
-2. One focused `data.query` only when a business decision needs values absent from the profile.
-3. `data.clean.metadata` only when the relevant operation or parameter is uncertain.
-4. One ordered `data.clean` call for explicit supported atomic cleaning.
-5. `data.tokenize` when raw Chinese text must become a stable derived dataset.
-6. `data.transform` for unsupported predicates, derived features, joins, grain changes, and chart/model-ready datasets.
-7. `data.feature.select` when handing off to modeling.
-8. Treat the bounded clean result as authoritative when complete and warning-free; profile or query afterward only when it has warnings or omitted facts.
-
-## Output Discipline
-
-For every preprocessing operation, record:
-
-- source dataset id;
-- derived dataset id or binding id returned by the tool;
-- fields changed;
-- rows or values affected when the tool reports them;
-- assumptions;
-- remaining blockers.
