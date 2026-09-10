@@ -56,9 +56,11 @@ class KnowledgeTaskQueryService:
         self,
         *,
         library_id: str = "global",
-        limit: int = 200,
+        limit: int | None = 200,
     ) -> list[KnowledgeTaskItem]:
-        bounded_limit = max(1, min(int(limit), 500))
+        # Cross-domain filtering needs the complete projection, including folded
+        # derivation attempts, before applying its own result limit.
+        bounded_limit = max(1, min(int(limit), 500)) if limit is not None else None
         with self._session_factory() as session:
             imports = list(
                 session.exec(

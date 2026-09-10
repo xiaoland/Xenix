@@ -274,6 +274,9 @@ class KnowledgeWorkspaceDialog(QDialog):
             return
         self._documents_request_id = None
         if generation != self._lifecycle_generation or not self._active:
+            if self._active:
+                self._documents_pending = False
+                self._refresh_document_list()
             return
         from ...services.knowledge_workspace_service import (
             KnowledgeWorkspaceDocuments,
@@ -307,6 +310,9 @@ class KnowledgeWorkspaceDialog(QDialog):
             return
         self._status_request_id = None
         if generation != self._lifecycle_generation or not self._active:
+            if self._active:
+                self._status_pending = False
+                self._refresh_workspace_status()
             return
         from ...services.knowledge_workspace_service import KnowledgeWorkspaceStatus
 
@@ -576,20 +582,18 @@ class KnowledgeWorkspaceDialog(QDialog):
 
     def hideEvent(self, event) -> None:
         self._deactivate()
-        self._thread_pool.waitForDone()
         super().hideEvent(event)
 
     def closeEvent(self, event) -> None:
         self._deactivate()
-        self._thread_pool.waitForDone()
         super().closeEvent(event)
 
     def _deactivate(self) -> None:
         if self._active:
             self._lifecycle_generation += 1
         self._active = False
-        self._documents_request_id = None
-        self._status_request_id = None
+        # Keep in-flight reads tracked across hiding/reopening. Their generation
+        # expires, but a replacement waits asynchronously for their completion.
         self._documents_pending = False
         self._status_pending = False
         self._refresh_timer.stop()

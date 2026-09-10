@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PySide6.QtCore import QEvent, QObject, QRunnable, Qt, QThreadPool, QTimer, Signal
+from PySide6.QtCore import QEvent, QObject, QRunnable, Qt, QThreadPool, QTimer, Signal, QSignalBlocker
 from PySide6.QtGui import QCloseEvent, QHideEvent, QShowEvent
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -151,7 +151,7 @@ class JobCenterDialog(QDialog):
             self._domain_filter.currentData(),
             self._status_filter.currentData(),
             self._search.text(),
-            self._limit,
+            self._limit + 1,
         )
         load.signals.finished.connect(self._on_loaded)
         self._load = load
@@ -184,6 +184,8 @@ class JobCenterDialog(QDialog):
             self.refresh()
 
     def _render_jobs(self, jobs: list[JobItem]) -> None:
+        has_more = len(jobs) > self._limit
+        jobs = jobs[:self._limit]
         selected = self._selected_reference()
         self._table.setRowCount(len(jobs))
         selected_row = -1
@@ -212,8 +214,7 @@ class JobCenterDialog(QDialog):
             .replace("%2", str(active_count))
             .replace("%3", str(failed_count))
         )
-        # A full page signals that more rows may exist; offer lazy loading.
-        self._load_more_button.setVisible(len(jobs) >= self._limit)
+        self._load_more_button.setVisible(has_more)
 
     def _selected_job(self) -> JobItem | None:
         row = self._table.currentRow()
@@ -291,6 +292,8 @@ class JobCenterDialog(QDialog):
     def retranslate_ui(self) -> None:
         selected_domain = self._domain_filter.currentData()
         selected_status = self._status_filter.currentData()
+        domain_blocker = QSignalBlocker(self._domain_filter)
+        status_blocker = QSignalBlocker(self._status_filter)
         self.setWindowTitle(self.tr("Jobs"))
         self._domain_filter.clear()
         self._domain_filter.addItem(self.tr("All services"), None)
@@ -302,6 +305,8 @@ class JobCenterDialog(QDialog):
             self._status_filter.addItem(self._translated_status(status), status)
         self._restore_filter(self._domain_filter, selected_domain)
         self._restore_filter(self._status_filter, selected_status)
+        domain_blocker.unblock()
+        status_blocker.unblock()
         self._search.setPlaceholderText(self.tr("Search jobs"))
         self._table.setHorizontalHeaderLabels(
             [

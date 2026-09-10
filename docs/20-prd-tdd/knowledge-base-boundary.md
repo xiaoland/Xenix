@@ -163,6 +163,8 @@ content preparation and index builds separately, and exposes only the actions
 supported by each owning service. This is a presentation/query plane over separate
 lifecycle authorities, not a generic task authority; internal `KnowledgeTask*`
 identities remain domain-specific.
+
+Index-rebuild dialogs also request status asynchronously. Opening, hiding, or closing Knowledge windows never waits for a status or task-list query; results from an earlier visibility generation are ignored. Reopening coalesces with any outstanding read and requests fresh state after it completes. Only application shutdown joins UI-owned reads before closing their services.
 Right-clicking a concrete document item exposes `Delete` for that item. The
 confirmation names the document, states that the imported copy/search/task state
 will be removed, preserves the original file, and states that removal cannot be

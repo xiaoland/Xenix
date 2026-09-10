@@ -54,6 +54,8 @@ The feed maps each domain's own status vocabulary into the shared `JobStatus` vo
 
 The feed presents `knowledge:<reference>` and `ml:<id>` as stable presentation ids while keeping the domain's raw identity separately for management actions.
 
+Service, status, and case-insensitive text filters combine before the display limit is applied; older matching tasks must not disappear behind an unfiltered recent-task cutoff. The UI compares stable status values across Qt's string conversion, preserves selected filters on language changes, and offers another page only when an additional matching task exists.
+
 ## Verification
 
 Scheduling and recovery behavior is covered by `tests/test_job_scheduler.py` and `tests/test_job_service.py`; Knowledge dispatch by `tests/test_knowledge_job_handlers.py`; the Job Center feed projection by `tests/runtime/test_job_center.py`. Persistence and backfill are covered by the migration tests under `tests/storage/`.

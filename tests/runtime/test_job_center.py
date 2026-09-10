@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from dataclasses import replace
 
 import pytest
 from PySide6.QtWidgets import QApplication
@@ -41,6 +42,53 @@ def _job_item() -> JobItem:
         phase="queued",
         updated_at=datetime.now(timezone.utc),
     )
+
+
+def test_job_center_filters_status_domain_and_search_through_qt(app, qtbot, storage, monkeypatch):
+    service = JobQueryService(storage.session_factory)
+    jobs = [replace(_job_item(), reference=f"ml:{status.value}", status=status) for status in JobStatus]
+    knowledge = replace(
+        _job_item(), reference="knowledge:failed", domain=JobDomain.KNOWLEDGE,
+        status=JobStatus.FAILED, target="Policy.pdf",
+    )
+    monkeypatch.setattr(service, "_ml_jobs", lambda: jobs)
+    monkeypatch.setattr(service, "_knowledge_jobs", lambda: [knowledge])
+    dialog = JobCenterDialog(service)
+    qtbot.addWidget(dialog)
+
+    def references():
+        return {
+            dialog._table.item(row, 0).data(Qt.ItemDataRole.UserRole).reference
+            for row in range(dialog._table.rowCount())
+        }
+
+    from PySide6.QtCore import Qt
+    try:
+        dialog.show()
+        qtbot.waitUntil(lambda: dialog._table.rowCount() == 6)
+        for status in JobStatus:
+            dialog._status_filter.setCurrentIndex(dialog._status_filter.findData(status.value))
+            expected = {f"ml:{status.value}"}
+            if status == JobStatus.FAILED:
+                expected.add(knowledge.reference)
+            qtbot.waitUntil(lambda expected=expected: references() == expected)
+        dialog._status_filter.setCurrentIndex(dialog._status_filter.findData(JobStatus.FAILED.value))
+        dialog._domain_filter.setCurrentIndex(dialog._domain_filter.findData(JobDomain.KNOWLEDGE.value))
+        dialog._search.setText("  POLICY  ")
+        qtbot.waitUntil(lambda: references() == {knowledge.reference})
+        dialog._search.setText("sales")
+        qtbot.waitUntil(lambda: references() == set())
+        dialog._domain_filter.setCurrentIndex(0)
+        qtbot.waitUntil(lambda: references() == {"ml:failed"})
+        dialog.retranslate_ui()
+        qtbot.waitUntil(lambda: dialog._load is None)
+        assert dialog._status_filter.currentData() == JobStatus.FAILED.value
+        assert references() == {"ml:failed"}
+        dialog._search.clear()
+        dialog._status_filter.setCurrentIndex(0)
+        qtbot.waitUntil(lambda: len(references()) == 6)
+    finally:
+        dialog.shutdown()
 
 
 def test_job_center_cancel_routes_to_scheduler(app, monkeypatch, tmp_path) -> None:
@@ -94,9 +142,12 @@ def test_job_center_load_more_reveals_lazy_page(app, monkeypatch, tmp_path) -> N
     dialog._render_jobs([_job_item()])
     assert dialog._load_more_button.isHidden()
 
-    # A full page signals that more rows may exist.
+    # An exact full page has no extra result to load.
     dialog._render_jobs([_job_item() for _ in range(JOB_PAGE_SIZE)])
+    assert dialog._load_more_button.isHidden()
+    dialog._render_jobs([_job_item() for _ in range(JOB_PAGE_SIZE + 1)])
     assert not dialog._load_more_button.isHidden()
+    assert dialog._table.rowCount() == JOB_PAGE_SIZE
 
     before = dialog._limit
     dialog._load_more()

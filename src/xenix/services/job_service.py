@@ -37,8 +37,6 @@ class JobQueryService:
     service. This service provides one vocabulary for consumers such as the GUI.
     """
 
-    _MAX_LIMIT = 500
-
     def __init__(
         self,
         session_factory: sessionmaker[Session],
@@ -50,12 +48,12 @@ class JobQueryService:
     def list_jobs(
         self,
         *,
-        domain: JobDomain | None = None,
-        status: JobStatus | None = None,
+        domain: JobDomain | str | None = None,
+        status: JobStatus | str | None = None,
         search: str = "",
         limit: int = 200,
     ) -> list[JobItem]:
-        bounded_limit = max(1, min(int(limit), self._MAX_LIMIT))
+        bounded_limit = max(1, int(limit))
         jobs: list[JobItem] = []
         if domain in {None, JobDomain.KNOWLEDGE}:
             jobs.extend(self._knowledge_jobs())
@@ -64,7 +62,7 @@ class JobQueryService:
 
         normalized_search = search.strip().casefold()
         if status is not None:
-            jobs = [job for job in jobs if job.status is status]
+            jobs = [job for job in jobs if job.status == status]
         if normalized_search:
             jobs = [
                 job
@@ -88,7 +86,7 @@ class JobQueryService:
                 updated_at=task.updated_at,
                 error_summary=task.error_summary or task.error_code,
             )
-            for task in self._knowledge_tasks.list_tasks(limit=self._MAX_LIMIT)
+            for task in self._knowledge_tasks.list_tasks(limit=None)
         ]
 
     def _ml_jobs(self) -> list[JobItem]:
@@ -97,7 +95,6 @@ class JobQueryService:
                 session.exec(
                     select(MLTaskRow)
                     .order_by(col(MLTaskRow.updated_at).desc(), col(MLTaskRow.id).desc())
-                    .limit(self._MAX_LIMIT)
                 )
             )
             dataset_ids = {task.dataset_id for task in tasks if task.dataset_id}

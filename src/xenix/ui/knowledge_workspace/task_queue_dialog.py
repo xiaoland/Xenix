@@ -280,12 +280,10 @@ class KnowledgeTaskQueueDialog(QDialog):
         self._deactivate()
         if self._log_dialog is not None:
             self._log_dialog.hide()
-        self._thread_pool.waitForDone()
         super().hideEvent(event)
 
     def closeEvent(self, event) -> None:
         self._deactivate()
-        self._thread_pool.waitForDone()
         super().closeEvent(event)
 
     def _deactivate(self) -> None:

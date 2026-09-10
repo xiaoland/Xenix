@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PySide6.QtCore import QEvent, Qt, Signal
+from PySide6.QtCore import QCoreApplication, QEvent, Qt, Signal
 from PySide6.QtWidgets import (
     QCheckBox,
     QDialog,
@@ -12,8 +12,10 @@ from PySide6.QtWidgets import (
 
 from ..services.knowledge_index_service import (
     KnowledgeIndexKind,
+    KnowledgeIndexOverview,
     KnowledgeIndexService,
 )
+from .knowledge_index_status import KnowledgeIndexStatusRequest
 
 
 class KnowledgeIndexRebuildDialog(QDialog):
@@ -27,6 +29,11 @@ class KnowledgeIndexRebuildDialog(QDialog):
         super().__init__(parent)
         self.setWindowModality(Qt.WindowModal)
         self._service = index_service
+        self._active = False
+        self._generation = 0
+        self._status_request: KnowledgeIndexStatusRequest | None = None
+        self._status: KnowledgeIndexOverview | None = None
+        self._status_failed = False
         self._summary = QLabel(self)
         self._summary.setWordWrap(True)
         self._keyword_checkbox = QCheckBox(self)
@@ -53,12 +60,40 @@ class KnowledgeIndexRebuildDialog(QDialog):
         self.retranslate_ui()
 
     def refresh(self) -> None:
-        try:
-            status = self._service.status()
-        except Exception:
-            self._summary.setText(self.tr("Knowledge index status is unavailable."))
+        if not self._active or self._status_request is not None:
+            return
+        self._status = None
+        self._status_failed = False
+        self._render_status()
+        request = KnowledgeIndexStatusRequest(self._generation)
+        request.finished.connect(self._on_status_finished, Qt.ConnectionType.QueuedConnection)
+        self._status_request = request
+        request.start(self._service)
+
+    def _on_status_finished(self, request: object, generation: int, result: object) -> None:
+        if request is not self._status_request:
+            return
+        self._status_request = None
+        if not self._active or generation != self._generation:
+            if self._active:
+                self.refresh()
+            return
+        self._status = result if isinstance(result, KnowledgeIndexOverview) else None
+        self._status_failed = self._status is None
+        self._render_status(reset_selection=True)
+
+    def _render_status(self, *, reset_selection: bool = False) -> None:
+        status = self._status
+        if status is None:
+            self._summary.setText(
+                self.tr("Knowledge index status is unavailable.")
+                if self._status_failed
+                else QCoreApplication.translate("SettingsDialog", "Checking Knowledge index status")
+            )
             self._keyword_checkbox.setEnabled(False)
             self._text_vector_checkbox.setEnabled(False)
+            self._keyword_checkbox.setChecked(False)
+            self._text_vector_checkbox.setChecked(False)
             self._sync_submit_state()
             return
         self._summary.setText(
@@ -73,13 +108,16 @@ class KnowledgeIndexRebuildDialog(QDialog):
         self._text_vector_checkbox.setEnabled(
             status.vector_configured and status.unit_count > 0
         )
-        self._keyword_checkbox.setChecked(status.unit_count > 0)
-        self._text_vector_checkbox.setChecked(
-            status.vector_configured and status.unit_count > 0
-        )
+        if reset_selection:
+            self._keyword_checkbox.setChecked(status.unit_count > 0)
+            self._text_vector_checkbox.setChecked(
+                status.vector_configured and status.unit_count > 0
+            )
         self._sync_submit_state()
 
     def _submit(self) -> None:
+        if not self._rebuild_button.isEnabled():
+            return
         selected: list[KnowledgeIndexKind] = []
         if self._keyword_checkbox.isChecked():
             selected.append(KnowledgeIndexKind.KEYWORD)
@@ -101,8 +139,8 @@ class KnowledgeIndexRebuildDialog(QDialog):
 
     def _sync_submit_state(self) -> None:
         self._rebuild_button.setEnabled(
-            self._keyword_checkbox.isChecked()
-            or self._text_vector_checkbox.isChecked()
+            (self._keyword_checkbox.isEnabled() and self._keyword_checkbox.isChecked())
+            or (self._text_vector_checkbox.isEnabled() and self._text_vector_checkbox.isChecked())
         )
 
     def retranslate_ui(self) -> None:
@@ -113,14 +151,23 @@ class KnowledgeIndexRebuildDialog(QDialog):
         self._cancel_button.setText(self.tr("Cancel"))
 
     def showEvent(self, event) -> None:
+        self._active = True
+        self._generation += 1
         self.refresh()
         super().showEvent(event)
+
+    def hideEvent(self, event) -> None:
+        self._active = False
+        self._generation += 1
+        if self._status_request is not None:
+            self._status_request.cancel()
+        super().hideEvent(event)
 
     def changeEvent(self, event: QEvent) -> None:
         super().changeEvent(event)
         if event.type() == QEvent.LanguageChange:
             self.retranslate_ui()
-            self.refresh()
+            self._render_status()
 
 
 __all__ = ["KnowledgeIndexRebuildDialog"]
