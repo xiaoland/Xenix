@@ -5,7 +5,7 @@ import sys
 import threading
 import traceback
 
-from PySide6.QtCore import QCoreApplication
+from PySide6.QtCore import QCoreApplication, Qt
 from PySide6.QtWidgets import QApplication, QMessageBox
 
 LOGGER = logging.getLogger("xenix.runtime")
@@ -76,6 +76,13 @@ def install_exception_hooks() -> None:
         if app is None:
             sys.stderr.write(summary)
             return
+
+        # Qt callback exceptions can arrive while bootstrap is processing events,
+        # before its normal splash cleanup. A topmost splash would hide this
+        # modal dialog and prevent bootstrap from resuming.
+        for window in app.topLevelWindows():
+            if window.type() == Qt.WindowType.SplashScreen:
+                window.hide()
 
         message_box = QMessageBox()
         message_box.setIcon(QMessageBox.Critical)

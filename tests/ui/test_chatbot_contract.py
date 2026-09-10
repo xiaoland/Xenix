@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import pytest
 from PySide6.QtWidgets import QToolButton
 from pytestqt.qtbot import QtBot
 
@@ -29,7 +30,9 @@ def test_chat_shell_has_stable_unique_semantic_identities(qtbot: QtBot) -> None:
     assert view.timeline.scroll_to_bottom_button.accessibleName() == view.tr("Scroll to bottom")
 
 
-def test_dataset_audit_block_is_rendered_in_tool_detail() -> None:
+@pytest.mark.parametrize("explanation", [None, "", "Removed incomplete rows."])
+def test_dataset_audit_block_is_rendered_in_tool_detail(explanation, qtbot) -> None:
+    from xenix.services.agent import ChatbotEvent, ChatbotEventAuthor, ChatbotEventKind
     from xenix.ui.conversation.presentation import coerce_blocks, render_content_blocks
 
     markdown = render_content_blocks(
@@ -51,7 +54,7 @@ def test_dataset_audit_block_is_rendered_in_tool_detail() -> None:
                         }
                     ],
                     "parameters_payload": {"drop_nulls": True},
-                    "agent_explanation": "Removed incomplete rows.",
+                    "agent_explanation": explanation,
                 }
             ]
         )
@@ -61,7 +64,23 @@ def test_dataset_audit_block_is_rendered_in_tool_detail() -> None:
     assert "Dataset: `clean\\`data` (`dataset-2`)" in markdown
     assert "Input 1: `raw` (`dataset-1`) — alias `source`" in markdown
     assert '"drop_nulls": true' in markdown
-    assert "Removed incomplete rows." in markdown
+    if explanation:
+        assert explanation in markdown
+    else:
+        assert "Agent-authored explanation" not in markdown
+
+    view = ThreadDetailView()
+    qtbot.addWidget(view)
+    view.render_events([ChatbotEvent(
+        id="history-tool", kind=ChatbotEventKind.TOOL, author=ChatbotEventAuthor.TOOL,
+        tool_name="data.clean", summary="Cleaned dataset",
+        detail_blocks=[{
+            "type": "dataset_audit", "dataset_id": "dataset-2",
+            "name": "Cleaned data", "agent_explanation": explanation,
+        }],
+    )])
+    from PySide6.QtWidgets import QTextBrowser
+    assert any("dataset-2" in browser.toPlainText() for browser in view.findChildren(QTextBrowser))
 
 
 def test_send_action_accessible_name_tracks_visual_state(qtbot: QtBot, tmp_path) -> None:

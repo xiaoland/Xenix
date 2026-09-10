@@ -90,7 +90,7 @@ class ChatbotBlock(BaseModel):
     created_at: str = ""
     inputs: list[dict[str, Any]] = Field(default_factory=list)
     parameters_payload: dict[str, Any] = Field(default_factory=dict)
-    agent_explanation: str = ""
+    agent_explanation: str | None = None
     is_openable: bool = False
     chatbot_source_projection: bool = False
     chatbot_visible: bool | None = None
@@ -227,14 +227,15 @@ def _dataset_audit_markdown(block: ChatbotBlock) -> str:
                     "DatasetAudit", "alias `{alias}`"
                 ).format(alias=_markdown_code(alias))
             lines.append(f"- {input_line}")
-    if block.agent_explanation.strip():
+    explanation = (block.agent_explanation or "").strip()
+    if explanation:
         lines.extend(
             [
                 "",
                 f"#### {QCoreApplication.translate('DatasetAudit', 'Agent-authored explanation')}",
                 f"*{QCoreApplication.translate('DatasetAudit', 'Not system-verified.')}*",
                 "",
-                block.agent_explanation.strip(),
+                explanation,
             ]
         )
     if block.parameters_payload:

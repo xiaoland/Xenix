@@ -24,7 +24,4 @@ recreate those authorities.
   [LLM conversation boundary](../../../../docs/20-prd-tdd/llm-conversation-boundary.md)
   and [Unit TDD](../../../../docs/30-unit-tdd/README.md) when changing that loop.
 
-Verify focused Harness behavior in `tests/agent/test_agent_harness_first_slice.py`
-and `tests/agent/test_agent_skill_tool_scope.py`; pair it with the LLM
-conversation, storage, and UI routes named by Unit TDD. Use source and tests—not
-this file—for exact schemas, events, records, and method contracts.
+Verify affected Harness behavior in `tests/agent/test_agent_harness_first_slice.py` and `tests/agent/test_agent_skill_tool_scope.py`; when the change affects the LLM conversation, storage, or UI contract, include the affected routes named by Unit TDD. Use source and tests—not this file—for exact schemas, events, records, and method contracts.
