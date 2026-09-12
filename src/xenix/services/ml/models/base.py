@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from abc import abstractmethod
 import json
+from abc import abstractmethod
 from pathlib import Path
 from typing import Any
 
@@ -11,12 +11,13 @@ import pandas as pd
 from pydantic import BaseModel, Field
 from sklearn.base import BaseEstimator, ClassifierMixin, clone
 from sklearn.compose import ColumnTransformer
+from sklearn.impute import SimpleImputer
 from sklearn.model_selection import GridSearchCV
 from sklearn.pipeline import Pipeline
-from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import LabelEncoder, OneHotEncoder, StandardScaler
 
-from ....exceptions import ValidationError
+from ....exceptions import ValidationError, report_exception
+from ..clustering_evidence import ClusteringEvaluationFacts
 from ..contracts import (
     ApplySummary,
     ApplyTaskRequest,
@@ -30,14 +31,17 @@ from ..contracts import (
     HyperparameterTuningTaskResult,
     PreparationFacts,
     SplitFacts,
-    TuningSummary,
     TrainingScopeFacts,
+    TuningSummary,
     _role_columns,
 )
-from ..clustering_evidence import ClusteringEvaluationFacts
 from ..dataset_loader import load_dataset, load_holdout_frame
-from ..evaluation import build_metric_snapshot, scoring_name_for_policy
-from ..evaluation import build_dummy_baseline_metrics, build_evaluation_comparison
+from ..evaluation import (
+    build_dummy_baseline_metrics,
+    build_evaluation_comparison,
+    build_metric_snapshot,
+    scoring_name_for_policy,
+)
 from ..preparation import (
     PreparedSupervisedSplit,
     attach_evaluation_context,
@@ -356,7 +360,8 @@ class NumericAndCategoricalModelService(ModelServiceBase):
             model = estimator.named_steps["model"]
             feature_names = list(preprocess.get_feature_names_out())
             importance_values, signed_values = cls._extract_driver_values(model)
-        except Exception:
+        except Exception as exc:
+            report_exception(exc)
             return None
 
         if len(feature_names) != len(importance_values):

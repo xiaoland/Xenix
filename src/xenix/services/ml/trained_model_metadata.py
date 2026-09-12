@@ -70,10 +70,7 @@ class TrainedModelMetadata(BaseModel):
 def parse_trained_model_metadata(payload: dict[str, Any] | None) -> TrainedModelMetadata | None:
     if not isinstance(payload, dict) or not payload:
         return None
-    try:
-        return TrainedModelMetadata.model_validate(payload)
-    except Exception:
-        return None
+    return TrainedModelMetadata.model_validate(payload)
 
 
 def build_saved_name(

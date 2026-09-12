@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import queue
 import shutil
@@ -18,8 +19,10 @@ from pydantic import (
     PositiveInt,
     StringConstraints,
     TypeAdapter,
-    ValidationError as PydanticValidationError,
     model_validator,
+)
+from pydantic import (
+    ValidationError as PydanticValidationError,
 )
 
 from ..config import AppPaths
@@ -320,7 +323,8 @@ def knowledge_import_worker_entry(
     def on_event(event: KnowledgeImportWorkerEvent) -> None:
         try:
             event_queue.put_nowait(event)
-        except Exception:
+        except Exception as exc:
+            logging.getLogger(__name__).exception("Operation failed: %s", exc)
             pass
 
     _run_worker_operation(request, on_event=on_event)
@@ -411,6 +415,7 @@ def _run_worker_operation(
         write_worker_result(result_path, result)
         _emit(on_event, "completed", "worker_succeeded")
     except Exception as exc:
+        logging.getLogger(__name__).exception("Operation failed: %s", exc)
         error_code = getattr(exc, "error_code", None)
         if not isinstance(error_code, str) or not error_code.startswith("knowledge_"):
             error_code = "knowledge_import_failed"

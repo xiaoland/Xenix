@@ -15,13 +15,18 @@ from sqlalchemy.orm import sessionmaker
 from sqlmodel import select
 
 from ..config import AppPaths
-from ..exceptions import ValidationError
+from ..exceptions import ValidationError, report_exception
 from .artifact_service import ArtifactService, RegisterArtifactInput
 from .knowledge_canonical import CanonicalIdentity
 from .knowledge_content_store import (
     CANONICAL_SCHEMA_VERSION,
     CanonicalBundleIdentity,
     KnowledgeContentStore,
+)
+from .knowledge_formats import SUPPORTED_KNOWLEDGE_SUFFIXES
+from .knowledge_import_storage_maintenance import (
+    KnowledgeImportStorageMaintenance,
+    KnowledgeImportStorageMaintenanceError,
 )
 from .knowledge_import_worker import (
     KnowledgeImportWorkerCancelled,
@@ -33,11 +38,6 @@ from .knowledge_import_worker import (
     KnowledgeImportWorkerTimedOut,
     LocalKnowledgeImportWorkerRunner,
 )
-from .knowledge_import_storage_maintenance import (
-    KnowledgeImportStorageMaintenance,
-    KnowledgeImportStorageMaintenanceError,
-)
-from .knowledge_formats import SUPPORTED_KNOWLEDGE_SUFFIXES
 from .knowledge_pipeline import (
     MAX_SOURCE_BYTES,
     FileProbe,
@@ -46,7 +46,7 @@ from .knowledge_pipeline import (
     ParserRouter,
 )
 from .knowledge_task_logs import KnowledgeTaskLogEntry, KnowledgeTaskLogStore
-from .storage.repositories import KnowledgeRepository
+from .storage.layout import knowledge_root
 from .storage.models import (
     ArtifactKind,
     ArtifactRow,
@@ -57,7 +57,7 @@ from .storage.models import (
     generate_id,
     utc_now,
 )
-from .storage.layout import knowledge_root
+from .storage.repositories import KnowledgeRepository
 
 if TYPE_CHECKING:
     from .job_scheduler import JobScheduler
@@ -652,7 +652,8 @@ class KnowledgeImportService:
         if self._canonical_ready_notifier is not None:
             try:
                 self._canonical_ready_notifier(document.id, generation.id, import_id)
-            except Exception:
+            except Exception as exc:
+                report_exception(exc)
                 # Canonical publication is already authoritative.  The independent
                 # derivation service recovers a missing event from current generations.
                 LOGGER.warning(
@@ -739,7 +740,8 @@ class KnowledgeImportService:
                     if was_inactive and self._corpus_changed_notifier is not None:
                         try:
                             self._corpus_changed_notifier(row.library_id)
-                        except Exception:
+                        except Exception as exc:
+                            report_exception(exc)
                             LOGGER.warning(
                                 "Knowledge index notification deferred to startup recovery",
                                 extra={
@@ -1018,7 +1020,8 @@ class KnowledgeImportService:
                 event_code=event_code,
                 level=level,
             )
-        except Exception:
+        except Exception as exc:
+            report_exception(exc)
             LOGGER.warning(
                 "Knowledge import task event could not be persisted",
                 extra={"event_name": "knowledge.import.task_log_failed"},

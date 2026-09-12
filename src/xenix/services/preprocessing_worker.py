@@ -9,7 +9,7 @@ from typing import Any, Protocol
 from uuid import uuid4
 
 from ..config import AppPaths
-from ..exceptions import ValidationError
+from ..exceptions import ValidationError, report_exception
 
 
 class PreprocessingWorkerRunner(Protocol):
@@ -169,10 +169,12 @@ def _register_generated_dataset(payload: dict[str, Any], paths: AppPaths) -> dic
             if isinstance(payload.get("metadata_payload"), dict)
             else None,
         )
-    except Exception:
+    except Exception as exc:
+        report_exception(exc)
         try:
             dataset_service.discard_unreferenced_dataset(dataset.id)
-        except Exception:
+        except Exception as exc:
+            report_exception(exc)
             pass
         raise
 

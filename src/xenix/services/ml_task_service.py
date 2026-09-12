@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import shutil
 import threading
 from collections.abc import Callable, Iterable, Mapping
@@ -16,7 +17,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlmodel import Field, SQLModel
 
 from ..config import AppPaths
-from ..exceptions import InvalidStateTransitionError, NotFoundError, ValidationError
+from ..exceptions import InvalidStateTransitionError, NotFoundError, ValidationError, report_exception
 from ..observability import extract_context, inject_context, record_counter, record_histogram, start_span
 from .artifact_service import ArtifactService, RegisterArtifactInput
 from .ml.contracts import (
@@ -30,8 +31,15 @@ from .ml.contracts import (
     TaskLogEntry,
     TrainedModelContextPayload,
 )
-from .ml.types import ModelTaskKind
 from .ml.execution import MLWorkerRunner
+from .ml.trained_model_metadata import (
+    TrainedModelMetadata,
+    artifact_file_name_from_path,
+    build_artifact_file_name,
+    build_save_note,
+    build_saved_name,
+)
+from .ml.types import ModelTaskKind
 from .ml.worker_pool import MLWorkerPool
 from .ml.worker_settings import MLWorkerSettingsService
 from .storage.layout import (
@@ -40,17 +48,10 @@ from .storage.layout import (
     ml_task_root,
     task_input_dir,
     task_logs_path,
-    task_output_dir,
     task_models_dir,
+    task_output_dir,
     task_request_path,
     task_result_path,
-)
-from .ml.trained_model_metadata import (
-    TrainedModelMetadata,
-    artifact_file_name_from_path,
-    build_artifact_file_name,
-    build_save_note,
-    build_saved_name,
 )
 from .storage.models import (
     ArtifactKind,
@@ -350,6 +351,7 @@ class MLTaskService:
                 self._record_task_duration(failed, task_started_at)
                 return failed
         except Exception as exc:
+            logging.getLogger(__name__).exception("Operation failed: %s", exc)
             current = self.get_ml_task(ml_task_id)
             if current.status is MLTaskStatus.RUNNING:
                 failed = self.fail_ml_task(
@@ -917,7 +919,8 @@ class MLTaskService:
         for callback in list(self._callbacks):
             try:
                 callback(task)
-            except Exception:
+            except Exception as exc:
+                report_exception(exc)
                 continue
 
     def _require_existing_path(self, path: Path) -> None:

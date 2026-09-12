@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from PySide6.QtCore import QEvent, QTimer, Qt
+from PySide6.QtCore import QEvent, Qt, QTimer
 from PySide6.QtWidgets import (
     QDialog,
     QHBoxLayout,
@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
+from ...exceptions import report_exception
 from ._tasks import TASK_POLL_INTERVAL_MS
 
 if TYPE_CHECKING:
@@ -58,7 +59,8 @@ class KnowledgeImportLogDialog(QDialog):
             return
         try:
             entries = self._service.read_import_logs(self._import_id)
-        except Exception:
+        except Exception as exc:
+            report_exception(exc)
             self._content.setPlainText(self.tr("The import log could not be read."))
             return
         lines = [

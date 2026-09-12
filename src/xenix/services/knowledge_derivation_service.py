@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import logging
 import queue
 import threading
-import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
@@ -11,6 +11,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlmodel import select
 
 from ..config import AppPaths
+from ..exceptions import report_exception
 from .knowledge_content_store import CanonicalBundleIdentity, KnowledgeContentStore
 from .knowledge_service import (
     KnowledgeUnitInput,
@@ -257,7 +258,8 @@ class KnowledgeDerivationService:
 
             document_ir = DoclingDocument.model_validate(bundle.docling_document)
             inputs = _knowledge_units(document_ir)
-        except Exception:
+        except Exception as exc:
+            report_exception(exc)
             return self._record_failure(job_id, "knowledge_derivation_failed")
 
         with self._session_factory() as session:
@@ -330,7 +332,8 @@ class KnowledgeDerivationService:
         if self._retrieval_ready_notifier is not None:
             try:
                 self._retrieval_ready_notifier(library_id)
-            except Exception:
+            except Exception as exc:
+                report_exception(exc)
                 LOGGER.warning(
                     "Knowledge vector rebuild notification was deferred",
                     extra={"event_name": "knowledge.index.notification_deferred"},
@@ -354,7 +357,8 @@ class KnowledgeDerivationService:
                 assert isinstance(item, str)
                 try:
                     self.derive_now(item)
-                except Exception:
+                except Exception as exc:
+                    report_exception(exc)
                     self._record_failure(item, "knowledge_derivation_failed")
             finally:
                 self._queue.task_done()
@@ -505,10 +509,7 @@ def _docling_item_text(item: Any, *, document: Any, label: str) -> str:
     text = str(getattr(item, "text", "") or "").strip()
     if text or label == "picture" or not hasattr(item, "export_to_markdown"):
         return text
-    try:
-        return str(item.export_to_markdown(doc=document)).strip()
-    except Exception:
-        return ""
+    return str(item.export_to_markdown(doc=document)).strip()
 
 
 def _heading_level(item: Any, *, fallback: int) -> int:

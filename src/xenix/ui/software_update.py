@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import threading
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -124,6 +125,7 @@ class SoftwareUpdateController(QObject):
             try:
                 status = worker()
             except Exception as exc:
+                logging.getLogger(__name__).exception("UI operation failed: %s", exc)
                 current = service.status
                 status = UpdateStatus(
                     UpdateState.FAILED,

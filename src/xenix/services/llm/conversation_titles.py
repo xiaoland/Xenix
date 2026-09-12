@@ -12,7 +12,7 @@ import logging
 import re
 from pathlib import Path
 
-from ...exceptions import NotFoundError, ValidationError
+from ...exceptions import NotFoundError, ValidationError, report_exception
 from ..storage.models import ConversationMessageKind, ConversationMessageRow
 from .conversation_models import (
     ConversationSnapshot,
@@ -141,6 +141,7 @@ class TitleGenerationMixin:
         except ThreadPausedError:
             raise
         except Exception as exc:
+            report_exception(exc)
             LOGGER.warning("Initial Thread title model failed; using deterministic fallback: %s", exc)
             return fallback
 

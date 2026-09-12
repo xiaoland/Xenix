@@ -1,24 +1,24 @@
 from __future__ import annotations
 
-from collections.abc import Callable
-from dataclasses import dataclass
 import difflib
 import hashlib
 import json
-from pathlib import Path
 import time
-from typing import TYPE_CHECKING, Any
 import unicodedata
+from collections.abc import Callable
+from dataclasses import dataclass
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 from pydantic import Field, model_validator
 from sqlalchemy.orm import sessionmaker
 from sqlmodel import SQLModel
 
 from ..config import AppPaths
-from ..exceptions import DatasetSourceMissingError, ValidationError
+from ..exceptions import DatasetSourceMissingError, ValidationError, report_exception
+from .data_tokenization_contracts import StagedTextResourceInput, TextPreparationInput
 from .dataset_inspection import InspectDatasetInput
 from .dataset_service import DatasetService, MaterializeManualApplyCsvInput
-from .data_tokenization_contracts import StagedTextResourceInput, TextPreparationInput
 from .ml.contracts import (
     ApplyInputFile,
     ApplyModelPayload,
@@ -40,6 +40,7 @@ from .ml.contracts import (
 )
 from .ml.evaluation import get_default_policy
 from .ml.registry import get_model_catalog_entry, get_model_service, list_model_catalog
+from .ml.trained_model_metadata import parse_trained_model_metadata, with_evaluation, with_evaluation_task
 from .ml.types import ApplyMode, ColumnRoleBinding, ColumnRoleKind, ModelFamily, ModelRoleSchema
 from .ml_task_service import CancelMLTaskInput, CreateMLTaskInput, MLTaskService
 from .storage.models import (
@@ -53,7 +54,6 @@ from .storage.models import (
     TrainedModelRow,
 )
 from .storage.repositories import DatasetColumnBindingRepository, TrainedModelRepository
-from .ml.trained_model_metadata import parse_trained_model_metadata, with_evaluation, with_evaluation_task
 from .tabular import resolve_tabular_column_index, resolve_tabular_schema
 
 if TYPE_CHECKING:
@@ -397,7 +397,8 @@ class MLService:
             if cancel_requested():
                 try:
                     self.cancel_task(task_id)
-                except Exception:
+                except Exception as exc:
+                    report_exception(exc)
                     pass
                 raise ValidationError("Agent run was cancelled.")
             task = self.get_task_details(task_id).task
@@ -425,7 +426,8 @@ class MLService:
                 for task_id in ([task.id for task in related_tasks] or root_task_ids):
                     try:
                         self.cancel_task(task_id)
-                    except Exception:
+                    except Exception as exc:
+                        report_exception(exc)
                         continue
                 raise ValidationError("Agent run was cancelled.")
 

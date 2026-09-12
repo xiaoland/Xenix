@@ -21,11 +21,10 @@ from sqlmodel import SQLModel
 from wordcloud import WordCloud
 
 from ..config import AppPaths
-from ..exceptions import ValidationError
+from ..exceptions import ValidationError, report_exception
 from ..observability import record_counter, record_histogram, start_span
 from .dataset_inspection import detect_source_format, load_dataframe
 from .storage.models import DatasetSourceFormat
-
 
 _DEFAULT_WIDTH = 960
 _DEFAULT_HEIGHT = 540
@@ -1193,7 +1192,8 @@ class AnalysisGraphService:
             if hwnd:
                 ctypes.windll.user32.ShowWindow(hwnd, 0)
             return kernel32
-        except Exception:
+        except Exception as exc:
+            report_exception(exc)
             return None
 
     def _records(self, frame: pd.DataFrame) -> list[dict[str, Any]]:

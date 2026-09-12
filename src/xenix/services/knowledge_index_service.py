@@ -225,20 +225,12 @@ class KnowledgeIndexService:
             keyword_state = "needs_rebuild"
 
         if KnowledgeIndexKind.TEXT_VECTOR.value in active_kinds:
-            try:
-                vector_configured = self._semantic.is_configured()
-            except Exception:
-                vector_configured = False
+            vector_configured = self._semantic.is_configured()
             vector_state = "building"
         else:
-            try:
-                semantic = self._semantic.inspect_index(library_id=library_id)
-            except Exception:
-                semantic = None
-            vector_configured = bool(semantic is not None and semantic.configured)
-            if semantic is None:
-                vector_state = "needs_attention"
-            elif not semantic.configured or semantic.unit_count == 0:
+            semantic = self._semantic.inspect_index(library_id=library_id)
+            vector_configured = semantic.configured
+            if not semantic.configured or semantic.unit_count == 0:
                 vector_state = "unavailable"
             elif semantic.ready:
                 vector_state = "ready"
@@ -264,11 +256,7 @@ class KnowledgeIndexService:
             None,
         )
 
-        batch_size = 1
-        try:
-            batch_size = max(1, self._embedding_settings.load().batch_size)
-        except Exception:
-            pass
+        batch_size = max(1, self._embedding_settings.load().batch_size)
         return KnowledgeIndexOverview(
             keyword_state=keyword_state,
             text_vector_state=vector_state,

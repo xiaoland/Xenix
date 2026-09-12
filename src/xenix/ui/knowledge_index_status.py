@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from concurrent.futures import Future
+import logging
+
+from concurrent.futures import CancelledError, Future
 
 from PySide6.QtCore import QObject, Signal
 
@@ -15,7 +17,7 @@ class KnowledgeIndexStatusRequest(QObject):
 
     generation is a caller-supplied token echoed back in finished so the consumer
     can discard stale results. finished emits (self, generation, status) where
-    status is a KnowledgeIndexOverview on success and None if the service raised.
+    status is a KnowledgeIndexOverview on success and the exception if the service raised.
     """
 
     finished = Signal(object, int, object)
@@ -38,10 +40,14 @@ class KnowledgeIndexStatusRequest(QObject):
 
     def _on_done(self, future: Future[KnowledgeIndexOverview]) -> None:
         self._future = None
+        status: KnowledgeIndexOverview | Exception
         try:
             status = future.result()
-        except Exception:
-            status = None
+        except CancelledError:
+            return
+        except Exception as exc:
+            logging.getLogger(__name__).exception("Background read failed")
+            status = exc
         self.finished.emit(self, self._generation, status)
 
 

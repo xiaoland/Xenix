@@ -9,7 +9,7 @@ from pathlib import Path
 import pypdfium2
 from pypdfium2 import raw as pdfium_c
 
-from ..exceptions import ValidationError
+from ..exceptions import ValidationError, report_exception
 
 
 class PdfPageTextState(StrEnum):
@@ -152,7 +152,8 @@ def _font_evidence(page, text_page) -> tuple[int, int]:
             base_name = font.get_base_name(errors="replace")
             if not font.is_embedded and base_name not in font.STANDARD_FONTS:
                 unembedded_nonstandard += 1
-        except Exception:
+        except Exception as exc:
+            report_exception(exc)
             unembedded_nonstandard += 1
     return text_objects, unembedded_nonstandard
 
@@ -166,7 +167,8 @@ def _image_evidence(page) -> tuple[int, float]:
         image_objects += 1
         try:
             left, bottom, right, top = item.get_bounds()
-        except Exception:
+        except Exception as exc:
+            report_exception(exc)
             continue
         object_width = max(0.0, min(float(width), right) - max(0.0, left))
         object_height = max(0.0, min(float(height), top) - max(0.0, bottom))

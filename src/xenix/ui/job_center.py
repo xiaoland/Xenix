@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from PySide6.QtCore import QEvent, QObject, QRunnable, Qt, QThreadPool, QTimer, Signal, QSignalBlocker
+import logging
+
+from PySide6.QtCore import QEvent, QObject, QRunnable, QSignalBlocker, Qt, QThreadPool, QTimer, Signal
 from PySide6.QtGui import QCloseEvent, QHideEvent, QShowEvent
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -18,6 +20,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ..exceptions import report_exception
 from ..services.job_scheduler import JobScheduler
 from ..services.job_service import JobDomain, JobItem, JobQueryService, JobStatus
 
@@ -57,6 +60,7 @@ class _JobLoad(QRunnable):
                 limit=self._limit,
             )
         except Exception as exc:
+            logging.getLogger(__name__).exception("Background read failed")
             result = exc
         self.signals.finished.emit(self._generation, result)
 
@@ -176,6 +180,10 @@ class JobCenterDialog(QDialog):
             return
         if isinstance(result, Exception):
             self._summary.setText(self.tr("Jobs could not be loaded."))
+            self._load_pending = False
+            self._refresh_timer.stop()
+            report_exception(result)
+            return
         elif isinstance(result, list):
             self._render_jobs(result)
             self._update_action_buttons()

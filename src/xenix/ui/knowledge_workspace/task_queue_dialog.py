@@ -5,13 +5,13 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from PySide6.QtCore import QEvent, QThreadPool, QTimer, Qt
+from PySide6.QtCore import QEvent, Qt, QThreadPool, QTimer
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QDialog,
     QFileDialog,
-    QHeaderView,
     QHBoxLayout,
+    QHeaderView,
     QInputDialog,
     QLineEdit,
     QMessageBox,
@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
+from ...exceptions import report_exception
 from ...services.knowledge_formats import knowledge_file_dialog_filter
 from ._tasks import TASK_POLL_INTERVAL_MS, _TaskListLoad
 from .import_log_dialog import KnowledgeImportLogDialog
@@ -112,6 +113,11 @@ class KnowledgeTaskQueueDialog(QDialog):
                 self._load_pending = False
                 self.refresh()
             return
+        if isinstance(tasks, Exception):
+            self._load_pending = False
+            self._refresh_timer.stop()
+            report_exception(tasks)
+            return
         self._render_tasks(tasks if isinstance(tasks, list) else [])
         if self._load_pending:
             self._load_pending = False
@@ -166,12 +172,8 @@ class KnowledgeTaskQueueDialog(QDialog):
                 self._indexes.enqueue_rebuild(task.index_kinds, trigger="manual")
             elif task.import_id:
                 self._retry_import(task)
-        except Exception:
-            QMessageBox.warning(
-                self,
-                self.tr("Task Failed"),
-                self.tr("The selected task could not be retried."),
-            )
+        except Exception as exc:
+            report_exception(exc)
         self.refresh()
 
     def _retry_import(self, task: KnowledgeTaskItem) -> None:

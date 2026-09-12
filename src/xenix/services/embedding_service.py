@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import math
 import unicodedata
 import urllib.error
@@ -17,12 +18,14 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
-    ValidationError as PydanticValidationError,
     field_validator,
+)
+from pydantic import (
+    ValidationError as PydanticValidationError,
 )
 
 from ..config import AppPaths
-from ..exceptions import ValidationError
+from ..exceptions import ValidationError, report_exception
 
 SETTINGS_FILE_NAME = "embedding_settings.json"
 EMBEDDING_SETTINGS_FILE_NAME = SETTINGS_FILE_NAME
@@ -265,7 +268,8 @@ class OpenAICompatibleEmbeddingService:
                 snapshot = EmbeddingSettings.model_validate(loaded).model_copy(deep=True)
         except EmbeddingValidationError:
             raise
-        except Exception:
+        except Exception as exc:
+            report_exception(exc)
             failed = True
             snapshot = None
         if failed or snapshot is None:
@@ -338,7 +342,8 @@ class OpenAICompatibleEmbeddingService:
                 headers=headers,
                 method="POST",
             )
-        except Exception:
+        except Exception as exc:
+            report_exception(exc)
             pass
         if http_request is None:
             raise EmbeddingValidationError(
@@ -371,7 +376,8 @@ class OpenAICompatibleEmbeddingService:
             status_code = exc.code if isinstance(exc.code, int) and not isinstance(exc.code, bool) else None
             try:
                 exc.close()
-            except Exception:
+            except Exception as exc:
+                report_exception(exc)
                 pass
             failure = EmbeddingValidationError(
                 "Embedding provider rejected the request.",
@@ -385,7 +391,8 @@ class OpenAICompatibleEmbeddingService:
                 error_code="embedding_provider_unavailable",
                 retryable=True,
             )
-        except Exception:
+        except Exception as exc:
+            logging.getLogger(__name__).exception("Operation failed: %s", exc)
             failure = EmbeddingValidationError(
                 "Embedding provider request failed.",
                 error_code="embedding_provider_request_failed",

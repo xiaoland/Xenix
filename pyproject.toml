@@ -128,6 +128,8 @@ python_version = "3.14"
 platform = "win32"
 mypy_path = "src"
 files = [
+    "src/xenix/exceptions.py",
+    "src/xenix/services/agent/harness_service.py",
     "src/xenix/application_lifetime.py",
     "src/xenix/application_composition.py",
     "src/xenix/application_services.py",

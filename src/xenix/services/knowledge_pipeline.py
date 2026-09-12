@@ -13,16 +13,17 @@ import unicodedata
 from collections.abc import Iterable
 from contextlib import ExitStack
 from dataclasses import dataclass, field
-from importlib.metadata import PackageNotFoundError, version as package_version
-from pathlib import Path
-from pathlib import PurePosixPath
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as package_version
+from pathlib import Path, PurePosixPath
 from typing import Any, Protocol, TypeVar
 from zipfile import BadZipFile, ZipFile
 
 import msoffcrypto
 import pikepdf
 from charset_normalizer import from_bytes
-from PIL import Image, ImageOps, UnidentifiedImageError, __version__ as pillow_version
+from PIL import Image, ImageOps, UnidentifiedImageError
+from PIL import __version__ as pillow_version
 
 from ..exceptions import ValidationError
 from .knowledge_formats import (
@@ -1576,7 +1577,7 @@ def _inspect_office_file(path: Path) -> tuple[str | None, bool]:
                 "OOXMLFile": "ooxml",
             }.get(type(office).__name__)
             return office_kind, bool(office.is_encrypted())
-    except Exception:
+    except msoffcrypto.exceptions.FileFormatError:
         return None, False
 
 

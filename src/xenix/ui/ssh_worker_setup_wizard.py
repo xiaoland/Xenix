@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import threading
 
 from PySide6.QtCore import QEvent, Signal
@@ -13,9 +14,9 @@ from PySide6.QtWidgets import (
     QPushButton,
     QSpinBox,
     QVBoxLayout,
+    QWidget,
     QWizard,
     QWizardPage,
-    QWidget,
 )
 
 from ..services.ml.ssh_worker_setup import SshWorkerSetupInput, SshWorkerSetupResult, SshWorkerSetupService
@@ -169,6 +170,7 @@ class SshWorkerSetupWizard(QWizard):
             try:
                 result = self._setup_service.setup(input_data)
             except Exception as exc:
+                logging.getLogger(__name__).exception("UI operation failed: %s", exc)
                 self._setup_failed.emit(str(exc))
                 return
             self._setup_succeeded.emit(result)

@@ -6,14 +6,14 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from PySide6.QtCore import QEvent, QThreadPool, QTimer, Qt
+from PySide6.QtCore import QEvent, Qt, QThreadPool, QTimer
 from PySide6.QtGui import QPalette
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QDialog,
     QFileDialog,
-    QHeaderView,
     QHBoxLayout,
+    QHeaderView,
     QLabel,
     QMenu,
     QMessageBox,
@@ -23,14 +23,15 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
+from ...exceptions import report_exception
 from ...services.knowledge_formats import (
     SUPPORTED_KNOWLEDGE_SUFFIXES,
     knowledge_file_dialog_filter,
 )
 from ._tasks import (
     WORKSPACE_ACTIVE_POLL_INTERVAL_MS,
-    _DocumentsLoadTask,
     _DocumentRemovalTask,
+    _DocumentsLoadTask,
     _DocumentViewportState,
     _KnowledgeFileDropAdapter,
     _StatusLoadTask,
@@ -38,10 +39,10 @@ from ._tasks import (
 from .task_queue_dialog import KnowledgeTaskQueueDialog
 
 if TYPE_CHECKING:
+    from ...services.knowledge_derivation_service import KnowledgeDerivationService
     from ...services.knowledge_document_lifecycle_service import (
         KnowledgeDocumentLifecycleService,
     )
-    from ...services.knowledge_derivation_service import KnowledgeDerivationService
     from ...services.knowledge_import_service import KnowledgeImportService
     from ...services.knowledge_index_service import KnowledgeIndexService
     from ...services.knowledge_service import KnowledgeService
@@ -99,6 +100,7 @@ class KnowledgeWorkspaceDialog(QDialog):
         self._document_state = _DocumentViewportState.COLD
         self._last_documents: KnowledgeWorkspaceDocuments | None = None
         self._last_status: KnowledgeWorkspaceStatus | None = None
+        self._status_failed = False
         self._drop_adapter = _KnowledgeFileDropAdapter(self)
         self._drop_adapter.files_dropped.connect(self._submit_import_paths)
 
@@ -192,7 +194,8 @@ class KnowledgeWorkspaceDialog(QDialog):
             try:
                 self._import_service.enqueue_file(path)
                 queued = True
-            except Exception:
+            except Exception as exc:
+                report_exception(exc)
                 failed_count += 1
         if queued:
             self.open_task_queue()
@@ -283,6 +286,13 @@ class KnowledgeWorkspaceDialog(QDialog):
             KnowledgeWorkspaceDocumentsState,
         )
 
+        if isinstance(result, Exception):
+            self._documents_pending = False
+            self._document_state = _DocumentViewportState.UNAVAILABLE
+            self._render_document_state()
+            self._refresh_timer.stop()
+            report_exception(result)
+            return
         if isinstance(result, KnowledgeWorkspaceDocuments):
             if result.state is KnowledgeWorkspaceDocumentsState.UNAVAILABLE:
                 self._document_state = _DocumentViewportState.UNAVAILABLE
@@ -316,7 +326,15 @@ class KnowledgeWorkspaceDialog(QDialog):
             return
         from ...services.knowledge_workspace_service import KnowledgeWorkspaceStatus
 
+        if isinstance(result, Exception):
+            self._status_pending = False
+            self._refresh_timer.stop()
+            self._status_failed = True
+            self._render_status()
+            report_exception(result)
+            return
         if isinstance(result, KnowledgeWorkspaceStatus):
+            self._status_failed = False
             self._last_status = result
         self._render_status()
         if self._status_pending:
@@ -379,6 +397,10 @@ class KnowledgeWorkspaceDialog(QDialog):
 
     def _render_status(self) -> None:
         status = self._last_status
+        if self._status_failed:
+            self._footer_status.setText(self.tr("Knowledge status could not be loaded."))
+            self._refresh_timer.stop()
+            return
         if status is None:
             self._footer_status.setText(self.tr("Loading Knowledge status…"))
             self._refresh_timer.stop()

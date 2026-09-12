@@ -1,17 +1,14 @@
 from __future__ import annotations
 
-from datetime import date, datetime
 import logging
 import math
-from pathlib import Path
 import re
+from datetime import date, datetime
+from pathlib import Path
 from time import perf_counter
 from typing import Literal
 
-try:
-    import polars as pl
-except Exception:  # pragma: no cover - depends on local runtime state
-    pl = None
+import polars as pl
 from pydantic import ConfigDict, Field
 from sqlmodel import SQLModel
 
@@ -21,7 +18,6 @@ from .dataset_inspection import detect_source_format
 from .dataset_service import DatasetService
 from .storage.models import DatasetSourceFormat
 from .tabular import TabularRuntimeError, load_tabular_frame
-
 
 DEFAULT_PROFILE_FIELD_LIMIT = 40
 MAX_PROFILE_FIELD_LIMIT = 80

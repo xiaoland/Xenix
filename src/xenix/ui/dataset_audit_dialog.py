@@ -1,4 +1,4 @@
-"""Modeless, session-scoped view over the Datasets a conversation produced."""
+"""Modeless view of a conversation's attached and generated datasets."""
 
 from __future__ import annotations
 
@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ..exceptions import report_exception
 from ..services.dataset_service import DatasetAuditPresentation
 
 if TYPE_CHECKING:
@@ -27,7 +28,7 @@ if TYPE_CHECKING:
 
 
 class DatasetAuditDialog(QDialog):
-    """Independent, modeless audit of the datasets one conversation produced.
+    """Independent, modeless audit of a conversation's datasets.
 
     Storage owns the derivation records; this dialog is a read-only projection
     resolved through the Agent Harness for the active conversation Thread.
@@ -46,6 +47,7 @@ class DatasetAuditDialog(QDialog):
         self._harness = harness
         self._thread_id = thread_id
         self._audits: list[DatasetAuditPresentation] = []
+        self._load_failed = False
 
         self._table = QTableWidget(0, 5, self)
         self._table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
@@ -91,14 +93,22 @@ class DatasetAuditDialog(QDialog):
     def refresh(self) -> None:
         try:
             self._audits = self._harness.resolve_session_dataset_audits(self._thread_id)
-        except Exception:
-            # Read-only projection: a deleted Thread or a failed read must not
-            # take the audit window down; it degrades to an empty list.
+        except Exception as exc:
+            self._load_failed = True
             self._audits = []
+            self._render_table()
+            self._render_detail()
+            report_exception(exc)
+            return
+        self._load_failed = False
         self._render_table()
         self._render_detail()
 
     def _render_table(self) -> None:
+        self._empty_label.setText(
+            self.tr("Dataset loading failed. Retry with Refresh.") if self._load_failed
+            else self.tr("No datasets are associated with this conversation yet.")
+        )
         selected = self._selected_dataset_id()
         self._table.setRowCount(len(self._audits))
         selected_row = -1
@@ -188,10 +198,11 @@ class DatasetAuditDialog(QDialog):
             ]
         )
         self._empty_label.setText(
-            self.tr("No datasets have been produced by this conversation yet.")
+            self.tr("No datasets are associated with this conversation yet.")
         )
         self._refresh_button.setText(self.tr("Refresh"))
         self._close_button.setText(self.tr("Close"))
+        self._render_table()
         self._render_detail()
 
     def changeEvent(self, event: QEvent) -> None:

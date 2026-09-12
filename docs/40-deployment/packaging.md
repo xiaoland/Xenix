@@ -28,6 +28,8 @@ Packaging success proves assembly, not usability. The smoke gate proves only the
 
 Record the build commit, build environment, commands, and smoke result as bundle evidence. Re-run the gate after dependency, spec, resource, translation, build-input, or packaging-script changes.
 
+The packaged splash intentionally collects only its base QML modules through `scripts/pyinstaller_hooks/hook-PySide6.QtQml.py`; add a module there when the scene begins importing it rather than restoring PyInstaller's full QML-tree collection.
+
 ## Packaged-Only Failures
 
 Start with the smoke gate and its failing boundary. Inspect PyInstaller analysis/collection evidence and the built `_internal` tree for missing native libraries, metadata, or data files; a successful analysis-time import does not prove delayed runtime loading.

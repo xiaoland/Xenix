@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import logging
+
+from pydantic import ValidationError as PydanticValidationError
 from PySide6.QtCore import QCoreApplication, QEvent
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -17,12 +20,12 @@ from PySide6.QtWidgets import (
 )
 
 from ...services.llm import (
+    PACKAGED_TRIAL_SECRET_SOURCE,
     LLMDialect,
     LLMModelOption,
     LLMProviderConfig,
     LLMService,
     LLMSettings,
-    PACKAGED_TRIAL_SECRET_SOURCE,
 )
 from ..semantic_identity import identify
 from ._card import Card
@@ -206,6 +209,7 @@ class ProviderSettingsEditor(QWidget):
         try:
             self._store_current_provider_fields()
         except Exception as exc:
+            logging.getLogger(__name__).exception("UI operation failed: %s", exc)
             self._revert_provider_selection()
             QMessageBox.warning(
                 self,
@@ -229,6 +233,7 @@ class ProviderSettingsEditor(QWidget):
         try:
             self._store_current_provider_fields()
         except Exception as exc:
+            logging.getLogger(__name__).exception("UI operation failed: %s", exc)
             QMessageBox.warning(
                 self,
                 QCoreApplication.translate("SettingsDialog", "Settings"),
@@ -322,7 +327,7 @@ class ProviderSettingsEditor(QWidget):
             return
         try:
             self._store_current_provider_fields()
-        except Exception:
+        except PydanticValidationError:
             return
         self._refresh_model_selectors_preserving_selection()
 
@@ -350,7 +355,7 @@ class ProviderSettingsEditor(QWidget):
             return
         try:
             settings = LLMSettings(providers=self._provider_configs)
-        except Exception:
+        except PydanticValidationError:
             return
         options = LLMService.model_options_from_settings(settings)
         self._replace_model_selector_items(

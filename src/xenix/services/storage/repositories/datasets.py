@@ -19,6 +19,9 @@ from ..models import (
 
 
 class DatasetRepository:
+    def list_by_ml_tasks(self, session: Session, task_ids: Collection[str]) -> list[DatasetRow]:
+        return list(session.exec(select(DatasetRow).where(DatasetRow.ml_task_id.in_(task_ids))))
+
     def create(self, session: Session, row: DatasetRow) -> DatasetRow:
         session.add(row)
         session.flush()

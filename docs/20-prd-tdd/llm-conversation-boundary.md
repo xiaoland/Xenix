@@ -59,7 +59,7 @@ Tool modules.
 - Chatbot UI submits intent and renders Chatbot Events. It neither accesses a
   conversation repository nor infers protocol state from storage rows or raw
   Tool payloads.
-- Failures from local UI commands such as opening a link use transient operation feedback outside the timeline. A terminal Harness submission failure uses a dismissible notification outside the timeline that remains until the next submission or Thread selection, while failures already represented by Chatbot Events, including connection retries and Tool failures, remain visible in the conversation UI.
+- Expected failures from local UI commands such as opening a link use transient operation feedback outside the timeline. Internal exception presentation is owned by [Unit TDD](../30-unit-tdd/application-composition.md#error-reporting). A terminal Harness submission failure uses a dismissible notification outside the timeline that remains until the next submission or Thread selection, while failures already represented by Chatbot Events, including connection retries and Tool failures, remain visible in the conversation UI.
 - Final Messages are durable. A pending sampling Message is the sole
   provisional canonical state. There is no persistent `Turn`, `Run`,
   `ConversationStore`, execution ledger, or automatic cross-process recovery.
@@ -93,6 +93,7 @@ Tool modules.
   evidence by that reference and projects it into the matching Tool event; it does
   not parse ToolResult content or create a second result authority. Agent-authored
   explanations are annotations, not system-verified evidence.
+- The session Dataset view composes canonical Dataset attachments, persisted derivations associated with ToolCall identities, and ML outputs associated with public task handles returned in canonical ToolResults. Result handles determine membership only; Dataset/ML records determine names, inputs, operations and generations. Imported and legacy ML datasets do not need synthetic derivation rows or a migration to appear.
 - Thinking, activity, connection, and usage are Chatbot Events. Observability
   may retain bounded diagnostics/usage but never restores, repairs, or replays
   conversation or Tool state.

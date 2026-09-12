@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import threading
 import weakref
 from collections.abc import Callable, Sequence
@@ -64,7 +65,7 @@ class HarnessHistoryAdapter:
     def list_threads(self) -> Sequence[HistoryThreadSummary]:
         return tuple(
             HistoryThreadSummary(id=thread.id, title=thread.title)
-            for thread in self._service.list_threads()  # type: ignore[no-untyped-call]
+            for thread in self._service.list_threads()
         )
 
     def rename_thread(self, thread_id: str, title: str | None) -> HistoryThreadSummary:
@@ -281,6 +282,7 @@ class HistoryPanel(QFrame):
         try:
             renamed = self._port.rename_thread(thread_id, title.strip() or None)
         except Exception as exc:
+            logging.getLogger(__name__).exception("UI operation failed: %s", exc)
             QMessageBox.warning(
                 self,
                 QCoreApplication.translate("MainWindow", "Rename Thread"),
@@ -316,6 +318,7 @@ class HistoryPanel(QFrame):
         try:
             self._port.delete_thread(thread_id)
         except Exception as exc:
+            logging.getLogger(__name__).exception("UI operation failed: %s", exc)
             QMessageBox.warning(
                 self,
                 QCoreApplication.translate("MainWindow", "Delete Thread"),
@@ -367,6 +370,7 @@ class HistoryPanel(QFrame):
         try:
             self._title_executor(thread_id, succeeded, failed)
         except Exception as exc:
+            logging.getLogger(__name__).exception("UI operation failed: %s", exc)
             self._close_title_progress()
             self._active_title = None
             QMessageBox.warning(
@@ -401,6 +405,7 @@ class HistoryPanel(QFrame):
         try:
             renamed = self._port.rename_thread(thread_id, title.strip() or None)
         except Exception as exc:
+            logging.getLogger(__name__).exception("UI operation failed: %s", exc)
             QMessageBox.warning(
                 self, QCoreApplication.translate("MainWindow", "Generate Thread Title"), str(exc)
             )

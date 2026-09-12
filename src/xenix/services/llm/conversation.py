@@ -21,11 +21,11 @@ from typing import Any
 from sqlalchemy.orm import sessionmaker
 from sqlmodel import select
 
-from ...exceptions import NotFoundError, ValidationError
+from ...exceptions import NotFoundError, ValidationError, report_exception
 from ...observability import (
     LLMTokenUsage,
-    LLMUsageObservation,
     LLMUsageObservability,
+    LLMUsageObservation,
     NullLLMUsageObservability,
 )
 from ..storage.models import (
@@ -71,16 +71,15 @@ from .service import LLMModelOption, LLMService
 from .tooling import (
     MAX_EXCHANGE_RESULT_BYTES,
     AgentToolRegistry,
+    StagedToolCall,
     ToolExecutionContext,
     ToolScope,
-    StagedToolCall,
-    canonical_tool_result_value,
     canonical_json_bytes,
+    canonical_tool_result_value,
     scope_fingerprint,
     terminal_tool_result,
     tool_failure_from_exception,
 )
-
 
 LOGGER = logging.getLogger(__name__)
 
@@ -177,6 +176,7 @@ class LLMConversationService(TitleGenerationMixin):
                 root_user_message_ids=[root.id for root, _terminal in completed],
             )
         except Exception as exc:
+            report_exception(exc)
             LOGGER.warning("LLM usage observability query failed: %s", exc.__class__.__name__)
             return ()
         return tuple(
@@ -535,6 +535,7 @@ class LLMConversationService(TitleGenerationMixin):
             )
             terminal = terminal_tool_result(outcome)
         except Exception as exc:
+            logging.getLogger(__name__).exception("Operation failed: %s", exc)
             # Project the failure once into the same canonical value consumed
             # by the provider and Chatbot.  The concrete exception message is
             # preserved so the agent sees what actually failed.
@@ -976,6 +977,7 @@ class LLMConversationService(TitleGenerationMixin):
         try:
             self._usage_observability.record_llm_usage(observation)
         except Exception as exc:
+            report_exception(exc)
             LOGGER.warning("LLM usage observability write failed: %s", exc.__class__.__name__)
 
     @staticmethod

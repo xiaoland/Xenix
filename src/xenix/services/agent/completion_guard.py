@@ -6,8 +6,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from ...exceptions import report_exception
 from ..llm import AgentProvider, ProviderMessage
-
 
 TURN_COMPLETION_GUARD_REMINDER = (
     "You appear to have stated a next action in this turn but did not complete it. "
@@ -75,6 +75,7 @@ class TurnCompletionGuard:
             result.usage_payload = response.usage_payload
             return result
         except Exception as exc:
+            report_exception(exc)
             return TurnCompletionGuardResult(
                 verdict=TurnCompletionGuardVerdict.COMPLETE,
                 reason=f"Guard failed closed: {exc}",

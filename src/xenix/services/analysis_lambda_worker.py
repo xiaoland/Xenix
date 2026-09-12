@@ -13,6 +13,7 @@ import base64
 import builtins
 import io
 import json
+import logging
 import math
 import re
 from dataclasses import dataclass
@@ -33,7 +34,6 @@ import statsmodels
 from matplotlib.figure import Figure
 
 from .dataset_inspection import detect_source_format, load_dataframe
-
 
 ALLOWED_IMPORT_ROOTS = {
     "collections",
@@ -259,6 +259,7 @@ def main(input_path: str, output_path: str) -> None:
         request = json.loads(Path(input_path).read_text(encoding="utf-8"))
         response = _execute(request)
     except Exception as exc:  # pragma: no cover - parent tests assert the surfaced error
+        logging.getLogger(__name__).exception("Operation failed: %s", exc)
         response = {
             "status": "failed",
             "error": f"{type(exc).__name__}: {exc}",

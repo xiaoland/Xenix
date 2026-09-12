@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import shutil
 import tempfile
 from dataclasses import dataclass
@@ -166,6 +167,7 @@ class SshWorkerSetupService:
             imports = "; ".join(f"import {module}" for module in REQUIRED_REMOTE_IMPORTS)
             self._run_checked(client, f"{_sh_quote(worker.python_command)} - <<'PY'\n{imports}\nPY", "Remote imports", details)
         except Exception as exc:
+            logging.getLogger(__name__).exception("Operation failed: %s", exc)
             return worker.model_copy(
                 update={
                     "setup_state": MLWorkerSetupState.FAILED,

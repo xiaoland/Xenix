@@ -19,9 +19,8 @@ from uuid import uuid4
 from zipfile import ZipFile, ZipInfo
 
 from ..config import AppPaths, package_root
-from ..exceptions import ValidationError
+from ..exceptions import ValidationError, report_exception
 from ..release_config import ReleaseConfig, load_release_config
-
 
 NATIVE_OCR_PROTOCOL_VERSION = 2
 RUNTIME_MANIFEST_SCHEMA_VERSION = 1
@@ -413,7 +412,8 @@ class PaddleOcrDeploymentService:
             )
         except FileNotFoundError:
             return PaddleOcrStatus(PaddleOcrState.NOT_INSTALLED, "runtime_missing")
-        except Exception:
+        except Exception as exc:
+            report_exception(exc)
             return PaddleOcrStatus(PaddleOcrState.REPAIR_REQUIRED, "verification_failed")
         finally:
             self._clear_transient_if(PaddleOcrState.CHECKING)
@@ -676,7 +676,8 @@ class PaddleOcrSession(AbstractContextManager["PaddleOcrSession"]):
         if exc_type is None and self._process is not None and self._process.poll() is None:
             try:
                 self.request("shutdown", {}, timeout=5)
-            except Exception:
+            except Exception as exc:
+                report_exception(exc)
                 pass
         self.close()
         return False

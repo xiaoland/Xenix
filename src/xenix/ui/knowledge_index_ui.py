@@ -6,10 +6,10 @@ from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QLabel,
-    QMessageBox,
     QVBoxLayout,
 )
 
+from ..exceptions import report_exception
 from ..services.knowledge_index_service import (
     KnowledgeIndexKind,
     KnowledgeIndexOverview,
@@ -81,6 +81,8 @@ class KnowledgeIndexRebuildDialog(QDialog):
         self._status = result if isinstance(result, KnowledgeIndexOverview) else None
         self._status_failed = self._status is None
         self._render_status(reset_selection=True)
+        if isinstance(result, Exception):
+            report_exception(result)
 
     def _render_status(self, *, reset_selection: bool = False) -> None:
         status = self._status
@@ -127,12 +129,8 @@ class KnowledgeIndexRebuildDialog(QDialog):
             return
         try:
             task_id = self._service.enqueue_rebuild(selected, trigger="manual")
-        except Exception:
-            QMessageBox.warning(
-                self,
-                self.tr("Knowledge Indexes"),
-                self.tr("The selected index rebuild could not be queued."),
-            )
+        except Exception as exc:
+            report_exception(exc)
             return
         self.submitted.emit(task_id)
         self.accept()

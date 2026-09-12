@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING
 
 from ..exceptions import InvalidStateTransitionError
@@ -37,6 +38,7 @@ class MLJobHandler:
         try:
             finished = self._ml_task_service.run_task(job.reference)
         except Exception as exc:
+            logging.getLogger(__name__).exception("Operation failed: %s", exc)
             return JobOutcome(JobStatus.FAILED, str(exc))
         if finished is None:
             return JobOutcome(JobStatus.SUCCEEDED)

@@ -1,23 +1,24 @@
 from __future__ import annotations
 
+import gc
+import json
+import logging
+import math
+import os
+import re
+import shutil
+import time
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
-import gc
 from dataclasses import dataclass
 from enum import StrEnum
 from hashlib import sha256
-import json
-import math
-import os
 from pathlib import Path, PurePosixPath
-import re
-import shutil
 from threading import Lock, RLock
-import time
 from uuid import uuid4
 
 from ..config import AppPaths
-from ..exceptions import ValidationError
+from ..exceptions import ValidationError, report_exception
 from .storage.layout import (
     knowledge_indexes_root,
     knowledge_root,
@@ -262,7 +263,8 @@ class LanceKnowledgeVectorStore:
                 ),
                 expected_unit_ids=unit_ids,
             )
-        except Exception:
+        except Exception as exc:
+            report_exception(exc)
             return False
 
     def search(
@@ -358,7 +360,8 @@ class LanceKnowledgeVectorStore:
                     expected_count=expected_count,
                     expected_dimensions=expected_dimensions,
                 )
-            except Exception:
+            except Exception as exc:
+                report_exception(exc)
                 return KnowledgeVectorGenerationState.CORRUPT
             return (
                 KnowledgeVectorGenerationState.USABLE
@@ -821,6 +824,9 @@ class LanceKnowledgeVectorStore:
     @staticmethod
     def _discard_exception_traceback(exc: Exception) -> None:
         """Drop frames that may otherwise retain native Lance/Arrow handles."""
+        logging.getLogger(__name__).error(
+            "Knowledge vector operation failed", exc_info=(type(exc), exc, exc.__traceback__),
+        )
         exc.__traceback__ = None
         exc.__cause__ = None
         exc.__context__ = None

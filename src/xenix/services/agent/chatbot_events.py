@@ -15,6 +15,7 @@ from typing import Any
 from pydantic import model_serializer
 from sqlmodel import Field, SQLModel
 
+from ...exceptions import report_exception
 from ..llm.messages import blocks_from_payload, blocks_to_json
 from ..llm.tooling import canonical_tool_result_value
 from .skill_catalog import is_agent_skill_tool
@@ -274,7 +275,8 @@ def _project_source_attachments(
             continue
         try:
             presentation = source_attachment_lookup(dataset_id)
-        except Exception:
+        except Exception as exc:
+            report_exception(exc)
             continue
         source_block = _source_attachment_block(dataset_id, presentation)
         if source_block is None:

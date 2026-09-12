@@ -15,10 +15,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from uuid import uuid4
 
-from PySide6.QtCore import QCoreApplication, QObject, QUrl, Qt, Signal
+from PySide6.QtCore import QCoreApplication, QObject, Qt, QUrl, Signal
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import QProgressDialog
 
+from ..exceptions import XenixError, report_exception
 from ..services.agent import (
     AgentHarnessService,
     AgentHarnessStreamEvent,
@@ -148,7 +149,8 @@ class ChatWorkspace(QObject):
                 selected = self._agent_harness_service.get_thread_snapshot(
                     self.conversation_thread_id
                 ).thread.selected_fq_model_key
-            except Exception:
+            except Exception as exc:
+                report_exception(exc)
                 selected = None
         self._thread_detail_view.set_model_options(
             options,
@@ -177,6 +179,8 @@ class ChatWorkspace(QObject):
         try:
             snapshot = self._agent_harness_service.set_thread_model(self.conversation_thread_id, fq_model_key)
         except Exception as exc:
+            if not isinstance(exc, XenixError):
+                report_exception(exc)
             self._thread_detail_view.show_operation_error(str(exc))
             return
         self._sync_thread_model_picker(snapshot)
@@ -215,6 +219,8 @@ class ChatWorkspace(QObject):
         try:
             attachment = self._source_attachment_input(normalized_path)
         except Exception as exc:
+            if not isinstance(exc, XenixError):
+                report_exception(exc)
             self._thread_detail_view.set_attachment_status(
                 normalized_path,
                 ComposerAttachmentStatus.FAILED,
@@ -251,6 +257,8 @@ class ChatWorkspace(QObject):
                 client_submission_id=client_submission_id,
             )
         except Exception as exc:
+            if not isinstance(exc, XenixError):
+                report_exception(exc)
             self._thread_detail_view.show_operation_error(str(exc))
             return
 
@@ -352,6 +360,8 @@ class ChatWorkspace(QObject):
         self._thread_detail_view.show_submission_error(str(failure))
         self._thread_detail_view.set_running(False)
         self.harness_failed.emit(failure)
+        if isinstance(failure, Exception) and not isinstance(failure, XenixError):
+            report_exception(failure)
 
     def _render_attachment_import_progress(self, event: AgentHarnessStreamEvent, source_index: int) -> None:
         progress = event.attachment_import
@@ -369,7 +379,8 @@ class ChatWorkspace(QObject):
             return
         try:
             snapshot = self._agent_harness_service.get_thread_snapshot(self.conversation_thread_id)
-        except Exception:
+        except Exception as exc:
+            report_exception(exc)
             self._thread_detail_view.clear_messages()
             return
         self._thread_detail_view.render_events(self._agent_harness_service.project_chatbot_events(snapshot))
@@ -386,6 +397,8 @@ class ChatWorkspace(QObject):
             try:
                 self._link_router.activate(uri, thread_id=thread_id)
             except Exception as exc:
+                if not isinstance(exc, XenixError):
+                    report_exception(exc)
                 self._service_link_activation_failed.emit(
                     _ServiceLinkActivationFailed(
                         activation_id=activation_id,
@@ -480,6 +493,8 @@ class ChatWorkspace(QObject):
         try:
             self._agent_harness_service.pause_thread(thread_id)
         except Exception as exc:
+            if not isinstance(exc, XenixError):
+                report_exception(exc)
             self._thread_detail_view.show_operation_error(str(exc))
             return
         self._conversation.mark_paused(thread_id)

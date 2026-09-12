@@ -35,11 +35,6 @@ def knowledge_lookup_tool(service: KnowledgeService) -> AgentTool[KnowledgeLooku
                 repair_hints=tuple(exc.repair_hints),
                 retryable=bool(exc.retryable),
             )
-        except Exception:
-            return ToolFailure(
-                code="knowledge_lookup_failed",
-                message="Knowledge lookup could not be completed.",
-            )
 
         return ToolSuccess(
             value={

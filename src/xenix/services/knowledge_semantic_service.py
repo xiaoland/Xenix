@@ -6,6 +6,7 @@ from typing import Sequence
 
 from sqlalchemy.orm import sessionmaker
 
+from ..exceptions import report_exception
 from .embedding_service import (
     EmbeddingProfile,
     EmbeddingService,
@@ -16,11 +17,6 @@ from .knowledge_service import (
     KnowledgeSemanticIntegrityError,
     KnowledgeSemanticUnavailable,
 )
-from .storage.knowledge_projection import (
-    CORPUS_FINGERPRINT_SCHEMA,
-    KnowledgeProjectionIdentity,
-    KnowledgeProjectionSnapshot,
-)
 from .knowledge_storage_maintenance import (
     KnowledgeStorageCleanupResult,
     KnowledgeStorageMaintenance,
@@ -29,6 +25,11 @@ from .knowledge_vector_store import (
     KnowledgeVectorRecord,
     KnowledgeVectorStoreError,
     LanceKnowledgeVectorStore,
+)
+from .storage.knowledge_projection import (
+    CORPUS_FINGERPRINT_SCHEMA,
+    KnowledgeProjectionIdentity,
+    KnowledgeProjectionSnapshot,
 )
 from .storage.models import KnowledgeVectorGenerationRow, generate_id
 from .storage.repositories.knowledge import KnowledgeRepository
@@ -242,7 +243,8 @@ class KnowledgeSemanticService:
                     return
                 self._storage_maintenance.cleanup()
                 self._maintenance_pending = False
-        except Exception:
+        except Exception as exc:
+            report_exception(exc)
             LOGGER.warning("Knowledge vector maintenance was deferred.")
 
     def _rebuild_generation(

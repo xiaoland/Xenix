@@ -19,6 +19,7 @@ from typing import Any, Callable
 from pydantic import BaseModel, ConfigDict, Field
 from PySide6.QtCore import QCoreApplication
 
+from ...exceptions import report_exception
 from ...services.agent import ChatbotEvent, ChatbotEventAuthor, ChatbotEventKind
 
 ArtifactResolver = Callable[[str], Any]
@@ -143,7 +144,8 @@ def render_content_blocks(
                 if block.is_openable and source_attachment_target_resolver is not None:
                     try:
                         target = source_attachment_target_resolver(block)
-                    except Exception:
+                    except Exception as exc:
+                        report_exception(exc)
                         target = None
                 target = safe_ui_open_target(target)
                 if target:

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ...exceptions import ValidationError
+from ...exceptions import ValidationError, report_exception
 
 
 def _raise_if_cancelled(ml_service, context, *, ml_task_ids=None) -> None:
@@ -10,7 +10,8 @@ def _raise_if_cancelled(ml_service, context, *, ml_task_ids=None) -> None:
         for task_id in ml_task_ids:
             try:
                 ml_service.cancel_task(task_id)
-            except Exception:
+            except Exception as exc:
+                report_exception(exc)
                 continue
     raise ValidationError("Agent run was cancelled.")
 

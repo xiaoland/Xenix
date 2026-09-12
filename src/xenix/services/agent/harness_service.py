@@ -14,16 +14,17 @@ from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 from queue import SimpleQueue
-from typing import Any, Iterator
+from typing import Any, Iterator, cast
 from uuid import uuid4
 
 from sqlmodel import Field, SQLModel
 
-from ...exceptions import NotFoundError, ValidationError
+from ...exceptions import NotFoundError, ValidationError, report_exception
 from ...observability import start_span
 from ..dataset_service import (
     DatasetAuditPresentation,
     DatasetService,
+    DatasetSourcePresentation,
     RegisterDatasetInput,
 )
 from ..llm import (
@@ -37,13 +38,14 @@ from ..llm import (
     LLMConversationService,
     PendingSampling,
     SubmissionClaim,
-    ThreadPausedError,
     TextBlock,
+    ThreadPausedError,
     blocks_from_payload,
 )
 from ..llm.providers import AgentProvider, LLMRetryEvent
 from ..llm.service import LLMModelOption, LLMService
 from ..llm.tooling import ToolScope
+from ..storage.models import ConversationThreadRow
 from .chatbot_events import (
     ChatbotEvent,
     ChatbotEventAuthor,
@@ -55,7 +57,7 @@ from .chatbot_events import (
     enrich_chatbot_events_with_source_attachments,
     project_chatbot_events,
 )
-from .tool_presentations import tool_presentation_for_name
+from .tool_presentations import ToolPresentation, tool_presentation_for_name
 
 LOGGER = logging.getLogger(__name__)
 
@@ -168,7 +170,7 @@ class AgentHarnessService:
             )
         )
 
-    def list_threads(self):
+    def list_threads(self) -> list[ConversationThreadRow]:
         return self._conversation_service.list_threads()
 
     def rename_thread(self, thread_id: str, title: str | None) -> ConversationSnapshot:
@@ -241,15 +243,40 @@ class AgentHarnessService:
         self,
         thread_id: str,
     ) -> list[DatasetAuditPresentation]:
-        """Resolve generated-Dataset evidence for one conversation Thread."""
+        """Compose session membership from canonical messages and domain records."""
 
         if self._dataset_service is None:
             return []
-        tool_call_ids = self._conversation_service.list_tool_call_message_ids(
-            thread_id
-        )
-        return self._dataset_service.resolve_dataset_audits_for_tool_calls(
-            tool_call_ids
+        snapshot = self._conversation_service.get_thread_snapshot(thread_id)
+        tool_call_ids: list[str] = []
+        dataset_ids: set[str] = set()
+        task_ids: set[str] = set()
+        for message in snapshot.messages:
+            if message.kind.value == "tool_call":
+                tool_call_ids.append(message.id)
+            elif message.kind.value == "user":
+                dataset_ids.update(
+                    block.dataset_id
+                    for block in blocks_from_payload(message.content_payload)
+                    if isinstance(block, DatasetBlock)
+                )
+            elif message.kind.value == "tool_result" and isinstance(message.value_payload, dict):
+                # Public handles establish membership only. Dataset/ML storage
+                # still owns provenance, including outputs completed after a timeout.
+                value = message.value_payload
+                for key in ("dataset_id", "result_dataset_id"):
+                    if isinstance(value.get(key), str):
+                        dataset_ids.add(value[key])
+                if isinstance(value.get("ml_task_id"), str):
+                    task_ids.add(value["ml_task_id"])
+                task_ids.update(
+                    task_id for task_id in value.get("task_ids", [])
+                    if isinstance(task_id, str)
+                )
+        return self._dataset_service.resolve_session_dataset_audits(
+            dataset_ids=dataset_ids,
+            tool_call_message_ids=tool_call_ids,
+            ml_task_ids=task_ids,
         )
 
     def set_provider(self, provider: AgentProvider | None) -> None:
@@ -543,7 +570,7 @@ class AgentHarnessService:
                 active_pending_id = pending.pending_message_id
                 self._register_cancel_event(active_pending_id, thread_id)
                 if not pending.staged_calls:
-                    snapshot = self._conversation_service.finalize_pending_assistant(active_pending_id)
+                    final_snapshot = self._conversation_service.finalize_pending_assistant(active_pending_id)
                     self._clear_cancel_event(active_pending_id)
                     active_pending_id = None
                     yield AgentHarnessStreamEvent(
@@ -551,7 +578,7 @@ class AgentHarnessService:
                         thread_id=thread_id,
                         pending_message_id=pending.pending_message_id,
                         client_submission_id=client_submission_id,
-                        snapshot=snapshot, chatbot_events=self.project_chatbot_events(snapshot), is_final=True,
+                        snapshot=final_snapshot, chatbot_events=self.project_chatbot_events(final_snapshot), is_final=True,
                     )
                     return
                 snapshot: ConversationSnapshot | None = None
@@ -832,6 +859,7 @@ class AgentHarnessService:
                     appended_snapshot=appended_snapshot,
                 )
             except Exception as exc:
+                report_exception(exc)
                 # Automatic naming is metadata.  It must never surface as a
                 # failure of an already-acknowledged conversation exchange.
                 LOGGER.warning("Initial Thread title update failed: %s", exc.__class__.__name__)
@@ -842,20 +870,20 @@ class AgentHarnessService:
         threading.Thread(target=run, name="xenix-initial-thread-title", daemon=True).start()
         return _InitialTitleTask(completed=completed, outcomes=outcomes)
 
-    def _resolve_dataset_source_presentation(self, dataset_id: str):
+    def _resolve_dataset_source_presentation(self, dataset_id: str) -> DatasetSourcePresentation | None:
         """Read presentation metadata without allowing it to affect replay."""
 
-        resolver = getattr(self._dataset_service, "resolve_dataset_source_presentation", None)
-        if not callable(resolver):
+        if self._dataset_service is None:
             return None
         try:
-            return resolver(dataset_id)
-        except Exception:
+            return self._dataset_service.resolve_dataset_source_presentation(dataset_id)
+        except Exception as exc:
+            report_exception(exc)
             return None
 
-    def _tool_presentation(self, tool_name: str):
+    def _tool_presentation(self, tool_name: str) -> ToolPresentation:
         lookup = getattr(self._tool_presentation_registry, "tool_presentation", None)
-        return lookup(tool_name) if callable(lookup) else tool_presentation_for_name(tool_name)
+        return cast(ToolPresentation, lookup(tool_name)) if callable(lookup) else tool_presentation_for_name(tool_name)
 
     def _register_cancel_event(self, pending_message_id: str, thread_id: str) -> None:
         with self._cancel_lock:
@@ -867,7 +895,7 @@ class AgentHarnessService:
             self._cancel_events.pop(pending_message_id, None)
             self._pending_threads.pop(pending_message_id, None)
 
-    def _cancel_requested(self, pending_message_id: str):
+    def _cancel_requested(self, pending_message_id: str) -> Callable[[], bool]:
         with self._cancel_lock:
             event = self._cancel_events.get(pending_message_id)
 

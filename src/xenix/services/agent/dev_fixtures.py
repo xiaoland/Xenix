@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from .harness_service import AgentHarnessService, SubmitUserTurnInput
+from ...exceptions import ValidationError
 from ..llm import AgentToolSpec, ProviderResponse, ProviderToolCall
-
+from .harness_service import AgentHarnessService, SubmitUserTurnInput
 
 MESSAGE_RENDERING_FIXTURE_TITLE = "Message rendering fixture"
 
@@ -36,7 +36,7 @@ def ensure_mock_conversation_history(harness: AgentHarnessService) -> None:
         registry = harness._conversation_service.tool_registry  # noqa: SLF001 - explicit fixture-only seam
         try:
             registry.get("fixture.noop")
-        except Exception:
+        except ValidationError:
             registry.register(
                 AgentToolSpec(name="fixture.noop", provider_name="fixture_noop", description="fixture"),
                 lambda _arguments, _context: {"fixture": True},

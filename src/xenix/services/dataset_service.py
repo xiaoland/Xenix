@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-from collections.abc import Collection
-
-import csv
 import codecs
+import csv
 import logging
 import shutil
+from collections.abc import Collection
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -18,7 +17,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlmodel import Field, SQLModel
 
 from ..config import AppPaths
-from ..exceptions import NotFoundError, ValidationError
+from ..exceptions import NotFoundError, ValidationError, report_exception
 from .dataset_inspection import (
     DatasetAttachmentMetadata,
     DatasetInspection,
@@ -36,10 +35,10 @@ from .storage.models import (
     DatasetWorkbookRow,
     ProjectRow,
 )
-from .storage.repositories import DatasetRepository, ProjectRepository
+from .storage.repositories import DatasetRepository, MLTaskRepository, ProjectRepository
 from .tabular import (
-    TabularSchema,
     TabularRuntimeError,
+    TabularSchema,
     apply_tabular_schema,
     load_tabular_frame,
     resolve_tabular_schema_for_loaded_frame,
@@ -452,6 +451,30 @@ class DatasetService:
             return []
         return self.resolve_dataset_audits_for_tool_calls([tool_call_message_id])
 
+    def resolve_session_dataset_audits(
+        self,
+        *,
+        dataset_ids: Collection[str],
+        tool_call_message_ids: Collection[str],
+        ml_task_ids: Collection[str],
+    ) -> list[DatasetAuditPresentation]:
+        """List attached and produced datasets using persisted provenance only."""
+        with self._session_factory() as session:
+            ids = set(dataset_ids)
+            ids.update(row.dataset_id for row in self._datasets.list_derivations_by_tool_calls(
+                session, tool_call_message_ids,
+            ))
+            ids.update(row.id for row in self._datasets.list_by_ml_tasks(session, ml_task_ids))
+            audits = []
+            for dataset_id in ids:
+                dataset = self._datasets.get(session, dataset_id)
+                if dataset is None:
+                    raise NotFoundError(f"Dataset '{dataset_id}' was not found.")
+                audits.append(self._dataset_audit_presentation(
+                    session, dataset, self._datasets.get_derivation(session, dataset_id),
+                ))
+            return sorted(audits, key=lambda audit: (audit.created_at, audit.dataset_id))
+
     def resolve_dataset_audits_for_tool_calls(
         self,
         tool_call_message_ids: Collection[str],
@@ -538,7 +561,8 @@ class DatasetService:
                     open_path=open_path,
                     is_openable=is_openable,
                 )
-        except Exception:
+        except Exception as exc:
+            report_exception(exc)
             # Historical/partially migrated storage must not make a Thread
             # unreadable merely because source enrichment failed.
             LOGGER.debug(
@@ -771,8 +795,28 @@ class DatasetService:
         self,
         session,
         dataset: DatasetRow,
-        derivation: DatasetDerivationRow,
+        derivation: DatasetDerivationRow | None,
     ) -> DatasetAuditPresentation:
+        if derivation is None:
+            task = MLTaskRepository().get(session, dataset.ml_task_id) if dataset.ml_task_id else None
+            source_ids = list((task.result_payload or {}).get("source_dataset_ids", [])) if task else []
+            if not source_ids and dataset.derived_from_dataset_id:
+                source_ids = [dataset.derived_from_dataset_id]
+            legacy_inputs: list[DatasetAuditInputPresentation] = []
+            for position, source_id in enumerate(source_ids):
+                source = self._datasets.get(session, source_id)
+                legacy_inputs.append(DatasetAuditInputPresentation(
+                    dataset_id=source_id, name=source.name if source else source_id, position=position,
+                ))
+            return DatasetAuditPresentation(
+                dataset_id=dataset.id, name=dataset.name,
+                generation=self._dataset_generation(session, dataset.id, {}),
+                operation_name=f"model.{task.task_type.value}" if task else (
+                    "derived" if legacy_inputs else "import"
+                ),
+                parameters_payload={"ml_task_id": task.id} if task else {},
+                created_at=dataset.created_at, inputs=legacy_inputs,
+            )
         input_rows = self._datasets.list_derivation_inputs(session, dataset.id)
         inputs: list[DatasetAuditInputPresentation] = []
         for edge in input_rows:
@@ -809,8 +853,12 @@ class DatasetService:
         input_ids = self._datasets.list_derivation_input_ids(session, dataset_id)
         if not input_ids:
             dataset = self._datasets.get(session, dataset_id)
-            if dataset is not None and dataset.derived_from_dataset_id:
-                input_ids = [dataset.derived_from_dataset_id]
+            if dataset is not None:
+                if dataset.ml_task_id:
+                    task = MLTaskRepository().get(session, dataset.ml_task_id)
+                    input_ids = list((task.result_payload or {}).get("source_dataset_ids", [])) if task else []
+                if not input_ids and dataset.derived_from_dataset_id:
+                    input_ids = [dataset.derived_from_dataset_id]
         generation = (
             1 + max(self._dataset_generation(session, input_id, memo) for input_id in input_ids)
             if input_ids
