@@ -1,0 +1,138 @@
+{
+  "restock": {
+    "standard": {
+      "optimum_yuan": "1845.00",
+      "optimal_plan_count": 2,
+      "optimal_plans": [
+        {
+          "Q102": 1,
+          "Q203": 2,
+          "Q204": 1,
+          "Q509": 1
+        },
+        {
+          "Q101": 1,
+          "Q203": 2,
+          "Q204": 1,
+          "Q509": 1
+        }
+      ]
+    },
+    "budget_tight": {
+      "optimum_yuan": "1415.00",
+      "optimal_plan_count": 1,
+      "optimal_plans": [
+        {
+          "Q102": 1,
+          "Q203": 2,
+          "Q204": 1
+        }
+      ]
+    },
+    "arrival_earlier": {
+      "optimum_yuan": "2050.00",
+      "optimal_plan_count": 1,
+      "optimal_plans": [
+        {
+          "Q203": 2,
+          "Q305": 1,
+          "Q509": 1,
+          "Q612": 2
+        }
+      ]
+    },
+    "margin_lower": {
+      "optimum_yuan": "1690.00",
+      "optimal_plan_count": 3,
+      "optimal_plans": [
+        {
+          "Q102": 2,
+          "Q509": 1,
+          "Q510": 1,
+          "Q611": 1
+        },
+        {
+          "Q101": 1,
+          "Q102": 1,
+          "Q509": 1,
+          "Q510": 1,
+          "Q611": 1
+        },
+        {
+          "Q101": 2,
+          "Q509": 1,
+          "Q510": 1,
+          "Q611": 1
+        }
+      ]
+    },
+    "margin_higher": {
+      "optimum_yuan": "1885.00",
+      "optimal_plan_count": 2,
+      "optimal_plans": [
+        {
+          "Q102": 1,
+          "Q203": 2,
+          "Q204": 1,
+          "Q509": 1
+        },
+        {
+          "Q101": 1,
+          "Q203": 2,
+          "Q204": 1,
+          "Q509": 1
+        }
+      ]
+    },
+    "no_purchase": {
+      "optimum_yuan": "0.00",
+      "optimal_plan_count": 1,
+      "optimal_plans": [
+        {}
+      ]
+    },
+    "confirmation": {
+      "optimum_yuan": "1280.65",
+      "optimal_plan_count": 1,
+      "optimal_plans": [
+        {
+          "P71": 2,
+          "P26": 2,
+          "P13": 1
+        }
+      ]
+    }
+  },
+  "campaign": {
+    "standard": [
+      "C01",
+      "C03",
+      "C06",
+      "C08",
+      "C11",
+      "C15",
+      "C16",
+      "C19",
+      "C23",
+      "C27",
+      "C31"
+    ],
+    "spending_threshold": [
+      "C03",
+      "C06",
+      "C08",
+      "C16",
+      "C23"
+    ],
+    "contact_interval": [
+      "C06",
+      "C08",
+      "C11",
+      "C15",
+      "C16",
+      "C19",
+      "C23",
+      "C31"
+    ]
+  }
+}

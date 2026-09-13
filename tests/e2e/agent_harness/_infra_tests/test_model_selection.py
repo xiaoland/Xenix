@@ -85,6 +85,6 @@ def test_explicit_case_selector_replaces_the_default_live_root() -> None:
     assert selector in arguments
     assert "tests/e2e/agent_harness" not in arguments
     defaults = benchmark_pytest_arguments(["--collect-only", "-q"])
-    selected_files = [Path(value) for value in defaults if value.endswith(".py")]
-    assert len(selected_files) == 3
+    selected_files = [Path(value.split("::")[0]) for value in defaults if ".py::" in value]
+    assert len(selected_files) == 4
     assert all(path.is_file() and path.name.startswith("test_business_") for path in selected_files)

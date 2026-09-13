@@ -1,0 +1,1 @@
+这是本次活动当日的客户快照。金额为已扣退款的近 90 日净消费（人民币元），无须重算。last_contact_date 为空表示从未回访；true/false 为布尔值；open_service_cases 是未结服务单数量。不同 customer_id 是不同客户，即使其他字段相同。

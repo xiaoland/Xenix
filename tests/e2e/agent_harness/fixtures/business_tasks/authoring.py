@@ -189,6 +189,8 @@ def campaign() -> None:
     for variant, today, threshold, gap, cities in (
         ("standard", "2026-07-01", 1000, 30, ("南京", "苏州")),
         ("confirmation", "2026-08-01", 1200, 45, ("南京", "苏州", "杭州")),
+        ("spending_threshold", "2026-07-01", 1200, 30, ("南京", "苏州")),
+        ("contact_interval", "2026-07-01", 1000, 45, ("南京", "苏州")),
     ):
         folder = ROOT / "campaign" / variant
         write(folder / "customers.csv", CUSTOMERS)
@@ -207,6 +209,12 @@ def campaign() -> None:
         if variant == "confirmation":
             rules["客户运营八月活动.txt"] = (
                 "老客回访活动规则（2026-08-01 至 2026-08-31 有效）\n本月范围增加杭州，南京、苏州继续参与，仅限在营客户。近 90 日净消费门槛改为至少 1200 元，距离上次回访至少 45 天或从未回访。VIP 仅免消费门槛，其他条件不豁免。有未结服务单的客户不回访。以上日期均含首尾日。"
+            )
+        elif variant != "standard":
+            rules["客户运营七月活动.txt"] = (
+                rules["客户运营七月活动.txt"]
+                .replace("至少 1000 元", f"至少 {threshold} 元")
+                .replace("至少 30 天", f"至少 {gap} 天")
             )
         for name, content in rules.items():
             write(folder / "knowledge" / name, content)

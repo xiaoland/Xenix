@@ -118,3 +118,8 @@ def _contains_eligible_list(frame: pl.DataFrame, expected: set[str]) -> bool:
 
 def test_business_campaign_eligibility(agent_harness_benchmark) -> None:
     agent_harness_benchmark.run(CampaignEligibilityTask(agent_harness_benchmark.business_variant))
+
+
+@pytest.mark.parametrize("scenario", ("spending_threshold", "contact_interval"))
+def test_campaign_contrast(agent_harness_benchmark, scenario) -> None:
+    agent_harness_benchmark.run(CampaignEligibilityTask(scenario))

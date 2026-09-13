@@ -37,7 +37,7 @@ def benchmark_pytest_arguments(arguments: list[str]) -> list[str]:
             f"{BENCHMARK_ROOT}."
         )
     collection_targets = list(explicit_targets) or [
-        f"{BENCHMARK_ROOT}/{path.name}"
+        f"{BENCHMARK_ROOT}/{path.name}::{path.stem}"
         for path in sorted(Path(__file__).resolve().parents[1].glob("test_business_*.py"))
     ]
     return [

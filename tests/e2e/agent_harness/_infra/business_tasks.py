@@ -62,6 +62,7 @@ class Delivery:
                         "user_turn": turn,
                         "uri": artifact.uri,
                         "title": artifact.title,
+                        "columns": artifact.frame.columns if artifact.frame is not None else None,
                         "rows": artifact.frame.to_dicts() if artifact.frame is not None else None,
                         "report": artifact.report,
                         "saved_model_id": artifact.model_id,
