@@ -1,0 +1,119 @@
+{
+  "status": "proposal only; no production mutation or model benchmarking of this API",
+  "schemas": {
+    "data.query": {
+      "before_chars": 969,
+      "after_chars": 645,
+      "proposed_parameters": {
+        "additionalProperties": false,
+        "properties": {
+          "datasets": {
+            "additionalProperties": {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            "description": "SQL table aliases mapped to Dataset IDs.",
+            "minProperties": 1,
+            "propertyNames": {
+              "minLength": 1
+            },
+            "type": "object"
+          },
+          "sql": {
+            "description": "DuckDB SELECT or CTE.",
+            "minLength": 1,
+            "type": "string"
+          },
+          "column_reference": {
+            "default": "names",
+            "description": "names uses source headers; indexes uses c0, c1, ... in source-column order.",
+            "enum": [
+              "names",
+              "indexes"
+            ],
+            "type": "string"
+          },
+          "limit": {
+            "default": 50,
+            "description": "Maximum returned rows.",
+            "maximum": 200,
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "datasets",
+          "sql"
+        ],
+        "type": "object"
+      }
+    },
+    "data.transform": {
+      "before_chars": 1156,
+      "after_chars": 832,
+      "proposed_parameters": {
+        "additionalProperties": false,
+        "properties": {
+          "datasets": {
+            "additionalProperties": {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            "description": "SQL table aliases mapped to Dataset IDs.",
+            "minProperties": 1,
+            "propertyNames": {
+              "minLength": 1
+            },
+            "type": "object"
+          },
+          "sql": {
+            "description": "DuckDB script. Saves the final SELECT, or the TEMP relation named output if there is no final query.",
+            "minLength": 1,
+            "type": "string"
+          },
+          "column_reference": {
+            "default": "names",
+            "description": "names uses source headers; indexes uses c0, c1, ... in source-column order.",
+            "enum": [
+              "names",
+              "indexes"
+            ],
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "description": "Name for the derived Dataset."
+          },
+          "explanation": {
+            "maxLength": 2048,
+            "type": "string",
+            "description": "Optional transformation rationale saved in the audit; not verified evidence."
+          }
+        },
+        "required": [
+          "datasets",
+          "sql"
+        ],
+        "type": "object"
+      }
+    }
+  },
+  "manual_execution": {
+    "aliases": [
+      "orders",
+      "stores"
+    ],
+    "rows": [
+      {
+        "region": "East",
+        "total": 30.0
+      },
+      {
+        "region": "West",
+        "total": 15.0
+      }
+    ],
+    "saved_rows": 2,
+    "scope": "proposed input model plus real SQL service, without full Agent dispatch"
+  }
+}

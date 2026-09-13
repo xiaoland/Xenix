@@ -347,7 +347,7 @@ class DataTools:
                 ],
                 parameters_payload=input_data.model_dump(
                     mode="json",
-                    exclude={"dataset_id", "bindings", "explanation"},
+                    exclude={"datasets", "explanation"},
                     exclude_none=True,
                 ),
                 agent_explanation=input_data.explanation,
@@ -430,30 +430,17 @@ class DataTools:
         self,
         input_data: DataQueryToolInput | DataTransformToolInput,
     ) -> list[DatasetSqlBinding]:
-        if input_data.bindings is not None:
-            bindings: list[DatasetSqlBinding] = []
-            for input_binding in input_data.bindings:
-                dataset = self._dataset_service.get_dataset(input_binding.dataset_id)
-                bindings.append(
-                    DatasetSqlBinding(
-                        alias=input_binding.alias,
-                        dataset_id=dataset.id,
-                        source_path=dataset.source_path,
-                    )
+        bindings: list[DatasetSqlBinding] = []
+        for alias, dataset_id in input_data.datasets.items():
+            dataset = self._dataset_service.get_dataset(dataset_id)
+            bindings.append(
+                DatasetSqlBinding(
+                    alias=alias,
+                    dataset_id=dataset.id,
+                    source_path=dataset.source_path,
                 )
-            return bindings
-
-        dataset_id = input_data.dataset_id
-        if dataset_id is None:
-            raise AssertionError("Validated SQL Tool input must own an input source.")
-        dataset = self._dataset_service.get_dataset(dataset_id)
-        return [
-            DatasetSqlBinding(
-                alias="input",
-                dataset_id=dataset.id,
-                source_path=dataset.source_path,
             )
-        ]
+        return bindings
 
     def _query_columns_payload(self, columns: list[dict[str, str]]) -> dict[str, Any]:
         rows = [

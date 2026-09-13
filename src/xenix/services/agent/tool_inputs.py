@@ -39,7 +39,7 @@ class DataIntegrateInput(AgentToolInput):
 
 
 class WordCloudSpec(AgentToolInput):
-    title: str | None = Field(default=None, description="Visible title.")
+    title: str | None = None
     word_field: str | None = Field(
         default=None,
         description="Term column; defaults to word.",
@@ -83,11 +83,11 @@ class WordCloudSpec(AgentToolInput):
 
 
 class AnalysisGraphInput(AgentToolInput):
-    dataset_id: PositiveInt = Field(description="Dataset containing the chart's values.")
+    dataset_id: PositiveInt
     spec: dict[str, Any] | None = Field(
         default=None,
         description=(
-            "Vega-Lite JSON object (mark, encoding, layer, facet, etc.). Xenix supplies data; omit data and datasets."
+            "Vega-Lite JSON. Xenix supplies data; omit data and datasets."
         ),
     )
     wordcloud_spec: WordCloudSpec | None = Field(
@@ -120,24 +120,23 @@ class AnalysisLambdaInput(AgentToolInput):
 
 
 class AnalysisProfileInput(AgentToolInput):
-    dataset_id: PositiveInt = Field(description="Dataset to profile.")
+    dataset_id: PositiveInt
     field_limit: Annotated[int, Field(ge=1, le=MAX_PROFILE_FIELD_LIMIT)] = Field(
         default=DEFAULT_PROFILE_FIELD_LIMIT,
-        description="Maximum field summaries.",
     )
     numeric_summary_limit: Annotated[
         int,
         Field(ge=1, le=MAX_NUMERIC_SUMMARY_LIMIT),
     ] = Field(
         default=DEFAULT_NUMERIC_SUMMARY_LIMIT,
-        description="Maximum numeric summaries, excluding identifiers.",
+        description="Excludes identifiers.",
     )
     correlation_column_limit: Annotated[
         int,
         Field(ge=2, le=MAX_CORRELATION_COLUMN_LIMIT),
     ] = Field(
         default=DEFAULT_CORRELATION_COLUMN_LIMIT,
-        description="Maximum numeric columns used for correlations.",
+        description="Numeric columns only.",
     )
 
 
@@ -169,7 +168,7 @@ class DataTokenizeInput(AgentToolInput):
     name: OptionalString | None = None
     text_column: RequiredString | None = Field(
         default=None,
-        description="Text column name. Supply text_column or text_column_index, not both.",
+        description="Supply text_column or text_column_index, not both.",
     )
     text_column_index: NonNegativeInteger | None = Field(
         default=None,
@@ -191,10 +190,7 @@ class DataTokenizeInput(AgentToolInput):
         default="zh_business_v1",
         description="Chinese or multilingual preparation; only multilingual supports phrases and resource Datasets.",
     )
-    phrase_mode: Literal["unigram", "unigram_bigram"] = Field(
-        default="unigram",
-        description="Single terms or terms with two-word phrases.",
-    )
+    phrase_mode: Literal["unigram", "unigram_bigram"] = "unigram"
     custom_dictionary_dataset_ids: Annotated[
         list[PositiveInt],
         Field(max_length=4),
@@ -231,19 +227,9 @@ class DataTokenizeInput(AgentToolInput):
         return self
 
 
-class DatasetBindingInput(AgentToolInput):
-    alias: RequiredString = Field(description="SQL table alias, e.g. orders.")
-    dataset_id: PositiveInt = Field(description="Dataset bound to the alias.")
-
-
 class DataQueryInput(AgentToolInput):
-    dataset_id: PositiveInt | None = Field(
-        default=None,
-        description="Single Dataset aliased as input. Supply this or bindings; bindings takes precedence.",
-    )
-    bindings: Annotated[list[DatasetBindingInput], Field(min_length=1)] | None = Field(
-        default=None,
-        description="Datasets with explicit SQL aliases.",
+    datasets: Annotated[dict[RequiredString, PositiveInt], Field(min_length=1)] = Field(
+        description="SQL table aliases mapped to Dataset IDs.",
     )
     sql: RequiredString = Field(description="DuckDB SELECT or CTE.")
     column_reference: Literal["names", "indexes"] = Field(
@@ -255,21 +241,10 @@ class DataQueryInput(AgentToolInput):
         description="Maximum returned rows.",
     )
 
-    @model_validator(mode="after")
-    def _has_input_source(self) -> DataQueryInput:
-        if self.dataset_id is None and self.bindings is None:
-            raise ValueError("data.query requires dataset_id or bindings.")
-        return self
-
 
 class DataTransformInput(AgentToolInput):
-    dataset_id: PositiveInt | None = Field(
-        default=None,
-        description="Single Dataset aliased as input. Supply this or bindings; bindings takes precedence.",
-    )
-    bindings: Annotated[list[DatasetBindingInput], Field(min_length=1)] | None = Field(
-        default=None,
-        description="Datasets with explicit SQL aliases.",
+    datasets: Annotated[dict[RequiredString, PositiveInt], Field(min_length=1)] = Field(
+        description="SQL table aliases mapped to Dataset IDs.",
     )
     sql: RequiredString = Field(
         description="DuckDB script. Saves the final SELECT, or the TEMP relation named output if there is no final query."
@@ -278,10 +253,7 @@ class DataTransformInput(AgentToolInput):
         default="names",
         description="names uses source headers; indexes uses c0, c1, ... in source-column order.",
     )
-    name: OptionalString | None = Field(
-        default=None,
-        description="Name for the derived Dataset.",
-    )
+    name: OptionalString | None = None
     explanation: (
         Annotated[
             str,
@@ -290,14 +262,8 @@ class DataTransformInput(AgentToolInput):
         | None
     ) = Field(
         default=None,
-        description="Optional transformation rationale saved in the audit; not verified evidence.",
+        description="Transformation rationale saved in the audit.",
     )
-
-    @model_validator(mode="after")
-    def _has_input_source(self) -> DataTransformInput:
-        if self.dataset_id is None and self.bindings is None:
-            raise ValueError("data.transform requires dataset_id or bindings.")
-        return self
 
 
 class RoleBindingInput(AgentToolInput):
@@ -313,12 +279,12 @@ class RoleBindingInput(AgentToolInput):
 
 
 class DataFeatureSelectInput(AgentToolInput):
-    dataset_id: PositiveInt = Field(description="Dataset whose columns are bound.")
+    dataset_id: PositiveInt
     model_key: RequiredString | None = Field(
         default=None,
         description="Model key for role validation.",
     )
-    role_bindings: list[RoleBindingInput] = Field(description="Column roles used by training.")
+    role_bindings: list[RoleBindingInput]
 
 
 ModelFamilyValue = Literal[
@@ -341,10 +307,7 @@ class ModelMetadataInput(AgentToolInput):
         default=None,
         description="Single model key or alias; returns roles and parameter schema.",
     )
-    model_family: ModelFamilyValue | None = Field(
-        default=None,
-        description="Browse models in this family.",
-    )
+    model_family: ModelFamilyValue | None = None
     include_param_grid_schema: bool = Field(
         default=False,
         description="Include tuning-grid schemas and model details.",
@@ -366,12 +329,9 @@ class ModelTrainInput(AgentToolInput):
     )
     params_by_model: dict[str, dict[str, Any]] | None = Field(
         default=None,
-        description="Parameter objects keyed by the entries in models.",
+        description="Keys match models.",
     )
-    run_name: OptionalString = Field(
-        default="",
-        description="Display name for this training run.",
-    )
+    run_name: OptionalString = ""
 
 
 class ModelHyperTrainInput(AgentToolInput):
@@ -379,11 +339,8 @@ class ModelHyperTrainInput(AgentToolInput):
     param_grids_by_model: Annotated[
         dict[str, dict[str, Any]],
         Field(min_length=1),
-    ] = Field(description="Tuning grids keyed by model key.")
-    run_name: OptionalString = Field(
-        default="",
-        description="Display name for this training run.",
-    )
+    ]
+    run_name: OptionalString = ""
 
 
 InlineCell = str | int | float | bool | None
@@ -420,21 +377,16 @@ class ModelApplyInput(AgentToolInput):
 
 
 class ModelTaskQueryInput(AgentToolInput):
-    task_ids: Annotated[list[PositiveInt], Field(min_length=1, max_length=20)] = Field(description="ML task IDs.")
-    include_logs: bool = Field(
-        default=False,
-        description="Include task logs.",
-    )
+    task_ids: Annotated[list[PositiveInt], Field(min_length=1, max_length=20)]
+    include_logs: bool = False
     include_details: bool = Field(
         default=False,
-        description="Include full persisted requests, results and artifact records; default summaries already include evaluation and links.",
+        description="Full persisted requests/results and artifact records; summaries already include evaluations and links.",
     )
 
 
 class ModelTaskStopInput(AgentToolInput):
-    task_ids: Annotated[list[PositiveInt], Field(min_length=1, max_length=20)] = Field(
-        description="ML task IDs to cancel."
-    )
+    task_ids: Annotated[list[PositiveInt], Field(min_length=1, max_length=20)]
 
 
 class KnowledgeLookupInput(AgentToolInput):
@@ -448,9 +400,7 @@ class KnowledgeLookupInput(AgentToolInput):
     ] = Field(description="Business question or search terms.")
     mode: Literal["auto", "keyword", "semantic", "hybrid"] = Field(
         default="auto",
-        description=(
-            "auto chooses an available mode; keyword matches terms, semantic matches meaning, hybrid combines both."
-        ),
+        description="auto selects an available retrieval mode.",
     )
 
 

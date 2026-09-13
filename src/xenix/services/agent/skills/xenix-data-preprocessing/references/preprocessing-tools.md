@@ -6,7 +6,7 @@ Tool definitions describe callable inputs and results. `data.clean.metadata` pro
 
 Appending compatible rows with `data.integrate` preserves the row grain. A join may multiply rows when keys repeat; its keys and expected cardinality determine whether later totals still answer the business question. `data.transform` supports joins, filters, calculations and aggregation without requiring an atomic-cleaning attempt.
 
-`data.query` computes a result for inspection; `data.transform` saves one for reuse or delivery. Both use DuckDB SQL, with `input` for a single Dataset or explicit aliases from `bindings`.
+`data.query` computes a result for inspection; `data.transform` saves one for reuse or delivery. Both use DuckDB SQL and a `datasets` mapping from SQL aliases to Dataset IDs, such as `{"orders": 12, "stores": 19}`. The example below assumes `{"input": 12}`; replace 12 with the actual Dataset ID.
 
 Names and indexes are alternative column selectors. `column_reference: "indexes"` exposes source columns as `c0`, `c1`, ... for that SQL call. For a source ordered as `[order_id, amount, status]`, this projection returns two columns, but amount remains source index 1:
 

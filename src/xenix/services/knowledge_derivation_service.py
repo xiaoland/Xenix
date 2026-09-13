@@ -35,7 +35,6 @@ from .storage.repositories.knowledge import KnowledgeRepository
 if TYPE_CHECKING:
     from .job_scheduler import JobScheduler
 
-_STOP = object()
 LOGGER = logging.getLogger(__name__)
 
 
@@ -74,7 +73,7 @@ class KnowledgeDerivationService:
         self._repository = KnowledgeRepository()
         self._retrieval_ready_notifier = retrieval_ready_notifier
         self._scheduler = scheduler
-        self._queue: queue.Queue[str | object] = queue.Queue()
+        self._queue: queue.Queue[int | None] = queue.Queue()
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         if scheduler is None:
@@ -338,7 +337,7 @@ class KnowledgeDerivationService:
         if self._stop.is_set():
             return
         self._stop.set()
-        self._queue.put(_STOP)
+        self._queue.put(None)
         if self._thread is not None:
             self._thread.join(timeout=max(0.0, timeout))
 
@@ -346,9 +345,8 @@ class KnowledgeDerivationService:
         while not self._stop.is_set():
             item = self._queue.get()
             try:
-                if item is _STOP:
+                if item is None:
                     return
-                assert isinstance(item, str)
                 try:
                     self.derive_now(item)
                 except Exception as exc:
@@ -368,7 +366,7 @@ class KnowledgeDerivationService:
             return (row.status, row.error_summary)
 
     def recover_pending(self) -> list[int]:
-        pending: list[str] = []
+        pending: list[int] = []
         with self._session_factory() as session:
             rows = list(
                 session.exec(
@@ -383,7 +381,7 @@ class KnowledgeDerivationService:
                 row.updated_at = utc_now()
                 session.add(row)
                 pending.append(row.id)
-            existing_attempts: dict[str, list[KnowledgeDerivationRow]] = {}
+            existing_attempts: dict[int, list[KnowledgeDerivationRow]] = {}
             for row in session.exec(select(KnowledgeDerivationRow)):
                 existing_attempts.setdefault(row.canonical_generation_id, []).append(row)
             documents = list(
