@@ -4,7 +4,7 @@
 - **Guardrails**: 用户已批准同时实现显式 SQL 数据源映射、选择性删除重复说明，以及清除知识库 worker 的字符串 ID 断言，并已授权提交本批相关改动。保持系统提示词、Skill 正文、工具暴露范围、SQL 算法和 Judge；SQL 参考资料随参数契约更新。不增加回归测试或 benchmark 基建自动化测试，不增加 migration。上一轮完整定义与全删说明的原始证据单独保留；其他任务的诊断改动不纳入本次提交。
 - **Current Truth**: SQL 工具现用必填 datasets 映射，已移除 dataset_id/bindings 两套输入及优先级；仅重复字段名、类型、schema 默认值的说明已删减，保留非显然语义。Analysis + Preprocessing 的工具定义为 12,382 → 11,160 字符（-9.9%），全激活为 16,594 → 15,062（-9.2%）。知识库独立 worker 使用整数任务队列与 None 停止信号，恢复记录类型已对齐。单一 owner、单一 packet 足够。
 - **Verification**: 44 项现有测试、pdm run check、pdm run smoke --isolated 通过；真实工具/SQLite/SQL worker 人工验证通过单表、多表、索引查询、保存、全部源别名 lineage、explanation 分离及 Artifact 解析，见 [implementation.json](implementation.json)。忽略 description 后只有两份 SQL schema 的数据源字段发生变化。layered 四个 standard 任务的现有 oracle/Judge 报告均 pass，共 1 次 SQL 日期类型错误，0 次源别名错误；人工复核仍发现月结解释有被 Judge 漏掉的错误，详见下文。
-- **Next Step**: 本批实现与验证已完成、获准提交。用户进一步明确批评的是消融实验缺少分层渐进处理，不能用生产说明的分层保留回应这一方法问题。后续实验按文末更正的设计固定接口、逐层剥离信息并与上一层对照；本次仅修正实验设计，尚未执行这些新阶段。任务目标扩张、解释缺少计算支撑及 Judge 漏判仍是后续议题。
+- **Next Step**: 实现已提交为 41adb2f；重新执行的渐进实验现已完成 22 个有效 cell，另保留 2 个中断。G0/G1 固定新接口比较后，分别对 Knowledge 模式和 SQL 方言做了层内复原；第二层收益很小且未确立稳定因果收益，本轮不推进 G3。结果与收敛判断见 [progressive-findings.md](progressive-findings.md)，相邻 cohort 数字见 [progressive-summary.json](progressive-summary.json)。本轮只更新实验与 packet，没有新增生产改动或提交；任务目标扩张、解释缺少计算支撑及 Judge 漏判仍单列。
 
 ## 首批比较
 
@@ -112,7 +112,7 @@ Provider 请求捕获逐份验证删除参数说明后，工具名称、简介�
 
 本轮未修改任何测试或 benchmark case/oracle/Judge 源码。仅使用现有用例与 build 中的临时测量入口；四个代表任务的结果也不等于整个历史题库、确认变体或稳定重复验收已经通过。
 
-## 消融方法更正：逐层剥离、相邻对照（尚未执行）
+## 消融方法更正：逐层剥离、相邻对照
 
 实验目标是识别各类说明的边际价值。生产如何放置信息与实验如何隔离变量是两个问题；“全部移除仍能否工作”只能给出极端情况，不能代替逐层删除。当前的 5 → 12 → 1 次错误分别来自旧接口完整说明、旧接口全删说明、新接口选择性删说明，既不是连续的同接口消融链，也不能证明选择性删说明导致错误下降。
 
@@ -127,4 +127,16 @@ Provider 请求捕获逐份验证删除参数说明后，工具名称、简介�
 
 这是起始分组，不预设必须删到 G3，也不预设更短的阶段一定保留。每步与上一组在相同任务/配置下配对比较；先选择实际触发该类信息的任务，再用适度重复辨别随机波动。未调用相关能力的任务不能证明该层说明无价值。若某层出现失败或明显额外恢复，在该层按工具或字段进一步拆分、复原定位，不继续跨层全删；有收益信号再扩展代表任务。保留全部尝试，避免只挑通过样本。
 
-观察交付正确性、参数/语义误用、恢复调用、轮次和实际 tokens，同时核查具体失败轨迹及 Judge 漏判。只有同接口、同条件下相邻组的差异可用于讨论该层贡献；本轮联合实现的 4/4 报告仍仅作为实现验证。上述阶段本次尚未运行，现有结果不会重新标记成渐进实验结果。
+观察交付正确性、参数/语义误用、恢复调用、轮次和实际 tokens，同时核查具体失败轨迹及 Judge 漏判。只有同接口、同条件下相邻组的差异可用于讨论该层贡献；前轮联合实现的 4/4 报告仍仅作为实现验证。更正设计时这些阶段尚未运行；后续新实验的完成情况见下节与 progressive-findings.md，历史结果没有被重新标记成渐进结果。
+
+## 渐进实验执行登记（2026-09-13～14，已完成）
+
+用户要求重新进行消融，起点固定为已提交的 41adb2f；生产源码、现有 case、Skill、系统提示词与 Judge 均不修改。执行前将三份配置复制到忽略目录并记录哈希，同时记录相关生产源码、用例与输入 schema 的指纹；每个 cell 检查输入文件未变，每次 Subject 请求验证除参数 description 外完整工具契约一致。原有 44 项测试、check 和 isolated smoke 已在此生产版本通过，本次 collect-only 选中一个标准业务 node，不新增回归测试或 benchmark 自动化测试。
+
+逐项变化与预先登记的样本顺序在 [progressive-plan.json](progressive-plan.json)。G0 在新接口上恢复未变字段的旧说明；G1 使用当前精简说明，但恢复 analysis.graph.spec 的例子与 data.transform.explanation 的证据性质限定，使这两项不混入显然重复层。G1 相比 G0 有 21 处说明变化，其中未暴露/未调用的参数不纳入有效性结论。SQL datasets 映射及其描述在 G0/G1 相同，旧参数不恢复。
+
+G0/G1 的初始范围是月结、分流、活动、补货各一对，并为月结与补货各增加一对新会话，总计 12 个 cell；交错组别先后，最多两个独立 cell 并行，不比较墙钟性能。每个 cell 沿用生产 Harness 配额和现有 benchmark 外部预算，不添加轮次上限。全部尝试保留，不以反复运行直到通过替换失败。
+
+G2 预定只缩短 SQL/图表族的三处说明：图表 spec 删除工具简介已有的 Vega-Lite 格式名及示例键、query.sql 删除重复的 DuckDB 名称、transform.sql 删除重复的 DuckDB script 引导语；保留图表数据注入和 transform 最终 SELECT/output 语义。G3 单独探测 datasets 的别名到 ID 关系说明，在 G2 基础上只删除 query/transform 这两处同义描述；这一层是明确改变关系提示的实验，不能与 G0/G1 固定该描述的控制混淆。G2/G3 均先在月结与补货各运行一次，复核上一层后决定是否重复、拆分或停止；不预先承诺保留更短组。
+
+临时执行入口为 `build/run-progressive-tool-ablation.py`，原始报告、请求与响应在 `build/tool-description-progressive/<arm>/<task>-rN/`。`build/batch-progressive-tool-ablation.py` 只启动显式列出的 cell，`build/summarize-progressive-tool-ablation.py` 从保存证据提取判题、真实 tokens、按 call ID 去重的 ToolFailure、实际参数使用及最终回答位置；不把静态字符缩减率当作 token 或费用节省。

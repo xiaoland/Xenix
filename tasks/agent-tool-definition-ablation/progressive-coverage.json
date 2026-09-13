@@ -1,0 +1,320 @@
+{
+  "scope": "Completed G0/G1 cells, explicit non-null fields; exposure alone does not establish dispensability.",
+  "g1_fields": [
+    {
+      "path": "/analysis.profile/properties/dataset_id",
+      "coverage": {
+        "g0": {
+          "tool_invocations": 9,
+          "explicit_nonnull_parameter_use": 9,
+          "definition_exposures": 70
+        },
+        "g1": {
+          "tool_invocations": 5,
+          "explicit_nonnull_parameter_use": 5,
+          "definition_exposures": 68
+        }
+      }
+    },
+    {
+      "path": "/analysis.profile/properties/field_limit",
+      "coverage": {
+        "g0": {
+          "tool_invocations": 9,
+          "explicit_nonnull_parameter_use": 1,
+          "definition_exposures": 70
+        },
+        "g1": {
+          "tool_invocations": 5,
+          "explicit_nonnull_parameter_use": 0,
+          "definition_exposures": 68
+        }
+      }
+    },
+    {
+      "path": "/analysis.profile/properties/numeric_summary_limit",
+      "coverage": {
+        "g0": {
+          "tool_invocations": 9,
+          "explicit_nonnull_parameter_use": 0,
+          "definition_exposures": 70
+        },
+        "g1": {
+          "tool_invocations": 5,
+          "explicit_nonnull_parameter_use": 0,
+          "definition_exposures": 68
+        }
+      }
+    },
+    {
+      "path": "/analysis.profile/properties/correlation_column_limit",
+      "coverage": {
+        "g0": {
+          "tool_invocations": 9,
+          "explicit_nonnull_parameter_use": 0,
+          "definition_exposures": 70
+        },
+        "g1": {
+          "tool_invocations": 5,
+          "explicit_nonnull_parameter_use": 0,
+          "definition_exposures": 68
+        }
+      }
+    },
+    {
+      "path": "/analysis.graph/properties/dataset_id",
+      "coverage": {
+        "g0": {
+          "tool_invocations": 9,
+          "explicit_nonnull_parameter_use": 9,
+          "definition_exposures": 70
+        },
+        "g1": {
+          "tool_invocations": 11,
+          "explicit_nonnull_parameter_use": 11,
+          "definition_exposures": 68
+        }
+      }
+    },
+    {
+      "path": "/analysis.graph/properties/wordcloud_spec/properties/title",
+      "coverage": {
+        "g0": {
+          "tool_invocations": 9,
+          "explicit_nonnull_parameter_use": 0,
+          "definition_exposures": 70
+        },
+        "g1": {
+          "tool_invocations": 11,
+          "explicit_nonnull_parameter_use": 0,
+          "definition_exposures": 68
+        }
+      }
+    },
+    {
+      "path": "/data.tokenize/properties/text_column",
+      "coverage": {
+        "g0": {
+          "tool_invocations": 0,
+          "explicit_nonnull_parameter_use": 0,
+          "definition_exposures": 0
+        },
+        "g1": {
+          "tool_invocations": 0,
+          "explicit_nonnull_parameter_use": 0,
+          "definition_exposures": 25
+        }
+      }
+    },
+    {
+      "path": "/data.tokenize/properties/phrase_mode",
+      "coverage": {
+        "g0": {
+          "tool_invocations": 0,
+          "explicit_nonnull_parameter_use": 0,
+          "definition_exposures": 0
+        },
+        "g1": {
+          "tool_invocations": 0,
+          "explicit_nonnull_parameter_use": 0,
+          "definition_exposures": 25
+        }
+      }
+    },
+    {
+      "path": "/data.transform/properties/name",
+      "coverage": {
+        "g0": {
+          "tool_invocations": 22,
+          "explicit_nonnull_parameter_use": 22,
+          "definition_exposures": 70
+        },
+        "g1": {
+          "tool_invocations": 18,
+          "explicit_nonnull_parameter_use": 18,
+          "definition_exposures": 68
+        }
+      }
+    },
+    {
+      "path": "/data.feature.select/properties/dataset_id",
+      "coverage": {
+        "g0": {
+          "tool_invocations": 4,
+          "explicit_nonnull_parameter_use": 4,
+          "definition_exposures": 27
+        },
+        "g1": {
+          "tool_invocations": 2,
+          "explicit_nonnull_parameter_use": 2,
+          "definition_exposures": 25
+        }
+      }
+    },
+    {
+      "path": "/data.feature.select/properties/role_bindings",
+      "coverage": {
+        "g0": {
+          "tool_invocations": 4,
+          "explicit_nonnull_parameter_use": 4,
+          "definition_exposures": 27
+        },
+        "g1": {
+          "tool_invocations": 2,
+          "explicit_nonnull_parameter_use": 2,
+          "definition_exposures": 25
+        }
+      }
+    },
+    {
+      "path": "/model.metadata/properties/model_family",
+      "coverage": {
+        "g0": {
+          "tool_invocations": 2,
+          "explicit_nonnull_parameter_use": 1,
+          "definition_exposures": 27
+        },
+        "g1": {
+          "tool_invocations": 1,
+          "explicit_nonnull_parameter_use": 0,
+          "definition_exposures": 25
+        }
+      }
+    },
+    {
+      "path": "/model.train/properties/params_by_model",
+      "coverage": {
+        "g0": {
+          "tool_invocations": 5,
+          "explicit_nonnull_parameter_use": 5,
+          "definition_exposures": 27
+        },
+        "g1": {
+          "tool_invocations": 5,
+          "explicit_nonnull_parameter_use": 5,
+          "definition_exposures": 25
+        }
+      }
+    },
+    {
+      "path": "/model.train/properties/run_name",
+      "coverage": {
+        "g0": {
+          "tool_invocations": 5,
+          "explicit_nonnull_parameter_use": 5,
+          "definition_exposures": 27
+        },
+        "g1": {
+          "tool_invocations": 5,
+          "explicit_nonnull_parameter_use": 5,
+          "definition_exposures": 25
+        }
+      }
+    },
+    {
+      "path": "/model.hyper_train/properties/param_grids_by_model",
+      "coverage": {
+        "g0": {
+          "tool_invocations": 0,
+          "explicit_nonnull_parameter_use": 0,
+          "definition_exposures": 27
+        },
+        "g1": {
+          "tool_invocations": 0,
+          "explicit_nonnull_parameter_use": 0,
+          "definition_exposures": 25
+        }
+      }
+    },
+    {
+      "path": "/model.hyper_train/properties/run_name",
+      "coverage": {
+        "g0": {
+          "tool_invocations": 0,
+          "explicit_nonnull_parameter_use": 0,
+          "definition_exposures": 27
+        },
+        "g1": {
+          "tool_invocations": 0,
+          "explicit_nonnull_parameter_use": 0,
+          "definition_exposures": 25
+        }
+      }
+    },
+    {
+      "path": "/model.task.query/properties/task_ids",
+      "coverage": {
+        "g0": {
+          "tool_invocations": 0,
+          "explicit_nonnull_parameter_use": 0,
+          "definition_exposures": 27
+        },
+        "g1": {
+          "tool_invocations": 1,
+          "explicit_nonnull_parameter_use": 1,
+          "definition_exposures": 25
+        }
+      }
+    },
+    {
+      "path": "/model.task.query/properties/include_logs",
+      "coverage": {
+        "g0": {
+          "tool_invocations": 0,
+          "explicit_nonnull_parameter_use": 0,
+          "definition_exposures": 27
+        },
+        "g1": {
+          "tool_invocations": 1,
+          "explicit_nonnull_parameter_use": 0,
+          "definition_exposures": 25
+        }
+      }
+    },
+    {
+      "path": "/model.task.query/properties/include_details",
+      "coverage": {
+        "g0": {
+          "tool_invocations": 0,
+          "explicit_nonnull_parameter_use": 0,
+          "definition_exposures": 27
+        },
+        "g1": {
+          "tool_invocations": 1,
+          "explicit_nonnull_parameter_use": 1,
+          "definition_exposures": 25
+        }
+      }
+    },
+    {
+      "path": "/model.task.stop/properties/task_ids",
+      "coverage": {
+        "g0": {
+          "tool_invocations": 0,
+          "explicit_nonnull_parameter_use": 0,
+          "definition_exposures": 0
+        },
+        "g1": {
+          "tool_invocations": 0,
+          "explicit_nonnull_parameter_use": 0,
+          "definition_exposures": 0
+        }
+      }
+    },
+    {
+      "path": "/knowledge.lookup/properties/mode",
+      "coverage": {
+        "g0": {
+          "tool_invocations": 8,
+          "explicit_nonnull_parameter_use": 1,
+          "definition_exposures": 77
+        },
+        "g1": {
+          "tool_invocations": 13,
+          "explicit_nonnull_parameter_use": 2,
+          "definition_exposures": 76
+        }
+      }
+    }
+  ]
+}
