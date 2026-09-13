@@ -99,6 +99,7 @@ jobs:
           New-Item -ItemType Directory -Path $reportDirectory | Out-Null
           "AGENT_REPORT_DIRECTORY=$reportDirectory" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
       - name: Run one bounded paid Agent cell
+        id: benchmark
         shell: pwsh
         run: |
           if ($env:BENCHMARK_SELECTOR -notmatch '^tests/e2e/agent_harness/test_[A-Za-z0-9_]+\.py(?:::[A-Za-z0-9_]+)?$') {
@@ -125,6 +126,7 @@ jobs:
           }
           pdm run benchmark-agent-harness -- @benchmarkArgs
       - name: Qualify the characterization report
+        if: ${{ !cancelled() && steps.benchmark.outcome != 'skipped' }}
         shell: pwsh
         run: |
           $reports = @(Get-ChildItem -LiteralPath $env:AGENT_REPORT_DIRECTORY -Filter "*.json" -File)

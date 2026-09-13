@@ -22,7 +22,7 @@ flowchart LR
     J --> R
     C --> T[Metrics and lifecycle trace]
     T --> R
-    R --> E[Report policy v2]
+    R --> E[Report policy v3: outcome and resources]
 ```
 
 ## What the benchmark measures
@@ -72,7 +72,11 @@ Each live cell runs in a killable spawn child with a 900-second deadline, at mos
 
 Reported subject tokens are limited to 500,000 per cell and 4,000,000 per pytest invocation. Token enforcement happens at response boundaries: count the completed response and stop before a later request. Missing usage stops further cells because invocation cost cannot be counted; round and time limits remain independent.
 
+Stopping because provider usage is missing is a measurement error, not proof that the Agent exhausted its task allowance. Conversely, an observed wall timeout is still a failed execution even when the interrupted response has unknown usage; scoring and accounting coverage answer different questions.
+
 A runtime error, failed integrity check, or exhausted cell does not automatically cancel unrelated remaining cases. Pytest `-x` and `--maxfail` control that choice. The invocation stops when its aggregate token limit is reached, accounting is unavailable, output cannot be persisted, or the user interrupts it.
+
+The invocation token cap controls admission of subsequent cells. A cell admitted before that cap retains its own execution status, budget and Judge result even when its returned usage takes the invocation total past the cap; results must not depend on the cost of earlier tasks. The report retains the aggregate consumption. A direct call attempted after the cap produces an unexecuted result, not evidence of an Agent failing the business task.
 
 ## Reports and acceptance
 
@@ -82,7 +86,13 @@ Integrity reflects the checks actually observed, independently of execution comp
 
 The report reader validates only fields consumed by policy, preserves additional metadata, and leaves diagnostics readable as they evolve. It does not demand exact keys throughout the report, recompute stored projection flags, compare independent token counters, cap trace sizes, or require a clean working tree. Schema v4 remains diagnostic-only; v5 reports remain readable and usable in their own cohorts. Cohorts and comparisons must share report schema, so a v6 task score cannot silently become a continuation of a v5 single-request trend.
 
-`agent-harness-report-policy-v2` characterizes one headless measurement without creating a gate. Formal acceptance uses three headless repetitions and one headed repetition. Structural prerequisites and integrity must pass in all four. For Judge-required cases, at least two headless Judge verdicts must pass, the third may be partial, and the headed Judge verdict must pass. A required Judge must complete; for cases without a Judge, all structural verdicts must pass.
+`agent-harness-report-policy-v3` separates descriptive measurement from acceptance. `characterize` accepts any nonempty cohort for the same task, mode and configuration; `compare` accepts equally shaped cohorts, including failed runs. Every explicitly supplied attempt remains visible, with no selection of the best retry. `qualified` describes whether the cohort can be interpreted together, and descriptive comparison `passed` means the comparison was produced, not that task performance improved. Mixed cases, duplicate runs and incompatible identities have no aggregate summary. Three headless repetitions plus one headed repetition retain the existing formal gate: structural prerequisites, integrity and budgets must pass in all four; Judge-required cases need at least two headless passes, at most one headless partial, and a headed pass. Other cases need all structural verdicts to pass.
+
+Policy decisions (payload schema v2) add per-run observations and cohort summaries without rewriting the cell report. Single-cell outcome is `fail` for exhausted execution, runtime failure or a failed deterministic outcome check; an available required Judge supplies pass/partial/fail after structural prerequisites pass. Invalid setup, measurement failure, unavailable/inconclusive Judge, missing evidence and unresolved integrity are `unscored`. Runtime failure records unsuccessful execution, not a claim about the root cause or an automatically diagnosed platform outage. Historical reports affected by the invocation cap remain unscored because their original terminal status was overwritten. These distinctions do not modify Judge verdicts or silently repair old reports.
+
+Summaries retain pass/partial/fail/unscored counts and show the denominator of the scored pass rate. A rate over supplied repetitions is descriptive, not a production estimate or a weighted portfolio score. The policy does not pool separate task families or scenarios. Changes to source/runtime identity remain visible per attempt; authors must identify implementation phases instead of pooling known different revisions just because their diagnostic identity fields are not comparison gates.
+
+Resource summaries include failed and unscored attempts' observed Subject tokens, token coverage, and medians across all attempts. Token totals are complete only when every admitted sampling round has reported usage and accounting is usable; otherwise observed tokens remain a lower bound and complete totals stay null. Total Subject tokens divided by successful tasks is reported only with complete accounting, no unscored attempts and at least one pass. Missing time or round measurements leave the corresponding median null. Comparisons suppress pass-rate deltas when any attempt is unscored. Tokens are a resource measure, not a currency estimate; Judge usage remains separate in cell reports. Zero successes have no finite cost-per-success estimate.
 
 Comparable reports retain the same schema, case and input variation, subject model, fixture, effective settings, optional Embedding/Judge settings, resource policy, and Judge rubric/model. A cohort also shares its Harness variant. Commit, dirty state, case source hash, runtime hash, original settings-file hash, and invocation ID remain diagnostic identity; they do not block developer comparisons. Scoring guidance participates in rubric identity. When intentionally changing evaluation semantics, describe that change alongside any comparison: a relaxed oracle is not evidence of a better model.
 
@@ -100,7 +110,7 @@ Per-request checkpoints and provider budget observations are journaled during ex
 - `pdm run benchmark-agent-harness -- --collect-only -q` and `pdm run benchmark-agent-harness-headed -- --collect-only -q` collect the same four default representative tasks without provider calls.
 - `pdm run benchmark-agent-harness -- tests/e2e/agent_harness/test_business_restock_decision.py::test_restock_contrast --llm-settings <path> --judge-llm-settings <path>` selects the restock contrasts. Add `[budget_tight]` to select just that scenario; campaign uses `test_campaign_contrast` with `spending_threshold` and `contact_interval`.
 - `pdm run benchmark-agent-harness -- <case selector> --llm-settings <path>` runs an explicit paid series. Add Judge settings when its rubric requires judgement; the headed command selects visible execution.
-- `pdm run benchmark-agent-harness-evaluate characterize <report>` reads one measurement. `formal <reports...>` and `compare --baseline <reports...> --candidate <reports...>` apply the acceptance/comparison policy; calibration arguments are optional.
+- `pdm run benchmark-agent-harness-evaluate characterize <reports...>` describes one same-mode cohort, including failures. `formal <reports...>` and `compare --baseline <reports...> --candidate <reports...>` apply the acceptance/comparison policy; calibration arguments are optional. Re-evaluating saved reports uses no Subject or Judge calls and leaves the originals unchanged.
 - `pdm run benchmark-agent-harness-calibrate-judge` evaluates an explicit calibration suite when Judge agreement needs investigation.
 
 The ordinary service portfolio stays offline and does not collect these cases. Service tests and Agent cases share no executable helpers, fixture data, or reports. Run the affected service checks before paid acceptance and broaden verification only when impact warrants it; CI may enforce its own service-job ordering.

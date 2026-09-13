@@ -698,25 +698,9 @@ def run_benchmark(
         result.budget,
         invocation_reported_subject_tokens=invocation_total,
     )
-    if (
-        result.run_status is BenchmarkRunStatus.COMPLETED
-        and invocation_total
-        > budget_policy.max_reported_invocation_subject_tokens
-    ):
-        result_budget = replace(
-            result_budget,
-            status=BenchmarkBudgetStatus.EXCEEDED,
-            exhaustion_reason="invocation_token_limit_exceeded",
-        )
-        result = replace(
-            result,
-            run_status=BenchmarkRunStatus.BUDGET_EXCEEDED,
-            semantic_verdict=SemanticVerdict.NOT_EVALUATED,
-            budget=result_budget,
-            failure_kind="invocation_token_limit_exceeded",
-        )
-    else:
-        result = replace(result, budget=result_budget)
+    # Dispatch stops subsequent cells at its aggregate cap. A completed task's
+    # outcome must not depend on the cost of tasks that happened to precede it.
+    result = replace(result, budget=result_budget)
     return _persist_result(output_directory, result)
 
 
@@ -915,7 +899,11 @@ def _run_model_cell(
                             services=case_services,
                         )
                     except BenchmarkBudgetError as exc:
-                        run_status = BenchmarkRunStatus.BUDGET_EXCEEDED
+                        run_status = (
+                            BenchmarkRunStatus.MEASUREMENT_ERROR
+                            if budget.snapshot().status is BenchmarkBudgetStatus.UNVERIFIABLE
+                            else BenchmarkRunStatus.BUDGET_EXCEEDED
+                        )
                         failure_kind = exc.code
                         event["exception"] = exception_payload(exc)
                     except Exception as exc:

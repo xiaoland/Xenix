@@ -6,7 +6,8 @@ consumer of the outcome and measurement fields needed for acceptance.  It has no
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from collections import Counter
+from dataclasses import dataclass, field
 from enum import StrEnum
 import json
 import math
@@ -19,7 +20,7 @@ from pydantic import BaseModel, ConfigDict, ValidationError
 from .judge_calibration import JudgeCalibrationReport
 
 
-REPORT_POLICY_ID = "agent-harness-report-policy-v2"
+REPORT_POLICY_ID = "agent-harness-report-policy-v3"
 AGENT_REPORT_KIND = "xenix.agent_harness.cell"
 CURRENT_REPORT_SCHEMA_VERSION = 6
 LEGACY_REPORT_SCHEMA_VERSION = 4
@@ -68,11 +69,13 @@ class ReportPolicyDecision:
     reason_codes: tuple[str, ...]
     case_id: str | None = None
     run_ids: tuple[str, ...] = ()
+    observations: tuple[Mapping[str, Any], ...] = ()
+    summary: Mapping[str, Any] = field(default_factory=dict)
 
     def to_payload(self) -> dict[str, Any]:
         return {
             "report_kind": "xenix.agent_harness.policy_decision",
-            "schema_version": 1,
+            "schema_version": 2,
             "policy_id": REPORT_POLICY_ID,
             "evaluation": self.evaluation,
             "qualified": self.qualified,
@@ -81,6 +84,8 @@ class ReportPolicyDecision:
             "reason_codes": list(self.reason_codes),
             "case_id": self.case_id,
             "run_ids": list(self.run_ids),
+            "observations": list(self.observations),
+            "summary": dict(self.summary),
         }
 
 
@@ -99,7 +104,7 @@ class ReportComparison:
     def to_payload(self) -> dict[str, Any]:
         return {
             "report_kind": "xenix.agent_harness.report_comparison",
-            "schema_version": 1,
+            "schema_version": 2,
             "policy_id": REPORT_POLICY_ID,
             "comparable": self.comparable,
             "gate_eligible": self.gate_eligible,
@@ -143,14 +148,17 @@ def load_agent_reports(paths: Iterable[Path]) -> tuple[LoadedAgentReport, ...]:
 def evaluate_characterization(
     reports: Sequence[LoadedAgentReport],
 ) -> ReportPolicyDecision:
-    """Qualify one headless measurement without turning it into a gate."""
+    """Describe every supplied attempt in one same-mode cohort, including failures."""
 
+    shape = _profile_shape(reports) or (0, 0)
     reasons = _measurement_reasons(
         reports,
-        headless_count=1,
-        headed_count=0,
+        headless_count=shape[0],
+        headed_count=shape[1],
         require_semantic_prerequisites=False,
     )
+    if all(shape):
+        reasons.append("characterization_execution_modes_mixed")
     qualified = not reasons
     return _decision(
         evaluation="characterization",
@@ -203,28 +211,26 @@ def compare_report_cohorts(
 
     baseline_shape = _profile_shape(baseline)
     candidate_shape = _profile_shape(candidate)
-    if baseline_shape == (1, 0):
-        baseline_decision = evaluate_characterization(baseline)
-    elif baseline_shape == (3, 1):
+    if baseline_shape == (3, 1):
         baseline_decision = evaluate_formal_acceptance(
             baseline,
             calibrations=calibrations,
         )
     else:
-        baseline_decision = _invalid_shape_decision("baseline", baseline)
-    if candidate_shape == (1, 0):
-        candidate_decision = evaluate_characterization(candidate)
-    elif candidate_shape == (3, 1):
+        baseline_decision = evaluate_characterization(baseline)
+    if candidate_shape == (3, 1):
         candidate_decision = evaluate_formal_acceptance(
             candidate,
             calibrations=calibrations,
         )
     else:
-        candidate_decision = _invalid_shape_decision("candidate", candidate)
+        candidate_decision = evaluate_characterization(candidate)
 
     reasons: list[str] = []
     if baseline_shape != candidate_shape:
         reasons.append("comparison_repetition_policy_mismatch")
+    if any(shape and all(shape) and shape != (3, 1) for shape in (baseline_shape, candidate_shape)):
+        reasons.append("characterization_execution_modes_mixed")
     if not _all_supported(baseline) or not _all_supported(candidate):
         reasons.append("legacy_report_not_comparable")
     if not reasons:
@@ -284,6 +290,11 @@ def _decision(
     reasons: Sequence[str],
 ) -> ReportPolicyDecision:
     case_ids = {report.case_id for report in reports if report.case_id is not None}
+    observations = tuple(_report_observation(report) for report in reports)
+    shape = _profile_shape(reports) or (0, 0)
+    coherent = not _measurement_reasons(
+        reports, headless_count=shape[0], headed_count=shape[1], require_semantic_prerequisites=False
+    ) and (not all(shape) or shape == (3, 1))
     return ReportPolicyDecision(
         evaluation=evaluation,
         qualified=qualified,
@@ -292,7 +303,117 @@ def _decision(
         reason_codes=_unique(reasons),
         case_id=next(iter(case_ids)) if len(case_ids) == 1 else None,
         run_ids=tuple(report.run_id for report in reports if report.run_id is not None),
+        observations=observations,
+        summary=_summarize_observations(observations) if coherent else {},
     )
+
+
+def _report_observation(report: LoadedAgentReport) -> dict[str, Any]:
+    """Project task success separately from evaluator availability and resource coverage."""
+
+    payload = report.payload
+    if report.qualification is ReportQualification.LEGACY_UNQUALIFIED:
+        return {"run_id": report.run_id, "outcome": "unscored", "reason": "legacy_unqualified"}
+    status = payload["run_status"]
+    budget = payload["budget"]
+    judge = payload["judge"]
+    semantic = payload["semantic"]
+    budget_reason = budget.get("exhaustion_reason")
+    stop_reason = budget_reason or payload.get("failure_kind") or ""
+    if status in {"invalid_setup", "measurement_error"}:
+        outcome, reason = "unscored", status
+    elif stop_reason.startswith("invocation_token_limit"):
+        # Old reports may have overwritten a completed cell at the dispatch cap.
+        # Their original outcome cannot be recovered from the projected flag.
+        outcome, reason = "unscored", "invocation_budget_interference"
+    elif (
+        status == "budget_exceeded"
+        and budget["status"] == "unverifiable"
+        and budget_reason == payload.get("failure_kind")
+    ):
+        # Older runners labelled a stop caused by missing usage as exhaustion.
+        # A real wall timeout still fails even if its interrupted usage is unknown.
+        outcome, reason = "unscored", "accounting_stopped_execution"
+    elif status in {"budget_exceeded", "runtime_error"}:
+        outcome, reason = "fail", status
+    elif status != "completed":
+        outcome, reason = "unscored", "execution_status_unknown"
+    elif not payload["integrity"]["passed"]:
+        outcome, reason = "unscored", "integrity_not_passed"
+    elif any(not check["passed"] for check in semantic["checks"]):
+        outcome, reason = "fail", "outcome_check_failed"
+    elif not semantic["checks"]:
+        outcome, reason = "unscored", "outcome_evidence_missing"
+    elif judge["required"]:
+        if judge["status"] == "completed" and judge["verdict"] in {"pass", "partial", "fail"}:
+            outcome, reason = judge["verdict"], "judge_verdict"
+        else:
+            outcome, reason = "unscored", "judge_unavailable_or_inconclusive"
+    elif semantic["verdict"] in {"pass", "partial", "fail"}:
+        outcome, reason = semantic["verdict"], "deterministic_verdict"
+    else:
+        outcome, reason = "unscored", "outcome_not_evaluated"
+    metrics = payload["subject_metrics"]
+    reported_responses = metrics.get("usage_reported_primary_response_count")
+    admitted_rounds = budget.get("sampling_rounds_admitted")
+    tokens_complete = (
+        budget["status"] in {"within_limits", "exceeded"}
+        and metrics.get("token_usage") is not None
+        and isinstance(reported_responses, int)
+        and reported_responses == admitted_rounds
+    )
+    return {
+        "run_id": report.run_id,
+        "outcome": outcome,
+        "reason": reason,
+        "run_status": status,
+        "failure_kind": payload.get("failure_kind"),
+        "judge_status": judge["status"],
+        "budget_reason": budget_reason,
+        "reported_subject_tokens": budget["reported_subject_tokens"],
+        "subject_tokens_complete": tokens_complete,
+        "turn_seconds": metrics.get("turn_seconds"),
+        "sampling_rounds": metrics.get("sampling_round_count"),
+        "provenance": {
+            key: payload["identity"].get(key)
+            for key in ("harness_variant", "repository_commit", "repository_dirty", "case_definition_sha256", "runtime_sha256")
+        },
+    }
+
+
+def _summarize_observations(observations: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    counts = Counter(item["outcome"] for item in observations)
+    attempts = len(observations)
+    scored = attempts - counts["unscored"]
+    complete_tokens = sum(bool(item.get("subject_tokens_complete")) for item in observations)
+    observed_tokens = sum(item.get("reported_subject_tokens", 0) for item in observations)
+    total_tokens = observed_tokens if attempts and complete_tokens == attempts else None
+
+    def full_median(key: str) -> float | None:
+        values = [item.get(key) for item in observations]
+        if not values or not all(
+            isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+            for value in values
+        ):
+            return None
+        return float(median(values))
+
+    return {
+        "attempt_count": attempts,
+        "scored_count": scored,
+        "outcome_counts": {key: counts[key] for key in ("pass", "partial", "fail", "unscored")},
+        "pass_rate": counts["pass"] / scored if scored else None,
+        "observed_subject_tokens": observed_tokens,
+        "subject_token_coverage": complete_tokens / attempts if attempts else None,
+        "total_subject_tokens": total_tokens,
+        "effective_subject_tokens_per_pass": (
+            total_tokens / counts["pass"]
+            if total_tokens is not None and counts["pass"] and scored == attempts else None
+        ),
+        "median_turn_seconds": full_median("turn_seconds"),
+        "median_sampling_rounds": full_median("sampling_rounds"),
+        "median_reported_subject_tokens": full_median("reported_subject_tokens") if total_tokens is not None else None,
+    }
 
 
 def _measurement_reasons(
@@ -318,17 +439,17 @@ def _measurement_reasons(
     if len({payload["case_id"] for payload in payloads}) != 1:
         reasons.append("case_identity_mismatch")
     reasons.extend(_cohort_identity_reasons(payloads))
-    for payload in payloads:
-        if payload["run_status"] != "completed":
-            reasons.append("execution_not_completed")
-        if not payload["integrity"]["passed"]:
-            reasons.append("integrity_not_passed")
-        if require_semantic_prerequisites:
+    if require_semantic_prerequisites:
+        for payload in payloads:
+            if payload["run_status"] != "completed":
+                reasons.append("execution_not_completed")
+            if not payload["integrity"]["passed"]:
+                reasons.append("integrity_not_passed")
             semantic_checks = payload["semantic"]["checks"]
             if not semantic_checks or not all(check["passed"] for check in semantic_checks):
                 reasons.append("semantic_prerequisite_not_passed")
-        if payload["budget"]["status"] != "within_limits":
-            reasons.append("budget_not_within_limits")
+            if payload["budget"]["status"] != "within_limits":
+                reasons.append("budget_not_within_limits")
     return list(_unique(reasons))
 
 
@@ -354,16 +475,26 @@ def _cohort_identity_reasons(payloads: Sequence[Mapping[str, Any]]) -> list[str]
         "identity.effective_settings_sha256",
         "identity.harness_variant",
         "budget.policy",
-        "judge.required",
-        "judge.rubric_id",
-        "judge.rubric_sha256",
-        "judge.provider_model",
     )
     # invocation_id is intentionally absent: it identifies one budget-owning
     # dispatch, while formal acceptance combines four independent dispatches.
-    for field in fields:
-        if len({_nested_value(payload, field) for payload in payloads}) != 1:
-            reasons.append(f"cohort_{field.replace('.', '_')}_mismatch")
+    for key in fields:
+        if len({_nested_value(payload, key) for payload in payloads}) != 1:
+            reasons.append(f"cohort_{key.replace('.', '_')}_mismatch")
+    reasons.extend(_judge_identity_reasons(payloads, prefix="cohort"))
+    return reasons
+
+
+def _judge_identity_reasons(payloads: Sequence[Mapping[str, Any]], *, prefix: str) -> list[str]:
+    # A crash before assessment has no observed rubric. Configured Judge settings
+    # still participate in identity; lack of a response is an outcome, not drift.
+    assessed = [payload for payload in payloads if payload["judge"]["required"] or payload["run_status"] == "completed"]
+    reasons = []
+    for key in ("judge.required", "judge.rubric_id", "judge.rubric_sha256", "judge.provider_model"):
+        values = {_nested_value(payload, key) for payload in assessed}
+        values.discard(None)
+        if len(values) > 1:
+            reasons.append(f"{prefix}_{key.replace('.', '_')}_mismatch")
     return reasons
 
 
@@ -457,16 +588,12 @@ def _comparison_identity_reasons(
         "identity.judge_settings_sha256",
         "identity.effective_settings_sha256",
         "budget.policy",
-        "judge.required",
-        "judge.rubric_id",
-        "judge.rubric_sha256",
-        "judge.provider_model",
     )
     return [
         f"comparison_{field.replace('.', '_')}_mismatch"
         for field in fields
         if _nested_value(left, field) != _nested_value(right, field)
-    ]
+    ] + _judge_identity_reasons([report.payload for report in (*baseline, *candidate)], prefix="comparison")
 
 
 def _comparison_judge_reasons(
@@ -477,41 +604,24 @@ def _comparison_judge_reasons(
     payloads = [report.payload for report in (*baseline, *candidate)]
     if not payloads or not any(payload["judge"]["required"] for payload in payloads):
         return []
-    reasons = _judge_cell_reasons(payloads)
-    reasons.extend(_calibration_reasons(payloads, calibrations))
-    return list(_unique(reasons))
+    judged = [payload for payload in payloads if payload["judge"]["status"] == "completed"]
+    return _calibration_reasons(judged, calibrations)
 
 
 def _metric_deltas(
     baseline: Sequence[LoadedAgentReport],
     candidate: Sequence[LoadedAgentReport],
 ) -> dict[str, float | int | None]:
-    def values(reports: Sequence[LoadedAgentReport], key: str) -> list[float]:
-        return [
-            float(value)
-            for report in reports
-            if isinstance((value := report.payload["subject_metrics"].get(key)), (int, float))
-            and not isinstance(value, bool)
-            and math.isfinite(value)
-        ]
-
-    baseline_seconds = values(baseline, "turn_seconds")
-    candidate_seconds = values(candidate, "turn_seconds")
-    baseline_tokens = [report.payload["budget"]["reported_subject_tokens"] for report in baseline]
-    candidate_tokens = [report.payload["budget"]["reported_subject_tokens"] for report in candidate]
-    return {
-        "median_turn_seconds": _median_delta(baseline_seconds, candidate_seconds),
-        "median_reported_subject_tokens": _median_delta(
-            baseline_tokens,
-            candidate_tokens,
-        ),
-    }
-
-
-def _median_delta(left: Sequence[float | int], right: Sequence[float | int]) -> float | None:
-    if not left or not right:
-        return None
-    return float(median(right) - median(left))
+    left = _summarize_observations(tuple(_report_observation(report) for report in baseline))
+    right = _summarize_observations(tuple(_report_observation(report) for report in candidate))
+    keys = ("median_turn_seconds", "median_sampling_rounds", "median_reported_subject_tokens", "effective_subject_tokens_per_pass")
+    deltas = {key: right[key] - left[key] if left[key] is not None and right[key] is not None else None for key in keys}
+    deltas["pass_rate"] = (
+        right["pass_rate"] - left["pass_rate"]
+        if left["scored_count"] == left["attempt_count"] and right["scored_count"] == right["attempt_count"]
+        else None
+    )
+    return deltas
 
 
 def _profile_shape(reports: Sequence[LoadedAgentReport]) -> tuple[int, int] | None:
@@ -519,17 +629,6 @@ def _profile_shape(reports: Sequence[LoadedAgentReport]) -> tuple[int, int] | No
         return None
     modes = [report.payload["execution_mode"] for report in reports]
     return modes.count("headless"), modes.count("headed")
-
-
-def _invalid_shape_decision(label: str, reports: Sequence[LoadedAgentReport]) -> ReportPolicyDecision:
-    return _decision(
-        evaluation=f"{label}_comparison_input",
-        reports=reports,
-        qualified=False,
-        accepted=False,
-        gate_eligible=False,
-        reasons=("comparison_profile_invalid",),
-    )
 
 
 def _all_supported(reports: Sequence[LoadedAgentReport]) -> bool:
@@ -571,6 +670,7 @@ class _BudgetFields(_PolicyFields):
     status: str
     policy: dict[str, Any]
     reported_subject_tokens: int
+    exhaustion_reason: str | None = None
 
 
 class _IdentityFields(_PolicyFields):
@@ -588,6 +688,7 @@ class _ReportFields(_PolicyFields):
     provider_model: str
     execution_mode: Literal["headless", "headed"]
     run_status: str
+    failure_kind: str | None = None
     semantic: _SemanticFields
     integrity: _IntegrityFields
     judge: _JudgeFields

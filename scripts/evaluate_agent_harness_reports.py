@@ -68,14 +68,14 @@ def _build_parser() -> argparse.ArgumentParser:
 
     characterize = subparsers.add_parser(
         "characterize",
-        help="Qualify exactly one headless v5 measurement without creating a gate.",
+        help="Describe all attempts in one same-mode task cohort, including failures.",
     )
     characterize.add_argument("reports", nargs="+", type=Path)
     characterize.add_argument("--output", type=Path)
 
     formal = subparsers.add_parser(
         "formal",
-        help="Gate exactly three headless and one headed v5 Agent reports.",
+        help="Gate exactly three headless and one headed Agent reports.",
     )
     formal.add_argument("reports", nargs="+", type=Path)
     formal.add_argument(

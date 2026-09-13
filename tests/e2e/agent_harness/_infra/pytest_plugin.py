@@ -160,7 +160,7 @@ class AgentHarnessBenchmarkController:
         return Path(source)
 
     def run(self, case: BenchmarkCase) -> BenchmarkRun:
-        """Run exactly one model/case cell and fail for infrastructure faults."""
+        """Run one model/case cell and surface failed execution or persistence."""
 
         invocation = self.config.stash[_INVOCATION_BUDGET_KEY]
         if invocation.halted_reason is not None:
@@ -198,7 +198,7 @@ class AgentHarnessBenchmarkController:
         invocation.observe(run)
         self._report(run)
 
-        failure = _infrastructure_failure(run)
+        failure = _execution_failure(run)
         if failure is not None:
             pytest.fail(failure)
         return run
@@ -218,6 +218,7 @@ class AgentHarnessBenchmarkController:
                 f"semantic={result.semantic_verdict.value}",
                 f"integrity={result.integrity_passed}",
                 f"judge={result.judge.status.value}",
+                f"judge_verdict={result.judge.verdict.value}",
                 f"budget={result.budget.status.value}",
                 f"rounds={result.budget.sampling_rounds_admitted}",
                 f"tokens={token_total if token_total is not None else 'unreported'}",
@@ -248,7 +249,7 @@ def _path_option(config: Config, option_name: str) -> Path | None:
     return Path(value) if value is not None else None
 
 
-def _infrastructure_failure(run: BenchmarkRun) -> str | None:
+def _execution_failure(run: BenchmarkRun) -> str | None:
     if not run.persisted:
         return "Agent Harness benchmark could not persist its measurement"
     if run.result.run_status is not BenchmarkRunStatus.COMPLETED:
