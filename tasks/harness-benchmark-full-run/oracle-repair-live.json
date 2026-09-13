@@ -1,0 +1,266 @@
+{
+  "scope": "Two repaired oracles only; new attempts with changed evaluation semantics; original 28-run evidence retained.",
+  "runs": [
+    {
+      "case_id": "ml.clustering_two_segments",
+      "run_id": "065ffe1481b748f89eddc9de6ab288fb",
+      "report": "build/agent-harness-oracle-repair/ml.clustering_two_segments-deepseek-deepseek-v4-flash-065ffe1481b748f89eddc9de6ab288fb.json",
+      "sha256": "1120ec824f107eddfc7845fd7578fba8c7223cde6953522d1daca203b9aefc05",
+      "identity": {
+        "case_definition_sha256": "804FF69F77A1EBAD76C8AC3E3456DE358315E1C3A8D2EC7C0C54840CBEC41041",
+        "effective_settings_sha256": "6973FC1DA2E20673BAAAE75940A37DE309FD0DC58E98CC9606C23B4EE0E547E8",
+        "embedding_settings_sha256": "84855E3EADB8F092BBE6E6E87D5ECAD071F1981359295FBA2826AEC4630F0397",
+        "fixture_sha256": "FB8D3E8D646A64E7901070752CF47E91475A3B4D6F3BC4E2191F40851F827FC5",
+        "harness_variant": "baseline",
+        "invocation_id": "ee7ed80ab7ca463594387ada6e9f2a98",
+        "judge_settings_sha256": "86A3403ECB36E19C283750DF3E07A5984AF12994769207E46981D0162835A507",
+        "repository_commit": "81fb9bbc682c92b68346a139f7e011f4b72a45ee",
+        "repository_dirty": true,
+        "runtime_sha256": "4010B1D8E998EDBE481549A554DE720FE74E8A541C49EF8E40D5302174D33B2D",
+        "settings_sha256": "9BD35670D0D0AD156B5F4B148A530992988DA094A0F68365D796ECA83C6149B6"
+      },
+      "observation": {
+        "run_id": "065ffe1481b748f89eddc9de6ab288fb",
+        "outcome": "pass",
+        "reason": "deterministic_verdict",
+        "run_status": "completed",
+        "failure_kind": null,
+        "judge_status": "not_requested",
+        "budget_reason": null,
+        "reported_subject_tokens": 49208,
+        "subject_tokens_complete": true,
+        "turn_seconds": 32.89713329996448,
+        "sampling_rounds": 6,
+        "provenance": {
+          "harness_variant": "baseline",
+          "repository_commit": "81fb9bbc682c92b68346a139f7e011f4b72a45ee",
+          "repository_dirty": true,
+          "case_definition_sha256": "804FF69F77A1EBAD76C8AC3E3456DE358315E1C3A8D2EC7C0C54840CBEC41041",
+          "runtime_sha256": "4010B1D8E998EDBE481549A554DE720FE74E8A541C49EF8E40D5302174D33B2D"
+        }
+      },
+      "semantic": {
+        "checks": [
+          {
+            "name": "exact_two_segment_partition",
+            "passed": true,
+            "summary": "exact_two_segment_partition_observed"
+          },
+          {
+            "name": "public_artifact_linked",
+            "passed": true,
+            "summary": "public_table_link_observed"
+          }
+        ],
+        "passed": true,
+        "verdict": "pass"
+      },
+      "integrity": {
+        "checks": [
+          {
+            "name": "canonical_completion",
+            "passed": true,
+            "summary": "canonical_completion_observed"
+          },
+          {
+            "name": "source_unchanged",
+            "passed": true,
+            "summary": "source_unchanged"
+          }
+        ],
+        "passed": true
+      },
+      "judge": {
+        "independence": "not_applicable",
+        "metrics": {
+          "elapsed_seconds": null,
+          "provider_retry_count": 0,
+          "token_usage": null
+        },
+        "provider_model": null,
+        "reason_codes": [],
+        "required": false,
+        "rubric_id": null,
+        "rubric_sha256": null,
+        "scores": {},
+        "status": "not_requested",
+        "summary": "judge_not_requested",
+        "verdict": "not_evaluated"
+      },
+      "subject_metrics": {
+        "assessment_seconds": 0.01687380002113059,
+        "derived_dataset_count": 1,
+        "message_counts": {
+          "assistant": 6,
+          "tool_call": 7,
+          "tool_result": 7,
+          "user": 1
+        },
+        "provider_retry_count": 0,
+        "sampling_round_count": 6,
+        "terminal_shape": [
+          6,
+          4
+        ],
+        "token_usage": {
+          "cached_input_tokens": 40320,
+          "input_tokens": 43446,
+          "output_tokens": 5762,
+          "total_tokens": 49208
+        },
+        "tool_call_counts_by_name": {
+          "agent.skill.activate": 1,
+          "analysis.graph": 1,
+          "analysis.profile": 1,
+          "data.query": 2,
+          "data.transform": 1,
+          "knowledge.lookup": 1
+        },
+        "tool_result_counts_by_status": {
+          "succeeded": 7
+        },
+        "turn_seconds": 32.89713329996448,
+        "usage_reported_primary_response_count": 6
+      },
+      "unchanged_input_and_settings": {
+        "fixture_sha256": true,
+        "effective_settings_sha256": true,
+        "embedding_settings_sha256": true,
+        "judge_settings_sha256": true
+      }
+    },
+    {
+      "case_id": "ml.recommendation_item_similarity",
+      "run_id": "26852a9e726c4feb8710550e56f6c9d3",
+      "report": "build/agent-harness-oracle-repair/ml.recommendation_item_similarity-deepseek-deepseek-v4-flash-26852a9e726c4feb8710550e56f6c9d3.json",
+      "sha256": "5d38c97e07ee739035b8f5711d53a0e2742dd4ee3441d5b7ea5974a6b5d571a7",
+      "identity": {
+        "case_definition_sha256": "306590E751B9BDFF0941784149A0EDBC39BA5C31F489DC3A7928083650D3C305",
+        "effective_settings_sha256": "6973FC1DA2E20673BAAAE75940A37DE309FD0DC58E98CC9606C23B4EE0E547E8",
+        "embedding_settings_sha256": "84855E3EADB8F092BBE6E6E87D5ECAD071F1981359295FBA2826AEC4630F0397",
+        "fixture_sha256": "A45CC8B727D1BA85002552245EEB9F1C4C8020B061221906AC2CFD97D67DD9F1",
+        "harness_variant": "baseline",
+        "invocation_id": "ee7ed80ab7ca463594387ada6e9f2a98",
+        "judge_settings_sha256": "86A3403ECB36E19C283750DF3E07A5984AF12994769207E46981D0162835A507",
+        "repository_commit": "81fb9bbc682c92b68346a139f7e011f4b72a45ee",
+        "repository_dirty": true,
+        "runtime_sha256": "4010B1D8E998EDBE481549A554DE720FE74E8A541C49EF8E40D5302174D33B2D",
+        "settings_sha256": "9BD35670D0D0AD156B5F4B148A530992988DA094A0F68365D796ECA83C6149B6"
+      },
+      "observation": {
+        "run_id": "26852a9e726c4feb8710550e56f6c9d3",
+        "outcome": "pass",
+        "reason": "deterministic_verdict",
+        "run_status": "completed",
+        "failure_kind": null,
+        "judge_status": "not_requested",
+        "budget_reason": null,
+        "reported_subject_tokens": 126648,
+        "subject_tokens_complete": true,
+        "turn_seconds": 40.18511200003559,
+        "sampling_rounds": 11,
+        "provenance": {
+          "harness_variant": "baseline",
+          "repository_commit": "81fb9bbc682c92b68346a139f7e011f4b72a45ee",
+          "repository_dirty": true,
+          "case_definition_sha256": "306590E751B9BDFF0941784149A0EDBC39BA5C31F489DC3A7928083650D3C305",
+          "runtime_sha256": "4010B1D8E998EDBE481549A554DE720FE74E8A541C49EF8E40D5302174D33B2D"
+        }
+      },
+      "semantic": {
+        "checks": [
+          {
+            "name": "exact_ranked_recommendations",
+            "passed": true,
+            "summary": "exact_ranked_recommendations_observed"
+          },
+          {
+            "name": "public_artifact_linked",
+            "passed": true,
+            "summary": "public_table_link_observed"
+          }
+        ],
+        "passed": true,
+        "verdict": "pass"
+      },
+      "integrity": {
+        "checks": [
+          {
+            "name": "canonical_completion",
+            "passed": true,
+            "summary": "canonical_completion_observed"
+          },
+          {
+            "name": "source_unchanged",
+            "passed": true,
+            "summary": "source_unchanged"
+          }
+        ],
+        "passed": true
+      },
+      "judge": {
+        "independence": "not_applicable",
+        "metrics": {
+          "elapsed_seconds": null,
+          "provider_retry_count": 0,
+          "token_usage": null
+        },
+        "provider_model": null,
+        "reason_codes": [],
+        "required": false,
+        "rubric_id": null,
+        "rubric_sha256": null,
+        "scores": {},
+        "status": "not_requested",
+        "summary": "judge_not_requested",
+        "verdict": "not_evaluated"
+      },
+      "subject_metrics": {
+        "assessment_seconds": 0.0040269999881275,
+        "derived_dataset_count": 2,
+        "message_counts": {
+          "assistant": 10,
+          "tool_call": 14,
+          "tool_result": 14,
+          "user": 1
+        },
+        "provider_retry_count": 0,
+        "sampling_round_count": 11,
+        "terminal_shape": [
+          2,
+          7
+        ],
+        "token_usage": {
+          "cached_input_tokens": 114944,
+          "input_tokens": 121426,
+          "output_tokens": 5222,
+          "total_tokens": 126648
+        },
+        "tool_call_counts_by_name": {
+          "agent.skill.activate": 1,
+          "agent.skill.read_reference": 1,
+          "analysis.profile": 1,
+          "data.feature.select": 1,
+          "data.query": 4,
+          "knowledge.lookup": 1,
+          "model.apply": 2,
+          "model.metadata": 1,
+          "model.task.query": 1,
+          "model.train": 1
+        },
+        "tool_result_counts_by_status": {
+          "failed": 1,
+          "succeeded": 13
+        },
+        "turn_seconds": 40.18511200003559,
+        "usage_reported_primary_response_count": 11
+      },
+      "unchanged_input_and_settings": {
+        "fixture_sha256": true,
+        "effective_settings_sha256": true,
+        "embedding_settings_sha256": true,
+        "judge_settings_sha256": true
+      }
+    }
+  ]
+}

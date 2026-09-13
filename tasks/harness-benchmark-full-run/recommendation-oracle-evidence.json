@@ -1,0 +1,97 @@
+{
+  "run_id": "1b1865c5b9e2400396066ae98c47a6cc",
+  "source_report": "build/agent-harness-full-81fb9bb/legacy/ml.recommendation_item_similarity-deepseek-deepseek-v4-flash-1b1865c5b9e2400396066ae98c47a6cc.json",
+  "method": "Same native model, roles, parameters and inline input as the saved attempt, isolated temporary runtime; no LLM calls.",
+  "rows": [
+    {
+      "source_file": "ef7697d5488c4a3a8297321f3206ea71.csv",
+      "input_row_number": 1,
+      "base_item": "SKU-A",
+      "rank": 1,
+      "recommended_item": "SKU-B",
+      "similarity": 1.0,
+      "common_user_count": 4
+    },
+    {
+      "source_file": "ef7697d5488c4a3a8297321f3206ea71.csv",
+      "input_row_number": 1,
+      "base_item": "SKU-A",
+      "rank": 2,
+      "recommended_item": "SKU-C",
+      "similarity": 1.0,
+      "common_user_count": 3
+    }
+  ],
+  "result_columns": [
+    "source_file",
+    "input_row_number",
+    "base_item",
+    "rank",
+    "recommended_item",
+    "similarity",
+    "common_user_count"
+  ],
+  "existing_content_matcher_accepts": true,
+  "output_parent_dataset_id": null,
+  "output_ml_task_id": "7b4926e6569f403da963d8440300bbba",
+  "task_training_dataset_id": "08ecfcdf9cd7423187fb641f00a4b113",
+  "source_dataset_id": "08ecfcdf9cd7423187fb641f00a4b113",
+  "existing_lineage_gate_accepts": false,
+  "original_tool_link_present_in_final_answer": true,
+  "result_payload": {
+    "task_id": "7b4926e6569f403da963d8440300bbba",
+    "trained_model_id": "950d952bfd0d4008a2edcc014c809439",
+    "model_key": "recommendation.item_similarity",
+    "output_file_path": "C:\\Users\\yyh\\AppData\\Local\\Temp\\xenix-recommendation-oracle-probe-9utsiob4\\artifacts\\ml-tasks\\7b4926e6569f403da963d8440300bbba\\output\\item_recommendations.csv",
+    "summary": {
+      "row_count": 2,
+      "input_file_count": 1,
+      "prediction_column_name": "recommended_item",
+      "apply_mode": "rows",
+      "horizon": null,
+      "group_count": null
+    },
+    "source_dataset_ids": [],
+    "source_artifact_ids": [],
+    "text_classification_apply_facts": null,
+    "text_clustering_apply_facts": null,
+    "text_topic_apply_facts": null,
+    "text_retrieval_apply_facts": null,
+    "error_summary": null,
+    "canonical_output_path": "C:\\Users\\yyh\\AppData\\Local\\Temp\\xenix-recommendation-oracle-probe-9utsiob4\\artifacts\\apply\\datasets\\08ecfcdf9cd7423187fb641f00a4b113\\7b4926e6569f403da963d8440300bbba-apply-results.csv",
+    "result_dataset_id": "fd97bf6833f24e668f172abd72b5945b",
+    "columns": [
+      {
+        "name": "source_file",
+        "type": "VARCHAR"
+      },
+      {
+        "name": "input_row_number",
+        "type": "BIGINT"
+      },
+      {
+        "name": "base_item",
+        "type": "VARCHAR"
+      },
+      {
+        "name": "rank",
+        "type": "BIGINT"
+      },
+      {
+        "name": "recommended_item",
+        "type": "VARCHAR"
+      },
+      {
+        "name": "similarity",
+        "type": "DOUBLE"
+      },
+      {
+        "name": "common_user_count",
+        "type": "BIGINT"
+      }
+    ],
+    "row_count": 2,
+    "input_file_count": 1,
+    "prediction_column_name": "recommended_item"
+  }
+}

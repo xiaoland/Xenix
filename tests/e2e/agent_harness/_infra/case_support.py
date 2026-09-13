@@ -1,15 +1,47 @@
-"""Shared, read-only source and canonical-state helpers for benchmark cases."""
+"""Read-only source, delivery and canonical-state helpers for benchmark cases."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from hashlib import sha256
 from pathlib import Path
+import re
 from typing import Any
 
-from xenix.services.llm.messages import DatasetBlock, blocks_from_payload
+import polars as pl
 
-from .contracts import BenchmarkCaseServices, BenchmarkInputError
+from xenix.exceptions import NotFoundError, ValidationError
+from xenix.services.dataset_inspection import detect_source_format
+from xenix.services.llm.messages import DatasetBlock, blocks_from_payload
+from xenix.services.tabular import load_tabular_frame
+
+from .contracts import BenchmarkCaseContext, BenchmarkCaseServices, BenchmarkInputError
+
+
+def linked_tables(context: BenchmarkCaseContext) -> dict[str, pl.DataFrame]:
+    """Read tables actually delivered by link, independent of Dataset lineage.
+
+    Invalid or unavailable links provide no delivery. Unexpected service or
+    table-reading errors propagate as measurement failures.
+    """
+    messages = list(getattr(context.snapshot, "messages", ()))
+    final_text = str(getattr(messages[-1], "text", "") or "") if messages else ""
+    uris = re.findall(r"artifact://[A-Za-z0-9-]+(?:\?[^)\s>\]]+)?", final_text)
+    tables = {}
+    for uri in dict.fromkeys(uris):
+        try:
+            artifact = context.services.artifacts.resolve_uri(uri)
+        except NotFoundError, ValidationError:
+            continue
+        if not artifact.exists or not artifact.ready_to_open:
+            continue
+        path = Path(artifact.absolute_path)
+        if not is_within(path, context.runtime_home):
+            continue
+        source_format = detect_source_format(path)
+        if source_format.value != "unknown":
+            tables[uri] = load_tabular_frame(path, source_format)
+    return tables
 
 
 @dataclass(frozen=True)

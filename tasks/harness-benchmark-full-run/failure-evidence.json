@@ -1,0 +1,263 @@
+[
+  {
+    "case_id": "ml.forecast_validation_v1",
+    "run_id": "af055598eeec4be09bd426ed20cbf823",
+    "source_report": "build/agent-harness-full-81fb9bb/legacy/ml.forecast_validation_v1-deepseek-deepseek-v4-flash-af055598eeec4be09bd426ed20cbf823.json",
+    "classification": "actual_delivery_failure",
+    "tool_uri": "artifact://59137ebae3ed4eb6ac3555e1a271187c",
+    "final_answer_uri": "artifact://59137ebae3ed4eb6ac5555e1a271187c",
+    "different_positions": [
+      [
+        29,
+        "3",
+        "5"
+      ]
+    ],
+    "failed_checks": [
+      {
+        "name": "public_future_artifact",
+        "passed": false,
+        "summary": "linked_future_artifact_missing"
+      }
+    ],
+    "notes": "Forecast dataset and temporal evaluation checks passed. The final answer changed one character in the actual model.apply artifact handle; Judge was blocked by delivery failure."
+  },
+  {
+    "case_id": "business.revenue.v1.confirmation",
+    "run_id": "12cb3d355e3e4299898a28b90e516917",
+    "source_report": "build/agent-harness-full-81fb9bb/confirmation/business.revenue.v1.confirmation-deepseek-deepseek-v4-flash-12cb3d355e3e4299898a28b90e516917.json",
+    "classification": "actual_explanation_contradictions",
+    "judge": {
+      "independence": "independent",
+      "metrics": {
+        "elapsed_seconds": 110.58057509997161,
+        "provider_retry_count": 0,
+        "token_usage": {
+          "cached_input_tokens": 2048,
+          "input_tokens": 5279,
+          "output_tokens": 8513,
+          "total_tokens": 13792
+        }
+      },
+      "provider_model": "deepseek/deepseek-v4-pro",
+      "reason_codes": [
+        "incorrect_business_claim"
+      ],
+      "required": true,
+      "rubric_id": "business.revenue_revision.explanation.v1",
+      "rubric_sha256": "73E55EF6575ABE0E1DDB2D780DE0F0C5E2DB301C5E0CAE1AD1650DE1F1FE17AB",
+      "scores": {
+        "month_close_grounding": 0,
+        "revision_explanation": 2
+      },
+      "status": "completed",
+      "summary": "judge_completed",
+      "verdict": "fail"
+    },
+    "claims": [
+      {
+        "claim": "东区有 2 笔 cancelled 订单",
+        "evidence": [
+          {
+            "order_id": "O10",
+            "paid_date": "2026-06-24",
+            "store_id": "S01",
+            "amount_yuan": "3000",
+            "status": "cancelled",
+            "region": "东区"
+          },
+          {
+            "order_id": "O20",
+            "paid_date": "2026-06-30",
+            "store_id": "S06",
+            "amount_yuan": "2700",
+            "status": "cancelled",
+            "region": "南区"
+          }
+        ],
+        "finding": "O10 belongs to east; O20 belongs to south. East has one cancelled order."
+      },
+      {
+        "claim": "R20 这笔 11,000 元的整单退款",
+        "evidence": [
+          {
+            "order_id": "O04",
+            "paid_date": "2026-06-20",
+            "store_id": "S02",
+            "amount_yuan": "12000",
+            "status": "paid"
+          }
+        ],
+        "finding": "The referenced order amount is 12,000 yuan; an 11,000-yuan refund is not the full order amount."
+      }
+    ],
+    "limitation": "Judge retained only reason codes and dimension scores, not prose identifying the exact offending sentence. These are independently verified contradictions; do not claim they are the exact hidden Judge rationale."
+  },
+  {
+    "case_id": "business.revenue.v1.standard",
+    "run_id": "f5c24ab1b83c4e3b8a16c71828887ddf",
+    "source_report": "build/agent-harness-full-81fb9bb/business/business.revenue.v1.standard-deepseek-deepseek-v4-flash-f5c24ab1b83c4e3b8a16c71828887ddf.json",
+    "classification": "actual_explanation_contradictions",
+    "judge": {
+      "independence": "independent",
+      "metrics": {
+        "elapsed_seconds": 133.27965059998678,
+        "provider_retry_count": 0,
+        "token_usage": {
+          "cached_input_tokens": 384,
+          "input_tokens": 5299,
+          "output_tokens": 11556,
+          "total_tokens": 16855
+        }
+      },
+      "provider_model": "deepseek/deepseek-v4-pro",
+      "reason_codes": [
+        "incorrect_business_claim"
+      ],
+      "required": true,
+      "rubric_id": "business.revenue_revision.explanation.v1",
+      "rubric_sha256": "73E55EF6575ABE0E1DDB2D780DE0F0C5E2DB301C5E0CAE1AD1650DE1F1FE17AB",
+      "scores": {
+        "month_close_grounding": 2,
+        "revision_explanation": 2
+      },
+      "status": "completed",
+      "summary": "judge_completed",
+      "verdict": "fail"
+    },
+    "claims": [
+      {
+        "claim": "西区……和东区是同一量级，只是退款更多",
+        "evidence": {
+          "east_refund_yuan": 8600.5,
+          "west_refund_yuan": 4400.25
+        },
+        "finding": "The stated refund comparison is reversed; the answer itself displays the correct opposite values."
+      },
+      {
+        "claim": "差距约 7,850 元，而单笔退款（如 7,000 元、2,000 元）就能改变排名",
+        "evidence": {
+          "east_net_yuan": 40750,
+          "west_net_yuan": 32900,
+          "gap_yuan": 7850
+        },
+        "finding": "Neither of the cited individual amounts exceeds the regional gap."
+      }
+    ],
+    "limitation": "Both Judge dimension scores are 2 while the verdict is fail with incorrect_business_claim. Preserve this scoring mismatch for Judge rubric review; independently verified answer contradictions mean a full-score vector does not establish that the answer passed."
+  },
+  {
+    "case_id": "ml.text_topic_discovery_v1",
+    "run_id": "e1fd7cd8069641a0881c0ff606f64184",
+    "source_report": "build/agent-harness-full-81fb9bb/legacy/ml.text_topic_discovery_v1-deepseek-deepseek-v4-flash-e1fd7cd8069641a0881c0ff606f64184.json",
+    "classification": "mixed_oracle_restriction_and_delivery_review",
+    "failed_checks": [
+      {
+        "name": "topic_assignments",
+        "passed": false,
+        "summary": "topic_assignment_dataset_or_artifact_missing"
+      },
+      {
+        "name": "public_group_safe_evaluation",
+        "passed": false,
+        "summary": "topic_evaluation_report_missing_or_invalid"
+      }
+    ],
+    "final_text": "已按“先归纳主题、再逐条标注、最后做成可复用标注器”的方式完成。汇报用概括和代表词，不逐条复述原文。\n\n## 一、归纳出的三个运营主题\n\n用聚类和主题模型两条独立路径各跑一次（都取 3 类），结果完全一致，且三类的代表词没有任何交叉：\n\n| 主题代码 | 主题名称 | 运营含义（一句话） | 代表词（中／英） | 条数 |\n|---|---|---|---|---|\n| T1_BOOKING_SCHEDULING | 预订与时段安排 | 关于能不能约到、约在什么时候、以及改期取消的流程体验 | 预约·日历·时段／候补·排期·名额／预订·日期·选择／确认·修改·取消 ↔ booking, calendar, slot, schedule, reserve | 12 |\n| T2_AIRFLOW_THERMAL | 通风与温度舒适 | 关于空气是否流通、冷热与闷不闷的体感 | 通风·气流·温度／送风·冷热·室温／空气·循环·闷热／冷风·暖气·舒适 ↔ ventilation, airflow, temperature, climate, comfort | 12 |\n| T3_ACOUSTIC_QUIET | 声学环境与安静度 | 关于隔音、回声、混响等对专注与安静的干扰 | 隔音·安静·噪声／回声·专注·声音／隔板·静音·干扰／声学·宁静·环境 ↔ acoustic, quiet, noise, focus, sound | 12 |\n\n三类规模恰好各 12 条，说明这是模板化采集的样本，**不要把主题占比当成业务优先级**来解读。\n\n## 二、交付物\n\n| 交付物 | 文件 |\n|---|---|\n| 标注表（含标签 + 标注器校验与相似度） | [venue_feedback_theme_labels_with_confidence](artifact://00e921f04c6c48d98ea2cd2c0caba574) |\n| 标注表（纯标签版，供系统对接） | [venue_feedback_labeled](artifact://227698c841994ebea3c8a1adbc138d32) |\n| 可复用标注器（保留的主题索引模型） | [model artifact](artifact://ac3d0334e4c94f81be16bc56c068cb72) |\n| 标注器对 36 条的实际输出（每条 Top-3 近邻+相似度） | [apply output](artifact://39607ee6ba7644ff95e7ebcdc607b044) |\n\n标注表字段：`feedback_ref, feedback, theme_code, theme_name, theme_name_en, discovery_cluster, nearest_reference, nearest_similarity, nearest_theme_code, labeller_check`。36 条全部完成标注，无缺失、无空文本。\n\n## 三、质量评估报告\n\n**主题划分的可靠程度（较高，但适用范围有限）**\n- 三类结构清晰：聚类轮廓系数 0.496，三类各占 1/3，无退化空组。\n- 结论可复现：5 次重抽样的稳定性得分为 1.0（完全一致），换用 LDA 主题模型在留出样本上得到的三个主题与聚类三类一一对应（各项占比均 1/3），说明这不是某一种算法的偶然结果。\n- 语义不混淆：三类合计 48 个不同词串，跨主题共用词为 **0 个**。三个主题用的是三套互不相交的词汇，因此基于关键词的归属不会出现歧义。\n- LDA 的连贯性指标为负（-0.255），这是语料太小、重复文本多造成的内部拟合指标偏弱，不代表主题本身不成立——它已由聚类和词汇互斥两点交叉印证。\n\n**数据本身的局限（需要向业务说明）**\n- 36 条里只有 **12 条不同文本**，其余 24 条是完全重复的模板短语，每个模板重复 3 次。因此这里的“高准确度”主要说明这三套关键词能被干净地分开，**不能证明**能处理措辞自由、口语化的新反馈。\n- 同理，标注器对 36 条做留一校验时，最近邻相似度全部为 1.0、主题全部一致（36/36）——这是重复文本导致的必然结果，属于弱证据，请勿当作对新文本的真实准确率。\n\n**关于“可复用分类器”的一个重要说明**\n原计划训练一个监督式文本分类模型（后续反馈直接输出主题），但平台的组安全评估要求每个主题在训练集和留出集都出现；本样本只有 12 个不同文本、留出集仅能容下约 2–3 个模板组，无法满足该条件，训练被平台拒绝执行两次。因此我改用**同样一套主题体系下的保留式标注索引**作为可复用方案：新反馈进入后，输出最相近的历史标注记录及其主题与相似度分数，可设阈值做“无法判定”兜底。\n\n**建议的复用方式**\n1. 新反馈批量入库后，用保留模型（`trained_model_id: 032ae7e0efdc4ed08692869f997bbe83`）对新数据执行标注，取最相近记录的主题作为结果。\n2. 相似度明显偏低的记录（例如低于当前同主题内的水平）不要自动归类，转人工复核，同时把人工确认结果并回语料。\n3. 当积累到措辞多样、非模板化的反馈（建议数百条以上）后，即可训练监督式分类器，届时能给出真正的留出准确率，替换当前的近邻方案。",
+    "failed_tools": [
+      {
+        "arguments": {
+          "binding_id": "e4ac9490c8bc4c51a67533cd129e21e6",
+          "models": [
+            "text.classification.multilingual_logistic_regression_tfidf"
+          ],
+          "params_by_model": {
+            "text.classification.multilingual_logistic_regression_tfidf": {
+              "class_weight": "balanced",
+              "max_features": 500,
+              "phrase_mode": "unigram_bigram"
+            }
+          },
+          "run_name": "venue feedback theme classifier - reusable"
+        },
+        "delivery": {
+          "serialized_bytes": 241
+        },
+        "failure": {
+          "code": "tool_validation_failed",
+          "message": "ML task 'b1a93b93995a48a48bb6a86f96da4f20' finished with status 'failed'. Group-safe classification requires every target class in both training and holdout partitions.",
+          "type": "tool_failure"
+        },
+        "name": "model.train",
+        "provider_call_id": "call_00_ET_UYxh50VMDMd6CPebwe5L5246",
+        "status": "failed"
+      },
+      {
+        "arguments": {
+          "binding_id": "0ea794b4f8284ffea3b3562b5fb61f22",
+          "models": [
+            "text.classification.multilingual_logistic_regression_tfidf"
+          ],
+          "params_by_model": {
+            "text.classification.multilingual_logistic_regression_tfidf": {
+              "class_weight": "balanced",
+              "max_features": 500,
+              "phrase_mode": "unigram_bigram"
+            }
+          },
+          "run_name": "venue feedback theme classifier - reusable (record-level group)"
+        },
+        "delivery": {
+          "serialized_bytes": 241
+        },
+        "failure": {
+          "code": "tool_validation_failed",
+          "message": "ML task 'fb51b64204d14369b5f1d471db0b5c70' finished with status 'failed'. Group-safe classification requires every target class in both training and holdout partitions.",
+          "type": "tool_failure"
+        },
+        "name": "model.train",
+        "provider_call_id": "call_00_ET_ymiatX2AktlQoSDez30E1306",
+        "status": "failed"
+      }
+    ],
+    "transformation_arguments": [
+      {
+        "bindings": [
+          {
+            "alias": "base",
+            "dataset_id": "43b81c7b200946fb9b49e7de6668e92a"
+          },
+          {
+            "alias": "assign",
+            "dataset_id": "3ca38b2d71774492b82a279b4f616d9f"
+          }
+        ],
+        "explanation": "Maps the three data-discovered feedback clusters to operational theme names so every record carries a business-readable topic label.",
+        "name": "venue_feedback_labeled",
+        "sql": "WITH theme_map AS (\n  SELECT * FROM (VALUES\n    (1, 'T1_BOOKING_SCHEDULING', '预订与时段安排', 'Booking & scheduling'),\n    (2, 'T2_AIRFLOW_THERMAL',     '通风与温度舒适', 'Airflow & thermal comfort'),\n    (3, 'T3_ACOUSTIC_QUIET',      '声学环境与安静度', 'Acoustics & quietness')\n  ) AS t(cluster_label, theme_code, theme_name, theme_name_en)\n)\nSELECT\n  b.feedback_ref,\n  b.feedback,\n  m.theme_code,\n  m.theme_name,\n  m.theme_name_en,\n  a.cluster_label AS discovery_cluster\nFROM base b\nJOIN assign a ON a.feedback_ref = b.feedback_ref\nJOIN theme_map m ON m.cluster_label = a.cluster_label\nORDER BY b.feedback_ref"
+      },
+      {
+        "bindings": [
+          {
+            "alias": "m",
+            "dataset_id": "a3362c39681a44f08db5490e99391191"
+          },
+          {
+            "alias": "l",
+            "dataset_id": "3e2c26f984134eb69f651a764b726369"
+          }
+        ],
+        "explanation": "Produces the delivery table: each feedback with its operational theme label plus the retained labeller's nearest labelled reference and similarity, so the label and a confidence signal sit side by side.",
+        "name": "venue_feedback_theme_labels_with_confidence",
+        "sql": "SELECT\n  m.feedback_ref,\n  m.feedback,\n  m.theme_code,\n  m.theme_name,\n  m.theme_name_en,\n  m.discovery_cluster,\n  m.matched_document_id   AS nearest_reference,\n  ROUND(m.similarity, 4)  AS nearest_similarity,\n  l.theme_code            AS nearest_theme_code,\n  CASE WHEN l.theme_code = m.theme_code THEN 'consistent' ELSE 'conflict' END AS labeller_check\nFROM m\nJOIN l ON l.feedback_ref = m.matched_document_id\nWHERE m.rank = 1\nORDER BY m.feedback_ref"
+      }
+    ],
+    "findings": [
+      "Prompt requests operational themes, per-feedback assignment, reuse, and a quality report; it does not require LDA or fixed probability columns.",
+      "Oracle requires exact LDA-specific assignment columns and an LDA evaluation artifact. Final delivery uses named themes and a retained nearest-neighbor index instead.",
+      "Final answer gives a quality-assessment section but does not link an original evaluation report. Judge is blocked, so adequacy of the alternate delivery is unassessed.",
+      "Two supervised classifier attempts failed on the every-class-in-both-group-partitions requirement; the Subject continued with retrieval and completed. No turn cap intervened."
+    ],
+    "limitation": "Do not relabel the entire cell pass from these findings; alternate saved output contents and evaluation adequacy need targeted review."
+  }
+]

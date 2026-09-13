@@ -1,0 +1,66 @@
+{
+  "run_id": "665017a6be6449e0bd6acac0a555a34b",
+  "source_report": "build/agent-harness-full-81fb9bb/legacy/ml.clustering_two_segments-deepseek-deepseek-v4-flash-665017a6be6449e0bd6acac0a555a34b.json",
+  "method": "Replay exact saved SQL against unchanged public input, without provider calls or oracle edits.",
+  "columns": [
+    "account_id",
+    "visits",
+    "avg_order_value",
+    "cluster_id",
+    "assignment_changed",
+    "normalized_distance_to_centroid"
+  ],
+  "rows": [
+    {
+      "account_id": "ACCT-001",
+      "visits": 1,
+      "avg_order_value": 12,
+      "cluster_id": 0,
+      "assignment_changed": false,
+      "normalized_distance_to_centroid": 0.041
+    },
+    {
+      "account_id": "ACCT-002",
+      "visits": 2,
+      "avg_order_value": 14,
+      "cluster_id": 0,
+      "assignment_changed": false,
+      "normalized_distance_to_centroid": 0.0667
+    },
+    {
+      "account_id": "ACCT-003",
+      "visits": 1,
+      "avg_order_value": 16,
+      "cluster_id": 0,
+      "assignment_changed": false,
+      "normalized_distance_to_centroid": 0.041
+    },
+    {
+      "account_id": "ACCT-004",
+      "visits": 9,
+      "avg_order_value": 88,
+      "cluster_id": 1,
+      "assignment_changed": false,
+      "normalized_distance_to_centroid": 0.1108
+    },
+    {
+      "account_id": "ACCT-005",
+      "visits": 10,
+      "avg_order_value": 92,
+      "cluster_id": 1,
+      "assignment_changed": false,
+      "normalized_distance_to_centroid": 0.0
+    },
+    {
+      "account_id": "ACCT-006",
+      "visits": 11,
+      "avg_order_value": 96,
+      "cluster_id": 1,
+      "assignment_changed": false,
+      "normalized_distance_to_centroid": 0.1108
+    }
+  ],
+  "existing_oracle_accepts": false,
+  "existing_oracle_accepts_required_columns": true,
+  "limitation": "Legacy report does not freeze exported workbook contents; artifact existence cannot be rechecked after runtime cleanup. The linked-artifact check was short-circuited because the table matcher returned no dataset."
+}
