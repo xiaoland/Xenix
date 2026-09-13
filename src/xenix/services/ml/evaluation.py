@@ -159,8 +159,8 @@ def get_default_policy(
         raise ValueError("Group-aware holdout is supported only for supervised evaluation.")
     return policy.model_copy(
         update={
-            "policy_key": f"{evaluation_kind.value}.group_hash_holdout.v1",
-            "split_strategy": "group_hash_holdout.v1",
+            "policy_key": f"{evaluation_kind.value}.group_hash_holdout.v2",
+            "split_strategy": "group_hash_holdout.v2",
         }
     )
 

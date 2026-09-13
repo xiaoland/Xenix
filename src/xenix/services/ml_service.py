@@ -404,7 +404,7 @@ class MLService:
             task = self.get_task_details(task_id).task
             if task.status in {MLTaskStatus.SUCCEEDED, MLTaskStatus.FAILED, MLTaskStatus.CANCELLED}:
                 if task.status is not MLTaskStatus.SUCCEEDED:
-                    raise ValidationError(f"ML task '{task.id}' finished with status '{task.status.value}'.")
+                    raise _unsuccessful_task_error(task)
                 return task
             time.sleep(0.1)
         return None
@@ -437,7 +437,7 @@ class MLService:
                 if task.status in {MLTaskStatus.FAILED, MLTaskStatus.CANCELLED}
             ]
             if failed:
-                raise ValidationError(f"ML task '{failed[0].id}' finished with status '{failed[0].status.value}'.")
+                raise _unsuccessful_task_error(failed[0])
 
             root_tasks_succeeded = all(task.status is MLTaskStatus.SUCCEEDED for task in root_tasks)
             if root_tasks_succeeded and len(trained_models) == len(root_task_ids):
@@ -634,7 +634,7 @@ class MLService:
             evaluation_policy=get_default_policy(
                 catalog.evaluation_kind,
                 summary_metric_name=catalog.summary_metric_name,
-                group_aware=any(
+                group_aware=get_model_service(model_key).uses_automatic_groups or any(
                     role_binding.role == "group" and role_binding.columns
                     for role_binding in binding.role_bindings
                 ),
@@ -1290,6 +1290,13 @@ class _ApplyContext:
     feature_columns: list[str]
     trained_model: TrainedModelRow
     apply_mode: ApplyMode
+
+
+def _unsuccessful_task_error(task: MLTaskRow) -> ValidationError:
+    message = f"ML task '{task.id}' finished with status '{task.status.value}'."
+    if task.error_summary:
+        message = f"{message} {task.error_summary}"
+    return ValidationError(message)
 
 
 def _now() -> Any:

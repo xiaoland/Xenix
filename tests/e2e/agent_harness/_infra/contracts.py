@@ -397,11 +397,10 @@ class AgentHarnessBenchmarkResult:
 
     @property
     def integrity_passed(self) -> bool:
-        """Whether the completed cell produced a trustworthy measurement."""
+        """Whether the observed integrity checks passed, independently of completion."""
 
         return (
-            self.run_status is BenchmarkRunStatus.COMPLETED
-            and bool(self.integrity_checks)
+            bool(self.integrity_checks)
             and all(check.passed for check in self.integrity_checks)
         )
 

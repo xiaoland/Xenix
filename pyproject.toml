@@ -88,7 +88,6 @@ test-affected = { composite = ["prepare", "python scripts/run_pytest.py --testmo
 list-affected = { composite = ["prepare", "python scripts/run_pytest.py --testmon --collect-only {args}"], env = { COVERAGE_CORE = "pytrace" } }
 benchmark-agent-harness = "python scripts/run_agent_harness_benchmark.py"
 benchmark-agent-harness-headed = "python scripts/run_agent_harness_headed_benchmark.py"
-benchmark-agent-harness-check = "python scripts/check_agent_harness_benchmark.py"
 benchmark-agent-harness-evaluate = "python scripts/evaluate_agent_harness_reports.py"
 benchmark-agent-harness-calibrate-judge = "python scripts/calibrate_agent_harness_judge.py"
 check = { composite = ["agent-skills-check", "lint", "typecheck", "knowledge-ocr-lock-check", "python -m compileall -q src tests scripts"] }

@@ -104,8 +104,8 @@ def test_group_hash_holdout_is_versioned_deterministic_and_disjoint() -> None:
     )
 
     assert first.split_facts == second.split_facts
-    assert first.split_facts.requested_strategy == "group_hash_holdout.v1"
-    assert first.split_facts.realized_strategy == "group_hash_holdout.v1"
+    assert first.split_facts.requested_strategy == "group_hash_holdout.v2"
+    assert first.split_facts.realized_strategy == "group_hash_holdout.v2"
     assert first.split_facts.group_overlap_count == 0
     assert first.train_groups is not None
     assert first.holdout_groups is not None
@@ -148,7 +148,7 @@ def test_group_role_rejects_non_group_policy() -> None:
     request = _request(grouped=True)
     request.evaluation_policy = get_default_policy(EvaluationKind.CLASSIFICATION)
 
-    with pytest.raises(ValidationError, match="requires evaluation policy 'group_hash_holdout.v1'"):
+    with pytest.raises(ValidationError, match="requires a grouped evaluation policy"):
         prepare_supervised_split(
             pd.DataFrame({"amount": range(8), "region": ["a", "b"] * 4}),
             pd.Series([0, 1] * 4),

@@ -1,11 +1,4 @@
-"""Case-agnostic pytest dispatch for the Agent Harness end-to-end benchmark.
-
-The CLI entry points under ``scripts/`` are thin shells over this module, and
-the offline ``_infra_tests`` import the same functions directly.  Keeping the
-selector validation and argument building here means tests depend on the
-benchmark's own package rather than reaching back into ``scripts/`` (which is
-only on ``sys.path`` as a side effect of an in-process pytest launch).
-"""
+"""Shared pytest selection for the headless and headed benchmark commands."""
 
 from __future__ import annotations
 
@@ -13,7 +6,6 @@ from pathlib import Path
 
 BENCHMARK_PLUGIN = "tests.e2e.agent_harness._infra.pytest_plugin"
 BENCHMARK_ROOT = "tests/e2e/agent_harness"
-INFRA_TEST_ROOT = "tests/e2e/agent_harness/_infra_tests"
 
 
 def benchmark_pytest_arguments(arguments: list[str]) -> list[str]:
@@ -44,7 +36,6 @@ def benchmark_pytest_arguments(arguments: list[str]) -> list[str]:
         "--direct",
         "-p",
         BENCHMARK_PLUGIN,
-        f"--ignore={INFRA_TEST_ROOT}",
         *collection_targets,
         "--run-agent-harness",
         *(
@@ -62,8 +53,6 @@ def _benchmark_target(argument: str) -> str | None:
         path == BENCHMARK_ROOT
         or path.startswith(f"{BENCHMARK_ROOT}/test_")
     ):
-        return None
-    if path == INFRA_TEST_ROOT or "/_infra" in path:
         return None
     return argument
 

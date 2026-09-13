@@ -613,6 +613,7 @@ def _group_hash_split(
     dataset_snapshot_payload: dict[str, Any],
 ) -> tuple[np.ndarray, np.ndarray, dict[str, Any]]:
     snapshot_digest = _json_digest(dataset_snapshot_payload)
+    source_digest = dataset_snapshot_payload["source_sha256"]
     canonical_groups = groups.reset_index(drop=True).map(
         lambda value: json.dumps(
             {"type": type(value).__name__, "value": str(value)},
@@ -625,7 +626,7 @@ def _group_hash_split(
     ordered_groups = sorted(
         unique_groups,
         key=lambda value: sha256(
-            f"group_hash_holdout.v1|42|{snapshot_digest}|{value}".encode()
+            f"group_hash_holdout.v2|42|{source_digest}|{value}".encode()
         ).hexdigest(),
     )
     target_rows = max(1, round(len(canonical_groups.index) * 0.2))
@@ -647,9 +648,9 @@ def _group_hash_split(
     )
     split = {
         "schema_version": 1,
-        "policy_key": "classification.group_hash_holdout.v1",
-        "requested_strategy": "group_hash_holdout.v1",
-        "realized_strategy": "group_hash_holdout.v1",
+        "policy_key": "classification.group_hash_holdout.v2",
+        "requested_strategy": "group_hash_holdout.v2",
+        "realized_strategy": "group_hash_holdout.v2",
         "source_dataset_snapshot_digest": snapshot_digest,
         "eligible_row_count": len(labels.index),
         "train_row_count": len(train_positions),

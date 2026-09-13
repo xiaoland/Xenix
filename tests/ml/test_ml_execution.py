@@ -160,7 +160,7 @@ def test_grouped_training_evaluation_and_apply_preserve_truthful_facts_and_linea
     completed_fit = _wait_for_terminal(tasks, fit_task.id)
     assert completed_fit.status is MLTaskStatus.SUCCEEDED, completed_fit.error_summary
     fit_payload = completed_fit.result_payload or {}
-    assert fit_payload["split_facts"]["realized_strategy"] == "group_hash_holdout.v1"
+    assert fit_payload["split_facts"]["realized_strategy"] == "group_hash_holdout.v2"
     assert fit_payload["split_facts"]["group_overlap_count"] == 0
     assert fit_payload["split_facts"]["eligible_group_count"] == 18
     assert fit_payload["preparation_facts"]["fit_scope"] == "outer_train_split"

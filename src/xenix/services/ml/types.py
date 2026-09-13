@@ -205,6 +205,8 @@ class ModelServiceBase(ABC):
     supports_apply: ClassVar[bool] = True
     apply_mode: ClassVar[ApplyMode] = ApplyMode.ROWS
     supports_hyperparameter_tuning: ClassVar[bool] = True
+    # Some engines group related rows even without a user-supplied group role.
+    uses_automatic_groups: ClassVar[bool] = False
     model_family: ClassVar[ModelFamily | None] = None
     model_task_kind: ClassVar[ModelTaskKind | None] = None
     train_role_schema: ClassVar[ModelRoleSchema | None] = None

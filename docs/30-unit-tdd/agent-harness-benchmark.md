@@ -78,6 +78,8 @@ A runtime error, failed integrity check, or exhausted cell does not automaticall
 
 Schema v6 retains separate execution status, integrity, structural outcome, Judge status/verdict, subject metrics, Judge metrics, budget, identity, and trace. `planned_turn_count` describes the task and remains unknown if setup failed before constructing its requests; `turns` records attempted submissions with status, failure, incremental metrics, checks and case-owned delivery evidence. New sequence tasks also retain submitted request text and attachment names. `subject_metrics` and `budget` describe the whole task. A later success cannot erase an earlier missing delivery. Structural success alone does not imply that a Judge-required answer passed. Provider errors and malformed judgements remain Judge states; they are not converted into semantic success or failure.
 
+Integrity reflects the checks actually observed, independently of execution completion. A budget-exceeded run whose inputs were preserved can have passing integrity while remaining an unsuccessful execution; no integrity evidence remains a non-pass. Do not interpret budget exhaustion as source mutation.
+
 The report reader validates only fields consumed by policy, preserves additional metadata, and leaves diagnostics readable as they evolve. It does not demand exact keys throughout the report, recompute stored projection flags, compare independent token counters, cap trace sizes, or require a clean working tree. Schema v4 remains diagnostic-only; v5 reports remain readable and usable in their own cohorts. Cohorts and comparisons must share report schema, so a v6 task score cannot silently become a continuation of a v5 single-request trend.
 
 `agent-harness-report-policy-v2` characterizes one headless measurement without creating a gate. Formal acceptance uses three headless repetitions and one headed repetition. Structural prerequisites and integrity must pass in all four. For Judge-required cases, at least two headless Judge verdicts must pass, the third may be partial, and the headed Judge verdict must pass. A required Judge must complete; for cases without a Judge, all structural verdicts must pass.
@@ -94,7 +96,7 @@ Per-request checkpoints and provider budget observations are journaled during ex
 
 ## Contributor commands
 
-- `pdm run benchmark-agent-harness-check -q` runs the dedicated offline infrastructure tests; use normal pytest options, for example `-k report_policy`.
+- Benchmark infrastructure has no dedicated automated test suite. Changes use static checks, collection, saved-report inspection, and explicit live measurement or manual Judge calibration according to the affected behavior.
 - `pdm run benchmark-agent-harness -- --collect-only -q` and `pdm run benchmark-agent-harness-headed -- --collect-only -q` collect the same four default representative tasks without provider calls.
 - `pdm run benchmark-agent-harness -- tests/e2e/agent_harness/test_business_restock_decision.py::test_restock_contrast --llm-settings <path> --judge-llm-settings <path>` selects the restock contrasts. Add `[budget_tight]` to select just that scenario; campaign uses `test_campaign_contrast` with `spending_threshold` and `contact_interval`.
 - `pdm run benchmark-agent-harness -- <case selector> --llm-settings <path>` runs an explicit paid series. Add Judge settings when its rubric requires judgement; the headed command selects visible execution.

@@ -19,6 +19,7 @@ This contract governs persisted ML work, not task packets under `tasks/`.
 - For supervised work, holdout evidence belongs to the split-trained evaluation
   artifact. The canonical apply artifact may be refit on all eligible rows and must
   not inherit an unsupported holdout-performance claim.
+- New grouped supervised evaluation derives its partition seed from source content, not the transient Dataset id assigned on import. Retained task policies keep their original partition semantics when earlier analyzers are evaluated again.
 
 Exact task fields, operation enums, model taxonomy, and persistence shapes are owned
 by source, schemas, and tests.
@@ -54,6 +55,7 @@ pending -> cancelled
   layout and application-log rotation belong to source and Deployment.
 - Failure detail is actionable and may include bounded worker/setup diagnostics,
   but never SSH credentials or private-key material.
+- Synchronous train, tune and apply waits include the persisted task error summary when reporting a failed terminal task. The originating Tool caller should not need an additional status query to learn why execution failed.
 - User-openable outputs follow the [artifact link contract](artifact-links.md);
   storage medium and deletion follow [storage ownership](storage-ownership.md).
 

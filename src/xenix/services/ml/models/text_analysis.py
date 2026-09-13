@@ -240,6 +240,7 @@ class MultilingualTextRetrievalParams(_MultilingualDiscoveryParamsBase):
 
 class MultilingualTextClassificationService(ModelServiceBase):
     key = "text.classification.multilingual_logistic_regression_tfidf"
+    uses_automatic_groups = True
     display_name = "Multilingual Raw Text Classification"
     problem_kind = ProblemKind.CLASSIFICATION
     family = "Text classification"
