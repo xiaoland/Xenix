@@ -21,7 +21,7 @@ from .judge_calibration import JudgeCalibrationReport
 
 REPORT_POLICY_ID = "agent-harness-report-policy-v2"
 AGENT_REPORT_KIND = "xenix.agent_harness.cell"
-CURRENT_REPORT_SCHEMA_VERSION = 5
+CURRENT_REPORT_SCHEMA_VERSION = 6
 LEGACY_REPORT_SCHEMA_VERSION = 4
 
 
@@ -123,11 +123,11 @@ def load_agent_report(path: Path) -> LoadedAgentReport:
             qualification=ReportQualification.LEGACY_UNQUALIFIED,
             payload=payload,
         )
-    if schema_version != CURRENT_REPORT_SCHEMA_VERSION:
+    if schema_version not in (5, CURRENT_REPORT_SCHEMA_VERSION):
         raise ReportPolicyError("unsupported_report_schema")
-    _validate_v5_report(payload)
+    _validate_report(payload)
     return LoadedAgentReport(
-        schema_version=CURRENT_REPORT_SCHEMA_VERSION,
+        schema_version=schema_version,
         qualification=ReportQualification.QUALIFIED,
         payload=payload,
     )
@@ -225,7 +225,7 @@ def compare_report_cohorts(
     reasons: list[str] = []
     if baseline_shape != candidate_shape:
         reasons.append("comparison_repetition_policy_mismatch")
-    if not _all_v5(baseline) or not _all_v5(candidate):
+    if not _all_supported(baseline) or not _all_supported(candidate):
         reasons.append("legacy_report_not_comparable")
     if not reasons:
         if baseline_shape is not None:
@@ -305,7 +305,7 @@ def _measurement_reasons(
     reasons: list[str] = []
     if len(reports) != headless_count + headed_count:
         reasons.append("repetition_count_invalid")
-    if not _all_v5(reports):
+    if not _all_supported(reports):
         reasons.append("legacy_unqualified")
         return reasons
     payloads = [report.payload for report in reports]
@@ -346,6 +346,7 @@ def _cohort_identity_reasons(payloads: Sequence[Mapping[str, Any]]) -> list[str]
         if any(not identity.get(key) for key in required_identity):
             reasons.append("identity_incomplete")
     fields = (
+        "schema_version",
         "provider_model",
         "identity.fixture_sha256",
         "identity.embedding_settings_sha256",
@@ -448,6 +449,7 @@ def _comparison_identity_reasons(
     left = baseline[0].payload
     right = candidate[0].payload
     fields = (
+        "schema_version",
         "case_id",
         "provider_model",
         "identity.fixture_sha256",
@@ -513,7 +515,7 @@ def _median_delta(left: Sequence[float | int], right: Sequence[float | int]) -> 
 
 
 def _profile_shape(reports: Sequence[LoadedAgentReport]) -> tuple[int, int] | None:
-    if not _all_v5(reports):
+    if not _all_supported(reports):
         return None
     modes = [report.payload["execution_mode"] for report in reports]
     return modes.count("headless"), modes.count("headed")
@@ -530,9 +532,9 @@ def _invalid_shape_decision(label: str, reports: Sequence[LoadedAgentReport]) ->
     )
 
 
-def _all_v5(reports: Sequence[LoadedAgentReport]) -> bool:
+def _all_supported(reports: Sequence[LoadedAgentReport]) -> bool:
     return bool(reports) and all(
-        report.qualification is ReportQualification.QUALIFIED and report.schema_version == CURRENT_REPORT_SCHEMA_VERSION
+        report.qualification is ReportQualification.QUALIFIED and report.schema_version in (5, CURRENT_REPORT_SCHEMA_VERSION)
         for report in reports
     )
 
@@ -599,7 +601,7 @@ def _validate_legacy_identity(payload: Mapping[str, Any]) -> None:
         raise ReportPolicyError("legacy_report_identity_invalid")
 
 
-def _validate_v5_report(payload: Mapping[str, Any]) -> None:
+def _validate_report(payload: Mapping[str, Any]) -> None:
     try:
         _ReportFields.model_validate(payload)
     except ValidationError as exc:

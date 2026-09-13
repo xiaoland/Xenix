@@ -91,6 +91,12 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         ),
     )
     group.addoption(
+        "--business-variant",
+        choices=("standard", "confirmation"),
+        default="standard",
+        help="Business input variation; repetitions do not add task weight.",
+    )
+    group.addoption(
         "--harness-variant",
         default="baseline",
         dest="agent_harness_variant",
@@ -142,6 +148,10 @@ class AgentHarnessBenchmarkController:
     """The deliberately small interface exposed to every benchmark case."""
 
     config: Config
+
+    @property
+    def business_variant(self) -> str:
+        return self.config.getoption("business_variant")
 
     def require_source(self) -> Path:
         source = self.config.getoption("agent_harness_source")

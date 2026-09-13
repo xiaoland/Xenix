@@ -1,0 +1,98 @@
+{
+  "eligible": [
+    "C03",
+    "C04",
+    "C06",
+    "C07",
+    "C08",
+    "C16",
+    "C17",
+    "C18",
+    "C20",
+    "C23",
+    "C28",
+    "C29"
+  ],
+  "excluded_by": {
+    "C01": [
+      "spend_or_vip"
+    ],
+    "C02": [
+      "spend_or_vip"
+    ],
+    "C03": [],
+    "C04": [],
+    "C05": [
+      "service_cases"
+    ],
+    "C06": [],
+    "C07": [],
+    "C08": [],
+    "C09": [
+      "city"
+    ],
+    "C10": [
+      "active"
+    ],
+    "C11": [
+      "spend_or_vip"
+    ],
+    "C12": [
+      "spend_or_vip"
+    ],
+    "C13": [
+      "spend_or_vip"
+    ],
+    "C14": [
+      "service_cases"
+    ],
+    "C15": [
+      "spend_or_vip"
+    ],
+    "C16": [],
+    "C17": [],
+    "C18": [],
+    "C19": [
+      "spend_or_vip"
+    ],
+    "C20": [],
+    "C21": [
+      "contact_gap"
+    ],
+    "C22": [
+      "service_cases"
+    ],
+    "C23": [],
+    "C24": [
+      "active"
+    ],
+    "C25": [
+      "service_cases"
+    ],
+    "C26": [
+      "city"
+    ],
+    "C27": [
+      "spend_or_vip"
+    ],
+    "C28": [],
+    "C29": [],
+    "C30": [
+      "contact_gap"
+    ],
+    "C31": [
+      "spend_or_vip"
+    ],
+    "C32": [
+      "spend_or_vip"
+    ]
+  },
+  "date": "2026-08-01",
+  "threshold_yuan": 1200,
+  "contact_days": 45,
+  "cities": [
+    "南京",
+    "苏州",
+    "杭州"
+  ]
+}

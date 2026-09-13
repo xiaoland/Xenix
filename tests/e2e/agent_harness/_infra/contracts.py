@@ -83,6 +83,7 @@ class JudgeRubric:
     rubric_id: str
     score_dimensions: tuple[str, ...]
     allowed_reason_codes: tuple[str, ...]
+    scoring_guidance: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -103,6 +104,7 @@ class BenchmarkCaseAssessment:
     judge_input: JudgeInput | None = None
     judge_required: bool = False
     terminal_shape: tuple[int, int] | None = None
+    turn_checks: tuple[tuple[OutcomeCheck, ...], ...] = ()
 
     @property
     def semantic_checks_passed(self) -> bool:
@@ -120,9 +122,17 @@ class BenchmarkDatasetAccess(Protocol):
 
     def list_datasets(self) -> list[Any]: ...
 
+    def get_dataset_audit(self, dataset_id: str) -> Any: ...
+
 
 class BenchmarkArtifactAccess(Protocol):
     def resolve_uri(self, uri: str) -> Any: ...
+
+
+class BenchmarkModelAccess(Protocol):
+    def get_task_details(self, ml_task_id: str) -> Any: ...
+
+    def get_trained_model(self, trained_model_id: str) -> Any: ...
 
 
 class BenchmarkKnowledgeImportAccess(Protocol):
@@ -154,6 +164,7 @@ class BenchmarkCaseServices:
 
     datasets: BenchmarkDatasetAccess
     artifacts: BenchmarkArtifactAccess
+    models: BenchmarkModelAccess | None = None
 
 
 @dataclass(frozen=True)
@@ -165,13 +176,16 @@ class BenchmarkCaseContext:
     source_state: Any | None
     run_dataset_ids: frozenset[str]
     runtime_home: Path
+    turns: tuple[BenchmarkTurnObservation, ...] = ()
 
 
 class BenchmarkCase(Protocol):
     """Small outcome-first contract; the runner never branches on case id.
 
-    A case may additionally define ``prepare(*, services)`` when its isolated
-    cell needs public product state before the measured subject turn.
+    Optional ``build_submissions`` returns sequential requests for one thread;
+    legacy cases keep ``build_submission``. ``capture_turn(*, context)`` freezes
+    delivered evidence before a later request can revise it. ``prepare`` may
+    establish public product state before subject timing.
     """
 
     case_id: str
@@ -231,6 +245,41 @@ class BenchmarkMetrics:
             "derived_dataset_count": self.derived_dataset_count,
             "terminal_shape": list(self.terminal_shape) if self.terminal_shape is not None else None,
         }
+
+
+@dataclass(frozen=True)
+class BenchmarkTurnResult:
+    """One user submission, with incremental (not cumulative) usage."""
+
+    index: int
+    run_status: BenchmarkRunStatus
+    subject_metrics: BenchmarkMetrics
+    failure_kind: str | None = None
+    semantic_checks: tuple[OutcomeCheck, ...] = ()
+    delivery_evidence: tuple[str, ...] = ()
+    request_text: str | None = None
+    attachment_names: tuple[str, ...] = ()
+
+    def to_payload(self) -> dict[str, Any]:
+        return {
+            "index": self.index,
+            "run_status": self.run_status.value,
+            "failure_kind": self.failure_kind,
+            "subject_metrics": self.subject_metrics.to_payload(),
+            "semantic_checks": [check.to_payload() for check in self.semantic_checks],
+            "delivery_evidence": list(self.delivery_evidence),
+            "request_text": self.request_text,
+            "attachment_names": list(self.attachment_names),
+        }
+
+
+@dataclass(frozen=True)
+class BenchmarkTurnObservation:
+    """Runtime-only checkpoint; a case owns the frozen delivery evidence."""
+
+    snapshot: Any | None
+    evidence: Any
+    result: BenchmarkTurnResult
 
 
 @dataclass(frozen=True)
@@ -342,7 +391,9 @@ class AgentHarnessBenchmarkResult:
     identity: BenchmarkIdentity = field(default_factory=BenchmarkIdentity)
     failure_kind: str | None = None
     trace: BenchmarkTraceResult | None = None
-    schema_version: int = 5
+    turns: tuple[BenchmarkTurnResult, ...] = ()
+    planned_turn_count: int | None = None
+    schema_version: int = 6
 
     @property
     def integrity_passed(self) -> bool:
@@ -383,5 +434,7 @@ class AgentHarnessBenchmarkResult:
             "budget": self.budget.to_payload(),
             "identity": self.identity.to_payload(),
             "failure_kind": self.failure_kind,
+            "planned_turn_count": self.planned_turn_count,
+            "turns": [turn.to_payload() for turn in self.turns],
             "trace": self.trace.to_payload() if self.trace is not None else None,
         }

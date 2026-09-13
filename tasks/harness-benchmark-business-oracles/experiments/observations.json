@@ -1,0 +1,289 @@
+{
+  "kind": "task_design_probe",
+  "design_date": "2026-09-13",
+  "executed_at": "2026-09-13T01:14:50.874836+08:00",
+  "provider_calls": 0,
+  "revenue": {
+    "round1": {
+      "东区": 39700,
+      "西区": 32000
+    },
+    "round2": {
+      "东区": 28700,
+      "西区": 32000
+    },
+    "delta": {
+      "东区": -11000,
+      "西区": 0
+    },
+    "rank_reverses": true,
+    "equivalent_row_permutation": true,
+    "equivalent_additional_duplicate": true,
+    "wrong_round1_outputs": {
+      "count_export_duplicates": {
+        "东区": 41600,
+        "西区": 32000
+      },
+      "drop_refunds_of_prior_month_orders": {
+        "东区": 39700,
+        "西区": 34000
+      },
+      "use_all_refund_dates": {
+        "东区": 36700,
+        "西区": 31500
+      },
+      "ignore_refunds": {
+        "东区": 48000,
+        "西区": 36000
+      }
+    },
+    "wrong_round2_outputs": {
+      "reuse_stale_answer": {
+        "东区": 39700,
+        "西区": 32000
+      },
+      "append_replacement_as_new_refund": {
+        "东区": 21700,
+        "西区": 32000
+      }
+    },
+    "wrong_behaviors_distinguished": 6
+  },
+  "campaign": {
+    "eligible_ids": [
+      "C01",
+      "C03",
+      "C06",
+      "C08",
+      "C11",
+      "C15",
+      "C16"
+    ],
+    "wrong_outputs": {
+      "use_superseded_policy": [
+        "C01",
+        "C02",
+        "C03",
+        "C04",
+        "C06",
+        "C08",
+        "C10",
+        "C11",
+        "C14",
+        "C15",
+        "C16"
+      ],
+      "amount_boundary_exclusive": [
+        "C06",
+        "C08",
+        "C16"
+      ],
+      "contact_boundary_exclusive": [
+        "C01",
+        "C06",
+        "C08",
+        "C11",
+        "C15",
+        "C16"
+      ],
+      "ignore_open_service_cases": [
+        "C01",
+        "C03",
+        "C06",
+        "C07",
+        "C08",
+        "C11",
+        "C12",
+        "C15",
+        "C16"
+      ],
+      "ignore_applicable_cities": [
+        "C01",
+        "C03",
+        "C05",
+        "C06",
+        "C08",
+        "C11",
+        "C15",
+        "C16"
+      ],
+      "ignore_vip_exception": [
+        "C01",
+        "C03",
+        "C08",
+        "C11",
+        "C15"
+      ]
+    },
+    "wrong_behaviors_distinguished": 6,
+    "policy_counterfactual_1200": [
+      "C06",
+      "C08",
+      "C16"
+    ],
+    "equivalent_row_permutation": true,
+    "equivalent_customer_renaming": true
+  },
+  "routing": {
+    "sklearn_version": "1.9.0",
+    "reference_model": "character TF-IDF (2-4 grams) + logistic regression, C=10",
+    "training_rows": 36,
+    "new_rows": 18,
+    "reference_text_accuracy": 1.0,
+    "reference_text_macro_f1": 1.0,
+    "majority_accuracy": 0.3333333333333333,
+    "channel_shortcut_accuracy": 0.0,
+    "equivalent_reordering_and_extra_column": true,
+    "meaning_counterfactual_accuracy": 1.0,
+    "meaning_counterfactual_truth": [
+      {
+        "ticket_id": "N0-00",
+        "queue": "退换"
+      },
+      {
+        "ticket_id": "N0-01",
+        "queue": "退换"
+      },
+      {
+        "ticket_id": "N0-02",
+        "queue": "退换"
+      },
+      {
+        "ticket_id": "N0-03",
+        "queue": "退换"
+      },
+      {
+        "ticket_id": "N0-04",
+        "queue": "退换"
+      },
+      {
+        "ticket_id": "N0-05",
+        "queue": "退换"
+      },
+      {
+        "ticket_id": "N1-00",
+        "queue": "票据"
+      },
+      {
+        "ticket_id": "N1-01",
+        "queue": "票据"
+      },
+      {
+        "ticket_id": "N1-02",
+        "queue": "票据"
+      },
+      {
+        "ticket_id": "N1-03",
+        "queue": "票据"
+      },
+      {
+        "ticket_id": "N1-04",
+        "queue": "票据"
+      },
+      {
+        "ticket_id": "N1-05",
+        "queue": "票据"
+      },
+      {
+        "ticket_id": "N2-00",
+        "queue": "物流"
+      },
+      {
+        "ticket_id": "N2-01",
+        "queue": "物流"
+      },
+      {
+        "ticket_id": "N2-02",
+        "queue": "物流"
+      },
+      {
+        "ticket_id": "N2-03",
+        "queue": "物流"
+      },
+      {
+        "ticket_id": "N2-04",
+        "queue": "物流"
+      },
+      {
+        "ticket_id": "N2-05",
+        "queue": "物流"
+      }
+    ],
+    "new_ticket_truth": [
+      {
+        "ticket_id": "N0-00",
+        "queue": "物流"
+      },
+      {
+        "ticket_id": "N0-01",
+        "queue": "物流"
+      },
+      {
+        "ticket_id": "N0-02",
+        "queue": "物流"
+      },
+      {
+        "ticket_id": "N0-03",
+        "queue": "物流"
+      },
+      {
+        "ticket_id": "N0-04",
+        "queue": "物流"
+      },
+      {
+        "ticket_id": "N0-05",
+        "queue": "物流"
+      },
+      {
+        "ticket_id": "N1-00",
+        "queue": "退换"
+      },
+      {
+        "ticket_id": "N1-01",
+        "queue": "退换"
+      },
+      {
+        "ticket_id": "N1-02",
+        "queue": "退换"
+      },
+      {
+        "ticket_id": "N1-03",
+        "queue": "退换"
+      },
+      {
+        "ticket_id": "N1-04",
+        "queue": "退换"
+      },
+      {
+        "ticket_id": "N1-05",
+        "queue": "退换"
+      },
+      {
+        "ticket_id": "N2-00",
+        "queue": "票据"
+      },
+      {
+        "ticket_id": "N2-01",
+        "queue": "票据"
+      },
+      {
+        "ticket_id": "N2-02",
+        "queue": "票据"
+      },
+      {
+        "ticket_id": "N2-03",
+        "queue": "票据"
+      },
+      {
+        "ticket_id": "N2-04",
+        "queue": "票据"
+      },
+      {
+        "ticket_id": "N2-05",
+        "queue": "票据"
+      }
+    ],
+    "reference_errors": [],
+    "limitation": "Miniature hand-authored texts prove only candidate signal and a shortcut contrast; no subject run, retained-model reuse, calibrated quality threshold or representative language coverage was tested."
+  }
+}

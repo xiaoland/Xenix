@@ -1,0 +1,91 @@
+ticket_id,customer_batch,channel,message,queue
+T-B5D15442,B01,微信,包裹三天没更新物流，想知道现在到哪里了。,物流
+T-8F8906DE,B01,微信,收货地址门牌号写错了，请帮我改到 302 室。,物流
+T-0E90A60E,B02,微信,快递显示签收，可是前台说没收到。,物流
+T-1B2B9AFF,B02,微信,我的订单还未发货，明天出差能否今天寄出？,物流
+T-D5D4A929,B03,微信,物流电话一直打不通，需要联系派件员。,物流
+T-AA8D6B7A,B03,微信,Shipment is stuck at the sorting center since Monday.,物流
+T-034D5AB5,B04,微信,Please deliver the parcel after 6pm when someone is home.,物流
+T-BD82FD58,B04,微信,Tracking says delivered to a neighbor but nobody has it.,物流
+T-D764B9F6,B05,微信,I changed offices; can you reroute the parcel before dispatch?,物流
+T-52459A23,B05,微信,The courier attempted delivery while our shop was closed.,物流
+T-5302604C,B06,微信,两箱货只送到一箱，另一箱运单在哪里？,物流
+T-EC90B0AB,B06,微信,快递柜取件码没有收到，请协助查询。,物流
+T-83D0C2AA,B07,微信,Can you confirm whether the carrier collected my order?,物流
+T-FC8B801D,B07,微信,The tracking number on my order does not work.,物流
+T-60F02FDF,B08,微信,台风之后物流中断了，预计哪天恢复配送？,物流
+T-B57419AE,B08,微信,包裹被退回寄件仓，我还想收到这件货。,物流
+T-3CBCECCB,B09,微信,运单里的联系电话少了一位，请更正给快递。,物流
+T-6DF96DFA,B09,微信,Could the driver leave the package at our reception desk?,物流
+T-C70DE337,B10,微信,The delivery route shows the wrong city for my package.,物流
+T-022665D2,B10,微信,预约周六配送，为什么今天就来派送？,物流
+T-0CC2E3E6,B11,微信,预售商品已到约定日期，发货时间能确认吗？,物流
+T-A0C5EC68,B11,微信,I need the tracking link for a shipment sent yesterday.,物流
+T-588E9B78,B12,微信,包裹在中转站破损，快递要求寄件方查件。,物流
+T-22A28DB9,B12,微信,收到发货通知但物流网站查不到该运单。,物流
+T-D1290297,B13,微信,The warehouse split my shipment; where is the second carton?,物流
+T-E30E148E,B13,微信,快递小哥说地址超区，能转到附近自提点吗？,物流
+T-F3B9B147,B14,微信,My parcel was sent to the old postcode; please trace it.,物流
+T-3170E1A2,B14,微信,派送员将商品放进了错误的快递柜。,物流
+T-E7A62B43,B15,微信,Could you arrange a new delivery attempt on Friday?,物流
+T-68631352,B15,微信,购买时承诺隔日达，现在仍显示待揽收。,物流
+T-7D3FDC26,B01,电话,鞋子尺码太小，想换大一码。,退换货
+T-F3C53446,B01,电话,杯子到货有裂纹，申请退货退款。,退换货
+T-360E1047,B02,电话,多买了一份，未拆封的那份可以退吗？,退换货
+T-E5563749,B02,电话,退货包裹已经签收，退款什么时候到账？,退换货
+T-E35FC503,B03,电话,衣服颜色与页面不符，需要换成蓝色。,退换货
+T-23D5D0B2,B03,电话,The jacket arrived with a broken zip; I need a replacement.,退换货
+T-A0EFF059,B04,电话,I returned the blender last week but no refund has arrived.,退换货
+T-A88D2C92,B04,电话,Can I exchange this shirt for a smaller size?,退换货
+T-C0E54D75,B05,电话,The product is defective and I want my money back.,退换货
+T-98C57972,B05,电话,I ordered two by mistake and would like to return one.,退换货
+T-A4B3E933,B06,电话,售后同意退款了，银行卡仍没收到款项。,退换货
+T-9F382067,B06,电话,刚收到的耳机没有声音，如何办理换新？,退换货
+T-82EA4B04,B07,电话,The replacement has the same fault; please arrange a refund.,退换货
+T-426F4130,B07,电话,Please send me the return label for the damaged lamp.,退换货
+T-BCB8C9B8,B08,电话,退货申请填错了数量，需要改成两件。,退换货
+T-F4E2C34D,B08,电话,这个配件不兼容我的设备，想退掉。,退换货
+T-392E2AFD,B09,电话,换货地址已经提交，请确认售后是否收到。,退换货
+T-E071FE1A,B09,电话,My refund was less than the amount I paid for the returned item.,退换货
+T-99F84235,B10,电话,I want to exchange the unopened item for another color.,退换货
+T-CE49B771,B10,电话,商品到手缺了零件，请走售后补换完整一套。,退换货
+T-75E30AB4,B11,电话,退回的机器还在检测，能确认退款进度吗？,退换货
+T-0C43F34E,B11,电话,How do I return a gift without the original outer box?,退换货
+T-EE2873F2,B12,电话,裤子洗前发现开线，希望免费换货。,退换货
+T-CA779793,B12,电话,退款失败提示账户错误，可以重新处理吗？,退换货
+T-85C1C625,B13,电话,The replacement size is also wrong; I would like to return it.,退换货
+T-0FC153E7,B13,电话,退款金额漏算了一件已退回的商品。,退换货
+T-D845AB78,B14,电话,My return request was closed even though the item is faulty.,退换货
+T-8EE2CBC4,B14,电话,我不再需要这台机器，七天内能申请无理由退货吗？,退换货
+T-53C11BF1,B15,电话,The shoes have different sizes in the same box; please replace them.,退换货
+T-1D9D6D11,B15,电话,换新后机器仍无法启动，我希望结束换货直接退款。,退换货
+T-86DF07B9,B01,邮件,请把发票抬头改成公司的全称。,发票
+T-5894CED9,B01,邮件,订单已完成，需要补开电子发票。,发票
+T-B0AD4F6F,B02,邮件,发票税号少了一位，能作废重开吗？,发票
+T-253C0409,B02,邮件,下载发票链接过期了，麻烦重新发送。,发票
+T-4AD80924,B03,邮件,财务需要专用发票，我之前选成普通发票了。,发票
+T-BD331F58,B03,邮件,Please issue an invoice with our company tax number.,发票
+T-83CB3873,B04,邮件,The invoice total does not match the paid order amount.,发票
+T-F128BDD1,B04,邮件,I need a PDF copy of the VAT invoice for reimbursement.,发票
+T-1942D32C,B05,邮件,Our billing department requires the company name on the invoice.,发票
+T-0243842D,B05,邮件,Could you correct the tax identification number on my invoice?,发票
+T-15561B0B,B06,邮件,上个月的发票邮箱填错了，需要再寄一份电子版。,发票
+T-53378770,B06,邮件,多张订单能否合并开具一张发票？,发票
+T-1A71CDE0,B07,邮件,The invoice download is blank when opened by our accountant.,发票
+T-C6F643A5,B07,邮件,Please split the invoice between the two purchasing departments.,发票
+T-5A5D89F5,B08,邮件,发票项目名称与实际购买商品不符。,发票
+T-643555D3,B08,邮件,退款后需要红字发票用于财务冲销。,发票
+T-AADED1B6,B09,邮件,发票税率显示错误，财务无法入账。,发票
+T-630C6903,B09,邮件,The invoice is marked personal but this was a business purchase.,发票
+T-BBA859A4,B10,邮件,We need an invoice dated in the month the order was completed.,发票
+T-1C43397C,B10,邮件,开票资料已经更新，请按新公司地址开票。,发票
+T-02E19B72,B11,邮件,电子发票上的金额小数位缺失了。,发票
+T-7D290200,B11,邮件,Could you resend the invoice attachment to our finance mailbox?,发票
+T-9F217A7F,B12,邮件,我要报销但没有找到订单的开票入口。,发票
+T-08AB6140,B12,邮件,请提供此订单的发票号码供财务核对。,发票
+T-E7138CD6,B13,邮件,"Our auditor needs the original electronic invoice, not a screenshot.",发票
+T-1B93B1EC,B13,邮件,发票上的购方名称打错一个字，请更正。,发票
+T-6BD68E89,B14,邮件,The tax invoice lists a product we did not purchase.,发票
+T-BB117451,B14,邮件,两家分公司分别付款，需要分别开票。,发票
+T-9A6372F5,B15,邮件,Can you cancel the duplicate invoice issued for the same purchase?,发票
+T-AFFED53F,B15,邮件,专票申请显示已开具，但是下载按钮一直不可用。,发票

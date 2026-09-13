@@ -86,7 +86,7 @@ def test_required_judge_failure_does_not_overwrite_the_semantic_channel() -> Non
     assert payload["judge"]["verdict"] == "not_evaluated"
 
 
-def test_v4_is_diagnostic_only_and_v5_requires_the_agent_report_kind(tmp_path: Path) -> None:
+def test_report_versions_remain_readable_without_mixing_measurement_semantics(tmp_path: Path) -> None:
     legacy_path = tmp_path / "legacy.json"
     legacy_path.write_text(
         json.dumps({"schema_version": 4, "case_id": "case", "run_id": "legacy"}),
@@ -98,6 +98,14 @@ def test_v4_is_diagnostic_only_and_v5_requires_the_agent_report_kind(tmp_path: P
     decision = evaluate_characterization((legacy,))
     assert not decision.qualified
     assert decision.reason_codes == ("legacy_unqualified",)
+
+    v5 = _load_result(tmp_path, replace(_result(run_id="v5"), schema_version=5))
+    v6 = _load_result(tmp_path, _result(run_id="v6"))
+    assert evaluate_characterization((v5,)).qualified
+    assert evaluate_characterization((v6,)).qualified
+    comparison = compare_report_cohorts((v5,), (v6,))
+    assert not comparison.comparable
+    assert "comparison_schema_version_mismatch" in comparison.reason_codes
 
     service_like_path = tmp_path / "service-like.json"
     payload = _result(run_id="v5").to_payload()

@@ -12,7 +12,7 @@ from typing import Any, Callable
 from PySide6.QtCore import QEvent, QEventLoop, QMimeData, QPoint, QPointF, Qt, QUrl
 from PySide6.QtGui import QDragEnterEvent, QDropEvent
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication, QPushButton
+from PySide6.QtWidgets import QApplication, QWidget
 
 from xenix.application_services import ApplicationServices
 from xenix.config import AppPaths
@@ -136,6 +136,7 @@ class HeadedBenchmarkCell:
             self.harness = self.runtime_services.agent.harness  # noqa: SLF001
             self.datasets = self.runtime_services.agent.datasets  # noqa: SLF001
             self.artifacts = self.runtime_services.agent.artifacts  # noqa: SLF001
+            self.models = self.runtime_services.agent.ml  # noqa: SLF001
             self.preparation_services = BenchmarkCasePreparationServices(
                 knowledge_import=_HeadedKnowledgeImportAccess(self),
                 knowledge_derivation=_HeadedKnowledgeDerivationAccess(self),
@@ -187,15 +188,15 @@ class HeadedBenchmarkCell:
     def _receive_services(self, services: ApplicationServices) -> None:
         self.runtime_services = services
 
-    def _button(self, semantic_id: str) -> QPushButton:
-        for button in self.window.findChildren(QPushButton):
-            if button.accessibleIdentifier() == semantic_id:
-                return button
+    def _control(self, semantic_id: str) -> Any:
+        for control in self.window.findChildren(QWidget):
+            if control.accessibleIdentifier() == semantic_id:
+                return control
         raise HeadedBenchmarkError("headed_control_unavailable")
 
     def create_thread(self, *, title: str, fq_model_key: str) -> str:
         QTest.mouseClick(
-            self._button("main.history.new-thread"),  # noqa: SLF001
+            self._control("main.history.new-thread"),  # noqa: SLF001
             Qt.MouseButton.LeftButton,
         )
         self.wait_until(
@@ -214,7 +215,7 @@ class HeadedBenchmarkCell:
     def import_knowledge_file(self, source_path: Path, *, timeout: float) -> Any:
         path = source_path.expanduser().resolve(strict=True)
         QTest.mouseClick(
-            self._button("main.header.knowledge"),  # noqa: SLF001
+            self._control("main.header.knowledge"),  # noqa: SLF001
             Qt.MouseButton.LeftButton,
         )
         workspace = self.wait_for_value(
@@ -289,11 +290,11 @@ class HeadedBenchmarkCell:
         )
         if attachments:
             view = self.window._thread_detail_view  # noqa: SLF001
-            self._drop_local_files(view._editor.viewport(), attachments)  # noqa: SLF001
+            self._drop_local_files(self._control("chat.composer.editor").viewport(), attachments)
             expected_paths = {str(path) for path in attachments}
             self.wait_until(
                 lambda: (
-                    expected_paths.issubset(set(view._attached_files))  # noqa: SLF001
+                    expected_paths.issubset(set(view.composer.attached_files))
                     and expected_paths.issubset(
                         set(self.window._chat_workspace.composer_attachments)  # noqa: SLF001
                     )
@@ -310,7 +311,7 @@ class HeadedBenchmarkCell:
             )
 
         view = self.window._thread_detail_view  # noqa: SLF001
-        view._editor.setPlainText(str(getattr(submission, "text", "") or ""))  # noqa: SLF001
+        self._control("chat.composer.editor").setPlainText(str(getattr(submission, "text", "") or ""))
         harness_failure: list[object] = []
 
         def observe(event: Any) -> None:
@@ -322,7 +323,7 @@ class HeadedBenchmarkCell:
         self.window._chat_workspace.harness_stream_event.connect(observe)  # noqa: SLF001
         self.window._chat_workspace.harness_failed.connect(record_failure)  # noqa: SLF001
         try:
-            QTest.mouseClick(view._send_button, Qt.MouseButton.LeftButton)  # noqa: SLF001
+            QTest.mouseClick(self._control("chat.composer.send-or-stop"), Qt.MouseButton.LeftButton)
             self.wait_until(
                 lambda: measurements.final_snapshot_seen or bool(harness_failure),
                 timeout=_SUBJECT_TURN_TIMEOUT_SECONDS,
@@ -337,8 +338,7 @@ class HeadedBenchmarkCell:
                 )
             self.wait_until(
                 lambda: (
-                    not view._running  # noqa: SLF001
-                    and self.window.conversation_idle
+                    self.window.conversation_idle
                 ),
                 timeout=10.0,
                 error_code="headed_ui_did_not_settle",
@@ -353,8 +353,8 @@ class HeadedBenchmarkCell:
         terminal_id = str(getattr(terminal, "id", "") or "")
         rendered = bool(
             terminal_id
-            and terminal_id in view._message_bubbles_by_id  # noqa: SLF001
-            and view._message_bubbles_by_id[terminal_id].isVisible()  # noqa: SLF001
+            and terminal_id in view.timeline.message_bubbles_by_id
+            and view.timeline.message_bubbles_by_id[terminal_id].isVisible()
         )
         self._checks.append(
             OutcomeCheck(
@@ -420,7 +420,7 @@ class HeadedBenchmarkCell:
             self._restore_app_home()
 
     def _select_model(self, fq_model_key: str) -> None:
-        picker = self.window._thread_detail_view._model_picker  # noqa: SLF001
+        picker = self._control("chat.composer.model-picker")
         index = picker.findData(fq_model_key)
         if index < 0:
             raise HeadedBenchmarkError("headed_model_not_available")
@@ -437,7 +437,7 @@ class HeadedBenchmarkCell:
         harness = self.runtime_services.agent.harness  # noqa: SLF001
         conversation = harness._conversation_service  # noqa: SLF001
         targets = (
-            (self.window, "_llm_service"),
+            (self.window._chat_workspace, "_llm_service"),  # noqa: SLF001
             (harness, "_llm_service"),
             (conversation, "_llm_service"),
         )

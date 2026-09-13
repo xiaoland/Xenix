@@ -1,0 +1,17 @@
+﻿customer_id,city,net_spend_90d_yuan,last_contact_date,vip,open_service_cases,active
+C01,南京,1000,2026-05-31,False,0,True
+C02,苏州,999.99,2026-05-01,False,0,True
+C03,南京,1000,2026-06-01,False,0,True
+C04,苏州,1000,2026-06-02,False,0,True
+C05,无锡,3000,2026-04-01,False,0,True
+C06,苏州,0,2026-05-01,True,0,True
+C07,南京,2000,2026-05-01,True,1,True
+C08,南京,2000,,False,0,True
+C09,苏州,2000,2026-05-01,False,0,False
+C10,南京,800,2026-05-01,False,0,True
+C11,苏州,1000,2026-05-01,False,0,True
+C12,南京,1000,2026-05-01,False,2,True
+C13,南京,1000,2026-07-01,False,0,True
+C14,苏州,0,2026-06-15,True,0,True
+C15,南京,1000,2026-05-02,False,0,True
+C16,苏州,999.99,2026-05-30,True,0,True

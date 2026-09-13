@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from hashlib import sha256
@@ -43,6 +44,8 @@ from .contracts import (
     BenchmarkMetrics,
     BenchmarkRunStatus,
     BenchmarkTraceResult,
+    BenchmarkTurnObservation,
+    BenchmarkTurnResult,
     JudgeResult,
     JudgeStatus,
     SemanticVerdict,
@@ -58,7 +61,7 @@ from .budgets import (
     run_isolated_call,
 )
 from .judge import judge_independence, run_judge
-from .telemetry import BenchmarkTrace, load_trace_journal
+from .telemetry import BenchmarkTrace, exception_payload, load_trace_journal
 
 
 LLM_SETTINGS_PATH_ENV = "XENIX_AGENT_BENCHMARK_LLM_SETTINGS_PATH"
@@ -140,6 +143,7 @@ class _BoundedLLMService(LLMService):
         super().__init__(settings_source)
         self._budget = budget
         self.sampling_responses: list[dict[str, Any]] = []
+        self.trace: BenchmarkTrace | None = None
 
     def complete(
         self,
@@ -151,6 +155,7 @@ class _BoundedLLMService(LLMService):
         before_provider_request: Callable[[], None] | None = None,
     ) -> Any:
         self._budget.begin_sampling_round()
+        self._record_budget("benchmark.subject.sampling_started")
         response = super().complete(
             fq_model_key=fq_model_key,
             messages=messages,
@@ -170,6 +175,7 @@ class _BoundedLLMService(LLMService):
         before_provider_request: Callable[[], None] | None = None,
     ) -> Iterator[Any]:
         self._budget.begin_sampling_round()
+        self._record_budget("benchmark.subject.sampling_started")
         for event in super().stream(
             fq_model_key=fq_model_key,
             messages=messages,
@@ -197,6 +203,7 @@ class _BoundedLLMService(LLMService):
         self.sampling_responses.append({
             "round": self._budget.snapshot().sampling_rounds_admitted,
             "reported_tokens": usage.total_tokens if usage is not None else None,
+            "usage": usage.to_payload() if usage is not None else None,
             "tool_calls": [
                 {"provider_call_id": item.provider_call_id, "name": item.tool_name}
                 for item in response.output_items if isinstance(item, ToolCallOutputItem)
@@ -205,6 +212,12 @@ class _BoundedLLMService(LLMService):
         self._budget.observe_subject_response(
             usage.total_tokens if usage is not None else None
         )
+        self._record_budget("benchmark.subject.usage")
+
+    def _record_budget(self, name: str) -> None:
+        if self.trace is not None:
+            with self.trace.span(name) as event:
+                event["budget"] = self._budget.snapshot().to_payload()
 
 
 def _delivery_diagnostics(value: Any) -> dict[str, Any]:
@@ -278,6 +291,7 @@ class _HeadlessBenchmarkCell:
             self.harness = services.harness
             self.datasets = services.datasets
             self.artifacts = services.artifacts
+            self.models = services.ml
             self.preparation_services = BenchmarkCasePreparationServices(
                 knowledge_import=self._knowledge_import,
                 knowledge_derivation=self._knowledge_derivation,
@@ -674,6 +688,8 @@ def run_benchmark(
             failure_kind=outcome.failure_kind or "child_process_failed",
             trace=recovered_trace,
         )
+    if outcome.status is not IsolatedCallStatus.COMPLETED:
+        result = _recover_partial_task(result)
     invocation_total = (
         invocation_reported_subject_tokens
         + result.budget.reported_subject_tokens
@@ -702,6 +718,80 @@ def run_benchmark(
     else:
         result = replace(result, budget=result_budget)
     return _persist_result(output_directory, result)
+
+
+def _metrics_from_payload(payload: dict[str, Any]) -> BenchmarkMetrics:
+    values = dict(payload)
+    usage = values.get("token_usage")
+    values["token_usage"] = TokenUsage(**usage) if usage is not None else None
+    shape = values.get("terminal_shape")
+    values["terminal_shape"] = tuple(shape) if shape is not None else None
+    return BenchmarkMetrics(**values)
+
+
+def _recover_partial_task(result: AgentHarnessBenchmarkResult) -> AgentHarnessBenchmarkResult:
+    """Retain completed requests and observed cost if the process dies mid-task."""
+    events = result.trace.events if result.trace is not None else ()
+    turns = []
+    metrics = result.subject_metrics
+    budget = result.budget
+    planned = result.planned_turn_count
+    active_turn = 0
+    last_budget_event = None
+    for event in events:
+        attributes = event.attributes
+        if event.name == "benchmark.turn.start":
+            active_turn = attributes["user_turn"]
+            planned = attributes["planned_turn_count"]
+        if event.name == "benchmark.turn.checkpoint":
+            payload = attributes["result"]
+            turns.append(
+                BenchmarkTurnResult(
+                    index=payload["index"],
+                    run_status=BenchmarkRunStatus(payload["run_status"]),
+                    failure_kind=payload["failure_kind"],
+                    subject_metrics=_metrics_from_payload(payload["subject_metrics"]),
+                    delivery_evidence=tuple(payload.get("delivery_evidence", ())),
+                    request_text=payload.get("request_text"),
+                    attachment_names=tuple(payload.get("attachment_names", ())),
+                )
+            )
+            metrics = _metrics_from_payload(attributes["cumulative_metrics"])
+        if "budget" in attributes:
+            last_budget_event = event.name
+            payload = attributes["budget"]
+            budget = replace(
+                budget,
+                sampling_rounds_admitted=payload["sampling_rounds_admitted"],
+                provider_attempts_dispatched=payload["provider_attempts_dispatched"],
+                reported_subject_tokens=payload["reported_subject_tokens"],
+            )
+    if active_turn > len(turns):
+        turns.append(
+            BenchmarkTurnResult(
+                index=active_turn,
+                run_status=result.run_status,
+                failure_kind=result.failure_kind,
+                subject_metrics=BenchmarkMetrics(
+                    sampling_round_count=budget.sampling_rounds_admitted - metrics.sampling_round_count,
+                ),
+            )
+        )
+        # No complete conversation projection survives this request. Do not
+        # mislabel earlier usage/message counts as complete task measurements.
+        metrics = replace(
+            metrics,
+            token_usage=None,
+            usage_reported_primary_response_count=None,
+            sampling_round_count=budget.sampling_rounds_admitted,
+        )
+    if last_budget_event == "benchmark.subject.sampling_started":
+        budget = replace(
+            budget,
+            status=BenchmarkBudgetStatus.UNVERIFIABLE,
+            exhaustion_reason="interrupted_provider_usage_unavailable",
+        )
+    return replace(result, turns=tuple(turns), planned_turn_count=planned, subject_metrics=metrics, budget=budget)
 
 
 def _run_model_cell(
@@ -745,6 +835,8 @@ def _run_model_cell(
     failure_kind: str | None = None
     assessment: BenchmarkCaseAssessment | None = None
     judge_result = JudgeResult()
+    turns: list[BenchmarkTurnObservation] = []
+    planned_turn_count: int | None = None
     with tempfile.TemporaryDirectory(
         prefix="cell-",
         dir=temporary_parent,
@@ -772,7 +864,9 @@ def _run_model_cell(
             case_services = BenchmarkCaseServices(
                 datasets=cell.datasets,
                 artifacts=cell.artifacts,
+                models=cell.models,
             )
+            cell.llm.trace = trace_recorder
             with trace_recorder.span("benchmark.case.prepare", case_id=case.case_id) as event:
                 before_dataset_ids = {
                     dataset.id for dataset in cell.datasets.list_datasets()
@@ -784,48 +878,137 @@ def _run_model_cell(
                     case=case,
                     services=cell.preparation_services,
                 )
-            started_at = time.perf_counter()
-            try:
+            build_submissions = getattr(case, "build_submissions", None)
+            submissions = (
+                tuple(build_submissions(thread_id=thread_id, fq_model_key=model_key))
+                if build_submissions
+                else (case.build_submission(thread_id=thread_id, fq_model_key=model_key),)
+            )
+            planned_turn_count = len(submissions)
+            if not submissions:
+                raise BenchmarkInputError("task_has_no_submissions")
+            previous_metrics = BenchmarkMetrics()
+            total_retries = 0
+            for index, submission in enumerate(submissions, start=1):
+                # UI completion flags and attachment capture belong to one request;
+                # the provider budget and production thread belong to the task.
+                measurements = _StreamMeasurements()
+                started_at = time.perf_counter()
+                with trace_recorder.span(
+                    "benchmark.turn.start", user_turn=index, planned_turn_count=planned_turn_count
+                ):
+                    pass
                 with trace_recorder.span(
                     "benchmark.subject.execute",
                     **{
+                        "user_turn": index,
                         "gen_ai.operation.name": "invoke_agent",
                         "gen_ai.request.model": model_key,
                         "gen_ai.conversation.id": thread_id,
                     },
                 ) as event:
-                    cell.execute_submission(
-                        submission=case.build_submission(
-                            thread_id=thread_id,
-                            fq_model_key=model_key,
-                        ),
-                        measurements=measurements,
-                        case=case,
-                        services=case_services,
-                    )
+                    try:
+                        cell.execute_submission(
+                            submission=submission,
+                            measurements=measurements,
+                            case=case,
+                            services=case_services,
+                        )
+                    except BenchmarkBudgetError as exc:
+                        run_status = BenchmarkRunStatus.BUDGET_EXCEEDED
+                        failure_kind = exc.code
+                        event["exception"] = exception_payload(exc)
+                    except Exception as exc:
+                        run_status = BenchmarkRunStatus.RUNTIME_ERROR
+                        failure_kind = _exception_kind(exc)
+                        event["exception"] = exception_payload(exc)
+                    elapsed = time.perf_counter() - started_at
+                    turn_seconds += elapsed
+                    total_retries += measurements.provider_retry_count
+                    turn_budget = budget.snapshot()
+                    if run_status is BenchmarkRunStatus.COMPLETED:
+                        if turn_budget.status is BenchmarkBudgetStatus.EXCEEDED:
+                            run_status = BenchmarkRunStatus.BUDGET_EXCEEDED
+                            failure_kind = turn_budget.exhaustion_reason
+                        elif turn_budget.status is BenchmarkBudgetStatus.UNVERIFIABLE:
+                            run_status = BenchmarkRunStatus.MEASUREMENT_ERROR
+                            failure_kind = turn_budget.exhaustion_reason
+                    if measurements.snapshot is None:
+                        measurements.snapshot = cell.harness.get_thread_snapshot(thread_id)
+                    if measurements.title_event_count and run_status is BenchmarkRunStatus.COMPLETED:
+                        run_status = BenchmarkRunStatus.MEASUREMENT_ERROR
+                        failure_kind = "unexpected_title_event"
                     event["provider_retry_count"] = measurements.provider_retry_count
                     event["final_snapshot_seen"] = measurements.final_snapshot_seen
-            except BenchmarkBudgetError as exc:
-                run_status = BenchmarkRunStatus.BUDGET_EXCEEDED
-                failure_kind = exc.code
-            except Exception as exc:
-                run_status = BenchmarkRunStatus.RUNTIME_ERROR
-                failure_kind = _exception_kind(exc)
-            finally:
-                turn_seconds = time.perf_counter() - started_at
-
-            if measurements.title_event_count and run_status is BenchmarkRunStatus.COMPLETED:
-                run_status = BenchmarkRunStatus.MEASUREMENT_ERROR
-                failure_kind = "unexpected_title_event"
-
-            if measurements.snapshot is None and thread_id is not None:
+                    event["run_status"] = run_status.value
+                    event["failure_kind"] = failure_kind
+                    messages = list(getattr(measurements.snapshot, "messages", ()))
+                    event["final_text"] = str(getattr(messages[-1], "text", "") or "") if messages else ""
+                cumulative_metrics = _collect_metrics(
+                    sampling_responses=cell.llm.sampling_responses,
+                    dataset_service=cell.datasets,
+                    snapshot=measurements.snapshot,
+                    turn_seconds=turn_seconds,
+                    assessment_seconds=None,
+                    pending_message_ids=measurements.pending_message_ids,
+                    provider_retry_count=total_retries,
+                    terminal_shape=None,
+                    budget=budget,
+                )
+                turn_result = BenchmarkTurnResult(
+                    index=index,
+                    run_status=run_status,
+                    failure_kind=failure_kind,
+                    subject_metrics=_incremental_metrics(cumulative_metrics, previous_metrics, elapsed),
+                    request_text=submission.text if build_submissions is not None else None,
+                    attachment_names=tuple(Path(item.file_path).name for item in submission.source_attachments)
+                    if build_submissions is not None
+                    else (),
+                )
+                evidence = None
                 try:
-                    measurements.snapshot = cell.harness.get_thread_snapshot(thread_id)
-                except Exception:
-                    pass
-            run_dataset_ids = frozenset(
-                dataset.id for dataset in cell.datasets.list_datasets()
-            ) - before_dataset_ids
+                    capture_turn = getattr(case, "capture_turn", None)
+                    if capture_turn is not None:
+                        with trace_recorder.span("benchmark.turn.capture", user_turn=index):
+                            evidence = capture_turn(
+                                context=BenchmarkCaseContext(
+                                    snapshot=measurements.snapshot,
+                                    services=case_services,
+                                    source_state=measurements.source_state,
+                                    runtime_home=paths.home,
+                                    run_dataset_ids=frozenset(dataset.id for dataset in cell.datasets.list_datasets())
+                                    - before_dataset_ids,
+                                    turns=tuple(turns),
+                                )
+                            )
+                except Exception as exc:
+                    if run_status is BenchmarkRunStatus.COMPLETED:
+                        run_status = BenchmarkRunStatus.MEASUREMENT_ERROR
+                        failure_kind = _exception_kind(exc)
+                    turn_result = replace(turn_result, run_status=run_status, failure_kind=failure_kind)
+                turns.append(
+                    BenchmarkTurnObservation(
+                        snapshot=deepcopy(measurements.snapshot),
+                        evidence=evidence,
+                        result=turn_result,
+                    )
+                )
+                report_evidence = getattr(evidence, "report_evidence", None)
+                if report_evidence is not None:
+                    turns[-1] = replace(
+                        turns[-1], result=replace(turn_result, delivery_evidence=report_evidence(index))
+                    )
+                with trace_recorder.span("benchmark.turn.checkpoint", user_turn=index) as event:
+                    event["result"] = turns[-1].result.to_payload()
+                    event["cumulative_metrics"] = cumulative_metrics.to_payload()
+                    event["budget"] = budget.snapshot().to_payload()
+                    event["planned_turn_count"] = planned_turn_count
+                previous_metrics = cumulative_metrics
+                subject_metrics = cumulative_metrics
+                if run_status is not BenchmarkRunStatus.COMPLETED:
+                    break
+            measurements.provider_retry_count = total_retries
+            run_dataset_ids = frozenset(dataset.id for dataset in cell.datasets.list_datasets()) - before_dataset_ids
             with trace_recorder.span("benchmark.subject.outcome") as event:
                 event["sampling_responses"] = cell.llm.sampling_responses
                 messages = list(getattr(measurements.snapshot, "messages", []))
@@ -841,16 +1024,15 @@ def _run_model_cell(
                         "provider_call_id": message.provider_call_id,
                         "arguments": message.arguments_payload,
                         "status": getattr(results.get(message.id), "result_status", None),
-                        "delivery": _delivery_diagnostics(
-                            getattr(results.get(message.id), "value_payload", None)
-                        ),
+                        "delivery": _delivery_diagnostics(getattr(results.get(message.id), "value_payload", None)),
                         "failure": (
                             results[message.id].value_payload
                             if getattr(results.get(message.id), "result_status", None) == "failed"
                             else None
                         ),
                     }
-                    for message in messages if getattr(message, "tool_id", None)
+                    for message in messages
+                    if getattr(message, "tool_id", None)
                 ]
                 event["datasets"] = [
                     {"id": dataset.id, "name": dataset.name}
@@ -867,13 +1049,14 @@ def _run_model_cell(
                             run_dataset_ids=run_dataset_ids,
                             runtime_home=paths.home,
                             services=case_services,
+                            turns=tuple(turns),
                         )
                     )
                     event["semantic_check_count"] = len(assessment.semantic_checks)
                     event["integrity_check_count"] = len(assessment.integrity_checks)
                 assessment_seconds = time.perf_counter() - assessment_started_at
                 subject_metrics = _collect_metrics(
-                    harness=cell.harness,
+                    sampling_responses=cell.llm.sampling_responses,
                     dataset_service=cell.datasets,
                     snapshot=measurements.snapshot,
                     turn_seconds=turn_seconds,
@@ -889,7 +1072,7 @@ def _run_model_cell(
                     failure_kind = _exception_kind(exc)
                 try:
                     subject_metrics = _collect_metrics(
-                        harness=cell.harness,
+                        sampling_responses=cell.llm.sampling_responses,
                         dataset_service=cell.datasets,
                         snapshot=measurements.snapshot,
                         turn_seconds=turn_seconds,
@@ -974,6 +1157,12 @@ def _run_model_cell(
         judge=judge_result,
         identity=identity,
         failure_kind=failure_kind,
+        planned_turn_count=planned_turn_count,
+        turns=tuple(
+            replace(turn.result, semantic_checks=assessment.turn_checks[index])
+            if assessment is not None and index < len(assessment.turn_checks) else turn.result
+            for index, turn in enumerate(turns)
+        ),
         trace=BenchmarkTraceResult(
             trace_id=trace_recorder.trace_id,
             events=trace_recorder.events,
@@ -1024,7 +1213,7 @@ def _prepare_case(
 
 def _collect_metrics(
     *,
-    harness: Any,
+    sampling_responses: list[dict[str, Any]],
     dataset_service: Any,
     snapshot: Any | None,
     turn_seconds: float,
@@ -1047,7 +1236,7 @@ def _collect_metrics(
         if kind == "tool_result":
             status = _enum_value(getattr(message, "result_status", None)) or "unknown"
             tool_result_counts[status] = tool_result_counts.get(status, 0) + 1
-    usage_count, token_usage = _usage_metrics(harness, snapshot)
+    usage_count, token_usage = _provider_usage_metrics(sampling_responses)
     return BenchmarkMetrics(
         turn_seconds=turn_seconds,
         assessment_seconds=assessment_seconds,
@@ -1063,37 +1252,43 @@ def _collect_metrics(
     )
 
 
-def _usage_metrics(harness: Any, snapshot: Any | None) -> tuple[int | None, TokenUsage | None]:
-    if snapshot is None:
-        return None, None
-    total_request_count = 0
-    aggregate: TokenUsage | None = None
-    for event in harness.project_chatbot_events(snapshot):
-        if _enum_value(getattr(event, "kind", None)) != "usage":
-            continue
-        payload = getattr(event, "usage_payload", None)
-        usage = LLMTokenUsage.from_payload(payload)
-        if usage is None:
-            continue
-        request_count = payload.get("request_count") if isinstance(payload, dict) else None
-        if not isinstance(request_count, int) or isinstance(request_count, bool) or request_count < 1:
-            continue
-        total_request_count += request_count
-        current = TokenUsage(
-            input_tokens=usage.input_tokens,
-            cached_input_tokens=usage.cached_input_tokens,
-            output_tokens=usage.output_tokens,
-            total_tokens=usage.total_tokens,
-        )
-        aggregate = current if aggregate is None else TokenUsage(
-            input_tokens=aggregate.input_tokens + current.input_tokens,
-            cached_input_tokens=aggregate.cached_input_tokens + current.cached_input_tokens,
-            output_tokens=aggregate.output_tokens + current.output_tokens,
-            total_tokens=aggregate.total_tokens + current.total_tokens,
-        )
-    if aggregate is None:
-        return None, None
-    return total_request_count, aggregate
+def _incremental_metrics(current: BenchmarkMetrics, previous: BenchmarkMetrics, seconds: float) -> BenchmarkMetrics:
+    """Snapshots contain the whole conversation; report each request's delta once."""
+    def counts(field: str) -> dict[str, int]:
+        before = getattr(previous, field)
+        return {key: value - before.get(key, 0) for key, value in getattr(current, field).items() if value != before.get(key, 0)}
+
+    usage = current.token_usage
+    if usage is not None and previous.token_usage is not None:
+        usage = TokenUsage(**{
+            key: value - getattr(previous.token_usage, key)
+            for key, value in usage.to_payload().items()
+        })
+    response_count = current.usage_reported_primary_response_count
+    if response_count is not None:
+        response_count -= previous.usage_reported_primary_response_count or 0
+    return BenchmarkMetrics(
+        turn_seconds=seconds,
+        sampling_round_count=current.sampling_round_count - previous.sampling_round_count,
+        usage_reported_primary_response_count=response_count,
+        token_usage=usage,
+        message_counts=counts("message_counts"),
+        tool_call_counts_by_name=counts("tool_call_counts_by_name"),
+        tool_result_counts_by_status=counts("tool_result_counts_by_status"),
+        provider_retry_count=current.provider_retry_count - previous.provider_retry_count,
+        derived_dataset_count=current.derived_dataset_count - previous.derived_dataset_count,
+    )
+
+
+def _provider_usage_metrics(responses: list[dict[str, Any]]) -> tuple[int, TokenUsage | None]:
+    """Count actual provider responses even if a user turn never reaches completion."""
+    usages = [response["usage"] for response in responses if response.get("usage") is not None]
+    if len(usages) != len(responses):
+        return len(usages), None
+    return len(usages), TokenUsage(**{
+        key: sum(usage[key] for usage in usages)
+        for key in ("input_tokens", "cached_input_tokens", "output_tokens", "total_tokens")
+    })
 
 
 def _evaluate_judge(
@@ -1217,6 +1412,7 @@ def _judge_rubric_identity(
             "rubric_id": rubric.rubric_id,
             "score_dimensions": list(rubric.score_dimensions),
             "allowed_reason_codes": list(rubric.allowed_reason_codes),
+            **({"scoring_guidance": list(rubric.scoring_guidance)} if rubric.scoring_guidance else {}),
         },
         ensure_ascii=False,
         separators=(",", ":"),

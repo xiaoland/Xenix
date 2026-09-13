@@ -162,6 +162,7 @@ def build_judge_messages(judge_input: JudgeInput) -> list[ProviderMessage]:
             "score_dimensions": list(rubric.score_dimensions),
             "allowed_reason_codes": list(rubric.allowed_reason_codes),
             "score_range": {"minimum": 0, "maximum": 2},
+            "scoring_guidance": list(rubric.scoring_guidance),
         },
         ensure_ascii=False,
         separators=(",", ":"),

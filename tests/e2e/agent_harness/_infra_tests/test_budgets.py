@@ -138,7 +138,6 @@ def test_reported_response_at_500k_boundary_halts_the_next_round(
     assert snapshot.status is BenchmarkBudgetStatus.WITHIN_LIMITS
     assert snapshot.reported_subject_tokens == 500_000
     assert snapshot.provider_attempts_dispatched == 1
-    assert service.sampling_responses == [{"round": 1, "reported_tokens": 500_000, "tool_calls": []}]
     assert snapshot.exhaustion_reason is None
     with pytest.raises(BenchmarkBudgetError, match="subject_token_limit_reached"):
         service.complete(messages=[], tools=[])

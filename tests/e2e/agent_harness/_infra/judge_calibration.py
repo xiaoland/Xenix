@@ -189,6 +189,7 @@ def judge_rubric_sha256(rubric: JudgeRubric) -> str:
             "rubric_id": rubric.rubric_id,
             "score_dimensions": list(rubric.score_dimensions),
             "allowed_reason_codes": list(rubric.allowed_reason_codes),
+            **({"scoring_guidance": list(rubric.scoring_guidance)} if rubric.scoring_guidance else {}),
         },
         ensure_ascii=False,
         separators=(",", ":"),

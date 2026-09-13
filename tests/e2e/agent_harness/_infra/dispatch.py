@@ -9,6 +9,8 @@ only on ``sys.path`` as a side effect of an in-process pytest launch).
 
 from __future__ import annotations
 
+from pathlib import Path
+
 BENCHMARK_PLUGIN = "tests.e2e.agent_harness._infra.pytest_plugin"
 BENCHMARK_ROOT = "tests/e2e/agent_harness"
 INFRA_TEST_ROOT = "tests/e2e/agent_harness/_infra_tests"
@@ -34,7 +36,10 @@ def benchmark_pytest_arguments(arguments: list[str]) -> list[str]:
             "Agent Harness selectors must name a live case under "
             f"{BENCHMARK_ROOT}."
         )
-    collection_targets = list(explicit_targets) or [BENCHMARK_ROOT]
+    collection_targets = list(explicit_targets) or [
+        f"{BENCHMARK_ROOT}/{path.name}"
+        for path in sorted(Path(__file__).resolve().parents[1].glob("test_business_*.py"))
+    ]
     return [
         "--direct",
         "-p",
