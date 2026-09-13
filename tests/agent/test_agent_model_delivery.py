@@ -18,7 +18,10 @@ def test_completed_training_exposes_evaluation_report_without_an_extra_query(tun
         fit_with_evaluate=lambda _input: fit,
         tune_with_evaluate=lambda _input: fit,
         wait_for_training_models=lambda *_args, **_kwargs: (
-            [fit, evaluation], [SimpleNamespace(id="model")],
+            [fit, evaluation], [SimpleNamespace(
+                id="model", ml_task_id="fit", model_key="regression.ridge",
+                metadata_payload={"evaluation_ml_task_id": "evaluation"},
+            )],
         ),
         get_task_details=lambda task_id: SimpleNamespace(artifacts=[report] if task_id == "evaluation" else []),
     )

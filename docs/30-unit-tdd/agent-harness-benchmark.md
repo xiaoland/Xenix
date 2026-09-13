@@ -68,9 +68,13 @@ Judge responses need usable verdicts, rubric scores, and reason codes. Markdown 
 
 ## Resource limits and failures
 
-Each live cell runs in a killable spawn child with a 900-second deadline, at most 12 subject sampling rounds, and two provider attempts per round. Optional title and completion-guard models are disabled in the effective settings so their requests do not escape subject accounting.
+Sampling follows the production Harness, which currently has no sampling-round cap. Provider retries follow the supplied production LLMSettings for both Subject and Judge. Benchmark counts rounds and dispatched attempts without imposing another limit, including across consecutive user requests; it does not reserve rounds for a future request. Optional title and completion-guard models are disabled in the effective settings so their requests do not escape subject accounting.
 
-Reported subject tokens are limited to 500,000 per cell and 4,000,000 per pytest invocation. Token enforcement happens at response boundaries: count the completed response and stop before a later request. Missing usage stops further cells because invocation cost cannot be counted; round and time limits remain independent.
+Resource policy `agent-harness-budget-v2` retains external cost and time limits: each live cell runs in a killable spawn child with a 900-second deadline. These are benchmark runner limits, not production Harness quotas. Older v1 reports remain readable but are not comparable with v2 as the same resource policy.
+
+An isolated call writes its result to a temporary file before exiting; the parent reads it after the child settles. Reports can exceed an IPC pipe's buffer, so waiting for child exit before draining a result pipe can deadlock and misreport completed work as a timeout. The temporary transport is removed after consumption, failure or termination; durable reports and trace journals retain their existing owners.
+
+Reported Subject tokens are counted after every response; there is no benchmark token cap on an executing task. The 4,000,000-token invocation allowance gates only subsequent cells. Missing or invalid usage marks accounting unavailable without interrupting production sampling; after the current user request settles it prevents further benchmark execution because invocation cost cannot be counted. The process deadline remains independent.
 
 Stopping because provider usage is missing is a measurement error, not proof that the Agent exhausted its task allowance. Conversely, an observed wall timeout is still a failed execution even when the interrupted response has unknown usage; scoring and accounting coverage answer different questions.
 
@@ -100,7 +104,7 @@ Calibration is optional. When supplied through `--calibration`, a passing report
 
 Each cell's trace preserves lifecycle spans, timings, paths, attributes, exception chains, and stack traces needed for diagnosis. CLI summaries print the trace ID and absolute JSON report path. Traces remain diagnostic evidence and never determine a semantic score merely because their format changed.
 
-The local `benchmark.subject.outcome` trace records the final text, Tool calls and arguments, failed results, response-to-tool-call grouping via provider call IDs, per-response reported tokens, completion handles and result sizes, and output Dataset identities before the temporary runtime closes. This makes incomplete delivery and repair attempts reviewable; those diagnostic exchanges are not added to Judge inputs.
+The local `benchmark.subject.outcome` trace records the final text, Tool calls and arguments, failed results, response-to-tool-call grouping via provider call IDs, per-response reported tokens, completion handles and result sizes, and output Dataset identities before the temporary runtime closes. Completed training also retains the compact per-model feedback, so selected IDs can be traced to actual parameters and evaluation evidence. This makes incomplete delivery and repair attempts reviewable; those diagnostic exchanges are not added to Judge inputs.
 
 Per-request checkpoints and provider budget observations are journaled during execution. Usage is aggregated from actual provider responses, including a user request that never reaches a terminal answer. If the child process times out or dies, the parent recovers completed deliveries and observed cost, identifies the interrupted request, and leaves unavailable measurements unknown. An interrupted provider response cannot be assigned zero tokens. New synthetic business tasks retain complete linked delivery tables/reports locally; this does not change legacy cases' evidence content policy. Neither snapshots nor intermediate Tool exchanges are sent to Judge; it receives the case's final deliveries from both requests when applicable.
 

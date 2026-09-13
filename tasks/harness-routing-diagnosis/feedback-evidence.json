@@ -1,0 +1,705 @@
+[
+  {
+    "variant": "confirmation",
+    "trace_run": "1bfb10996370452398e38d9ce83a22e1",
+    "trace_round": 5,
+    "run_name": "ticket-routing-unigram",
+    "params": {
+      "class_weight": "balanced",
+      "max_features": 5000,
+      "phrase_mode": "unigram"
+    },
+    "holdout": {
+      "accuracy": 0.7777777777777778,
+      "balanced_accuracy": 0.7777777777777778,
+      "precision_macro": 0.7738095238095237,
+      "precision_weighted": 0.7738095238095237,
+      "recall_macro": 0.7777777777777778,
+      "recall_weighted": 0.7777777777777778,
+      "f1_macro": 0.7641025641025642,
+      "f1_weighted": 0.764102564102564,
+      "log_loss": 0.8000091309575426,
+      "roc_auc": 0.9722222222222222,
+      "pr_auc": 0.9452380952380951
+    },
+    "confusion": [
+      [
+        6,
+        0,
+        0
+      ],
+      [
+        0,
+        5,
+        1
+      ],
+      [
+        1,
+        2,
+        3
+      ]
+    ],
+    "baseline_accuracy": 0.3333333333333333,
+    "split": {
+      "realized_strategy": "group_hash_holdout.v2",
+      "train_row_count": 72,
+      "holdout_row_count": 18,
+      "eligible_group_count": 15,
+      "group_overlap_count": 0
+    },
+    "applied": {
+      "history": {
+        "count": 90,
+        "accuracy": 1.0,
+        "wrong_ticket_ids": []
+      },
+      "new_batch": {
+        "count": 30,
+        "accuracy": 0.9333333333333333,
+        "wrong_ticket_ids": [
+          "T-01CA1F80",
+          "T-D00705F3"
+        ]
+      }
+    },
+    "tool_result_bytes": 5671,
+    "tool_result_top_level_bytes": {
+      "dataset_id": 34,
+      "task_ids": 72,
+      "trained_model_ids": 36,
+      "models": 5089,
+      "artifacts": 360
+    },
+    "tool_return_artifact_kinds": [
+      "model",
+      "evaluation_report"
+    ],
+    "fit_and_eval_payload_keys": [
+      [
+        "task_id",
+        "evaluation_kind",
+        "evaluation_policy",
+        "error_summary",
+        "model_key",
+        "params",
+        "model_artifact_path",
+        "final_model_artifact_path",
+        "holdout_artifact_path",
+        "export_artifact_path",
+        "report_artifact_path",
+        "split_facts",
+        "preparation_facts",
+        "training_scopes",
+        "forecast_split_facts",
+        "forecast_preparation_facts",
+        "recommendation_split_facts",
+        "recommendation_preparation_facts",
+        "text_preparation_facts",
+        "text_preparation_specification",
+        "text_leakage_facts",
+        "text_vectorization_facts",
+        "text_clustering_evaluation",
+        "text_topic_evaluation",
+        "text_retrieval_evaluation",
+        "result_summary",
+        "trained_model_id",
+        "canonical_model_artifact_path",
+        "evaluation_model_artifact_path"
+      ],
+      [
+        "task_id",
+        "evaluation_kind",
+        "evaluation_policy",
+        "error_summary",
+        "trained_model_id",
+        "model_key",
+        "evaluation",
+        "baseline_evaluation",
+        "comparison",
+        "split_facts",
+        "preparation_facts",
+        "forecast_evaluation",
+        "clustering_evaluation",
+        "recommendation_evaluation",
+        "text_classification_evaluation",
+        "text_clustering_evaluation",
+        "text_topic_evaluation",
+        "text_retrieval_evaluation"
+      ]
+    ],
+    "public_links_resolve": [
+      true,
+      true
+    ],
+    "tool_feedback": {
+      "dataset_id": "facd91a96de64e59b517a66c0fba11fc",
+      "task_ids": [
+        "90afac2ea4ee49a9b256f8f247612206",
+        "a6be2db02c464184857871a5768ddf8c"
+      ],
+      "trained_model_ids": [
+        "aa68735cc87c4b7bbc8c01e37bbe5e10"
+      ],
+      "models": [
+        {
+          "trained_model_id": "aa68735cc87c4b7bbc8c01e37bbe5e10",
+          "model_key": "text.classification.multilingual_logistic_regression_tfidf",
+          "training_task_id": "90afac2ea4ee49a9b256f8f247612206",
+          "evaluation_task_id": "a6be2db02c464184857871a5768ddf8c",
+          "evaluation_kind": "classification",
+          "params": {
+            "preparation_profile": "multilingual_business_v1",
+            "phrase_mode": "unigram",
+            "max_features": 5000,
+            "minimum_document_frequency": 1,
+            "class_weight": "balanced",
+            "custom_dictionary_dataset_ids": [],
+            "stopword_dataset_ids": []
+          },
+          "training_scopes": {
+            "evaluation_model": "holdout_train_split",
+            "apply_model": "all_eligible_rows"
+          },
+          "comparison": {
+            "primary_metric_name": "f1_weighted",
+            "direction": "max",
+            "candidate_value": 0.764102564102564,
+            "baseline_value": 0.16666666666666666,
+            "verdict": "candidate_better"
+          },
+          "evaluation": {
+            "primary_metric_name": "f1_weighted",
+            "primary_metric_value": 0.764102564102564,
+            "metrics": {
+              "accuracy": 0.7777777777777778,
+              "balanced_accuracy": 0.7777777777777778,
+              "precision_macro": 0.7738095238095237,
+              "precision_weighted": 0.7738095238095237,
+              "recall_macro": 0.7777777777777778,
+              "recall_weighted": 0.7777777777777778,
+              "f1_macro": 0.7641025641025642,
+              "f1_weighted": 0.764102564102564,
+              "log_loss": 0.8000091309575426,
+              "roc_auc": 0.9722222222222222,
+              "pr_auc": 0.9452380952380951
+            },
+            "details": {
+              "labels": [
+                "发票",
+                "物流",
+                "退换货"
+              ],
+              "confusion_matrix": [
+                [
+                  6,
+                  0,
+                  0
+                ],
+                [
+                  0,
+                  5,
+                  1
+                ],
+                [
+                  1,
+                  2,
+                  3
+                ]
+              ],
+              "classification_report": {
+                "发票": {
+                  "precision": 0.8571428571428571,
+                  "recall": 1.0,
+                  "f1-score": 0.9230769230769231,
+                  "support": 6.0
+                },
+                "物流": {
+                  "precision": 0.7142857142857143,
+                  "recall": 0.8333333333333334,
+                  "f1-score": 0.7692307692307693,
+                  "support": 6.0
+                },
+                "退换货": {
+                  "precision": 0.75,
+                  "recall": 0.5,
+                  "f1-score": 0.6,
+                  "support": 6.0
+                },
+                "accuracy": 0.7777777777777778,
+                "macro avg": {
+                  "precision": 0.7738095238095237,
+                  "recall": 0.7777777777777778,
+                  "f1-score": 0.7641025641025642,
+                  "support": 18.0
+                },
+                "weighted avg": {
+                  "precision": 0.7738095238095237,
+                  "recall": 0.7777777777777778,
+                  "f1-score": 0.764102564102564,
+                  "support": 18.0
+                }
+              },
+              "probability_metrics": {
+                "available": true,
+                "variant": "weighted_ovr"
+              }
+            }
+          },
+          "baseline_evaluation": {
+            "primary_metric_name": "f1_weighted",
+            "primary_metric_value": 0.16666666666666666,
+            "metrics": {
+              "accuracy": 0.3333333333333333,
+              "balanced_accuracy": 0.3333333333333333,
+              "precision_macro": 0.1111111111111111,
+              "precision_weighted": 0.1111111111111111,
+              "recall_macro": 0.3333333333333333,
+              "recall_weighted": 0.3333333333333333,
+              "f1_macro": 0.16666666666666666,
+              "f1_weighted": 0.16666666666666666,
+              "log_loss": 24.029102259411435,
+              "roc_auc": 0.5,
+              "pr_auc": 0.3333333333333333
+            },
+            "details": {
+              "labels": [
+                "发票",
+                "物流",
+                "退换货"
+              ],
+              "confusion_matrix": [
+                [
+                  6,
+                  0,
+                  0
+                ],
+                [
+                  6,
+                  0,
+                  0
+                ],
+                [
+                  6,
+                  0,
+                  0
+                ]
+              ],
+              "classification_report": {
+                "发票": {
+                  "precision": 0.3333333333333333,
+                  "recall": 1.0,
+                  "f1-score": 0.5,
+                  "support": 6.0
+                },
+                "物流": {
+                  "precision": 0.0,
+                  "recall": 0.0,
+                  "f1-score": 0.0,
+                  "support": 6.0
+                },
+                "退换货": {
+                  "precision": 0.0,
+                  "recall": 0.0,
+                  "f1-score": 0.0,
+                  "support": 6.0
+                },
+                "accuracy": 0.3333333333333333,
+                "macro avg": {
+                  "precision": 0.1111111111111111,
+                  "recall": 0.3333333333333333,
+                  "f1-score": 0.16666666666666666,
+                  "support": 18.0
+                },
+                "weighted avg": {
+                  "precision": 0.1111111111111111,
+                  "recall": 0.3333333333333333,
+                  "f1-score": 0.16666666666666666,
+                  "support": 18.0
+                }
+              },
+              "probability_metrics": {
+                "available": true,
+                "variant": "weighted_ovr"
+              }
+            }
+          },
+          "result_summary": {
+            "class_count": 3,
+            "train_row_count": 72,
+            "holdout_row_count": 18,
+            "evaluation_model_training_scope": "holdout_train_split",
+            "apply_model_training_scope": "all_eligible_rows",
+            "connected_group_count": 15,
+            "transformed_feature_count": 309
+          },
+          "split_facts": {
+            "requested_strategy": "group_hash_holdout.v2",
+            "realized_strategy": "group_hash_holdout.v2",
+            "eligible_row_count": 90,
+            "train_row_count": 72,
+            "holdout_row_count": 18,
+            "eligible_group_count": 15,
+            "train_group_count": 12,
+            "holdout_group_count": 3,
+            "group_overlap_count": 0,
+            "random_state": 42,
+            "evaluation_scope": "holdout"
+          },
+          "text_classification_evaluation": {
+            "preparation": {
+              "source_row_count": 90,
+              "eligible_row_count": 90,
+              "missing_text_row_count": 0,
+              "non_empty_text_row_count": 90,
+              "empty_after_preparation_row_count": 0,
+              "cjk_text_row_count": 50,
+              "latin_text_row_count": 39,
+              "mixed_script_text_row_count": 1,
+              "token_count": 573,
+              "custom_dictionary_term_count": 0,
+              "stopword_term_count": 49,
+              "custom_term_match_count": 0,
+              "collapsed_exact_duplicate_row_count": 0,
+              "collapsed_template_duplicate_row_count": 0
+            },
+            "leakage": {
+              "group_policy_key": "business_template_connected_union.v1",
+              "template_policy_key": "masked_token_jaccard.v1",
+              "template_similarity_threshold": 0.8,
+              "business_group_supplied": true,
+              "eligible_row_count": 90,
+              "business_group_count": 15,
+              "template_group_count": 90,
+              "connected_group_count": 15,
+              "near_duplicate_edge_count": 0,
+              "train_business_group_overlap_count": 0,
+              "train_template_group_overlap_count": 0,
+              "train_connected_group_overlap_count": 0
+            },
+            "vectorization": {
+              "fit_row_count": 72,
+              "transformed_feature_count": 309,
+              "inspected_row_count": 18,
+              "empty_after_preparation_row_count": 0,
+              "out_of_vocabulary_row_count": 2
+            }
+          }
+        }
+      ],
+      "artifacts": [
+        {
+          "ml_task_id": "90afac2ea4ee49a9b256f8f247612206",
+          "artifact_id": "8e7c6a99b9c9429baf73387336948d0d",
+          "kind": "model",
+          "uri": "artifact://8e7c6a99b9c9429baf73387336948d0d"
+        },
+        {
+          "ml_task_id": "a6be2db02c464184857871a5768ddf8c",
+          "artifact_id": "412eb129200949ffb2043c77a28fad21",
+          "kind": "evaluation_report",
+          "uri": "artifact://412eb129200949ffb2043c77a28fad21"
+        }
+      ]
+    },
+    "query_feedback": {
+      "task_ids": [
+        "90afac2ea4ee49a9b256f8f247612206"
+      ],
+      "tasks": [
+        {
+          "task_id": "90afac2ea4ee49a9b256f8f247612206",
+          "task_type": "fit",
+          "status": "succeeded",
+          "error_summary": null,
+          "result": {
+            "model_key": "text.classification.multilingual_logistic_regression_tfidf",
+            "trained_model_id": "aa68735cc87c4b7bbc8c01e37bbe5e10",
+            "evaluation_kind": "classification",
+            "params": {
+              "preparation_profile": "multilingual_business_v1",
+              "phrase_mode": "unigram",
+              "max_features": 5000,
+              "minimum_document_frequency": 1,
+              "class_weight": "balanced",
+              "custom_dictionary_dataset_ids": [],
+              "stopword_dataset_ids": []
+            },
+            "training_scopes": {
+              "evaluation_model": "holdout_train_split",
+              "apply_model": "all_eligible_rows"
+            },
+            "result_summary": {
+              "class_count": 3,
+              "train_row_count": 72,
+              "holdout_row_count": 18,
+              "evaluation_model_training_scope": "holdout_train_split",
+              "apply_model_training_scope": "all_eligible_rows",
+              "connected_group_count": 15,
+              "transformed_feature_count": 309
+            },
+            "split_facts": {
+              "requested_strategy": "group_hash_holdout.v2",
+              "realized_strategy": "group_hash_holdout.v2",
+              "eligible_row_count": 90,
+              "train_row_count": 72,
+              "holdout_row_count": 18,
+              "eligible_group_count": 15,
+              "train_group_count": 12,
+              "holdout_group_count": 3,
+              "group_overlap_count": 0,
+              "random_state": 42,
+              "evaluation_scope": "holdout"
+            },
+            "evaluation_task_id": "a6be2db02c464184857871a5768ddf8c"
+          },
+          "artifacts": [
+            {
+              "artifact_id": "8e7c6a99b9c9429baf73387336948d0d",
+              "kind": "model",
+              "uri": "artifact://8e7c6a99b9c9429baf73387336948d0d"
+            }
+          ]
+        },
+        {
+          "task_id": "a6be2db02c464184857871a5768ddf8c",
+          "task_type": "evaluate",
+          "status": "succeeded",
+          "error_summary": null,
+          "result": {
+            "model_key": "text.classification.multilingual_logistic_regression_tfidf",
+            "trained_model_id": "aa68735cc87c4b7bbc8c01e37bbe5e10",
+            "evaluation_kind": "classification",
+            "comparison": {
+              "primary_metric_name": "f1_weighted",
+              "direction": "max",
+              "candidate_value": 0.764102564102564,
+              "baseline_value": 0.16666666666666666,
+              "verdict": "candidate_better"
+            },
+            "evaluation": {
+              "primary_metric_name": "f1_weighted",
+              "primary_metric_value": 0.764102564102564,
+              "metrics": {
+                "accuracy": 0.7777777777777778,
+                "balanced_accuracy": 0.7777777777777778,
+                "precision_macro": 0.7738095238095237,
+                "precision_weighted": 0.7738095238095237,
+                "recall_macro": 0.7777777777777778,
+                "recall_weighted": 0.7777777777777778,
+                "f1_macro": 0.7641025641025642,
+                "f1_weighted": 0.764102564102564,
+                "log_loss": 0.8000091309575426,
+                "roc_auc": 0.9722222222222222,
+                "pr_auc": 0.9452380952380951
+              },
+              "details": {
+                "labels": [
+                  "发票",
+                  "物流",
+                  "退换货"
+                ],
+                "confusion_matrix": [
+                  [
+                    6,
+                    0,
+                    0
+                  ],
+                  [
+                    0,
+                    5,
+                    1
+                  ],
+                  [
+                    1,
+                    2,
+                    3
+                  ]
+                ],
+                "classification_report": {
+                  "发票": {
+                    "precision": 0.8571428571428571,
+                    "recall": 1.0,
+                    "f1-score": 0.9230769230769231,
+                    "support": 6.0
+                  },
+                  "物流": {
+                    "precision": 0.7142857142857143,
+                    "recall": 0.8333333333333334,
+                    "f1-score": 0.7692307692307693,
+                    "support": 6.0
+                  },
+                  "退换货": {
+                    "precision": 0.75,
+                    "recall": 0.5,
+                    "f1-score": 0.6,
+                    "support": 6.0
+                  },
+                  "accuracy": 0.7777777777777778,
+                  "macro avg": {
+                    "precision": 0.7738095238095237,
+                    "recall": 0.7777777777777778,
+                    "f1-score": 0.7641025641025642,
+                    "support": 18.0
+                  },
+                  "weighted avg": {
+                    "precision": 0.7738095238095237,
+                    "recall": 0.7777777777777778,
+                    "f1-score": 0.764102564102564,
+                    "support": 18.0
+                  }
+                },
+                "probability_metrics": {
+                  "available": true,
+                  "variant": "weighted_ovr"
+                }
+              }
+            },
+            "baseline_evaluation": {
+              "primary_metric_name": "f1_weighted",
+              "primary_metric_value": 0.16666666666666666,
+              "metrics": {
+                "accuracy": 0.3333333333333333,
+                "balanced_accuracy": 0.3333333333333333,
+                "precision_macro": 0.1111111111111111,
+                "precision_weighted": 0.1111111111111111,
+                "recall_macro": 0.3333333333333333,
+                "recall_weighted": 0.3333333333333333,
+                "f1_macro": 0.16666666666666666,
+                "f1_weighted": 0.16666666666666666,
+                "log_loss": 24.029102259411435,
+                "roc_auc": 0.5,
+                "pr_auc": 0.3333333333333333
+              },
+              "details": {
+                "labels": [
+                  "发票",
+                  "物流",
+                  "退换货"
+                ],
+                "confusion_matrix": [
+                  [
+                    6,
+                    0,
+                    0
+                  ],
+                  [
+                    6,
+                    0,
+                    0
+                  ],
+                  [
+                    6,
+                    0,
+                    0
+                  ]
+                ],
+                "classification_report": {
+                  "发票": {
+                    "precision": 0.3333333333333333,
+                    "recall": 1.0,
+                    "f1-score": 0.5,
+                    "support": 6.0
+                  },
+                  "物流": {
+                    "precision": 0.0,
+                    "recall": 0.0,
+                    "f1-score": 0.0,
+                    "support": 6.0
+                  },
+                  "退换货": {
+                    "precision": 0.0,
+                    "recall": 0.0,
+                    "f1-score": 0.0,
+                    "support": 6.0
+                  },
+                  "accuracy": 0.3333333333333333,
+                  "macro avg": {
+                    "precision": 0.1111111111111111,
+                    "recall": 0.3333333333333333,
+                    "f1-score": 0.16666666666666666,
+                    "support": 18.0
+                  },
+                  "weighted avg": {
+                    "precision": 0.1111111111111111,
+                    "recall": 0.3333333333333333,
+                    "f1-score": 0.16666666666666666,
+                    "support": 18.0
+                  }
+                },
+                "probability_metrics": {
+                  "available": true,
+                  "variant": "weighted_ovr"
+                }
+              }
+            },
+            "split_facts": {
+              "requested_strategy": "group_hash_holdout.v2",
+              "realized_strategy": "group_hash_holdout.v2",
+              "eligible_row_count": 90,
+              "train_row_count": 72,
+              "holdout_row_count": 18,
+              "eligible_group_count": 15,
+              "train_group_count": 12,
+              "holdout_group_count": 3,
+              "group_overlap_count": 0,
+              "random_state": 42,
+              "evaluation_scope": "holdout"
+            },
+            "text_classification_evaluation": {
+              "preparation": {
+                "source_row_count": 90,
+                "eligible_row_count": 90,
+                "missing_text_row_count": 0,
+                "non_empty_text_row_count": 90,
+                "empty_after_preparation_row_count": 0,
+                "cjk_text_row_count": 50,
+                "latin_text_row_count": 39,
+                "mixed_script_text_row_count": 1,
+                "token_count": 573,
+                "custom_dictionary_term_count": 0,
+                "stopword_term_count": 49,
+                "custom_term_match_count": 0,
+                "collapsed_exact_duplicate_row_count": 0,
+                "collapsed_template_duplicate_row_count": 0
+              },
+              "leakage": {
+                "group_policy_key": "business_template_connected_union.v1",
+                "template_policy_key": "masked_token_jaccard.v1",
+                "template_similarity_threshold": 0.8,
+                "business_group_supplied": true,
+                "eligible_row_count": 90,
+                "business_group_count": 15,
+                "template_group_count": 90,
+                "connected_group_count": 15,
+                "near_duplicate_edge_count": 0,
+                "train_business_group_overlap_count": 0,
+                "train_template_group_overlap_count": 0,
+                "train_connected_group_overlap_count": 0
+              },
+              "vectorization": {
+                "fit_row_count": 72,
+                "transformed_feature_count": 309,
+                "inspected_row_count": 18,
+                "empty_after_preparation_row_count": 0,
+                "out_of_vocabulary_row_count": 2
+              }
+            }
+          },
+          "artifacts": [
+            {
+              "artifact_id": "412eb129200949ffb2043c77a28fad21",
+              "kind": "evaluation_report",
+              "uri": "artifact://412eb129200949ffb2043c77a28fad21"
+            }
+          ]
+        }
+      ]
+    },
+    "query_bytes": 6149,
+    "full_diagnostic_bytes": 27351,
+    "full_diagnostics_match_storage": [
+      true,
+      true
+    ]
+  }
+]

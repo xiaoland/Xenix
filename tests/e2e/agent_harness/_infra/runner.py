@@ -53,7 +53,6 @@ from .contracts import (
 )
 from .budgets import (
     BenchmarkBudgetController,
-    BenchmarkBudgetError,
     BenchmarkBudgetPolicy,
     BenchmarkBudgetSnapshot,
     BenchmarkBudgetStatus,
@@ -132,8 +131,8 @@ class _StreamMeasurements:
                 self.source_state_captured = True
 
 
-class _BoundedLLMService(LLMService):
-    """Real provider gateway with benchmark-only request admission guards."""
+class _MeteredLLMService(LLMService):
+    """Production provider gateway with passive benchmark usage observations."""
 
     def __init__(
         self,
@@ -161,7 +160,7 @@ class _BoundedLLMService(LLMService):
             messages=messages,
             tools=tools,
             retry_callback=retry_callback,
-            before_provider_request=self._admission(before_provider_request),
+            before_provider_request=self._count_provider_request(before_provider_request),
         )
         self._observe_response(response)
         return response
@@ -180,23 +179,23 @@ class _BoundedLLMService(LLMService):
             fq_model_key=fq_model_key,
             messages=messages,
             tools=tools,
-            before_provider_request=self._admission(before_provider_request),
+            before_provider_request=self._count_provider_request(before_provider_request),
         ):
             response = getattr(event, "response", None)
             if response is not None:
                 self._observe_response(response)
             yield event
 
-    def _admission(
+    def _count_provider_request(
         self,
         original: Callable[[], None] | None,
     ) -> Callable[[], None]:
-        def admit() -> None:
+        def observe() -> None:
             if original is not None:
                 original()
-            self._budget.admit_provider_attempt()
+            self._budget.observe_provider_attempt()
 
-        return admit
+        return observe
 
     def _observe_response(self, response: Any) -> None:
         usage = LLMTokenUsage.from_payload(getattr(response, "usage_payload", None))
@@ -227,6 +226,9 @@ def _delivery_diagnostics(value: Any) -> dict[str, Any]:
         for key in ("timed_out", "task_ids", "ml_task_id", "dataset_id", "result_dataset_id", "artifact_id", "uri"):
             if key in value:
                 facts[key] = value[key]
+        if "trained_model_ids" in value:
+            facts["trained_model_ids"] = value["trained_model_ids"]
+            facts["models"] = value.get("models", [])
         result = value.get("result")
         if isinstance(result, dict):
             facts["result"] = _delivery_diagnostics(result)
@@ -253,7 +255,7 @@ class _HeadlessBenchmarkCell:
         self._scheduler = None
         try:
             self._storage = StorageBootstrapService().initialize(paths)
-            llm = _BoundedLLMService(FrozenLLMSettingsSource(settings), budget)
+            llm = _MeteredLLMService(FrozenLLMSettingsSource(settings), budget)
             self.llm = llm
             worker_settings = MLWorkerSettingsService(paths)
             embedding_settings_service = EmbeddingSettingsService(paths)
@@ -407,12 +409,8 @@ def _load_judge_configuration(
             model_key=selected_model or None,
             setup_error=f"judge_{setup_error}",
         )
-    effective_settings = settings.model_copy(
-        deep=True,
-        update={"retry_attempts": DEFAULT_BUDGET_POLICY.max_provider_attempts},
-    )
     return _JudgeConfiguration(
-        settings=effective_settings,
+        settings=settings,
         settings_sha256=settings_sha256,
         model_key=selected_model,
     )
@@ -468,7 +466,7 @@ def run_benchmark(
         resolved_settings_path = resolve_llm_settings_path(settings_path)
         settings, settings_sha256 = load_settings_snapshot(resolved_settings_path)
         model_key = selected_model_key(settings, requested_model)
-        effective_settings = _effective_subject_settings(settings, budget_policy)
+        effective_settings = _effective_subject_settings(settings)
         effective_settings_sha256 = _sha256_text(
             effective_settings.model_dump_json()
         )
@@ -875,7 +873,7 @@ def _run_model_cell(
             total_retries = 0
             for index, submission in enumerate(submissions, start=1):
                 # UI completion flags and attachment capture belong to one request;
-                # the provider budget and production thread belong to the task.
+                # cumulative usage observations and the production thread belong to the task.
                 measurements = _StreamMeasurements()
                 started_at = time.perf_counter()
                 with trace_recorder.span(
@@ -898,14 +896,6 @@ def _run_model_cell(
                             case=case,
                             services=case_services,
                         )
-                    except BenchmarkBudgetError as exc:
-                        run_status = (
-                            BenchmarkRunStatus.MEASUREMENT_ERROR
-                            if budget.snapshot().status is BenchmarkBudgetStatus.UNVERIFIABLE
-                            else BenchmarkRunStatus.BUDGET_EXCEEDED
-                        )
-                        failure_kind = exc.code
-                        event["exception"] = exception_payload(exc)
                     except Exception as exc:
                         run_status = BenchmarkRunStatus.RUNTIME_ERROR
                         failure_kind = _exception_kind(exc)
@@ -915,10 +905,7 @@ def _run_model_cell(
                     total_retries += measurements.provider_retry_count
                     turn_budget = budget.snapshot()
                     if run_status is BenchmarkRunStatus.COMPLETED:
-                        if turn_budget.status is BenchmarkBudgetStatus.EXCEEDED:
-                            run_status = BenchmarkRunStatus.BUDGET_EXCEEDED
-                            failure_kind = turn_budget.exhaustion_reason
-                        elif turn_budget.status is BenchmarkBudgetStatus.UNVERIFIABLE:
+                        if turn_budget.status is BenchmarkBudgetStatus.UNVERIFIABLE:
                             run_status = BenchmarkRunStatus.MEASUREMENT_ERROR
                             failure_kind = turn_budget.exhaustion_reason
                     if measurements.snapshot is None:
@@ -1099,10 +1086,7 @@ def _run_model_cell(
                     )
         budget_snapshot = budget.snapshot()
         if run_status is BenchmarkRunStatus.COMPLETED:
-            if budget_snapshot.status is BenchmarkBudgetStatus.EXCEEDED:
-                run_status = BenchmarkRunStatus.BUDGET_EXCEEDED
-                failure_kind = budget_snapshot.exhaustion_reason
-            elif budget_snapshot.status is BenchmarkBudgetStatus.UNVERIFIABLE:
+            if budget_snapshot.status is BenchmarkBudgetStatus.UNVERIFIABLE:
                 run_status = BenchmarkRunStatus.MEASUREMENT_ERROR
                 failure_kind = budget_snapshot.exhaustion_reason
         try:
@@ -1180,7 +1164,7 @@ def _open_benchmark_cell(
             paths=paths,
             settings=settings,
             embedding_settings=embedding_settings,
-            bounded_llm=_BoundedLLMService(
+            metered_llm=_MeteredLLMService(
                 FrozenLLMSettingsSource(settings),
                 budget,
             ),
@@ -1501,12 +1485,10 @@ def _model_setup_error(settings: LLMSettings, model_key: str) -> str | None:
 
 def _effective_subject_settings(
     settings: LLMSettings,
-    policy: BenchmarkBudgetPolicy,
 ) -> LLMSettings:
     return settings.model_copy(
         deep=True,
         update={
-            "retry_attempts": policy.max_provider_attempts,
             "thread_title_fq_model_key": "",
             "turn_completion_guard_fq_model_key": "",
         },

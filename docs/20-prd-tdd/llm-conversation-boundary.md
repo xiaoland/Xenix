@@ -69,7 +69,7 @@ Tool modules.
   conversation provenance.
 - Tool identity, scope, and typed arguments are validated at invocation. Invalid model arguments become a canonical failed ToolResult with field-level details, allowing the next sample to repair the call; they do not abort sampling before the ToolResult exists.
 - Skill activation is derived from the successful canonical ToolCall's arguments and paired terminal status, independently of whether its result was paged. The built-in `result.page` remains available in every tool scope and returns the requested page directly without repaging its envelope.
-- Completed training and tuning Tools return the public Artifact handles for their settled tasks alongside evaluation facts, so delivering an evaluation report does not require a second status query. Pending work remains discoverable through `model.task.query`.
+- Completed training and tuning Tools associate each retained model with its evaluation facts and public Artifact handles, so delivering an evaluation report does not require a second status query. Pending work remains discoverable through `model.task.query`, which returns related evaluation status and result summaries; full persisted diagnostics are available on explicit request.
 - A ToolResult stores one bounded direct JSON value. Tabular Tools choose XTT
   before returning; known and normalized failures use the typed `ToolFailure`
   value. Provider adapters only encode that value for their wire protocol, and

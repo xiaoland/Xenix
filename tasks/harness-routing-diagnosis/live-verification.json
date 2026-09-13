@@ -1,0 +1,402 @@
+{
+  "note": "Three distinct implementation phases; no pooled pass rate. The second process was stopped after a diagnosed result-Pipe deadlock. Its journal proves both answers and Judge completion, but the recovered report lacks the verdict and Judge usage; do not treat that absence as no Judge call.",
+  "runs": [
+    {
+      "phase": "round_limit_removed_only",
+      "report": "build/agent-harness-routing-repair/business.routing.v1.standard-deepseek-deepseek-v4-flash-33c5313fa3044ba6abc1820772d39f0e.json",
+      "report_sha256": "cbeeee8a6777ba9e3fd1b88958cd1ffbac8f8ebf693bbf072129ec1218f72a06",
+      "run_id": "33c5313fa3044ba6abc1820772d39f0e",
+      "run_status": "budget_exceeded",
+      "failure_kind": "subject_token_limit_exceeded",
+      "budget": {
+        "exhaustion_reason": "subject_token_limit_exceeded",
+        "invocation_reported_subject_tokens": 522020,
+        "policy": {
+          "execution_limits": "production_harness_and_llm_settings",
+          "max_reported_invocation_subject_tokens": 4000000,
+          "max_reported_subject_tokens": 500000,
+          "max_wall_seconds": 900.0,
+          "policy_id": "agent-harness-budget-v2",
+          "token_enforcement": "response_boundary"
+        },
+        "provider_attempts_dispatched": 17,
+        "reported_subject_tokens": 522020,
+        "sampling_rounds_admitted": 17,
+        "status": "exceeded"
+      },
+      "subject_metrics": {
+        "assessment_seconds": 0.000596800004132092,
+        "derived_dataset_count": 6,
+        "message_counts": {
+          "assistant": 17,
+          "tool_call": 36,
+          "tool_result": 36,
+          "user": 1
+        },
+        "provider_retry_count": 0,
+        "sampling_round_count": 17,
+        "terminal_shape": null,
+        "token_usage": {
+          "cached_input_tokens": 462592,
+          "input_tokens": 507499,
+          "output_tokens": 14521,
+          "total_tokens": 522020
+        },
+        "tool_call_counts_by_name": {
+          "agent.skill.activate": 2,
+          "agent.skill.read_reference": 2,
+          "analysis.profile": 1,
+          "data.feature.select": 3,
+          "data.query": 8,
+          "data.transform": 5,
+          "knowledge.lookup": 1,
+          "model.apply": 2,
+          "model.metadata": 1,
+          "model.task.query": 1,
+          "model.train": 10
+        },
+        "tool_result_counts_by_status": {
+          "failed": 2,
+          "succeeded": 34
+        },
+        "turn_seconds": 228.09466910001356,
+        "usage_reported_primary_response_count": 17
+      },
+      "turns": [
+        {
+          "request_number": 1,
+          "run_status": "budget_exceeded",
+          "failure_kind": "subject_token_limit_exceeded",
+          "sampling_rounds": 17,
+          "token_usage": {
+            "cached_input_tokens": 462592,
+            "input_tokens": 507499,
+            "output_tokens": 14521,
+            "total_tokens": 522020
+          }
+        }
+      ],
+      "judge": {
+        "independence": "independent",
+        "metrics": {
+          "elapsed_seconds": null,
+          "provider_retry_count": 0,
+          "token_usage": null
+        },
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "reason_codes": [],
+        "required": true,
+        "rubric_id": "business.routing_reuse.explanation.v1",
+        "rubric_sha256": "A813A96D29847CB305A36AB2EE5F3F67032B064D8322EFE11D5B58F609B02289",
+        "scores": {},
+        "status": "blocked",
+        "summary": "subject_run_not_completed",
+        "verdict": "not_evaluated"
+      },
+      "semantic": {
+        "checks": [
+          {
+            "name": "turn_1.answer_completed",
+            "passed": false,
+            "summary": "terminal_assistant_answer"
+          },
+          {
+            "name": "turn_1.deliveries_accessible",
+            "passed": true,
+            "summary": "linked_artifacts_readable"
+          },
+          {
+            "name": "turn_1.reusable_analyzer_saved",
+            "passed": false,
+            "summary": "saved_model_ids=[]"
+          },
+          {
+            "name": "turn_2.answer_completed",
+            "passed": false,
+            "summary": "terminal_assistant_answer"
+          },
+          {
+            "name": "turn_2.deliveries_accessible",
+            "passed": false,
+            "summary": "linked_artifacts_readable"
+          },
+          {
+            "name": "turn_2.complete_batch_quality",
+            "passed": false,
+            "summary": "accuracy=None; required=0.9"
+          },
+          {
+            "name": "turn_2.saved_analyzer_reused",
+            "passed": false,
+            "summary": "delivered_predictions_reference_same_persisted_model"
+          }
+        ],
+        "passed": false,
+        "verdict": "not_evaluated"
+      }
+    },
+    {
+      "phase": "production_limits_before_transport_fix",
+      "report": "build/agent-harness-routing-production-limits/business.routing.v1.standard-deepseek-deepseek-v4-flash-8dbb12247e1b462ba89185b87aad107b.json",
+      "report_sha256": "3b8c2242f827d871bc2d25896ac793207cdd400922dd4e8560670f333c71b3d1",
+      "run_id": "8dbb12247e1b462ba89185b87aad107b",
+      "run_status": "runtime_error",
+      "failure_kind": "child_process_no_result",
+      "budget": {
+        "exhaustion_reason": null,
+        "invocation_reported_subject_tokens": 571425,
+        "policy": {
+          "execution_limits": "production_harness_and_llm_settings",
+          "max_reported_invocation_subject_tokens": 4000000,
+          "max_wall_seconds": 900.0,
+          "policy_id": "agent-harness-budget-v2",
+          "token_enforcement": "next_cell_admission"
+        },
+        "provider_attempts_dispatched": 17,
+        "reported_subject_tokens": 571425,
+        "sampling_rounds_admitted": 17,
+        "status": "not_evaluated"
+      },
+      "subject_metrics": {
+        "assessment_seconds": null,
+        "derived_dataset_count": 4,
+        "message_counts": {
+          "assistant": 17,
+          "tool_call": 25,
+          "tool_result": 25,
+          "user": 2
+        },
+        "provider_retry_count": 0,
+        "sampling_round_count": 17,
+        "terminal_shape": null,
+        "token_usage": {
+          "cached_input_tokens": 515200,
+          "input_tokens": 546996,
+          "output_tokens": 24429,
+          "total_tokens": 571425
+        },
+        "tool_call_counts_by_name": {
+          "agent.skill.activate": 1,
+          "agent.skill.read_reference": 1,
+          "analysis.graph": 1,
+          "analysis.profile": 2,
+          "data.feature.select": 1,
+          "data.query": 8,
+          "data.transform": 2,
+          "model.apply": 2,
+          "model.metadata": 1,
+          "model.task.query": 1,
+          "model.train": 5
+        },
+        "tool_result_counts_by_status": {
+          "succeeded": 25
+        },
+        "turn_seconds": 201.6440899000736,
+        "usage_reported_primary_response_count": 17
+      },
+      "turns": [
+        {
+          "request_number": 1,
+          "run_status": "completed",
+          "failure_kind": null,
+          "sampling_rounds": 12,
+          "token_usage": {
+            "cached_input_tokens": 256000,
+            "input_tokens": 283280,
+            "output_tokens": 19422,
+            "total_tokens": 302702
+          }
+        },
+        {
+          "request_number": 2,
+          "run_status": "completed",
+          "failure_kind": null,
+          "sampling_rounds": 5,
+          "token_usage": {
+            "cached_input_tokens": 259200,
+            "input_tokens": 263716,
+            "output_tokens": 5007,
+            "total_tokens": 268723
+          }
+        }
+      ],
+      "judge": {
+        "independence": "not_applicable",
+        "metrics": {
+          "elapsed_seconds": null,
+          "provider_retry_count": 0,
+          "token_usage": null
+        },
+        "provider_model": null,
+        "reason_codes": [],
+        "required": false,
+        "rubric_id": null,
+        "rubric_sha256": null,
+        "scores": {},
+        "status": "not_requested",
+        "summary": "judge_not_requested",
+        "verdict": "not_evaluated"
+      },
+      "semantic": {
+        "checks": [],
+        "passed": false,
+        "verdict": "not_evaluated"
+      }
+    },
+    {
+      "phase": "final_with_file_transport",
+      "report": "build/agent-harness-routing-final/business.routing.v1.standard-deepseek-deepseek-v4-flash-6d4a4c531dc747cbb58f653c2cc7aaf6.json",
+      "report_sha256": "aee01dee7c645464e7beffe0798d3978a2c5d8b2f40498cf39e557104b0e11da",
+      "run_id": "6d4a4c531dc747cbb58f653c2cc7aaf6",
+      "run_status": "completed",
+      "failure_kind": null,
+      "budget": {
+        "exhaustion_reason": null,
+        "invocation_reported_subject_tokens": 652557,
+        "policy": {
+          "execution_limits": "production_harness_and_llm_settings",
+          "max_reported_invocation_subject_tokens": 4000000,
+          "max_wall_seconds": 900.0,
+          "policy_id": "agent-harness-budget-v2",
+          "token_enforcement": "next_cell_admission"
+        },
+        "provider_attempts_dispatched": 18,
+        "reported_subject_tokens": 652557,
+        "sampling_rounds_admitted": 18,
+        "status": "within_limits"
+      },
+      "subject_metrics": {
+        "assessment_seconds": 0.0015844000154174864,
+        "derived_dataset_count": 5,
+        "message_counts": {
+          "assistant": 18,
+          "tool_call": 33,
+          "tool_result": 33,
+          "user": 2
+        },
+        "provider_retry_count": 0,
+        "sampling_round_count": 18,
+        "terminal_shape": null,
+        "token_usage": {
+          "cached_input_tokens": 597376,
+          "input_tokens": 627287,
+          "output_tokens": 25270,
+          "total_tokens": 652557
+        },
+        "tool_call_counts_by_name": {
+          "agent.skill.activate": 1,
+          "agent.skill.read_reference": 1,
+          "analysis.graph": 1,
+          "analysis.profile": 2,
+          "data.feature.select": 2,
+          "data.query": 11,
+          "data.transform": 4,
+          "knowledge.lookup": 1,
+          "model.apply": 2,
+          "model.metadata": 1,
+          "model.train": 7
+        },
+        "tool_result_counts_by_status": {
+          "failed": 1,
+          "succeeded": 32
+        },
+        "turn_seconds": 235.72061239997856,
+        "usage_reported_primary_response_count": 18
+      },
+      "turns": [
+        {
+          "request_number": 1,
+          "run_status": "completed",
+          "failure_kind": null,
+          "sampling_rounds": 12,
+          "token_usage": {
+            "cached_input_tokens": 279808,
+            "input_tokens": 304050,
+            "output_tokens": 19919,
+            "total_tokens": 323969
+          }
+        },
+        {
+          "request_number": 2,
+          "run_status": "completed",
+          "failure_kind": null,
+          "sampling_rounds": 6,
+          "token_usage": {
+            "cached_input_tokens": 317568,
+            "input_tokens": 323237,
+            "output_tokens": 5351,
+            "total_tokens": 328588
+          }
+        }
+      ],
+      "judge": {
+        "independence": "independent",
+        "metrics": {
+          "elapsed_seconds": 28.356582499982323,
+          "provider_retry_count": 0,
+          "token_usage": {
+            "cached_input_tokens": 256,
+            "input_tokens": 11707,
+            "output_tokens": 2664,
+            "total_tokens": 14371
+          }
+        },
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "reason_codes": [],
+        "required": true,
+        "rubric_id": "business.routing_reuse.explanation.v1",
+        "rubric_sha256": "A813A96D29847CB305A36AB2EE5F3F67032B064D8322EFE11D5B58F609B02289",
+        "scores": {
+          "adoption_evidence": 2,
+          "manual_correction_estimate": 2,
+          "selected_analyzer_reused": 2,
+          "usable_queue_labels": 2
+        },
+        "status": "completed",
+        "summary": "judge_completed",
+        "verdict": "pass"
+      },
+      "semantic": {
+        "checks": [
+          {
+            "name": "turn_1.answer_completed",
+            "passed": true,
+            "summary": "terminal_assistant_answer"
+          },
+          {
+            "name": "turn_1.deliveries_accessible",
+            "passed": true,
+            "summary": "linked_artifacts_readable"
+          },
+          {
+            "name": "turn_1.reusable_analyzer_saved",
+            "passed": true,
+            "summary": "saved_model_ids=['b581e18c61c047e5af6bbb28f55ec389']"
+          },
+          {
+            "name": "turn_2.answer_completed",
+            "passed": true,
+            "summary": "terminal_assistant_answer"
+          },
+          {
+            "name": "turn_2.deliveries_accessible",
+            "passed": true,
+            "summary": "linked_artifacts_readable"
+          },
+          {
+            "name": "turn_2.complete_batch_quality",
+            "passed": true,
+            "summary": "accuracy=1.0; required=0.9"
+          },
+          {
+            "name": "turn_2.saved_analyzer_reused",
+            "passed": true,
+            "summary": "delivered_predictions_reference_same_persisted_model"
+          }
+        ],
+        "passed": true,
+        "verdict": "pass"
+      }
+    }
+  ]
+}

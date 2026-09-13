@@ -1,0 +1,262 @@
+{
+  "feedback": {
+    "dataset_id": "33c77d4fb70e4b648f4bfee8cade9b5c",
+    "task_ids": [
+      "743d68adddf04b07a964437be3e36149",
+      "e34c259900f6483cbafeb1e7de9745cb"
+    ],
+    "trained_model_ids": [
+      "b8252a6456744bc7933c2bc9d678f076"
+    ],
+    "models": [
+      {
+        "trained_model_id": "b8252a6456744bc7933c2bc9d678f076",
+        "model_key": "regression.ridge",
+        "training_task_id": "743d68adddf04b07a964437be3e36149",
+        "evaluation_task_id": "e34c259900f6483cbafeb1e7de9745cb",
+        "evaluation_kind": "regression",
+        "best_params": {
+          "model__alpha": 0.1,
+          "model__fit_intercept": true
+        },
+        "tuning_summary": {
+          "best_params": {
+            "model__alpha": 0.1,
+            "model__fit_intercept": true
+          },
+          "cv_summary": {
+            "best_score": 0.9994869021282342,
+            "candidate_count": 4
+          }
+        },
+        "comparison": {
+          "primary_metric_name": "r2",
+          "direction": "max",
+          "candidate_value": 0.9996396705138375,
+          "baseline_value": -0.05624381650278698,
+          "verdict": "candidate_better"
+        },
+        "evaluation": {
+          "primary_metric_name": "r2",
+          "primary_metric_value": 0.9996396705138375,
+          "metrics": {
+            "r2": 0.9996396705138375,
+            "mse": 0.5524213101703555,
+            "rmse": 0.7432505029734965,
+            "mae": 0.6716653780343506,
+            "mape": 82512054889549.34,
+            "explained_variance": 0.9996421196601093,
+            "residual_mean": -0.061276319556398416,
+            "residual_std": 0.7407202729991786
+          },
+          "details": {}
+        },
+        "baseline_evaluation": {
+          "primary_metric_name": "r2",
+          "primary_metric_value": -0.05624381650278698,
+          "metrics": {
+            "r2": -0.05624381650278698,
+            "mse": 1619.327907870995,
+            "rmse": 40.2408735972642,
+            "mae": 37.581859141126934,
+            "mape": 2.145783122511066e+16,
+            "explained_variance": -2.220446049250313e-16,
+            "residual_mean": 9.285872193065865,
+            "residual_std": 39.1548271032454
+          },
+          "details": {}
+        },
+        "result_summary": {
+          "key_driver_report": true,
+          "driver_count": 1,
+          "top_key_drivers": [
+            {
+              "feature": "x",
+              "importance": 1.0
+            }
+          ],
+          "evaluation_model_training_scope": "holdout_train_split",
+          "apply_model_training_scope": "all_eligible_rows"
+        },
+        "split_facts": {
+          "requested_strategy": "holdout",
+          "realized_strategy": "holdout",
+          "eligible_row_count": 60,
+          "train_row_count": 48,
+          "holdout_row_count": 12,
+          "eligible_group_count": null,
+          "train_group_count": null,
+          "holdout_group_count": null,
+          "group_overlap_count": 0,
+          "random_state": 42,
+          "evaluation_scope": "holdout"
+        }
+      }
+    ],
+    "artifacts": [
+      {
+        "ml_task_id": "743d68adddf04b07a964437be3e36149",
+        "artifact_id": "966d040d002d4c14aba34544710e30c4",
+        "kind": "model",
+        "uri": "artifact://966d040d002d4c14aba34544710e30c4"
+      },
+      {
+        "ml_task_id": "743d68adddf04b07a964437be3e36149",
+        "artifact_id": "1539d2b2554e468886e8f685c8263607",
+        "kind": "export_file",
+        "uri": "artifact://1539d2b2554e468886e8f685c8263607"
+      },
+      {
+        "ml_task_id": "e34c259900f6483cbafeb1e7de9745cb",
+        "artifact_id": "0110c06568bc45a396aac84a2d4f0cee",
+        "kind": "evaluation_report",
+        "uri": "artifact://0110c06568bc45a396aac84a2d4f0cee"
+      }
+    ]
+  },
+  "query": {
+    "task_ids": [
+      "743d68adddf04b07a964437be3e36149",
+      "e34c259900f6483cbafeb1e7de9745cb"
+    ],
+    "tasks": [
+      {
+        "task_id": "743d68adddf04b07a964437be3e36149",
+        "task_type": "hyperparameter_tuning",
+        "status": "succeeded",
+        "error_summary": null,
+        "result": {
+          "model_key": "regression.ridge",
+          "trained_model_id": "b8252a6456744bc7933c2bc9d678f076",
+          "evaluation_kind": "regression",
+          "best_params": {
+            "model__alpha": 0.1,
+            "model__fit_intercept": true
+          },
+          "tuning_summary": {
+            "best_params": {
+              "model__alpha": 0.1,
+              "model__fit_intercept": true
+            },
+            "cv_summary": {
+              "best_score": 0.9994869021282342,
+              "candidate_count": 4
+            }
+          },
+          "result_summary": {
+            "key_driver_report": true,
+            "driver_count": 1,
+            "top_key_drivers": [
+              {
+                "feature": "x",
+                "importance": 1.0
+              }
+            ],
+            "evaluation_model_training_scope": "holdout_train_split",
+            "apply_model_training_scope": "all_eligible_rows"
+          },
+          "split_facts": {
+            "requested_strategy": "holdout",
+            "realized_strategy": "holdout",
+            "eligible_row_count": 60,
+            "train_row_count": 48,
+            "holdout_row_count": 12,
+            "eligible_group_count": null,
+            "train_group_count": null,
+            "holdout_group_count": null,
+            "group_overlap_count": 0,
+            "random_state": 42,
+            "evaluation_scope": "holdout"
+          },
+          "evaluation_task_id": "e34c259900f6483cbafeb1e7de9745cb"
+        },
+        "artifacts": [
+          {
+            "artifact_id": "966d040d002d4c14aba34544710e30c4",
+            "kind": "model",
+            "uri": "artifact://966d040d002d4c14aba34544710e30c4"
+          },
+          {
+            "artifact_id": "1539d2b2554e468886e8f685c8263607",
+            "kind": "export_file",
+            "uri": "artifact://1539d2b2554e468886e8f685c8263607"
+          }
+        ]
+      },
+      {
+        "task_id": "e34c259900f6483cbafeb1e7de9745cb",
+        "task_type": "evaluate",
+        "status": "succeeded",
+        "error_summary": null,
+        "result": {
+          "model_key": "regression.ridge",
+          "trained_model_id": "b8252a6456744bc7933c2bc9d678f076",
+          "evaluation_kind": "regression",
+          "comparison": {
+            "primary_metric_name": "r2",
+            "direction": "max",
+            "candidate_value": 0.9996396705138375,
+            "baseline_value": -0.05624381650278698,
+            "verdict": "candidate_better"
+          },
+          "evaluation": {
+            "primary_metric_name": "r2",
+            "primary_metric_value": 0.9996396705138375,
+            "metrics": {
+              "r2": 0.9996396705138375,
+              "mse": 0.5524213101703555,
+              "rmse": 0.7432505029734965,
+              "mae": 0.6716653780343506,
+              "mape": 82512054889549.34,
+              "explained_variance": 0.9996421196601093,
+              "residual_mean": -0.061276319556398416,
+              "residual_std": 0.7407202729991786
+            },
+            "details": {}
+          },
+          "baseline_evaluation": {
+            "primary_metric_name": "r2",
+            "primary_metric_value": -0.05624381650278698,
+            "metrics": {
+              "r2": -0.05624381650278698,
+              "mse": 1619.327907870995,
+              "rmse": 40.2408735972642,
+              "mae": 37.581859141126934,
+              "mape": 2.145783122511066e+16,
+              "explained_variance": -2.220446049250313e-16,
+              "residual_mean": 9.285872193065865,
+              "residual_std": 39.1548271032454
+            },
+            "details": {}
+          },
+          "split_facts": {
+            "requested_strategy": "holdout",
+            "realized_strategy": "holdout",
+            "eligible_row_count": 60,
+            "train_row_count": 48,
+            "holdout_row_count": 12,
+            "eligible_group_count": null,
+            "train_group_count": null,
+            "holdout_group_count": null,
+            "group_overlap_count": 0,
+            "random_state": 42,
+            "evaluation_scope": "holdout"
+          }
+        },
+        "artifacts": [
+          {
+            "artifact_id": "0110c06568bc45a396aac84a2d4f0cee",
+            "kind": "evaluation_report",
+            "uri": "artifact://0110c06568bc45a396aac84a2d4f0cee"
+          }
+        ]
+      }
+    ]
+  },
+  "serialized_bytes": 2707,
+  "public_links_resolve": [
+    true,
+    true,
+    true
+  ]
+}

@@ -601,6 +601,11 @@ class ModelTaskQueryInput(AgentToolInput):
         default=False,
         description="Set true to include task logs in the response.",
     )
+    include_details: bool = Field(
+        default=False,
+        description="Include full persisted requests, results and artifact records for diagnosis. "
+        "The default already returns status, evaluation evidence, public links and related evaluation tasks.",
+    )
 
 
 class ModelTaskStopInput(AgentToolInput):

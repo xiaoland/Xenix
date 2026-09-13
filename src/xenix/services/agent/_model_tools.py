@@ -18,6 +18,7 @@ from ..ml_service import (
 from ..storage.models import (
     MLTaskArtifactKind,
     MLTaskRow,
+    MLTaskType,
     TrainedModelRow,
 )
 from ..llm.tooling import (
@@ -37,6 +38,7 @@ from ._model_keys import (
     normalize_model_keys,
     normalize_model_mapping,
 )
+from ._model_feedback import training_feedback, training_result_summary
 from ._tool_common import _raise_if_cancelled
 
 
@@ -225,8 +227,8 @@ class ModelTools:
     def _training_completion(
         self, dataset_id: str, tasks: list[MLTaskRow], trained_models: list[TrainedModelRow],
     ) -> ToolSuccess:
-        # Evaluation has already settled. Return its public handles alongside
-        # the facts so delivering a report does not require another status call.
+        # Public links remain attached to task IDs, which identify each
+        # candidate's training and evaluation in the model summaries.
         artifacts = [
             {
                 "ml_task_id": task.id,
@@ -242,7 +244,7 @@ class ModelTools:
             "dataset_id": dataset_id,
             "task_ids": [task.id for task in tasks],
             "trained_model_ids": [model.id for model in trained_models],
-            "results": [task.result_payload for task in tasks],
+            "models": training_feedback(tasks, trained_models),
             "artifacts": artifacts,
         })
 
@@ -316,20 +318,47 @@ class ModelTools:
         context: ToolExecutionContext,
     ) -> ToolSuccess:
         _raise_if_cancelled(self._ml_service, context)
+        requested = [self._ml_service.get_task_details(task_id).task for task_id in input_data.task_ids]
+        models = self._ml_service.trained_models_for_root_tasks(input_data.task_ids)
+        models_by_task = {model.ml_task_id: model for model in models}
+        related = self._ml_service.related_training_tasks(requested, models)
         tasks = []
-        for task_id in input_data.task_ids:
-            details = self._ml_service.get_task_details(task_id)
-            tasks.append(
-                {
-                    "task": details.task.model_dump(mode="json"),
-                    "artifacts": [artifact.model_dump(mode="json") for artifact in details.artifacts],
-                    "logs": (
-                        [log.model_dump(mode="json") for log in details.logs]
-                        if input_data.include_logs
-                        else []
-                    ),
+        for related_task in related:
+            details = self._ml_service.get_task_details(related_task.id)
+            task = details.task
+            result = task.result_payload or {}
+            if task.task_type is MLTaskType.APPLY:
+                result = {key: value for key, value in result.items()
+                          if key not in {"output_file_path", "canonical_output_path"} and value is not None}
+            else:
+                result = training_result_summary(result)
+            model = models_by_task.get(task.id)
+            if model is not None:
+                result = {
+                    **result,
+                    "trained_model_id": model.id,
+                    "evaluation_task_id": self._ml_service.evaluation_task_id_for_model(model),
                 }
-            )
+            item = {
+                "task_id": task.id,
+                "task_type": task.task_type.value,
+                "status": task.status.value,
+                "error_summary": task.error_summary,
+                "result": result,
+                "artifacts": [
+                    {"artifact_id": artifact.artifact_id, "kind": artifact.artifact_kind.value,
+                     "uri": f"artifact://{artifact.artifact_id}"}
+                    for artifact in details.artifacts if artifact.artifact_id
+                ],
+            }
+            if input_data.include_details:
+                item["details"] = {
+                    "task": task.model_dump(mode="json"),
+                    "artifacts": [artifact.model_dump(mode="json") for artifact in details.artifacts],
+                }
+            if input_data.include_logs:
+                item["logs"] = [log.model_dump(mode="json") for log in details.logs]
+            tasks.append(item)
         return ToolSuccess(value={"task_ids": input_data.task_ids, "tasks": tasks})
 
     def _model_task_stop(

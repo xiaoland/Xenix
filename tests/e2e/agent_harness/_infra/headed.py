@@ -102,10 +102,10 @@ class HeadedBenchmarkCell:
         paths: AppPaths,
         settings: LLMSettings,
         embedding_settings: EmbeddingSettings | None,
-        bounded_llm: LLMService,
+        metered_llm: LLMService,
     ) -> None:
         self.paths = paths
-        self.llm = bounded_llm
+        self.llm = metered_llm
         self._previous_app_home = os.environ.get("XENIX_APP_HOME")
         self._closed = False
         self._checks: list[OutcomeCheck] = []
@@ -132,7 +132,7 @@ class HeadedBenchmarkCell:
             self.pump_events()
             if not self.window.isVisible():
                 raise HeadedBenchmarkError("headed_main_window_not_visible")
-            self._install_bounded_llm_gateway(bounded_llm)
+            self._install_metered_llm_gateway(metered_llm)
             self.harness = self.runtime_services.agent.harness  # noqa: SLF001
             self.datasets = self.runtime_services.agent.datasets  # noqa: SLF001
             self.artifacts = self.runtime_services.agent.artifacts  # noqa: SLF001
@@ -433,7 +433,7 @@ class HeadedBenchmarkCell:
         if selected != fq_model_key:
             raise HeadedBenchmarkError("headed_model_selection_failed")
 
-    def _install_bounded_llm_gateway(self, bounded_llm: LLMService) -> None:
+    def _install_metered_llm_gateway(self, metered_llm: LLMService) -> None:
         harness = self.runtime_services.agent.harness  # noqa: SLF001
         conversation = harness._conversation_service  # noqa: SLF001
         targets = (
@@ -447,8 +447,8 @@ class HeadedBenchmarkCell:
                 if not hasattr(owner, attribute):
                     raise HeadedBenchmarkError("headed_llm_gateway_seam_missing")
                 originals.append((owner, attribute, getattr(owner, attribute)))
-                setattr(owner, attribute, bounded_llm)
-            if any(getattr(owner, attribute) is not bounded_llm for owner, attribute in targets):
+                setattr(owner, attribute, metered_llm)
+            if any(getattr(owner, attribute) is not metered_llm for owner, attribute in targets):
                 raise HeadedBenchmarkError("headed_llm_gateway_install_failed")
         except Exception:
             for owner, attribute, original in reversed(originals):

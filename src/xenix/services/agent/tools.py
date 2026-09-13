@@ -436,7 +436,7 @@ class AgentToolRegistry:
             provider_name="model_train",
             description=(
                 "Train and evaluate one or more models for a persisted dataset column role binding. "
-                "Completed results include evaluation facts, retained model IDs, and public Artifact links."
+                "Completed results group parameters and evaluation evidence by retained model, with public Artifact links."
             ),
             input_model=ModelTrainInput,
             handler=self._model_tools._model_train,
@@ -475,7 +475,10 @@ class AgentToolRegistry:
         return self._tool(
             name="model.task.query",
             provider_name="model_task_query",
-            description="Query ML task status, metadata, artifacts, errors, and logs by explicit task ids.",
+            description=(
+                "Query ML task status, result summaries, public Artifact links and errors. "
+                "Training queries include related evaluation tasks. Full diagnostics and logs are optional."
+            ),
             input_model=ModelTaskQueryInput,
             handler=self._model_tools._model_task_query,
         )
