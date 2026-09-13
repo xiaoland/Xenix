@@ -58,8 +58,8 @@ class ChatbotEvent(SQLModel):
     text: str | None = None
     reasoning: str | None = None
     refusal: str | None = None
-    source_message_ids: list[str] = Field(default_factory=list)
-    tool_call_id: str | None = None
+    source_message_ids: list[int] = Field(default_factory=list)
+    tool_call_id: int | None = None
     tool_name: str | None = None
     # The canonical ToolResult value copied from the Conversation Message.
     # Detail blocks are only its UI envelope, never an alternate raw result.
@@ -87,19 +87,19 @@ ToolPresentationLookup = Callable[[str], ToolPresentation]
 # A source presentation is deliberately a loose read-only boundary.  The
 # DatasetService/Harness owns the concrete record; this module only copies the
 # bounded fields needed by the Chatbot UI and remains usable without it.
-SourceAttachmentLookup = Callable[[str], Mapping[str, Any] | Any | None]
+SourceAttachmentLookup = Callable[[int], Mapping[str, Any] | Any | None]
 
 
-def thinking_chatbot_event_id(pending_message_id: str) -> str:
+def thinking_chatbot_event_id(pending_message_id: int) -> str:
     return f"{pending_message_id}:thinking"
 
 
-def activity_chatbot_event_id(pending_message_id: str, sequence_index: int) -> str:
+def activity_chatbot_event_id(pending_message_id: int, sequence_index: int) -> str:
     return f"{pending_message_id}:activity:{sequence_index}"
 
 
 def build_activity_chatbot_event(
-    *, pending_message_id: str, sequence_index: int,
+    *, pending_message_id: int, sequence_index: int,
 ) -> ChatbotEvent:
     return ChatbotEvent(
         id=activity_chatbot_event_id(pending_message_id, sequence_index),
@@ -112,7 +112,7 @@ def build_activity_chatbot_event(
 
 
 def build_thinking_chatbot_event(
-    *, pending_message_id: str, status: ChatbotEventStatus,
+    *, pending_message_id: int, status: ChatbotEventStatus,
 ) -> ChatbotEvent:
     return ChatbotEvent(
         id=thinking_chatbot_event_id(pending_message_id),
@@ -126,7 +126,7 @@ def build_thinking_chatbot_event(
 
 
 def build_llm_connection_chatbot_event(
-    *, sampling_id: str, retry_events: list[dict[str, Any]],
+    *, sampling_id: int, retry_events: list[dict[str, Any]],
     status: ChatbotEventStatus = ChatbotEventStatus.IN_PROGRESS,
 ) -> ChatbotEvent:
     return ChatbotEvent(
@@ -151,7 +151,7 @@ def project_chatbot_events(
         key=lambda message: getattr(message, "sequence_index", 0),
     )
     result_by_call = {
-        str(message.tool_call_message_id): message
+        message.tool_call_message_id: message
         for message in messages
         if _kind_value(getattr(message, "kind", None)) == "tool_result"
         and getattr(message, "tool_call_message_id", None)
@@ -166,7 +166,7 @@ def project_chatbot_events(
                 continue
             events.append(project_text_message_event(message))
         elif kind == "tool_call":
-            result = result_by_call.get(str(getattr(message, "id", "")))
+            result = result_by_call.get(getattr(message, "id", None))
             tool_name = _tool_name(message)
             if tool_name and (not is_agent_skill_tool(tool_name) or should_project_agent_skill_tools()):
                 events.append(project_tool_chatbot_event(
@@ -189,7 +189,7 @@ def project_text_message_event(
         text=_optional_text(getattr(message, "text", None)) if kind == "assistant" else None,
         reasoning=_optional_text(getattr(message, "reasoning", None)) if kind == "assistant" else None,
         refusal=_optional_text(getattr(message, "refusal", None)) if kind == "assistant" else None,
-        source_message_ids=[str(message.id)],
+        source_message_ids=[message.id],
     )
 
 
@@ -207,7 +207,7 @@ def enrich_chatbot_events_with_source_attachments(
     """
 
     canonical_user_ids = {
-        str(getattr(message, "id", ""))
+        getattr(message, "id", None)
         for message in getattr(snapshot, "messages", [])
         if _kind_value(getattr(message, "kind", None)) == "user"
     }
@@ -266,11 +266,11 @@ def _project_source_attachments(
         if not block.get("chatbot_source_projection")
         if (file_name := _safe_file_name(block.get("file_name"))) is not None
     }
-    projected_sources: set[tuple[str, str]] = set()
+    projected_sources: set[tuple[str, str | int]] = set()
     for block in result:
         if str(block.get("type") or "").strip().lower() != "dataset":
             continue
-        dataset_id = str(block.get("dataset_id") or "").strip()
+        dataset_id = block.get("dataset_id")
         if not dataset_id:
             continue
         try:
@@ -300,7 +300,7 @@ def _project_source_attachments(
 
 
 def _source_attachment_block(
-    dataset_id: str,
+    dataset_id: int,
     presentation: Mapping[str, Any] | Any | None,
 ) -> dict[str, Any] | None:
     if presentation is None:
@@ -312,7 +312,7 @@ def _source_attachment_block(
         return getattr(presentation, name, default)
 
     file_name = _safe_file_name(value("file_name"))
-    source_group_id = _bounded_ui_text(value("source_group_id", value("source_key")))
+    source_group_id = value("source_group_id", value("source_key"))
     file_path = _bounded_file_path(value("file_path", value("open_path")))
     is_openable = bool(value("is_openable", value("available", bool(file_path)))) and bool(file_path)
     if not file_name:
@@ -331,11 +331,11 @@ def _source_attachment_block(
     return block
 
 
-def _source_identity(block: Mapping[str, Any]) -> tuple[str, str] | None:
+def _source_identity(block: Mapping[str, Any]) -> tuple[str, str | int] | None:
     """Return one stable source identity, with DatasetImport taking priority."""
 
     for field in ("source_group_id", "source_key", "artifact_id"):
-        value = _bounded_ui_text(block.get(field))
+        value = block.get(field)
         if value:
             return (field, value)
     file_name = _safe_file_name(block.get("file_name"))
@@ -405,17 +405,17 @@ def project_tool_chatbot_event(
         "succeeded": ChatbotEventStatus.COMPLETED,
     }.get(result_status, ChatbotEventStatus.PENDING)
     presentation = tool_presentation(tool_name, tool_presentation_lookup=tool_presentation_lookup)
-    call_id = str(getattr(tool_call, "id", ""))
+    call_id = tool_call.id
     source_ids = [call_id]
     if result_message is not None:
-        source_ids.append(str(result_message.id))
+        source_ids.append(result_message.id)
     result_value = _canonical_result_value(result_message, result_status)
     payload = result_value if isinstance(result_value, dict) else None
     summary = presentation.summary_for(result_status or "pending")
     if status is ChatbotEventStatus.COMPLETED and isinstance(payload, dict):
         summary = _tool_summary_from_payload(tool_name, payload) or summary
     return ChatbotEvent(
-        id=call_id, kind=ChatbotEventKind.TOOL,
+        id=str(call_id), kind=ChatbotEventKind.TOOL,
         sequence_index=int(getattr(tool_call, "sequence_index", 0)),
         author=ChatbotEventAuthor.TOOL, status=status,
         source_message_ids=source_ids, tool_call_id=call_id,
@@ -508,8 +508,8 @@ def _tool_actions(tool_name: str, payload: dict[str, Any] | None) -> list[dict[s
         return []
     raw = payload.get("task_ids")
     if not isinstance(raw, list):
-        raw = [payload.get("ml_task_id")] if isinstance(payload.get("ml_task_id"), str) else []
-    task_ids = [str(value) for value in raw if str(value).strip()]
+        raw = [payload.get("ml_task_id")] if isinstance(payload.get("ml_task_id"), int) else []
+    task_ids = [value for value in raw if isinstance(value, int)]
     return [{"type": "open_tool_call_detail", "task_ids": task_ids}] if task_ids else []
 
 

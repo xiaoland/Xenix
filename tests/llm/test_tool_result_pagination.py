@@ -18,7 +18,7 @@ from xenix.services.llm.tooling import (
 
 
 def _context() -> ToolExecutionContext:
-    return ToolExecutionContext(thread_id="thread-1", tool_call_message_id="call-1")
+    return ToolExecutionContext(thread_id=101, tool_call_message_id=102)
 
 
 def _registry(tmp_path: Path) -> AgentToolRegistry:
@@ -28,7 +28,7 @@ def _registry(tmp_path: Path) -> AgentToolRegistry:
 def test_store_saves_and_pages_by_codepoint(tmp_path: Path) -> None:
     store = ToolResultPageStore(tmp_path / "pages")
     text = "中文" * 2500  # 5000 Unicode code points
-    result_id = store.save(thread_id="t1", tool_call_message_id="m1", text=text)
+    result_id = store.save(thread_id=103, tool_call_message_id=104, text=text)
 
     first = store.read_page(result_id, offset=0, limit=1024)
     assert first.text == text[:1024]
@@ -50,14 +50,14 @@ def test_store_rejects_unknown_or_malformed_id(tmp_path: Path) -> None:
 
 def test_store_delete_for_thread_and_gc(tmp_path: Path) -> None:
     store = ToolResultPageStore(tmp_path / "pages")
-    store.save(thread_id="keep", tool_call_message_id=None, text="a" * 10)
-    doomed = store.save(thread_id="drop", tool_call_message_id=None, text="b" * 10)
+    store.save(thread_id=105, tool_call_message_id=107, text="a" * 10)
+    doomed = store.save(thread_id=106, tool_call_message_id=108, text="b" * 10)
 
-    assert store.delete_for_thread("drop") == 1
+    assert store.delete_for_thread(106) == 1
     with pytest.raises(ValidationError):
         store.read_page(doomed, offset=0, limit=10)
 
-    old = store.save(thread_id="keep", tool_call_message_id=None, text="c" * 10)
+    old = store.save(thread_id=105, tool_call_message_id=109, text="c" * 10)
     os.utime(tmp_path / "pages" / f"{old}.txt", (0, 0))
     assert store.collect_garbage(max_age_seconds=1) >= 1
 

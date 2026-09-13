@@ -1358,4 +1358,4 @@ def _validate_service_budget_admission(
 
 
 def _dataset_snapshot_digest(snapshot: dict[str, Any]) -> str:
-    return _digest_json(snapshot)
+    return snapshot.get("sampling_fingerprint") or _digest_json(snapshot)

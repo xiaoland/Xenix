@@ -107,10 +107,10 @@ class LLMUsageObservation:
 
     operation: str
     usage: LLMTokenUsage
-    thread_id: str | None = None
-    root_user_message_id: str | None = None
-    frontier_message_id: str | None = None
-    pending_message_id: str | None = None
+    thread_id: int | None = None
+    root_user_message_id: int | None = None
+    frontier_message_id: int | None = None
+    pending_message_id: int | None = None
     fq_model_key: str | None = None
     observed_at: datetime | None = None
 
@@ -150,9 +150,9 @@ class LLMUsageObservability(Protocol):
     def query_primary_usage(
         self,
         *,
-        thread_id: str,
-        root_user_message_ids: Collection[str],
-    ) -> dict[str, LLMUsageAggregate]: ...
+        thread_id: int,
+        root_user_message_ids: Collection[int],
+    ) -> dict[int, LLMUsageAggregate]: ...
 
 
 class NullLLMUsageObservability:
@@ -164,9 +164,9 @@ class NullLLMUsageObservability:
     def query_primary_usage(
         self,
         *,
-        thread_id: str,
-        root_user_message_ids: Collection[str],
-    ) -> dict[str, LLMUsageAggregate]:
+        thread_id: int,
+        root_user_message_ids: Collection[int],
+    ) -> dict[int, LLMUsageAggregate]:
         del thread_id, root_user_message_ids
         return {}
 
@@ -210,18 +210,18 @@ class LocalLLMUsageObservability:
     def query_primary_usage(
         self,
         *,
-        thread_id: str,
-        root_user_message_ids: Collection[str],
-    ) -> dict[str, LLMUsageAggregate]:
+        thread_id: int,
+        root_user_message_ids: Collection[int],
+    ) -> dict[int, LLMUsageAggregate]:
         requested = {
             stable_hash(message_id): message_id
             for message_id in root_user_message_ids
-            if isinstance(message_id, str) and message_id
+            if isinstance(message_id, int) and message_id
         }
         if not requested:
             return {}
         thread_key = stable_hash(thread_id)
-        aggregates: dict[str, LLMUsageAggregate] = {}
+        aggregates: dict[int, LLMUsageAggregate] = {}
         observed_sampling_keys: set[str] = set()
         try:
             with self._lock:
@@ -480,8 +480,8 @@ def error_type(exc: BaseException) -> str:
     return exc.__class__.__name__
 
 
-def stable_hash(value: str) -> str:
-    return hashlib.sha256(value.encode("utf-8")).hexdigest()[:16]
+def stable_hash(value: str | int) -> str:
+    return hashlib.sha256(str(value).encode("utf-8")).hexdigest()[:16]
 
 
 def inject_context(carrier: dict[str, str]) -> dict[str, str]:
@@ -620,8 +620,8 @@ def _is_valid_usage_observation(observation: Any) -> bool:
     )
 
 
-def _stable_key(value: str | None) -> str | None:
-    return stable_hash(value) if isinstance(value, str) and value else None
+def _stable_key(value: str | int | None) -> str | None:
+    return stable_hash(value) if isinstance(value, (str, int)) and value else None
 
 
 def _usage_from_record(record: dict[str, Any]) -> LLMTokenUsage | None:

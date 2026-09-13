@@ -143,7 +143,7 @@ class RecommendationRankingCase:
             raise BenchmarkInputError("fixture_set_hash_mismatch")
         return combined
 
-    def build_submission(self, *, thread_id: str, fq_model_key: str) -> SubmitUserTurnInput:
+    def build_submission(self, *, thread_id: int, fq_model_key: str) -> SubmitUserTurnInput:
         return SubmitUserTurnInput(
             thread_id=thread_id,
             text=BUSINESS_PROMPT,
@@ -250,7 +250,7 @@ def _resolve_recommendation_outcome(
 ) -> tuple[Any | None, pl.DataFrame | None]:
     target_source_ids = _source_ids_for_digest(context, _EXPECTED_TARGETS_SHA256)
     datasets = list(context.services.datasets.list_datasets())
-    by_id = {str(dataset.id): dataset for dataset in datasets}
+    by_id = {dataset.id: dataset for dataset in datasets}
     for dataset in datasets:
         if not _is_run_descendant(
             dataset,
@@ -273,7 +273,7 @@ def _recommendation_outcome_diagnostic(context: BenchmarkCaseContext) -> str:
     if not target_source_ids:
         return "target_source_identity_missing"
     datasets = list(context.services.datasets.list_datasets())
-    by_id = {str(dataset.id): dataset for dataset in datasets}
+    by_id = {dataset.id: dataset for dataset in datasets}
     descendant_count = 0
     readable_count = 0
     expected_column_count = 0
@@ -581,9 +581,9 @@ def _source_ids_for_digest(context: BenchmarkCaseContext, digest: str) -> set[st
 
 def _is_run_descendant(
     dataset: Any,
-    by_id: dict[str, Any],
-    source_ids: set[str],
-    run_ids: frozenset[str],
+    by_id: dict[int, Any],
+    source_ids: set[int],
+    run_ids: frozenset[int],
 ) -> bool:
     if dataset.id not in run_ids:
         return False

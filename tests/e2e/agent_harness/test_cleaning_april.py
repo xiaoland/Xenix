@@ -57,7 +57,7 @@ class AprilDineInSalesCleaningCase:
             raise BenchmarkInputError("fixture_hash_mismatch")
         return digest
 
-    def build_submission(self, *, thread_id: str, fq_model_key: str) -> SubmitUserTurnInput:
+    def build_submission(self, *, thread_id: int, fq_model_key: str) -> SubmitUserTurnInput:
         return SubmitUserTurnInput(
             thread_id=thread_id,
             text="清洗",
@@ -161,7 +161,7 @@ class AprilDineInSalesCleaningCase:
         snapshot: Any,
         dataset_service: Any,
         source_dataset_ids: set[str],
-        run_dataset_ids: frozenset[str],
+        run_dataset_ids: frozenset[int],
     ) -> tuple[Any, pl.DataFrame] | None:
         for message in reversed(list(getattr(snapshot, "messages", []))):
             if enum_value(getattr(message, "kind", None)) != "tool_result":

@@ -36,7 +36,7 @@ def _invoke_service(service, arguments: dict) -> ToolSuccess | ToolFailure:
         tool_name="knowledge.lookup",
         provider_name="knowledge_lookup",
         arguments=arguments,
-        context=ToolExecutionContext(thread_id="thread-1"),
+        context=ToolExecutionContext(thread_id=101),
     )
 
 
@@ -56,7 +56,7 @@ def test_lookup_tool_returns_one_minimal_value_for_auto_and_keyword(
             tool_name="knowledge.lookup",
             provider_name="knowledge_lookup",
             arguments=arguments,
-            context=ToolExecutionContext(thread_id="thread-1"),
+            context=ToolExecutionContext(thread_id=101),
         )
         for arguments in (
             {"query": "雨具补货"},

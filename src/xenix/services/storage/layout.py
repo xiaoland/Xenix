@@ -47,15 +47,15 @@ def knowledge_tasks_root(paths: AppPaths) -> Path:
     return knowledge_root(paths) / "tasks"
 
 
-def knowledge_import_task_root(paths: AppPaths, import_id: str) -> Path:
-    return knowledge_tasks_root(paths) / "imports" / import_id
+def knowledge_import_task_root(paths: AppPaths, import_id: int) -> Path:
+    return knowledge_tasks_root(paths) / "imports" / str(import_id)
 
 
-def knowledge_import_result_path(paths: AppPaths, import_id: str) -> Path:
+def knowledge_import_result_path(paths: AppPaths, import_id: int) -> Path:
     return knowledge_import_task_root(paths, import_id) / "result.json"
 
 
-def knowledge_import_logs_path(paths: AppPaths, import_id: str) -> Path:
+def knowledge_import_logs_path(paths: AppPaths, import_id: int) -> Path:
     return knowledge_import_task_root(paths, import_id) / "logs.jsonl"
 
 
@@ -63,40 +63,40 @@ def ml_task_parent_root(paths: AppPaths) -> Path:
     return paths.artifacts / "ml-tasks"
 
 
-def ml_task_root(paths: AppPaths, ml_task_id: str) -> Path:
-    return ml_task_parent_root(paths) / ml_task_id
+def ml_task_root(paths: AppPaths, ml_task_id: int) -> Path:
+    return ml_task_parent_root(paths) / str(ml_task_id)
 
 
-def task_input_dir(paths: AppPaths, ml_task_id: str) -> Path:
+def task_input_dir(paths: AppPaths, ml_task_id: int) -> Path:
     return ml_task_root(paths, ml_task_id) / "input"
 
 
-def task_output_dir(paths: AppPaths, ml_task_id: str) -> Path:
+def task_output_dir(paths: AppPaths, ml_task_id: int) -> Path:
     return ml_task_root(paths, ml_task_id) / "output"
 
 
-def task_models_dir(paths: AppPaths, ml_task_id: str) -> Path:
+def task_models_dir(paths: AppPaths, ml_task_id: int) -> Path:
     return ml_task_root(paths, ml_task_id) / "models"
 
 
-def task_request_path(paths: AppPaths, ml_task_id: str) -> Path:
+def task_request_path(paths: AppPaths, ml_task_id: int) -> Path:
     return ml_task_root(paths, ml_task_id) / "request.json"
 
 
-def task_result_path(paths: AppPaths, ml_task_id: str) -> Path:
+def task_result_path(paths: AppPaths, ml_task_id: int) -> Path:
     return ml_task_root(paths, ml_task_id) / "result.json"
 
 
-def task_logs_path(paths: AppPaths, ml_task_id: str) -> Path:
+def task_logs_path(paths: AppPaths, ml_task_id: int) -> Path:
     return ml_task_root(paths, ml_task_id) / "logs.jsonl"
 
 
-def dataset_model_dir(paths: AppPaths, dataset_id: str) -> Path:
-    return artifact_models_root(paths) / "datasets" / dataset_id
+def dataset_model_dir(paths: AppPaths, dataset_id: int) -> Path:
+    return artifact_models_root(paths) / "datasets" / str(dataset_id)
 
 
-def dataset_apply_dir(paths: AppPaths, dataset_id: str) -> Path:
-    return artifact_apply_root(paths) / "datasets" / dataset_id
+def dataset_apply_dir(paths: AppPaths, dataset_id: int) -> Path:
+    return artifact_apply_root(paths) / "datasets" / str(dataset_id)
 
 
 def ensure_storage_layout(paths: AppPaths) -> None:

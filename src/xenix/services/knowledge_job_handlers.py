@@ -15,20 +15,20 @@ if TYPE_CHECKING:
 
 
 class KnowledgeJobService(Protocol):
-    def recover_pending(self) -> list[str]: ...
+    def recover_pending(self) -> list[int]: ...
 
-    def run_unit(self, reference: str) -> None: ...
+    def run_unit(self, reference: int) -> None: ...
 
-    def job_outcome(self, reference: str) -> tuple[str, str | None]: ...
+    def job_outcome(self, reference: int) -> tuple[str, str | None]: ...
 
 
 def _reconcile(
     session: "Session",
     jobs: list[JobRow],
-    requeue_refs: list[str],
+    requeue_refs: list[int],
     *,
     kind: str,
-) -> list[str]:
+) -> list[int]:
     """Reconcile persisted JobRows with the domain's requeue decision.
 
     Running rows for requeued units return to queued; newly materialized domain
@@ -88,7 +88,7 @@ class _KnowledgeHandler:
     def __init__(self, service: KnowledgeJobService) -> None:
         self._service = service
 
-    def recover(self, session: "Session", jobs: list[JobRow]) -> list[str]:
+    def recover(self, session: "Session", jobs: list[JobRow]) -> list[int]:
         return _reconcile(
             session,
             jobs,

@@ -45,14 +45,14 @@ class KnowledgeIndexOverview:
     vector_configured: bool
     unit_count: int
     estimated_vector_requests: int
-    active_task_id: str | None
+    active_task_id: int | None
     active_task_status: str | None
     error_code: str | None
 
 
 @dataclass(frozen=True)
 class KnowledgeIndexTaskView:
-    task_id: str
+    task_id: int
     index_kinds: tuple[str, ...]
     trigger: str
     status: str
@@ -108,7 +108,7 @@ class KnowledgeIndexService:
         *,
         trigger: str,
         library_id: str = "global",
-    ) -> str:
+    ) -> int:
         kinds = _normalize_index_kinds(index_kinds)
         if trigger not in _TRIGGERS:
             raise ValueError("Knowledge index task trigger is invalid.")
@@ -145,7 +145,7 @@ class KnowledgeIndexService:
             self._submit(task_id)
         return task_id
 
-    def notify_corpus_changed(self, library_id: str = "global") -> str | None:
+    def notify_corpus_changed(self, library_id: str = "global") -> int | None:
         try:
             configured = self._embedding.freeze() is not None
         except EmbeddingValidationError:
@@ -316,7 +316,7 @@ class KnowledgeIndexService:
             for row in rows
         ]
 
-    def rebuild_now(self, task_id: str) -> KnowledgeIndexTaskView:
+    def rebuild_now(self, task_id: int) -> KnowledgeIndexTaskView:
         # Claim the task under the same short lock used by enqueue/coalescing.
         # Otherwise a producer can merge a new kind into a still-queued row after
         # this worker has read its old payload, making metadata claim work that the
@@ -347,7 +347,7 @@ class KnowledgeIndexService:
                         library_id=library_id,
                     )
                     session.commit()
-            generation_id: str | None = None
+            generation_id: int | None = None
             profile_fingerprint: str | None = None
             corpus_fingerprint: str | None = None
             if KnowledgeIndexKind.TEXT_VECTOR.value in kinds:
@@ -418,7 +418,7 @@ class KnowledgeIndexService:
                 )
         self._status_executor.shutdown(wait=True, cancel_futures=True)
 
-    def _set_phase(self, task_id: str, phase: str) -> None:
+    def _set_phase(self, task_id: int, phase: str) -> None:
         with self._session_factory() as session:
             row = self._repository.get_index_task(session, task_id)
             if row is None:
@@ -434,7 +434,7 @@ class KnowledgeIndexService:
             try:
                 if item is _STOP:
                     return
-                assert isinstance(item, str)
+                assert isinstance(item, int)
                 self.rebuild_now(item)
             finally:
                 self._queue.task_done()
@@ -446,24 +446,24 @@ class KnowledgeIndexService:
         with self._status_requests_lock:
             self._status_requests.discard(future)
 
-    def _submit(self, task_id: str) -> None:
+    def _submit(self, task_id: int) -> None:
         if self._scheduler is not None:
             self._scheduler.enqueue(JobDomain.KNOWLEDGE, "index_build", task_id)
         elif not self._stop.is_set():
             self._queue.put(task_id)
 
-    def run_unit(self, task_id: str) -> None:
+    def run_unit(self, task_id: int) -> None:
         self.rebuild_now(task_id)
 
-    def job_outcome(self, task_id: str) -> tuple[str, str | None]:
+    def job_outcome(self, task_id: int) -> tuple[str, str | None]:
         with self._session_factory() as session:
             row = self._repository.get_index_task(session, task_id)
             if row is None:
                 return ("failed", "Knowledge index task is missing.")
             return (row.status, row.error_summary)
 
-    def recover_pending(self) -> list[str]:
-        pending: list[str] = []
+    def recover_pending(self) -> list[int]:
+        pending: list[int] = []
         with self._session_factory() as session:
             rows = self._repository.list_index_tasks(
                 session,

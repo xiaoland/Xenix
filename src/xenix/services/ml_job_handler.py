@@ -31,7 +31,7 @@ class MLJobHandler:
     def concurrency_limit(self) -> int:
         return self._ml_task_service.max_concurrent_tasks
 
-    def recover(self, session: "Session", jobs: list[JobRow]) -> list[str]:
+    def recover(self, session: "Session", jobs: list[JobRow]) -> list[int]:
         return []
 
     def run(self, job: JobRow) -> JobOutcome:

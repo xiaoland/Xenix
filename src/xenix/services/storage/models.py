@@ -3,10 +3,11 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from enum import StrEnum
 from typing import Any
-from uuid import uuid4
 
 from sqlalchemy import Column, Enum as SQLAlchemyEnum, Index, JSON, UniqueConstraint, text
 from sqlmodel import Field, SQLModel
+
+from .identity import identity_column
 
 DEFAULT_AGENT_INTERFACE_LOCALE = "en_US"
 
@@ -36,10 +37,6 @@ def default_agent_thread_system_prompt(interface_locale: str | None = None) -> s
 
 
 DEFAULT_AGENT_THREAD_SYSTEM_PROMPT = default_agent_thread_system_prompt()
-
-
-def generate_id() -> str:
-    return uuid4().hex
 
 
 def utc_now() -> datetime:
@@ -132,7 +129,7 @@ class ArtifactKind(StrEnum):
 class ProjectRow(SQLModel, table=True):
     __tablename__ = "project"
 
-    id: str = Field(default_factory=generate_id, primary_key=True)
+    id: int = Field(sa_column=identity_column(primary_key=True))
     name: str = Field(index=True)
     description: str | None = None
     created_at: datetime = Field(default_factory=utc_now)
@@ -142,19 +139,19 @@ class ProjectRow(SQLModel, table=True):
 class DatasetRow(SQLModel, table=True):
     __tablename__ = "dataset"
 
-    id: str = Field(default_factory=generate_id, primary_key=True)
-    project_id: str = Field(foreign_key="project.id", index=True)
+    id: int = Field(sa_column=identity_column(primary_key=True))
+    project_id: int = Field(foreign_key="project.id", index=True)
     name: str = Field(index=True)
     source_path: str
     source_format: DatasetSourceFormat = Field(default=DatasetSourceFormat.UNKNOWN, index=True)
-    import_id: str | None = Field(default=None, foreign_key="dataset_import.id", index=True)
-    workbook_id: str | None = Field(default=None, foreign_key="dataset_workbook.id", index=True)
+    import_id: int | None = Field(default=None, foreign_key="dataset_import.id", index=True)
+    workbook_id: int | None = Field(default=None, foreign_key="dataset_workbook.id", index=True)
     sheet_name: str | None = Field(default=None, index=True)
     sheet_index: int | None = Field(default=None, index=True)
-    copied_from: str | None = Field(default=None, foreign_key="dataset.id", index=True)
+    copied_from: int | None = Field(default=None, foreign_key="dataset.id", index=True)
     copied_at: datetime | None = None
-    derived_from_dataset_id: str | None = Field(default=None, foreign_key="dataset.id", index=True)
-    ml_task_id: str | None = Field(default=None, foreign_key="ml_task.id", index=True, unique=True)
+    derived_from_dataset_id: int | None = Field(default=None, foreign_key="dataset.id", index=True)
+    ml_task_id: int | None = Field(default=None, foreign_key="ml_task.id", index=True, unique=True)
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
 
@@ -164,7 +161,7 @@ class DatasetDerivationRow(SQLModel, table=True):
 
     __tablename__ = "dataset_derivation"
 
-    dataset_id: str = Field(primary_key=True, foreign_key="dataset.id")
+    dataset_id: int = Field(primary_key=True, foreign_key="dataset.id")
     operation_name: str = Field(index=True)
     parameters_payload: dict[str, Any] = Field(
         default_factory=dict,
@@ -173,7 +170,7 @@ class DatasetDerivationRow(SQLModel, table=True):
     agent_explanation: str | None = None
     # Tool execution happens before the staged ToolCall Message is committed,
     # so this is a stable future reference rather than an immediate FK.
-    tool_call_message_id: str | None = Field(default=None, index=True)
+    tool_call_message_id: int | None = Field(default=None, index=True)
     created_at: datetime = Field(default_factory=utc_now)
 
 
@@ -189,9 +186,9 @@ class DatasetDerivationInputRow(SQLModel, table=True):
         ),
     )
 
-    id: str = Field(default_factory=generate_id, primary_key=True)
-    derivation_dataset_id: str = Field(foreign_key="dataset_derivation.dataset_id", index=True)
-    input_dataset_id: str = Field(foreign_key="dataset.id", index=True)
+    id: int = Field(sa_column=identity_column(primary_key=True))
+    derivation_dataset_id: int = Field(foreign_key="dataset_derivation.dataset_id", index=True)
+    input_dataset_id: int = Field(foreign_key="dataset.id", index=True)
     input_position: int
     alias: str | None = None
 
@@ -199,8 +196,8 @@ class DatasetDerivationInputRow(SQLModel, table=True):
 class DatasetImportRow(SQLModel, table=True):
     __tablename__ = "dataset_import"
 
-    id: str = Field(default_factory=generate_id, primary_key=True)
-    project_id: str = Field(foreign_key="project.id", index=True)
+    id: int = Field(sa_column=identity_column(primary_key=True))
+    project_id: int = Field(foreign_key="project.id", index=True)
     original_path: str
     original_file_name: str
     source_format: DatasetSourceFormat = Field(default=DatasetSourceFormat.UNKNOWN, index=True)
@@ -211,8 +208,8 @@ class DatasetImportRow(SQLModel, table=True):
 class DatasetWorkbookRow(SQLModel, table=True):
     __tablename__ = "dataset_workbook"
 
-    id: str = Field(default_factory=generate_id, primary_key=True)
-    import_id: str = Field(foreign_key="dataset_import.id", index=True)
+    id: int = Field(sa_column=identity_column(primary_key=True))
+    import_id: int = Field(foreign_key="dataset_import.id", index=True)
     sheet_count: int = 0
     engine: str | None = None
     metadata_payload: dict[str, Any] = Field(
@@ -225,8 +222,8 @@ class DatasetWorkbookRow(SQLModel, table=True):
 class DatasetColumnBindingRow(SQLModel, table=True):
     __tablename__ = "dataset_column_binding"
 
-    id: str = Field(default_factory=generate_id, primary_key=True)
-    dataset_id: str = Field(foreign_key="dataset.id", index=True)
+    id: int = Field(sa_column=identity_column(primary_key=True))
+    dataset_id: int = Field(foreign_key="dataset.id", index=True)
     role_bindings: list[dict[str, Any]] = Field(
         default_factory=list,
         sa_column=Column(JSON, nullable=False),
@@ -245,9 +242,9 @@ class DatasetColumnBindingRow(SQLModel, table=True):
 class MLTaskRow(SQLModel, table=True):
     __tablename__ = "ml_task"
 
-    id: str = Field(default_factory=generate_id, primary_key=True)
-    project_id: str = Field(foreign_key="project.id", index=True)
-    dataset_id: str | None = Field(default=None, foreign_key="dataset.id", index=True)
+    id: int = Field(sa_column=identity_column(primary_key=True))
+    project_id: int = Field(foreign_key="project.id", index=True)
+    dataset_id: int | None = Field(default=None, foreign_key="dataset.id", index=True)
     task_type: MLTaskType = Field(
         sa_column=Column(
             SQLAlchemyEnum(
@@ -291,7 +288,7 @@ class JobRow(SQLModel, table=True):
         UniqueConstraint("domain", "reference", name="uq_job_domain_reference"),
     )
 
-    id: str = Field(default_factory=generate_id, primary_key=True)
+    id: int = Field(sa_column=identity_column(primary_key=True))
     domain: JobDomain = Field(
         sa_column=Column(
             SQLAlchemyEnum(
@@ -303,7 +300,7 @@ class JobRow(SQLModel, table=True):
         ),
     )
     kind: str = Field(index=True)
-    reference: str = Field(index=True)
+    reference: int = Field(index=True)
     status: JobStatus = Field(
         sa_column=Column(
             SQLAlchemyEnum(
@@ -325,8 +322,8 @@ class JobRow(SQLModel, table=True):
 class MLTaskArtifactRow(SQLModel, table=True):
     __tablename__ = "ml_task_artifact"
 
-    id: str = Field(default_factory=generate_id, primary_key=True)
-    ml_task_id: str = Field(foreign_key="ml_task.id", index=True)
+    id: int = Field(sa_column=identity_column(primary_key=True))
+    ml_task_id: int = Field(foreign_key="ml_task.id", index=True)
     artifact_kind: MLTaskArtifactKind = Field(
         sa_column=Column(
             SQLAlchemyEnum(
@@ -338,7 +335,7 @@ class MLTaskArtifactRow(SQLModel, table=True):
         ),
     )
     absolute_path: str
-    artifact_id: str | None = Field(default=None, foreign_key="artifact.id", index=True)
+    artifact_id: int | None = Field(default=None, foreign_key="artifact.id", index=True)
     ready_to_open: bool = True
     created_at: datetime = Field(default_factory=utc_now)
 
@@ -346,7 +343,7 @@ class MLTaskArtifactRow(SQLModel, table=True):
 class ConversationThreadRow(SQLModel, table=True):
     __tablename__ = "conversation_thread"
 
-    id: str = Field(default_factory=generate_id, primary_key=True)
+    id: int = Field(sa_column=identity_column(primary_key=True))
     title: str | None = Field(default=None, index=True)
     system_prompt: str = Field(default=DEFAULT_AGENT_THREAD_SYSTEM_PROMPT)
     selected_fq_model_key: str | None = Field(default=None, index=True)
@@ -378,8 +375,8 @@ class ConversationMessageRow(SQLModel, table=True):
         ),
     )
 
-    id: str = Field(default_factory=generate_id, primary_key=True)
-    thread_id: str = Field(foreign_key="conversation_thread.id", index=True)
+    id: int = Field(sa_column=identity_column(primary_key=True))
+    thread_id: int = Field(foreign_key="conversation_thread.id", index=True)
     sequence_index: int = Field(index=True)
     kind: ConversationMessageKind = Field(
         sa_column=Column(
@@ -407,7 +404,7 @@ class ConversationMessageRow(SQLModel, table=True):
         sa_column=Column(JSON, nullable=True),
     )
     scope_fingerprint: str | None = None
-    tool_call_message_id: str | None = Field(
+    tool_call_message_id: int | None = Field(
         default=None,
         foreign_key="conversation_message.id",
         index=True,
@@ -438,7 +435,7 @@ class ConversationMessageRow(SQLModel, table=True):
 class ArtifactRow(SQLModel, table=True):
     __tablename__ = "artifact"
 
-    id: str = Field(default_factory=generate_id, primary_key=True)
+    id: int = Field(sa_column=identity_column(primary_key=True))
     kind: ArtifactKind = Field(default=ArtifactKind.OTHER, index=True)
     title: str = Field(index=True)
     absolute_path: str
@@ -468,15 +465,15 @@ class KnowledgeDocumentRow(SQLModel, table=True):
         ),
     )
 
-    id: str = Field(default_factory=generate_id, primary_key=True)
+    id: int = Field(sa_column=identity_column(primary_key=True))
     library_id: str = Field(default="global", index=True)
     title: str = Field(index=True)
-    source_artifact_id: str | None = Field(default=None, foreign_key="artifact.id", index=True)
+    source_artifact_id: int | None = Field(default=None, foreign_key="artifact.id", index=True)
     source_sha256: str | None = Field(default=None, index=True)
     source_format: str | None = Field(default=None, index=True)
     canonical_path: str | None = None
-    canonical_generation_id: str = Field(default_factory=generate_id, index=True)
-    retrieval_generation_id: str | None = Field(default=None, index=True)
+    canonical_generation_id: int = Field(sa_column=identity_column(index=True))
+    retrieval_generation_id: int | None = Field(default=None, index=True)
     retrieval_status: str = Field(default="pending", index=True)
     retrieval_projection_version: int | None = Field(default=None, index=True)
     retrieval_content_fingerprint: str | None = Field(default=None, index=True)
@@ -499,9 +496,9 @@ class KnowledgeUnitRow(SQLModel, table=True):
         ),
     )
 
-    id: str = Field(default_factory=generate_id, primary_key=True)
-    document_id: str = Field(foreign_key="knowledge_document.id", index=True)
-    canonical_generation_id: str = Field(index=True)
+    id: int = Field(sa_column=identity_column(primary_key=True))
+    document_id: int = Field(foreign_key="knowledge_document.id", index=True)
+    canonical_generation_id: int = Field(index=True)
     ordinal: int = Field(index=True)
     text: str
     search_text: str
@@ -526,7 +523,7 @@ class KnowledgeVectorGenerationRow(SQLModel, table=True):
         ),
     )
 
-    id: str = Field(default_factory=generate_id, primary_key=True)
+    id: int = Field(sa_column=identity_column(primary_key=True))
     library_id: str = Field(default="global", index=True)
     corpus_fingerprint: str = Field(index=True)
     profile_fingerprint: str = Field(index=True)
@@ -545,7 +542,7 @@ class KnowledgeIndexTaskRow(SQLModel, table=True):
 
     __tablename__ = "knowledge_index_task"
 
-    id: str = Field(default_factory=generate_id, primary_key=True)
+    id: int = Field(sa_column=identity_column(primary_key=True))
     library_id: str = Field(default="global", index=True)
     index_kinds_payload: list[str] = Field(
         default_factory=list,
@@ -556,7 +553,7 @@ class KnowledgeIndexTaskRow(SQLModel, table=True):
     phase: str = Field(default="queued", index=True)
     profile_fingerprint: str | None = Field(default=None, index=True)
     corpus_fingerprint: str | None = Field(default=None, index=True)
-    vector_generation_id: str | None = Field(default=None, index=True)
+    vector_generation_id: int | None = Field(default=None, index=True)
     error_code: str | None = Field(default=None, index=True)
     error_summary: str | None = None
     created_at: datetime = Field(default_factory=utc_now)
@@ -575,7 +572,7 @@ class KnowledgeImportRow(SQLModel, table=True):
         ),
     )
 
-    id: str = Field(default_factory=generate_id, primary_key=True)
+    id: int = Field(sa_column=identity_column(primary_key=True))
     library_id: str = Field(default="global", index=True)
     original_file_name: str
     source_format: str = Field(index=True)
@@ -583,11 +580,11 @@ class KnowledgeImportRow(SQLModel, table=True):
     status: str = Field(default="pending", index=True)
     phase: str = Field(default="queued", index=True)
     attempt_number: int = 1
-    retry_of: str | None = Field(default=None, index=True)
-    planned_document_id: str | None = Field(default=None, index=True)
-    document_id: str | None = Field(default=None, foreign_key="knowledge_document.id", index=True)
-    source_artifact_id: str | None = Field(default=None, foreign_key="artifact.id", index=True)
-    canonical_generation_id: str | None = Field(default=None, index=True)
+    retry_of: int | None = Field(default=None, index=True)
+    planned_document_id: int | None = Field(default=None, index=True)
+    document_id: int | None = Field(default=None, foreign_key="knowledge_document.id", index=True)
+    source_artifact_id: int | None = Field(default=None, foreign_key="artifact.id", index=True)
+    canonical_generation_id: int | None = Field(default=None, index=True)
     canonical_path: str | None = None
     envelope_sha256: str | None = None
     content_ir_sha256: str | None = None
@@ -605,10 +602,10 @@ class KnowledgeCanonicalGenerationRow(SQLModel, table=True):
 
     __tablename__ = "knowledge_canonical_generation"
 
-    id: str = Field(default_factory=generate_id, primary_key=True)
-    document_id: str = Field(foreign_key="knowledge_document.id", index=True)
-    import_id: str | None = Field(default=None, foreign_key="knowledge_import.id", index=True)
-    source_artifact_id: str | None = Field(default=None, foreign_key="artifact.id", index=True)
+    id: int = Field(sa_column=identity_column(primary_key=True))
+    document_id: int = Field(foreign_key="knowledge_document.id", index=True)
+    import_id: int | None = Field(default=None, foreign_key="knowledge_import.id", index=True)
+    source_artifact_id: int | None = Field(default=None, foreign_key="artifact.id", index=True)
     library_id: str = Field(default="global", index=True)
     source_sha256: str = Field(index=True)
     source_format: str = Field(index=True)
@@ -643,17 +640,17 @@ class KnowledgeDerivationRow(SQLModel, table=True):
         ),
     )
 
-    id: str = Field(default_factory=generate_id, primary_key=True)
-    document_id: str = Field(foreign_key="knowledge_document.id", index=True)
-    canonical_generation_id: str = Field(
+    id: int = Field(sa_column=identity_column(primary_key=True))
+    document_id: int = Field(foreign_key="knowledge_document.id", index=True)
+    canonical_generation_id: int = Field(
         foreign_key="knowledge_canonical_generation.id",
         index=True,
     )
-    import_id: str | None = Field(default=None, foreign_key="knowledge_import.id", index=True)
+    import_id: int | None = Field(default=None, foreign_key="knowledge_import.id", index=True)
     status: str = Field(default="queued", index=True)
     phase: str = Field(default="queued", index=True)
     attempt_number: int = 1
-    retry_of: str | None = Field(
+    retry_of: int | None = Field(
         default=None,
         foreign_key="knowledge_derivation.id",
         index=True,
@@ -668,9 +665,9 @@ class KnowledgeDerivationRow(SQLModel, table=True):
 class TrainedModelRow(SQLModel, table=True):
     __tablename__ = "trained_model"
 
-    id: str = Field(default_factory=generate_id, primary_key=True)
-    dataset_id: str | None = Field(default=None, foreign_key="dataset.id", index=True)
-    ml_task_id: str = Field(foreign_key="ml_task.id", index=True, unique=True)
+    id: int = Field(sa_column=identity_column(primary_key=True))
+    dataset_id: int | None = Field(default=None, foreign_key="dataset.id", index=True)
+    ml_task_id: int = Field(foreign_key="ml_task.id", index=True, unique=True)
     model_key: str = Field(index=True)
     problem_kind: ProblemKind | None = Field(default=None, index=True)
     artifact_path: str

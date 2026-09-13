@@ -135,7 +135,7 @@ class KnowledgeStorageMaintenance:
         with self._session_factory() as session:
             return self._repository.list_all_vector_generations(session)
 
-    def _delete_metadata(self, generation_id: str) -> None:
+    def _delete_metadata(self, generation_id: int) -> None:
         with self._session_factory() as session:
             self._repository.delete_vector_generation(session, generation_id)
             session.commit()

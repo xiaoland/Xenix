@@ -69,7 +69,7 @@ class CustomerSegmentationCase:
             raise BenchmarkInputError("fixture_hash_mismatch")
         return digest
 
-    def build_submission(self, *, thread_id: str, fq_model_key: str) -> SubmitUserTurnInput:
+    def build_submission(self, *, thread_id: int, fq_model_key: str) -> SubmitUserTurnInput:
         return SubmitUserTurnInput(
             thread_id=thread_id,
             text=(

@@ -25,8 +25,8 @@ class KnowledgeTaskItem:
     updated_at: datetime
     error_code: str | None
     owner: str
-    owner_id: str
-    import_id: str | None
+    owner_id: int
+    import_id: int | None
     error_summary: str | None = None
     index_kinds: tuple[str, ...] = ()
     can_cancel: bool = False
@@ -85,7 +85,7 @@ class KnowledgeTaskQueryService:
             document_ids = tuple({row.document_id for row in derivations})
             documents = (
                 {
-                    str(row[0]): str(row[1])
+                    row[0]: str(row[1])
                     for row in session.exec(
                         select(KnowledgeDocumentRow.id, KnowledgeDocumentRow.title).where(
                             KnowledgeDocumentRow.id.in_(document_ids)
@@ -105,7 +105,7 @@ class KnowledgeTaskQueryService:
             )
 
         derivations_by_import: dict[str, list[KnowledgeDerivationRow]] = {}
-        derivations_by_generation: dict[tuple[str, str], list[KnowledgeDerivationRow]] = {}
+        derivations_by_generation: dict[tuple[int, int], list[KnowledgeDerivationRow]] = {}
         for row in derivations:
             if row.import_id:
                 derivations_by_import.setdefault(row.import_id, []).append(row)
@@ -114,7 +114,7 @@ class KnowledgeTaskQueryService:
             ).append(row)
 
         items: list[KnowledgeTaskItem] = []
-        folded_derivation_ids: set[str] = set()
+        folded_derivation_ids: set[int] = set()
         for row in imports:
             attempts = sorted(
                 derivations_by_import.get(row.id, ()),

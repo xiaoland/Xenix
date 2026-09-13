@@ -29,7 +29,7 @@ from xenix.services.ml.types import ColumnRoleKind, EvaluationKind
 
 def _snapshot(*, source_sha256: str = "a" * 64) -> DatasetSnapshotFact:
     return DatasetSnapshotFact(
-        dataset_id="dataset-1",
+        dataset_id=101,
         source_sha256=source_sha256,
         source_byte_size=1024,
         schema_digest="b" * 64,
@@ -50,9 +50,9 @@ def _request(
     if grouped:
         bindings.append({"role": "group", "columns": ["account_id"]})
     return FitTaskRequest(
-        task_id="task-1",
-        project_id="project-1",
-        dataset_id="dataset-1",
+        task_id=102,
+        project_id=103,
+        dataset_id=101,
         dataset_source_path=dataset_source_path,
         evaluation_kind=evaluation_kind,
         train_role_bindings=bindings,
@@ -225,7 +225,7 @@ def test_grouped_tabular_fit_and_evaluate_preserve_typed_facts(tmp_path: Path) -
 
     evaluation = LogisticRegressionService.evaluate(
         EvaluateTaskRequest(
-            task_id="evaluate-1",
+            task_id=104,
             project_id=request.project_id,
             dataset_id=request.dataset_id,
             dataset_source_path=request.dataset_source_path,
@@ -234,7 +234,7 @@ def test_grouped_tabular_fit_and_evaluate_preserve_typed_facts(tmp_path: Path) -
             evaluation_policy=request.evaluation_policy,
             dataset_snapshot=request.dataset_snapshot,
             evaluate_model=EvaluateModelPayload(
-                trained_model_id="trained-1",
+                trained_model_id=105,
                 model_key=LogisticRegressionService.key,
                 trained_model_artifact_path=fit_result.model_artifact_path,
                 holdout_artifact_path=fit_result.holdout_artifact_path or "",

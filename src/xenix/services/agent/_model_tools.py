@@ -149,7 +149,7 @@ class ModelTools:
         )
         binding = self._ml_service.get_column_binding(binding_id)
         dataset_id = binding.dataset_id
-        created_task_ids: list[str] = []
+        created_task_ids: list[int] = []
         for model_key in models:
             _raise_if_cancelled(self._ml_service, context)
             created = self._ml_service.fit_with_evaluate(
@@ -194,7 +194,7 @@ class ModelTools:
         )
         binding = self._ml_service.get_column_binding(binding_id)
         dataset_id = binding.dataset_id
-        created_task_ids: list[str] = []
+        created_task_ids: list[int] = []
         for model_key, grid in normalized_grids.items():
             _raise_if_cancelled(self._ml_service, context)
             created = self._ml_service.tune_with_evaluate(
@@ -225,7 +225,7 @@ class ModelTools:
         return self._training_completion(dataset_id, tasks, trained_models)
 
     def _training_completion(
-        self, dataset_id: str, tasks: list[MLTaskRow], trained_models: list[TrainedModelRow],
+        self, dataset_id: int, tasks: list[MLTaskRow], trained_models: list[TrainedModelRow],
     ) -> ToolSuccess:
         # Public links remain attached to task IDs, which identify each
         # candidate's training and evaluation in the model summaries.
@@ -285,7 +285,7 @@ class ModelTools:
             )
         return self._apply_completion(completed_task.id)
 
-    def _apply_completion(self, task_id: str) -> ToolSuccess:
+    def _apply_completion(self, task_id: int) -> ToolSuccess:
         details = self._ml_service.get_task_details(task_id)
         output_artifact = next(
             artifact
@@ -373,7 +373,7 @@ class ModelTools:
             stopped.append({"task_id": task_id, "status": task.status.value})
         return ToolSuccess(value={"task_ids": input_data.task_ids, "tasks": stopped})
 
-    def _in_progress_result(self, task_ids: list[str], *, message: str) -> ToolSuccess:
+    def _in_progress_result(self, task_ids: list[int], *, message: str) -> ToolSuccess:
         tasks = []
         for task_id in task_ids:
             details = self._ml_service.get_task_details(task_id)
@@ -396,12 +396,12 @@ class ModelTools:
             }
         )
 
-    def _resolve_apply_input_sources(self, input_sources: list[str]) -> list[ApplySourceInput]:
+    def _resolve_apply_input_sources(self, input_sources: list[int | str]) -> list[ApplySourceInput]:
         return [self._resolve_apply_input_source(input_source) for input_source in input_sources]
 
-    def _resolve_apply_input_source(self, input_source: str) -> ApplySourceInput:
-        source = input_source.strip()
-        if source.startswith("artifact://"):
+    def _resolve_apply_input_source(self, input_source: int | str) -> ApplySourceInput:
+        source = input_source
+        if isinstance(source, str):
             artifact = self._artifact_service.resolve_uri(source)
             if not artifact.exists:
                 raise ValidationError("Apply input artifact file is missing.")

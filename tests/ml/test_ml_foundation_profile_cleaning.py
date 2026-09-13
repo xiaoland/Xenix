@@ -120,7 +120,7 @@ def test_clean_room_profile_and_whole_dataset_cleaning_workflow(
             ],
         },
         ToolExecutionContext(
-            thread_id="foundation-profile-cleaning",
+            thread_id=101,
             dataset_ids=(source_dataset.id,),
         ),
     )
@@ -138,7 +138,7 @@ def test_clean_room_profile_and_whole_dataset_cleaning_workflow(
     assert "T-001" not in clean_outcome.value
     assert "2025-01-01" not in clean_outcome.value
     assert len(clean_outcome.value) < 4_096
-    assert _xtt_metadata(clean_outcome.value, "source_dataset_id") == source_dataset.id
+    assert int(_xtt_metadata(clean_outcome.value, "source_dataset_id")) == source_dataset.id
     operation_effects = _xtt_json_metadata(clean_outcome.value, "operation_effects")
     assert operation_effects[2] == {
         "operation": "missing.fill_median",
@@ -162,8 +162,8 @@ def test_clean_room_profile_and_whole_dataset_cleaning_workflow(
             "rows_removed": 1,
         }
     ]
-    derived_dataset_id = _xtt_metadata(clean_outcome.value, "dataset_id")
-    artifact_id = _xtt_metadata(clean_outcome.value, "artifact_id")
+    derived_dataset_id = int(_xtt_metadata(clean_outcome.value, "dataset_id"))
+    artifact_id = int(_xtt_metadata(clean_outcome.value, "artifact_id"))
     derived_dataset = datasets.get_dataset(derived_dataset_id)
     assert derived_dataset.derived_from_dataset_id == source_dataset.id
     assert [dataset.id for dataset in datasets.list_derived_datasets(source_dataset.id)] == [

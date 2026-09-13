@@ -140,7 +140,7 @@ class TextGroupedClassificationCase:
     def validate_input(self) -> str:
         return _validate_fixture_set(self.train_path, self.apply_path)
 
-    def build_submission(self, *, thread_id: str, fq_model_key: str) -> SubmitUserTurnInput:
+    def build_submission(self, *, thread_id: int, fq_model_key: str) -> SubmitUserTurnInput:
         return SubmitUserTurnInput(
             thread_id=thread_id,
             text=BUSINESS_PROMPT,
@@ -249,7 +249,7 @@ def _resolve_prediction_outcome(
 ) -> tuple[Any | None, pl.DataFrame | None]:
     apply_source_ids = _source_ids_for_digest(context, _EXPECTED_APPLY_SHA256)
     datasets = list(context.services.datasets.list_datasets())
-    by_id = {str(dataset.id): dataset for dataset in datasets}
+    by_id = {dataset.id: dataset for dataset in datasets}
     for dataset in datasets:
         if not _is_run_descendant(
             dataset,
@@ -493,9 +493,9 @@ def _source_ids_for_digest(context: BenchmarkCaseContext, digest: str) -> set[st
 
 def _is_run_descendant(
     dataset: Any,
-    by_id: dict[str, Any],
-    source_ids: set[str],
-    run_ids: frozenset[str],
+    by_id: dict[int, Any],
+    source_ids: set[int],
+    run_ids: frozenset[int],
 ) -> bool:
     if dataset.id not in run_ids:
         return False

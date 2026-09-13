@@ -72,7 +72,7 @@ class FeedbackKeywordFrequencyCase:
             raise BenchmarkInputError("fixture_hash_mismatch")
         return digest
 
-    def build_submission(self, *, thread_id: str, fq_model_key: str) -> SubmitUserTurnInput:
+    def build_submission(self, *, thread_id: int, fq_model_key: str) -> SubmitUserTurnInput:
         return SubmitUserTurnInput(
             thread_id=thread_id,
             text=(
@@ -136,7 +136,7 @@ class FeedbackKeywordFrequencyCase:
 
 def _resolve_outcome(context: BenchmarkCaseContext) -> tuple[Any | None, pl.DataFrame | None]:
     datasets = list(context.services.datasets.list_datasets())
-    by_id = {str(dataset.id): dataset for dataset in datasets}
+    by_id = {dataset.id: dataset for dataset in datasets}
     source_ids = _source_ids(context)
     for dataset in datasets:
         if not _is_run_descendant(dataset, by_id, source_ids, context.run_dataset_ids):
@@ -211,16 +211,16 @@ def _terminal_text(snapshot: Any | None) -> str:
     return str(getattr(messages[-1], "text", "") or "")
 
 
-def _source_ids(context: BenchmarkCaseContext) -> set[str]:
+def _source_ids(context: BenchmarkCaseContext) -> set[int]:
     state = context.source_state
     return set(state.source_dataset_ids) if isinstance(state, AttachedSourceState) else set()
 
 
 def _is_run_descendant(
     dataset: Any,
-    by_id: dict[str, Any],
-    source_ids: set[str],
-    run_ids: frozenset[str],
+    by_id: dict[int, Any],
+    source_ids: set[int],
+    run_ids: frozenset[int],
 ) -> bool:
     if dataset.id not in run_ids:
         return False

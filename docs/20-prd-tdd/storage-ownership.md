@@ -24,6 +24,7 @@ storage libraries are owned by source, migrations, configuration, and tests.
 
 ## Identity and Consistency
 
+- Xenix-owned business objects use persistent positive integer IDs allocated by one runtime-local SQLite sequence. Database rows, service inputs, Tool schemas and canonical JSON use those same integers; URI and display boundaries use decimal text. Published IDs are never reused within that runtime, and allocation may leave gaps. Provider identifiers, configuration keys and content hashes are not business-object IDs.
 - Dataset registrations reference service-owned tabular materializations.
 - A table with columns and zero rows is a valid Dataset, including a cleaning result that removed every row. Registration and export preserve its schema; operations that require samples enforce that requirement at execution.
 - Importing an attachment materializes one or more service-owned datasets and

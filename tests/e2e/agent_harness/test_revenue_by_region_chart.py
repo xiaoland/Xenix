@@ -160,7 +160,7 @@ class RevenueByRegionChartCase:
             raise BenchmarkInputError("fixture_hash_mismatch")
         return digest
 
-    def build_submission(self, *, thread_id: str, fq_model_key: str) -> SubmitUserTurnInput:
+    def build_submission(self, *, thread_id: int, fq_model_key: str) -> SubmitUserTurnInput:
         return SubmitUserTurnInput(
             thread_id=thread_id,
             text=REGIONAL_REVENUE_TASK_INTENT,
@@ -247,7 +247,7 @@ class RevenueByRegionChartCase:
             if not isinstance(payload, dict):
                 continue
             artifact_id = payload.get("artifact_id")
-            if not isinstance(artifact_id, str) or not artifact_id.strip():
+            if not isinstance(artifact_id, int):
                 continue
             try:
                 artifact = artifact_service.resolve_uri(build_artifact_uri(artifact_id))

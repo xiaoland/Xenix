@@ -1,6 +1,6 @@
 # Unit Design
 
-Local design routes: [Application composition, cleanup, and error reporting](application-composition.md), [Data cleaning](data-cleaning.md), and [Agent benchmark](agent-harness-benchmark.md). The remainder of this page owns LLM Conversation / Agent Harness seams.
+Local design routes: [Application composition, cleanup, and error reporting](application-composition.md), [Persistent object identity](persistent-identity.md), [Data cleaning](data-cleaning.md), and [Agent benchmark](agent-harness-benchmark.md). The remainder of this page owns LLM Conversation / Agent Harness seams.
 
 ## Admission
 

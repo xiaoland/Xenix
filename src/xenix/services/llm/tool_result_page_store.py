@@ -12,14 +12,13 @@ from __future__ import annotations
 import json
 import re
 import time
-import uuid
 from dataclasses import dataclass
 from pathlib import Path
 
 from ...exceptions import ValidationError
 
 
-_RESULT_ID_PATTERN = re.compile(r"^[0-9a-f]{32}$")
+_RESULT_ID_PATTERN = re.compile(r"^[1-9][0-9]*$")
 
 
 @dataclass(frozen=True)
@@ -39,11 +38,14 @@ class ToolResultPageStore:
     def save(
         self,
         *,
-        thread_id: str,
-        tool_call_message_id: str | None,
+        thread_id: int,
+        tool_call_message_id: int,
         text: str,
-    ) -> str:
-        result_id = uuid.uuid4().hex
+    ) -> int:
+        # One cached value belongs to one already-reserved canonical ToolCall.
+        # Reuse that durable identity instead of introducing another handle.
+        self._validate_result_id(tool_call_message_id)
+        result_id = tool_call_message_id
         (self._root_dir / f"{result_id}.txt").write_text(text, encoding="utf-8")
         (self._root_dir / f"{result_id}.meta.json").write_text(
             json.dumps(
@@ -59,7 +61,7 @@ class ToolResultPageStore:
 
     def read_page(
         self,
-        result_id: str,
+        result_id: int,
         *,
         offset: int,
         limit: int,
@@ -78,7 +80,7 @@ class ToolResultPageStore:
             has_more=end < total_chars,
         )
 
-    def delete_for_thread(self, thread_id: str) -> int:
+    def delete_for_thread(self, thread_id: int) -> int:
         removed = 0
         for meta_path in self._root_dir.glob("*.meta.json"):
             result_id = meta_path.name.removesuffix(".meta.json")
@@ -109,13 +111,13 @@ class ToolResultPageStore:
             removed += 1
         return removed
 
-    def _delete_pair(self, result_id: str) -> None:
+    def _delete_pair(self, result_id: int | str) -> None:
         (self._root_dir / f"{result_id}.txt").unlink(missing_ok=True)
         (self._root_dir / f"{result_id}.meta.json").unlink(missing_ok=True)
 
     @staticmethod
-    def _validate_result_id(result_id: str) -> None:
-        if not isinstance(result_id, str) or not _RESULT_ID_PATTERN.fullmatch(result_id):
+    def _validate_result_id(result_id: int) -> None:
+        if type(result_id) is not int or result_id < 1:
             raise ValidationError("Invalid paged result id.")
 
 

@@ -30,7 +30,7 @@ class KnowledgeUnitInput:
 
 @dataclass(frozen=True)
 class KnowledgeDocumentSummary:
-    document_id: str
+    document_id: int
     title: str
     source_format: str
     content_state: str
@@ -41,10 +41,10 @@ class KnowledgeDocumentSummary:
 @dataclass(frozen=True)
 class KnowledgeMatch:
     citation_id: str
-    document_id: str
-    document_generation_id: str
-    source_artifact_id: str | None
-    unit_id: str
+    document_id: int
+    document_generation_id: int
+    source_artifact_id: int | None
+    unit_id: int
     title: str
     locator: dict[str, Any]
     quote: str
@@ -58,10 +58,10 @@ class KnowledgeRetrievalResult:
 
 @dataclass(frozen=True)
 class KnowledgeSemanticCandidates:
-    unit_ids: tuple[str, ...]
+    unit_ids: tuple[int, ...]
     corpus_fingerprint: str
     profile_fingerprint: str
-    generation_id: str
+    generation_id: int
 
 
 class KnowledgeSemanticUnavailable(ValidationError):
@@ -169,7 +169,7 @@ class KnowledgeService:
         self,
         query: str,
         *,
-        document_ids: list[str] | None = None,
+        document_ids: list[int] | None = None,
         top_k: int = 5,
         library_id: str = "global",
     ) -> list[KnowledgeMatch]:
@@ -201,7 +201,7 @@ class KnowledgeService:
         query: str,
         *,
         mode: str = "auto",
-        document_ids: list[str] | None = None,
+        document_ids: list[int] | None = None,
         top_k: int = 5,
         library_id: str = "global",
     ) -> KnowledgeRetrievalResult:
@@ -305,9 +305,9 @@ class KnowledgeService:
         query: str,
         *,
         library_id: str,
-        document_ids: list[str],
+        document_ids: list[int],
         limit: int,
-    ) -> list[str]:
+    ) -> list[int]:
         with self._session_factory() as session:
             return self._repository.search_unit_ids(
                 session,
@@ -320,10 +320,10 @@ class KnowledgeService:
     def _matches_for_unit_ids(
         self,
         session,
-        unit_ids: list[str],
+        unit_ids: list[int],
         *,
         library_id: str,
-        document_ids: list[str],
+        document_ids: list[int],
         limit: int,
         excerpt_query: str,
     ) -> list[KnowledgeMatch]:
@@ -515,9 +515,9 @@ def _fts_query(value: str) -> str:
 def _validated_lookup(
     query: str,
     *,
-    document_ids: list[str] | None,
+    document_ids: list[int] | None,
     top_k: int,
-) -> tuple[str, list[str]]:
+) -> tuple[str, list[int]]:
     normalized_query = query.strip()
     if not normalized_query:
         raise ValidationError("Knowledge query is required.")
@@ -534,13 +534,13 @@ def _validated_lookup(
 
 
 def _reciprocal_rank_fusion(
-    keyword_ids: list[str],
-    semantic_ids: list[str],
+    keyword_ids: list[int],
+    semantic_ids: list[int],
     *,
     limit: int,
-) -> list[str]:
-    scores: dict[str, float] = {}
-    best_ranks: dict[str, int] = {}
+) -> list[int]:
+    scores: dict[int, float] = {}
+    best_ranks: dict[int, int] = {}
     for ranking in (keyword_ids, semantic_ids):
         for rank, unit_id in enumerate(dict.fromkeys(ranking), start=1):
             scores[unit_id] = scores.get(unit_id, 0.0) + 1.0 / (_HYBRID_RRF_K + rank)

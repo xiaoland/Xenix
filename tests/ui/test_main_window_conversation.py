@@ -49,9 +49,9 @@ class _ControlledExecutor:
 
 class _Harness:
     def __init__(self) -> None:
-        self.threads = [_thread("thread-a", "Thread A"), _thread("thread-b", "Thread B")]
+        self.threads = [_thread(102, "Thread A"), _thread(101, "Thread B")]
         self.snapshots = {
-            thread.id: _snapshot(thread.id, thread.title, [_text_event(f"{thread.id}:stable", "stable")])
+            thread.id: _snapshot(thread.id, thread.title, [_text_event(thread.id + 1000, "stable")])
             for thread in self.threads
         }
         self.pause_thread = Mock()
@@ -62,17 +62,17 @@ class _Harness:
         return self.threads
 
 
-def _thread(thread_id: str, title: str) -> SimpleNamespace:
+def _thread(thread_id: int, title: str) -> SimpleNamespace:
     return SimpleNamespace(id=thread_id, title=title, selected_fq_model_key=None)
 
 
-def _snapshot(thread_id: str, title: str, events: list[ChatbotEvent] | None = None) -> SimpleNamespace:
+def _snapshot(thread_id: int, title: str, events: list[ChatbotEvent] | None = None) -> SimpleNamespace:
     return SimpleNamespace(thread=_thread(thread_id, title), messages=[], events=events or [])
 
 
-def _text_event(event_id: str, text: str) -> ChatbotEvent:
+def _text_event(event_id: int, text: str) -> ChatbotEvent:
     return ChatbotEvent(
-        id=event_id,
+        id=str(event_id),
         kind=ChatbotEventKind.TEXT,
         author=ChatbotEventAuthor.ASSISTANT,
         status=ChatbotEventStatus.COMPLETED,
@@ -151,11 +151,11 @@ def test_acknowledged_failure_reloads_canonical_without_restoring_input(qtbot: Q
     attachment = tmp_path / "input.csv"
     _submit(view, "Committed", attachment)
     recorded = executor.submissions[0]
-    appended = _snapshot("thread-a", "Thread A", [_text_event("append", "Committed")])
+    appended = _snapshot(102, "Thread A", [_text_event(901, "Committed")])
     recorded.on_event(
         AgentHarnessStreamEvent(
             kind="snapshot",
-            thread_id="thread-a",
+            thread_id=102,
             client_submission_id=recorded.submission.client_submission_id,
             snapshot=appended,
         )
@@ -164,8 +164,8 @@ def test_acknowledged_failure_reloads_canonical_without_restoring_input(qtbot: Q
 
     assert view.composer.editor.toPlainText() == ""
     assert view.composer.attached_files == []
-    assert harness.get_thread_snapshot.call_args.args == ("thread-a",)
-    assert "thread-a:stable" in view.timeline.message_bubbles_by_id
+    assert harness.get_thread_snapshot.call_args.args == (102,)
+    assert 1102 in view.timeline.message_bubbles_by_id
     assert "append" not in view.timeline.message_bubbles_by_id
     assert window.conversation_idle
 
@@ -178,8 +178,8 @@ def test_history_switch_clears_preparing_turn_and_old_callbacks_cannot_mutate_ne
     _submit(view, "Old turn")
     old = executor.submissions[0]
 
-    window._history_panel.open_thread("thread-b")
-    assert window.conversation_thread_id == "thread-b"
+    window._history_panel.open_thread(101)
+    assert window.conversation_thread_id == 101
     assert window.conversation_idle
     assert view.composer.editor.isEnabled()
 
@@ -189,19 +189,19 @@ def test_history_switch_clears_preparing_turn_and_old_callbacks_cannot_mutate_ne
     old.on_event(
         AgentHarnessStreamEvent(
             kind="snapshot",
-            thread_id="thread-a",
+            thread_id=102,
             client_submission_id=old.submission.client_submission_id,
-            snapshot=_snapshot("thread-a", "Thread A", [_text_event("old", "OLD")]),
+            snapshot=_snapshot(102, "Thread A", [_text_event(902, "OLD")]),
             is_final=True,
         )
     )
     old.on_failure(old.submission.client_submission_id, RuntimeError("old failure"))
 
-    assert window.conversation_thread_id == "thread-b"
+    assert window.conversation_thread_id == 101
     assert len(executor.submissions) == 2
     assert not window.conversation_idle
     assert view.composer.editor.toPlainText() == "New turn"
-    assert new.submission.thread_id == "thread-b"
+    assert new.submission.thread_id == 101
     assert harness.get_thread_snapshot.call_count == 0
 
 
@@ -211,11 +211,11 @@ def test_stop_ignores_live_callbacks_but_final_snapshot_unlocks_composer(qtbot: 
     _submit(view, "Stop after append")
     recorded = executor.submissions[0]
     submission_id = recorded.submission.client_submission_id
-    appended = _snapshot("thread-a", "Thread A", [_text_event("append", "Stop after append")])
+    appended = _snapshot(102, "Thread A", [_text_event(901, "Stop after append")])
     recorded.on_event(
         AgentHarnessStreamEvent(
             kind="snapshot",
-            thread_id="thread-a",
+            thread_id=102,
             client_submission_id=submission_id,
             snapshot=appended,
         )
@@ -223,25 +223,25 @@ def test_stop_ignores_live_callbacks_but_final_snapshot_unlocks_composer(qtbot: 
     recorded.on_event(
         AgentHarnessStreamEvent(
             kind="thinking",
-            thread_id="thread-a",
+            thread_id=102,
             client_submission_id=submission_id,
-            pending_message_id="pending",
+            pending_message_id=103,
             chatbot_event=build_thinking_chatbot_event(
-                pending_message_id="pending",
+                pending_message_id=103,
                 status=ChatbotEventStatus.IN_PROGRESS,
             ),
         )
     )
     view.stop_requested.emit()
-    harness.pause_thread.assert_called_once_with("thread-a")
+    harness.pause_thread.assert_called_once_with(102)
     recorded.on_event(
         AgentHarnessStreamEvent(
             kind="thinking",
-            thread_id="thread-a",
+            thread_id=102,
             client_submission_id=submission_id,
-            pending_message_id="pending",
+            pending_message_id=103,
             chatbot_event=build_thinking_chatbot_event(
-                pending_message_id="pending",
+                pending_message_id=103,
                 status=ChatbotEventStatus.IN_PROGRESS,
             ),
         )
@@ -251,16 +251,16 @@ def test_stop_ignores_live_callbacks_but_final_snapshot_unlocks_composer(qtbot: 
     recorded.on_event(
         AgentHarnessStreamEvent(
             kind="snapshot",
-            thread_id="thread-a",
+            thread_id=102,
             client_submission_id=submission_id,
-            snapshot=_snapshot("thread-a", "Thread A", [_text_event("final", "Final")]),
+            snapshot=_snapshot(102, "Thread A", [_text_event(903, "Final")]),
             is_final=True,
         )
     )
     assert window.conversation_idle
     assert view.composer.editor.isEnabled()
     assert not view.composer.running
-    assert "final" in view.timeline.message_bubbles_by_id
+    assert 903 in view.timeline.message_bubbles_by_id
 
 
 def test_ack_then_direct_final_snapshot_unlocks_composer(qtbot: QtBot, ui_artifacts, tmp_path) -> None:
@@ -272,17 +272,17 @@ def test_ack_then_direct_final_snapshot_unlocks_composer(qtbot: QtBot, ui_artifa
     recorded.on_event(
         AgentHarnessStreamEvent(
             kind="snapshot",
-            thread_id="thread-a",
+            thread_id=102,
             client_submission_id=submission_id,
-            snapshot=_snapshot("thread-a", "Thread A", [_text_event("append", "No live event")]),
+            snapshot=_snapshot(102, "Thread A", [_text_event(901, "No live event")]),
         )
     )
     recorded.on_event(
         AgentHarnessStreamEvent(
             kind="snapshot",
-            thread_id="thread-a",
+            thread_id=102,
             client_submission_id=submission_id,
-            snapshot=_snapshot("thread-a", "Thread A", [_text_event("final", "Done")]),
+            snapshot=_snapshot(102, "Thread A", [_text_event(903, "Done")]),
             is_final=True,
         )
     )
@@ -302,9 +302,9 @@ def test_close_shuts_executor_and_late_callbacks_do_not_change_view(qtbot: QtBot
     recorded.on_event(
         AgentHarnessStreamEvent(
             kind="snapshot",
-            thread_id="thread-a",
+            thread_id=102,
             client_submission_id=recorded.submission.client_submission_id,
-            snapshot=_snapshot("thread-a", "Thread A", [_text_event("late", "late")]),
+            snapshot=_snapshot(102, "Thread A", [_text_event(904, "late")]),
             is_final=True,
         )
     )

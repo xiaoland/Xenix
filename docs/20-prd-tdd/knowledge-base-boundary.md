@@ -99,12 +99,7 @@ canonical-ready generation
   current retrieval pointer and re-derives from canonical content; persisted legacy
   Units do not become searchable merely because their rows still exist. Status and
   corpus compatibility use this bounded metadata instead of reading every Unit body.
-- Unit identity is derived deterministically from document, canonical generation,
-  projection version, and ordinal. One repository snapshot reads current projection
-  metadata and ordered Unit DTOs from the same SQLite view and validates their
-  implied identities/counts. Vector build embeds only that frozen snapshot and
-  rechecks the same identity before publication and before the observable task can
-  succeed.
+- Units have persistent integer identities allocated by SQLite. Corpus fingerprints combine document projection metadata with ordered Unit IDs; status reads those IDs without loading text bodies. One repository snapshot reads metadata and ordered Unit DTOs from the same SQLite view. Vector build embeds that frozen snapshot and rechecks its identity before publication and before the observable task can succeed.
 - For retrieval-ready documents, keyword lookup is the minimum baseline. Semantic
   and hybrid lookup are compatible derived projections; absence of embeddings must
   not disable an available keyword projection or cause an explicit semantic/hybrid

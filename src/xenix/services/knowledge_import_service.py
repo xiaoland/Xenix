@@ -47,6 +47,7 @@ from .knowledge_pipeline import (
 )
 from .knowledge_task_logs import KnowledgeTaskLogEntry, KnowledgeTaskLogStore
 from .storage.layout import knowledge_root
+from .storage.identity import reserve_ids
 from .storage.models import (
     ArtifactKind,
     ArtifactRow,
@@ -54,7 +55,6 @@ from .storage.models import (
     KnowledgeCanonicalGenerationRow,
     KnowledgeDocumentRow,
     KnowledgeImportRow,
-    generate_id,
     utc_now,
 )
 from .storage.repositories import KnowledgeRepository
@@ -130,33 +130,33 @@ _SAFE_IMPORT_ERRORS = {
 
 @dataclass(frozen=True)
 class KnowledgeImportReceipt:
-    import_id: str
+    import_id: int
     status: str
     reused_existing: bool
 
 
 @dataclass(frozen=True)
 class KnowledgeImportResult:
-    import_id: str
-    document_id: str
-    source_artifact_id: str | None
+    import_id: int
+    document_id: int
+    source_artifact_id: int | None
     source_sha256: str
     canonical_path: str | None
-    canonical_generation_id: str | None
+    canonical_generation_id: int | None
     canonical_ready: bool
     reused_existing: bool
 
 
 @dataclass(frozen=True)
 class KnowledgeImportView:
-    import_id: str
+    import_id: int
     file_name: str
     source_format: str
     status: str
     phase: str
     attempt_number: int
-    document_id: str | None
-    canonical_generation_id: str | None
+    document_id: int | None
+    canonical_generation_id: int | None
     reused_existing: bool
     error_code: str | None
     error_summary: str | None
@@ -175,7 +175,7 @@ class KnowledgeImportService:
         artifact_service: ArtifactService,
         knowledge_repository: KnowledgeRepository,
         worker_runner: KnowledgeImportWorkerRunner | None = None,
-        canonical_ready_notifier: Callable[[str, str, str | None], object] | None = None,
+        canonical_ready_notifier: Callable[[int, int, int | None], object] | None = None,
         corpus_changed_notifier: Callable[[str], object] | None = None,
         start_worker: bool = True,
         scheduler: JobScheduler | None = None,
@@ -194,7 +194,7 @@ class KnowledgeImportService:
         self._queue: queue.Queue[str | object] = queue.Queue()
         self._passwords: dict[str, str] = {}
         self._password_lock = threading.Lock()
-        self._source_paths: dict[str, Path] = {}
+        self._source_paths: dict[int, Path] = {}
         self._source_path_lock = threading.Lock()
         self._mutation_lock = threading.RLock()
         self._stop = threading.Event()
@@ -228,8 +228,8 @@ class KnowledgeImportService:
                 "Knowledge source size is outside the supported range.",
                 error_code="knowledge_source_size_unsupported",
             )
-        import_id = generate_id()
-        planned_document_id = generate_id()
+        import_id = reserve_ids(self._session_factory)[0]
+        planned_document_id = reserve_ids(self._session_factory)[0]
         with self._session_factory() as session:
             row = KnowledgeImportRow(
                 id=import_id,
@@ -264,7 +264,7 @@ class KnowledgeImportService:
 
     def wait_for_import(
         self,
-        import_id: str,
+        import_id: int,
         *,
         timeout: float = 900.0,
     ) -> KnowledgeImportResult:
@@ -278,7 +278,7 @@ class KnowledgeImportService:
 
     def retry_import(
         self,
-        import_id: str,
+        import_id: int,
         *,
         password: str | None = None,
         source_path: Path | None = None,
@@ -378,7 +378,7 @@ class KnowledgeImportService:
         self._submit(row.id)
         return KnowledgeImportReceipt(row.id, row.status, False)
 
-    def cancel_import(self, import_id: str) -> bool:
+    def cancel_import(self, import_id: int) -> bool:
         with self._session_factory() as session:
             row = self._knowledge_repo.get_import(session, import_id)
             if row is None or row.status in _TERMINAL_IMPORT_STATUSES:
@@ -423,7 +423,7 @@ class KnowledgeImportService:
             for row in rows
         ]
 
-    def read_import_logs(self, import_id: str) -> tuple[KnowledgeTaskLogEntry, ...]:
+    def read_import_logs(self, import_id: int) -> tuple[KnowledgeTaskLogEntry, ...]:
         return self._task_logs.read(import_id)
 
     def shutdown(self, *, timeout: float = 15.0) -> None:
@@ -444,7 +444,7 @@ class KnowledgeImportService:
             try:
                 if item is _STOP:
                     return
-                assert isinstance(item, str)
+                assert isinstance(item, int)
                 try:
                     self._process_import(item)
                 except Exception as exc:
@@ -454,18 +454,18 @@ class KnowledgeImportService:
                     )
                     self._record_failure(item, exc)
             finally:
-                if isinstance(item, str):
+                if isinstance(item, int):
                     self._store.discard_staged_canonical_bundle(item)
                 self._queue.task_done()
 
-    def _process_import(self, import_id: str) -> None:
+    def _process_import(self, import_id: int) -> None:
         password = self._take_password(import_id)
         prepared = self._prepare_source_snapshot(import_id)
         if prepared is None:
             return
         source_path, probe, identity_values = prepared
         self._raise_if_cancelled(import_id)
-        generation_id = generate_id()
+        generation_id = reserve_ids(self._session_factory)[0]
         identity = CanonicalIdentity(
             **identity_values,
             canonical_generation_id=generation_id,
@@ -602,10 +602,10 @@ class KnowledgeImportService:
                     )
                     return
                 document = KnowledgeDocumentRow(
-                    id=str(identity_values["document_id"]),
+                    id=identity_values["document_id"],
                     library_id=str(identity_values["library_id"]),
                     title=Path(str(identity_values["display_name"])).stem,
-                    source_artifact_id=str(identity_values["source_artifact_id"]),
+                    source_artifact_id=identity_values["source_artifact_id"],
                     source_sha256=str(identity_values["source_sha256"]),
                     source_format=str(identity_values["source_format"]),
                     canonical_path=None,
@@ -663,7 +663,7 @@ class KnowledgeImportService:
 
     def _prepare_source_snapshot(
         self,
-        import_id: str,
+        import_id: int,
     ) -> tuple[Path, FileProbeResult, dict[str, Any]] | None:
         self._advance(import_id, status="running", phase="snapshot")
         self._log_event(
@@ -814,7 +814,7 @@ class KnowledgeImportService:
             raise ValidationError("Knowledge import identity is incomplete.")
         return source_path, probe, identity_values
 
-    def _completed_result(self, import_id: str) -> KnowledgeImportResult | None:
+    def _completed_result(self, import_id: int) -> KnowledgeImportResult | None:
         with self._session_factory() as session:
             row = self._knowledge_repo.get_import(session, import_id)
             if row is None:
@@ -850,13 +850,13 @@ class KnowledgeImportService:
                 reused_existing=row.reused_existing,
             )
 
-    def _submit(self, import_id: str) -> None:
+    def _submit(self, import_id: int) -> None:
         if self._scheduler is not None:
             self._scheduler.enqueue(JobDomain.KNOWLEDGE, "import", import_id)
         elif not self._stop.is_set():
             self._queue.put(import_id)
 
-    def run_import(self, import_id: str) -> None:
+    def run_import(self, import_id: int) -> None:
         try:
             self._process_import(import_id)
         except Exception as exc:
@@ -868,20 +868,20 @@ class KnowledgeImportService:
         finally:
             self._store.discard_staged_canonical_bundle(import_id)
 
-    def run_unit(self, import_id: str) -> None:
+    def run_unit(self, import_id: int) -> None:
         self.run_import(import_id)
 
-    def job_outcome(self, import_id: str) -> tuple[str, str | None]:
+    def job_outcome(self, import_id: int) -> tuple[str, str | None]:
         with self._session_factory() as session:
             row = self._knowledge_repo.get_import(session, import_id)
             if row is None:
                 return ("failed", "Knowledge import is missing.")
             return (row.status, row.error_summary)
 
-    def cancel_unit(self, import_id: str) -> None:
+    def cancel_unit(self, import_id: int) -> None:
         self.cancel_import(import_id)
 
-    def recover_pending(self) -> list[str]:
+    def recover_pending(self) -> list[int]:
         pending: list[str] = []
         with self._session_factory() as session:
             rows = self._knowledge_repo.list_imports_by_status(
@@ -974,7 +974,7 @@ class KnowledgeImportService:
                 },
             )
 
-    def _advance(self, import_id: str, *, status: str, phase: str) -> None:
+    def _advance(self, import_id: int, *, status: str, phase: str) -> None:
         with self._session_factory() as session:
             row = self._knowledge_repo.get_import(session, import_id)
             if row is None or row.status == "cancelled":
@@ -987,7 +987,7 @@ class KnowledgeImportService:
 
     def _handle_worker_event(
         self,
-        import_id: str,
+        import_id: int,
         event: KnowledgeImportWorkerEvent,
     ) -> None:
         if event.phase in {
@@ -1007,7 +1007,7 @@ class KnowledgeImportService:
 
     def _log_event(
         self,
-        import_id: str,
+        import_id: int,
         *,
         phase: str,
         event_code: str,
@@ -1027,7 +1027,7 @@ class KnowledgeImportService:
                 extra={"event_name": "knowledge.import.task_log_failed"},
             )
 
-    def _cancel_requested(self, import_id: str) -> bool:
+    def _cancel_requested(self, import_id: int) -> bool:
         with self._session_factory() as session:
             row = self._knowledge_repo.get_import(session, import_id)
             return bool(
@@ -1036,7 +1036,7 @@ class KnowledgeImportService:
                 or row.status == "cancelled"
             )
 
-    def _mark_import_cancelled(self, import_id: str) -> None:
+    def _mark_import_cancelled(self, import_id: int) -> None:
         with self._session_factory() as session:
             row = self._knowledge_repo.get_import(session, import_id)
             if row is None or row.status in {
@@ -1053,7 +1053,7 @@ class KnowledgeImportService:
             level="warning",
         )
 
-    def _raise_if_cancelled(self, import_id: str) -> None:
+    def _raise_if_cancelled(self, import_id: int) -> None:
         with self._session_factory() as session:
             row = self._knowledge_repo.get_import(session, import_id)
             if row is not None and row.cancel_requested:
@@ -1070,7 +1070,7 @@ class KnowledgeImportService:
         self._knowledge_repo.save_import(session, row)
         session.commit()
 
-    def _record_failure(self, import_id: str, exc: Exception) -> None:
+    def _record_failure(self, import_id: int, exc: Exception) -> None:
         if isinstance(exc, _ImportCancelled):
             return
         code = getattr(exc, "error_code", None)
@@ -1105,7 +1105,7 @@ class KnowledgeImportService:
             level="warning" if needs_attention else "error",
         )
 
-    def _converge_duplicate(self, import_id: str) -> None:
+    def _converge_duplicate(self, import_id: int) -> None:
         with self._session_factory() as session:
             row = self._knowledge_repo.get_import(session, import_id)
             if row is None or not row.source_sha256:
@@ -1142,8 +1142,8 @@ class KnowledgeImportService:
         self,
         session,
         *,
-        planned_document_id: str,
-        excluding_import_id: str | None = None,
+        planned_document_id: int,
+        excluding_import_id: int | None = None,
     ) -> int:
         return self._knowledge_repo.max_attempt_number(
             session,
@@ -1151,20 +1151,20 @@ class KnowledgeImportService:
             excluding_import_id=excluding_import_id,
         ) + 1
 
-    def _remember_password(self, import_id: str, password: str | None) -> None:
+    def _remember_password(self, import_id: int, password: str | None) -> None:
         if password:
             with self._password_lock:
                 self._passwords[import_id] = password
 
-    def _take_password(self, import_id: str) -> str | None:
+    def _take_password(self, import_id: int) -> str | None:
         with self._password_lock:
             return self._passwords.pop(import_id, None)
 
-    def _remember_source_path(self, import_id: str, source_path: Path) -> None:
+    def _remember_source_path(self, import_id: int, source_path: Path) -> None:
         with self._source_path_lock:
             self._source_paths[import_id] = source_path
 
-    def _take_source_path(self, import_id: str) -> Path | None:
+    def _take_source_path(self, import_id: int) -> Path | None:
         with self._source_path_lock:
             return self._source_paths.pop(import_id, None)
 

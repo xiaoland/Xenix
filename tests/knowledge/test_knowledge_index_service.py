@@ -33,7 +33,7 @@ class _BlockingSemantic:
         if not self.rebuild_release.wait(timeout=3):
             raise TimeoutError("Knowledge index rebuild test release timed out.")
         return SimpleNamespace(
-            id="generation-1",
+            id=101,
             profile_fingerprint="profile-1",
             corpus_fingerprint="corpus-1",
         )
@@ -45,7 +45,7 @@ class _BlockingSemantic:
             configured=True,
             unit_count=0,
             ready=True,
-            generation_id="generation-1",
+            generation_id=101,
         )
 
 

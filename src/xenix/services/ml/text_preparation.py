@@ -94,7 +94,7 @@ class _StrictFact(BaseModel):
 
 
 class TextResourceReference(_StrictFact):
-    dataset_id: str = Field(min_length=1, max_length=128)
+    dataset_id: int = Field(ge=1)
     source_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     term_count: int = Field(ge=0, le=_MAX_RESOURCE_TERMS)
 

@@ -28,13 +28,13 @@ from ...observability import (
     LLMUsageObservation,
     NullLLMUsageObservability,
 )
+from ..storage.identity import reserve_ids
 from ..storage.models import (
     ConversationMessageKind,
     ConversationMessageRow,
     ConversationThreadRow,
     ConversationToolResultStatus,
     default_agent_thread_system_prompt,
-    generate_id,
 )
 from ..storage.repositories import ConversationRepository
 from .conversation_models import (
@@ -107,12 +107,12 @@ class LLMConversationService(TitleGenerationMixin):
         self._usage_observability = usage_observability or NullLLMUsageObservability()
         self._repository = ConversationRepository()
         self._gates_lock = threading.Lock()
-        self._thread_gates: dict[str, threading.RLock] = {}
-        self._claims: set[tuple[str, str]] = set()
+        self._thread_gates: dict[int, threading.RLock] = {}
+        self._claims: set[tuple[int, str]] = set()
         self._claims_lock = threading.Lock()
-        self._pending: dict[str, _PendingExchange] = {}
+        self._pending: dict[int, _PendingExchange] = {}
         self._pending_lock = threading.RLock()
-        self._thread_controls: dict[str, _ThreadControl] = {}
+        self._thread_controls: dict[int, _ThreadControl] = {}
 
     @property
     def tool_registry(self) -> AgentToolRegistry:
@@ -151,7 +151,7 @@ class LLMConversationService(TitleGenerationMixin):
         with self._session_factory() as session:
             return self._repository.list_threads(session)
 
-    def get_thread_snapshot(self, thread_id: str) -> ConversationSnapshot:
+    def get_thread_snapshot(self, thread_id: int) -> ConversationSnapshot:
         with self._session_factory() as session:
             thread = self._repository.get_thread(session, thread_id)
             if thread is None:
@@ -190,7 +190,7 @@ class LLMConversationService(TitleGenerationMixin):
             if (aggregate := aggregates.get(root.id)) is not None and aggregate.request_count > 0
         )
 
-    def rename_thread(self, thread_id: str, title: str | None) -> ConversationSnapshot:
+    def rename_thread(self, thread_id: int, title: str | None) -> ConversationSnapshot:
         with self._gate(thread_id):
             with self._session_factory() as session:
                 row = self._repository.rename_thread(session, thread_id, title.strip() if title else None, _utc_now())
@@ -199,7 +199,7 @@ class LLMConversationService(TitleGenerationMixin):
                 session.commit()
             return self.get_thread_snapshot(thread_id)
 
-    def set_thread_model(self, thread_id: str, fq_model_key: str) -> ConversationSnapshot:
+    def set_thread_model(self, thread_id: int, fq_model_key: str) -> ConversationSnapshot:
         selected = self.validate_fq_model_key(fq_model_key)
         with self._gate(thread_id):
             with self._session_factory() as session:
@@ -214,7 +214,7 @@ class LLMConversationService(TitleGenerationMixin):
                 session.commit()
             return self.get_thread_snapshot(thread_id)
 
-    def delete_thread(self, thread_id: str) -> None:
+    def delete_thread(self, thread_id: int) -> None:
         with self._pending_lock:
             with self._gate(thread_id):
                 with self._session_factory() as session:
@@ -226,7 +226,7 @@ class LLMConversationService(TitleGenerationMixin):
                     session.commit()
                 self._thread_controls.pop(thread_id, None)
 
-    def pause_thread(self, thread_id: str) -> None:
+    def pause_thread(self, thread_id: int) -> None:
         """Pause new LLM provider sends for one Thread in this process only."""
 
         with self._pending_lock:
@@ -238,7 +238,7 @@ class LLMConversationService(TitleGenerationMixin):
                 if not control.paused:
                     control.paused = True
 
-    def is_thread_paused(self, thread_id: str) -> bool:
+    def is_thread_paused(self, thread_id: int) -> bool:
         """Return only runtime pause state; it is intentionally not durable."""
 
         with self._pending_lock:
@@ -247,15 +247,15 @@ class LLMConversationService(TitleGenerationMixin):
     def claim_user_submission(
         self,
         *,
-        thread_id: str | None,
-        expected_frontier_id: str | None,
+        thread_id: int | None,
+        expected_frontier_id: int | None,
         client_submission_id: str,
     ) -> SubmissionClaim:
         normalized_id = client_submission_id.strip()
         if not normalized_id:
             raise ValidationError("Client submission ID cannot be empty.")
         if thread_id is None:
-            return SubmissionClaim(thread_id="", expected_frontier_id=None, client_submission_id=normalized_id)
+            return SubmissionClaim(thread_id=None, expected_frontier_id=None, client_submission_id=normalized_id)
         with self._pending_lock:
             with self._gate(thread_id):
                 snapshot = self.get_thread_snapshot(thread_id)
@@ -297,7 +297,7 @@ class LLMConversationService(TitleGenerationMixin):
         self,
         input_data: AppendUserMessageInput,
         *,
-        expected_frontier_id: str | None = None,
+        expected_frontier_id: int | None = None,
     ) -> ConversationSnapshot:
         client_submission_id = input_data.client_submission_id.strip()
         if not client_submission_id:
@@ -350,8 +350,8 @@ class LLMConversationService(TitleGenerationMixin):
     def sample_existing_frontier(
         self,
         *,
-        thread_id: str,
-        expected_frontier_id: str,
+        thread_id: int,
+        expected_frontier_id: int,
         tool_scope: ToolScope | None = None,
         fq_model_key: str | None = None,
         provider: AgentProvider | None = None,
@@ -372,8 +372,8 @@ class LLMConversationService(TitleGenerationMixin):
     def begin_sampling(
         self,
         *,
-        thread_id: str,
-        expected_frontier_id: str,
+        thread_id: int,
+        expected_frontier_id: int,
         tool_scope: ToolScope | None = None,
     ) -> PendingSampling:
         """Persist the pre-I/O placeholder and grant a live sampling capability."""
@@ -387,7 +387,7 @@ class LLMConversationService(TitleGenerationMixin):
     def complete_pending_sampling(
         self,
         *,
-        pending_message_id: str,
+        pending_message_id: int,
         provider: AgentProvider | None = None,
         fq_model_key: str | None = None,
         retry_callback: Callable[[LLMRetryEvent], None] | None = None,
@@ -421,8 +421,8 @@ class LLMConversationService(TitleGenerationMixin):
     def sample_existing_frontier_stream(
         self,
         *,
-        thread_id: str,
-        expected_frontier_id: str,
+        thread_id: int,
+        expected_frontier_id: int,
         tool_scope: ToolScope | None = None,
         fq_model_key: str | None = None,
     ) -> Iterator[ConversationLiveEvent | PendingSampling]:
@@ -469,14 +469,14 @@ class LLMConversationService(TitleGenerationMixin):
             if not handed_off:
                 self.cancel_sampling(pending.pending_message_id)
 
-    def list_staged_tool_calls(self, pending_message_id: str) -> tuple[StagedToolCall, ...]:
+    def list_staged_tool_calls(self, pending_message_id: int) -> tuple[StagedToolCall, ...]:
         with self._pending_lock:
             exchange = self._pending.get(pending_message_id)
             if exchange is None or exchange.cancelled:
                 raise ValidationError("The pending LLM exchange is no longer current.")
             return tuple(exchange.calls.values())
 
-    def finalize_pending_assistant(self, pending_message_id: str) -> ConversationSnapshot:
+    def finalize_pending_assistant(self, pending_message_id: int) -> ConversationSnapshot:
         with self._pending_lock:
             exchange = self._current_exchange(pending_message_id)
             if exchange.calls:
@@ -490,8 +490,8 @@ class LLMConversationService(TitleGenerationMixin):
     def invoke_staged_tool(
         self,
         *,
-        pending_message_id: str,
-        staged_call_message_id: str,
+        pending_message_id: int,
+        staged_call_message_id: int,
         cancel_requested: Callable[[], bool] | None = None,
     ) -> ConversationSnapshot | None:
         cancel_requested = cancel_requested or (lambda: False)
@@ -565,7 +565,7 @@ class LLMConversationService(TitleGenerationMixin):
             raise
         return self._finalize_exchange(pending_message_id)
 
-    def cancel_sampling(self, pending_message_id: str) -> None:
+    def cancel_sampling(self, pending_message_id: int) -> None:
         with self._pending_lock:
             exchange = self._pending.get(pending_message_id)
             if exchange is None:
@@ -594,8 +594,8 @@ class LLMConversationService(TitleGenerationMixin):
     def _begin_sampling(
         self,
         *,
-        thread_id: str,
-        expected_frontier_id: str,
+        thread_id: int,
+        expected_frontier_id: int,
         tool_scope: ToolScope,
     ) -> PendingSampling:
         # Tool definitions are part of the pre-I/O sampling capability.  Fully
@@ -652,7 +652,7 @@ class LLMConversationService(TitleGenerationMixin):
 
     def _stage_provider_response(
         self,
-        pending_message_id: str,
+        pending_message_id: int,
         response: ProviderResponse,
         *,
         fq_model_key: str | None,
@@ -674,14 +674,14 @@ class LLMConversationService(TitleGenerationMixin):
 
     def _stage_provider_output(
         self,
-        pending_message_id: str,
+        pending_message_id: int,
         output_items: list[ProviderOutputItem],
     ) -> PendingSampling:
         if not output_items:
             raise ValidationError("LLM output is empty.")
         with self._pending_lock:
             exchange = self._current_exchange(pending_message_id)
-            calls: dict[str, StagedToolCall] = {}
+            calls: dict[int, StagedToolCall] = {}
             assistant_seen = False
             for item in output_items:
                 if isinstance(item, AssistantOutputItem):
@@ -693,7 +693,7 @@ class LLMConversationService(TitleGenerationMixin):
                     raise ValidationError("LLM output item is unsupported.")
                 # Validate at invocation so invalid model arguments become a
                 # ToolResult the model can repair, rather than aborting sampling.
-                call_id = generate_id()
+                call_id = reserve_ids(self._session_factory)[0]
                 calls[call_id] = StagedToolCall(
                     pending_message_id=pending_message_id,
                     staged_call_id=call_id,
@@ -712,7 +712,7 @@ class LLMConversationService(TitleGenerationMixin):
                 has_assistant_output=assistant_seen,
             )
 
-    def _finalize_exchange(self, pending_message_id: str) -> ConversationSnapshot:
+    def _finalize_exchange(self, pending_message_id: int) -> ConversationSnapshot:
         with self._pending_lock:
             exchange = self._current_exchange(pending_message_id)
             if exchange.calls and len(exchange.calls) != len(exchange.results):
@@ -932,7 +932,7 @@ class LLMConversationService(TitleGenerationMixin):
     def _primary_usage_observation(
         self,
         *,
-        pending_message_id: str,
+        pending_message_id: int,
         usage_payload: dict[str, Any] | None,
         fq_model_key: str | None,
     ) -> LLMUsageObservation | None:
@@ -957,7 +957,7 @@ class LLMConversationService(TitleGenerationMixin):
         self,
         *,
         operation: str,
-        thread_id: str,
+        thread_id: int,
         usage_payload: dict[str, Any] | None,
         fq_model_key: str | None,
     ) -> None:
@@ -1049,7 +1049,7 @@ class LLMConversationService(TitleGenerationMixin):
     @staticmethod
     def _validate_user_append_messages(
         messages: list[ConversationMessageRow],
-        expected_frontier_id: str | None,
+        expected_frontier_id: int | None,
         *,
         allow_paused_frontier: bool = False,
     ) -> None:
@@ -1075,7 +1075,7 @@ class LLMConversationService(TitleGenerationMixin):
         }:
             raise ValidationError("The existing Client frontier must be sampled before another User Message.")
 
-    def _admit_provider_request(self, pending_message_id: str) -> None:
+    def _admit_provider_request(self, pending_message_id: int) -> None:
         """Linearize one provider attempt against the runtime Thread pause."""
 
         with self._pending_lock:
@@ -1085,7 +1085,7 @@ class LLMConversationService(TitleGenerationMixin):
                     self._discard_pending_locked(exchange.thread_id, expected_pending_id=pending_message_id)
                     raise ThreadPausedError(exchange.thread_id)
 
-    def _accept_provider_response(self, pending_message_id: str) -> None:
+    def _accept_provider_response(self, pending_message_id: int) -> None:
         """Discard a response that returned after a Thread pause won."""
 
         with self._pending_lock:
@@ -1095,7 +1095,7 @@ class LLMConversationService(TitleGenerationMixin):
                     self._discard_pending_locked(exchange.thread_id, expected_pending_id=pending_message_id)
                     raise ThreadPausedError(exchange.thread_id)
 
-    def _accept_auxiliary_provider_response(self, thread_id: str) -> None:
+    def _accept_auxiliary_provider_response(self, thread_id: int) -> None:
         """Reject metadata-provider output returned after a Thread pause."""
 
         with self._pending_lock:
@@ -1103,7 +1103,7 @@ class LLMConversationService(TitleGenerationMixin):
                 if self._thread_control_locked(thread_id).paused:
                     raise ThreadPausedError(thread_id)
 
-    def _admit_auxiliary_provider_request(self, thread_id: str) -> None:
+    def _admit_auxiliary_provider_request(self, thread_id: int) -> None:
         """Give metadata LLM work the same Thread-pause admission rule."""
 
         with self._pending_lock:
@@ -1114,12 +1114,12 @@ class LLMConversationService(TitleGenerationMixin):
     def _exchange_is_paused_locked(self, exchange: _PendingExchange) -> bool:
         return self._thread_control_locked(exchange.thread_id).paused
 
-    def _thread_control_locked(self, thread_id: str) -> _ThreadControl:
+    def _thread_control_locked(self, thread_id: int) -> _ThreadControl:
         """Return a Thread control while ``_pending_lock`` is held."""
 
         return self._thread_controls.setdefault(thread_id, _ThreadControl())
 
-    def _discard_pending_locked(self, thread_id: str, expected_pending_id: str | None) -> None:
+    def _discard_pending_locked(self, thread_id: int, expected_pending_id: int | None) -> None:
         matching_ids = {
             pending_id
             for pending_id, exchange in self._pending.items()
@@ -1150,18 +1150,18 @@ class LLMConversationService(TitleGenerationMixin):
                     if exchange is not None:
                         exchange.cancelled = True
 
-    def _current_exchange(self, pending_message_id: str) -> _PendingExchange:
+    def _current_exchange(self, pending_message_id: int) -> _PendingExchange:
         exchange = self._pending.get(pending_message_id)
         if exchange is None or exchange.cancelled:
             raise ValidationError("The pending LLM exchange is no longer current.")
         return exchange
 
-    def _gate_for(self, thread_id: str) -> threading.RLock:
+    def _gate_for(self, thread_id: int) -> threading.RLock:
         with self._gates_lock:
             return self._thread_gates.setdefault(thread_id, threading.RLock())
 
     @contextmanager
-    def _gate(self, thread_id: str):
+    def _gate(self, thread_id: int):
         gate = self._gate_for(thread_id)
         with gate:
             yield

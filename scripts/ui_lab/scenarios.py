@@ -26,7 +26,7 @@ def build_chat_mixed_timeline(_context: ScenarioContext) -> ScenarioHandle:
                 sequence_index=0,
                 author=ChatbotEventAuthor.USER,
                 content_blocks=[{"type": "text", "text": "Compare quarterly sales by region."}],
-                source_message_ids=["message:user:001"],
+                source_message_ids=[1],
             ),
             ChatbotEvent(
                 id="message:assistant:001",
@@ -40,7 +40,7 @@ def build_chat_mixed_timeline(_context: ScenarioContext) -> ScenarioHandle:
                         "text": "I profiled the synthetic dataset and checked regional totals.",
                     }
                 ],
-                source_message_ids=["message:assistant:001"],
+                source_message_ids=[2],
             ),
             _tool_event("tool:profile:001", 2, "Profile complete", "12 columns, 240 rows"),
             _tool_event("tool:query:001", 3, "Query complete", "North leads the synthetic total"),
@@ -111,7 +111,7 @@ def _tool_event(
         sequence_index=sequence_index,
         author=ChatbotEventAuthor.TOOL,
         status=ChatbotEventStatus.COMPLETED,
-        tool_call_id=event_id,
+        tool_call_id=sequence_index,
         tool_name="analysis.profile",
         icon_key="analysis",
         summary=summary,

@@ -77,7 +77,7 @@ class _DocumentRemovalTask(QRunnable):
         self,
         service: KnowledgeDocumentLifecycleService,
         generation: int,
-        document_id: str,
+        document_id: int,
     ) -> None:
         super().__init__()
         self._service = service

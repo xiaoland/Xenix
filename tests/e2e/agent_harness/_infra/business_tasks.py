@@ -36,7 +36,7 @@ class DeliveredArtifact:
     kind: str
     frame: pl.DataFrame | None
     report: dict[str, Any] | None
-    model_id: str | None
+    model_id: int | None
     model_available: bool
 
 
@@ -87,7 +87,7 @@ class BusinessTask:
         self.folder = FIXTURE_ROOT / self.task / variant
         self.case_id = f"business.{self.task}.v1.{variant}"
         self._external_hashes: dict[Path, str] = {}
-        self._registered_hashes: dict[str, str] = {}
+        self._registered_hashes: dict[int, str] = {}
 
     def validate_input(self) -> str:
         required = [self.folder / name for names in self.attachments for name in names]
@@ -107,7 +107,7 @@ class BusinessTask:
             .upper()
         )
 
-    def build_submissions(self, *, thread_id: str, fq_model_key: str) -> tuple[SubmitUserTurnInput, ...]:
+    def build_submissions(self, *, thread_id: int, fq_model_key: str) -> tuple[SubmitUserTurnInput, ...]:
         return tuple(
             SubmitUserTurnInput(
                 thread_id=thread_id,
@@ -203,7 +203,7 @@ def deliveries(context: BenchmarkCaseContext) -> tuple[Delivery, ...]:
     return tuple(turn.evidence for turn in context.turns if isinstance(turn.evidence, Delivery))
 
 
-def _artifact_model_ids(metadata: dict[str, Any], context: BenchmarkCaseContext) -> set[str]:
+def _artifact_model_ids(metadata: dict[str, Any], context: BenchmarkCaseContext) -> set[int]:
     """Follow public provenance so formatting a prediction table stays legitimate."""
     if context.services.models is None:
         return set()

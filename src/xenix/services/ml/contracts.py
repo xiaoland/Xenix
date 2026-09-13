@@ -59,10 +59,12 @@ class ColumnSelection(BaseModel):
 
 class DatasetSnapshotFact(BaseModel):
     schema_version: int = 1
-    dataset_id: str
+    dataset_id: int
     source_sha256: str
     source_byte_size: int
     schema_digest: str
+    # Identity migration must not reshuffle a retained training/evaluation split.
+    sampling_fingerprint: str | None = Field(default=None, exclude_if=lambda value: value is None)
 
 
 def _role_columns(role_bindings: list[dict[str, Any]], role: str) -> list[str]:
@@ -99,9 +101,9 @@ class ForecastOptions(BaseModel):
 
 
 class TaskRequestBase(BaseModel):
-    task_id: str
-    project_id: str
-    dataset_id: str
+    task_id: int
+    project_id: int
+    dataset_id: int
     dataset_source_path: str
     evaluation_kind: EvaluationKind
     train_role_bindings: list[dict[str, Any]]
@@ -137,7 +139,7 @@ class HyperparameterTuningPayload(BaseModel):
 
 
 class EvaluateModelPayload(BaseModel):
-    trained_model_id: str
+    trained_model_id: int
     model_key: str
     trained_model_artifact_path: str
     holdout_artifact_path: str
@@ -163,12 +165,12 @@ class ApplyInputFile(BaseModel):
     absolute_path: str
     file_name: str
     source_kind: str
-    dataset_id: str | None = None
-    artifact_id: str | None = None
+    dataset_id: int | None = None
+    artifact_id: int | None = None
 
 
 class ApplyModelPayload(BaseModel):
-    trained_model_id: str
+    trained_model_id: int
     model_key: str
     trained_model_artifact_path: str
 
@@ -181,9 +183,9 @@ class ApplyTaskRequest(BaseModel):
     and never neither; the validator raises ValueError otherwise.
     """
 
-    task_id: str
-    project_id: str
-    dataset_id: str
+    task_id: int
+    project_id: int
+    dataset_id: int
     dataset_source_path: str
     feature_columns: list[str] = Field(default_factory=list)
     apply_model: ApplyModelPayload
@@ -354,7 +356,7 @@ class TuningSummary(BaseModel):
 
 
 class TaskResultBase(BaseModel):
-    task_id: str
+    task_id: int
     evaluation_kind: EvaluationKind
     evaluation_policy: EvaluationPolicySnapshot
     error_summary: str | None = None
@@ -410,7 +412,7 @@ class HyperparameterTuningTaskResult(TaskResultBase):
 
 
 class EvaluateTaskResult(TaskResultBase):
-    trained_model_id: str
+    trained_model_id: int
     model_key: str
     evaluation: CandidateMetrics | None = None
     baseline_evaluation: CandidateMetrics | None = None
@@ -436,13 +438,13 @@ class ApplySummary(BaseModel):
 
 
 class ApplyTaskResult(BaseModel):
-    task_id: str
-    trained_model_id: str
+    task_id: int
+    trained_model_id: int
     model_key: str
     output_file_path: str
     summary: ApplySummary
-    source_dataset_ids: list[str] = Field(default_factory=list)
-    source_artifact_ids: list[str] = Field(default_factory=list)
+    source_dataset_ids: list[int] = Field(default_factory=list)
+    source_artifact_ids: list[int] = Field(default_factory=list)
     text_classification_apply_facts: TextClassificationApplyFacts | None = None
     text_clustering_apply_facts: TextClusteringApplyFacts | None = None
     text_topic_apply_facts: TextTopicApplyFacts | None = None

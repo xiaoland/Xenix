@@ -36,7 +36,7 @@ class _SemanticSearch:
             unit_ids=tuple(self.unit_ids[:limit]),
             corpus_fingerprint="fake-corpus",
             profile_fingerprint="fake-profile",
-            generation_id="fake-generation",
+            generation_id=101,
         )
 
     def is_current(

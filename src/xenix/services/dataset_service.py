@@ -26,6 +26,7 @@ from .dataset_inspection import (
     inspect_attachment_metadata_file,
     inspect_dataset_file,
 )
+from .storage.identity import reserve_ids
 from .storage.models import (
     DatasetDerivationInputRow,
     DatasetDerivationRow,
@@ -69,7 +70,7 @@ RequiredDerivationText = Annotated[
 
 
 class DatasetDerivationSourceInput(SQLModel):
-    dataset_id: RequiredDerivationText
+    dataset_id: int = Field(ge=1)
     alias: str | None = None
 
 
@@ -78,19 +79,19 @@ class DatasetDerivationInput(SQLModel):
     inputs: list[DatasetDerivationSourceInput] = Field(min_length=1)
     parameters_payload: dict[str, Any] = Field(default_factory=dict)
     agent_explanation: str | None = None
-    tool_call_message_id: str | None = None
+    tool_call_message_id: int | None = None
 
 
 class RegisterDatasetInput(SQLModel):
     source_path: str
-    project_id: str | None = None
+    project_id: int | None = None
     name: str | None = None
-    derived_from_dataset_id: str | None = None
+    derived_from_dataset_id: int | None = None
     derivation: DatasetDerivationInput | None = None
 
 
 class RenameDatasetInput(SQLModel):
-    dataset_id: str
+    dataset_id: int
     new_name: str
 
 
@@ -100,13 +101,13 @@ class MaterializeManualApplyCsvInput(SQLModel):
 
 
 class ExportDatasetCopyInput(SQLModel):
-    dataset_id: str
+    dataset_id: int
     destination_path: str
     csv_encoding: str = "utf-8"
 
 
 class RegisteredDatasetAttachmentItem(SQLModel):
-    dataset_id: str
+    dataset_id: int
     name: str
     file_name: str
     source_format: str
@@ -129,28 +130,28 @@ class DatasetSourcePresentation:
     only make the local open action unavailable.
     """
 
-    dataset_id: str
-    source_group_id: str
+    dataset_id: int
+    source_group_id: int
     file_name: str
     open_path: str | None
     is_openable: bool
 
 
 class DatasetAuditInputPresentation(SQLModel):
-    dataset_id: str
+    dataset_id: int
     name: str
     position: int
     alias: str | None = None
 
 
 class DatasetAuditPresentation(SQLModel):
-    dataset_id: str
+    dataset_id: int
     name: str
     generation: int
     operation_name: str
     parameters_payload: dict[str, Any] = Field(default_factory=dict)
     agent_explanation: str | None = None
-    tool_call_message_id: str | None = None
+    tool_call_message_id: int | None = None
     created_at: datetime
     inputs: list[DatasetAuditInputPresentation] = Field(default_factory=list)
 
@@ -190,6 +191,7 @@ class DatasetService:
         if not frame_specs:
             raise ValidationError("Dataset file must contain at least one non-empty table.")
 
+        dataset_numbers = iter(reserve_ids(self._session_factory, len(frame_specs)))
         with self._session_factory() as session:
             derivation = input_data.derivation
             derivation_sources = self._resolve_derivation_sources(session, derivation)
@@ -249,7 +251,7 @@ class DatasetService:
             written_paths: list[Path] = []
             try:
                 for spec in frame_specs:
-                    dataset_id = uuid4().hex
+                    dataset_id = next(dataset_numbers)
                     sheet_name = str(spec["sheet_name"]) if spec.get("sheet_name") is not None else None
                     dataset_name = name
                     if len(frame_specs) > 1 and sheet_name:
@@ -366,8 +368,8 @@ class DatasetService:
             datasets=items,
         )
 
-    def discard_unreferenced_dataset(self, dataset_id: str) -> bool:
-        normalized = dataset_id.strip()
+    def discard_unreferenced_dataset(self, dataset_id: int) -> bool:
+        normalized = dataset_id
         if not normalized:
             raise ValidationError("Dataset id cannot be empty.")
         with self._session_factory() as session:
@@ -398,38 +400,38 @@ class DatasetService:
             session.commit()
             return row
 
-    def list_datasets(self, project_id: str | None = None) -> list[DatasetRow]:
+    def list_datasets(self, project_id: int | None = None) -> list[DatasetRow]:
         with self._session_factory() as session:
             if project_id is None:
                 return self._datasets.list_all(session)
             return self._datasets.list_by_project(session, project_id)
 
-    def list_source_datasets(self, project_id: str | None = None) -> list[DatasetRow]:
+    def list_source_datasets(self, project_id: int | None = None) -> list[DatasetRow]:
         with self._session_factory() as session:
             if project_id is None:
                 return self._datasets.list_sources(session)
             return self._datasets.list_source_by_project(session, project_id)
 
-    def list_generated_datasets(self, project_id: str | None = None) -> list[DatasetRow]:
+    def list_generated_datasets(self, project_id: int | None = None) -> list[DatasetRow]:
         with self._session_factory() as session:
             if project_id is None:
                 return self._datasets.list_generated(session)
             return self._datasets.list_generated_by_project(session, project_id)
 
-    def list_derived_datasets(self, source_dataset_id: str) -> list[DatasetRow]:
+    def list_derived_datasets(self, source_dataset_id: int) -> list[DatasetRow]:
         with self._session_factory() as session:
             if self._datasets.get(session, source_dataset_id) is None:
                 raise NotFoundError(f"Dataset '{source_dataset_id}' was not found.")
             return self._datasets.list_derived_by_source(session, source_dataset_id)
 
-    def get_dataset(self, dataset_id: str) -> DatasetRow:
+    def get_dataset(self, dataset_id: int) -> DatasetRow:
         with self._session_factory() as session:
             row = self._datasets.get(session, dataset_id)
             if row is None:
                 raise NotFoundError(f"Dataset '{dataset_id}' was not found.")
             return row
 
-    def get_dataset_audit(self, dataset_id: str) -> DatasetAuditPresentation | None:
+    def get_dataset_audit(self, dataset_id: int) -> DatasetAuditPresentation | None:
         """Return persisted derivation evidence for one Dataset, if it has any."""
 
         with self._session_factory() as session:
@@ -443,7 +445,7 @@ class DatasetService:
 
     def resolve_dataset_audits_for_tool_call(
         self,
-        tool_call_message_id: str,
+        tool_call_message_id: int,
     ) -> list[DatasetAuditPresentation]:
         """Resolve generated Dataset evidence by its originating ToolCall."""
 
@@ -454,9 +456,9 @@ class DatasetService:
     def resolve_session_dataset_audits(
         self,
         *,
-        dataset_ids: Collection[str],
-        tool_call_message_ids: Collection[str],
-        ml_task_ids: Collection[str],
+        dataset_ids: Collection[int],
+        tool_call_message_ids: Collection[int],
+        ml_task_ids: Collection[int],
     ) -> list[DatasetAuditPresentation]:
         """List attached and produced datasets using persisted provenance only."""
         with self._session_factory() as session:
@@ -477,14 +479,14 @@ class DatasetService:
 
     def resolve_dataset_audits_for_tool_calls(
         self,
-        tool_call_message_ids: Collection[str],
+        tool_call_message_ids: Collection[int],
     ) -> list[DatasetAuditPresentation]:
         """Resolve generated Dataset evidence for a set of originating ToolCalls."""
 
         requested = {
             message_id
             for message_id in tool_call_message_ids
-            if isinstance(message_id, str) and message_id
+            if isinstance(message_id, int) and message_id
         }
         if not requested:
             return []
@@ -500,7 +502,7 @@ class DatasetService:
 
     def resolve_dataset_source_presentation(
         self,
-        dataset_id: str,
+        dataset_id: int,
     ) -> DatasetSourcePresentation | None:
         """Resolve bounded source metadata for a dataset without reading data.
 
@@ -511,9 +513,9 @@ class DatasetService:
         substituted for the original user-selected source file.
         """
 
-        if not isinstance(dataset_id, str):
+        if not isinstance(dataset_id, int):
             return None
-        normalized_id = dataset_id.strip()
+        normalized_id = dataset_id
         if not normalized_id:
             return None
 
@@ -524,9 +526,8 @@ class DatasetService:
                     return None
 
                 import_id = dataset.import_id
-                if not isinstance(import_id, str) or not import_id.strip():
+                if import_id is None:
                     return None
-                import_id = import_id.strip()
                 imported = self._datasets.get_import(session, import_id)
                 if imported is None:
                     return None
@@ -572,7 +573,7 @@ class DatasetService:
             )
             return None
 
-    def get_dataset_by_ml_task(self, ml_task_id: str) -> DatasetRow | None:
+    def get_dataset_by_ml_task(self, ml_task_id: int) -> DatasetRow | None:
         with self._session_factory() as session:
             return self._datasets.get_by_ml_task(session, ml_task_id)
 
@@ -786,7 +787,7 @@ class DatasetService:
             "sheet_index": sheet_index,
         }
 
-    def _dataset_storage_path(self, dataset_id: str, *, derived: bool) -> Path:
+    def _dataset_storage_path(self, dataset_id: int, *, derived: bool) -> Path:
         directory = self._paths.state / "datasets" / ("derived" if derived else "imported")
         directory.mkdir(parents=True, exist_ok=True)
         return directory / f"{dataset_id}.parquet"
@@ -844,7 +845,7 @@ class DatasetService:
     def _dataset_generation(
         self,
         session,
-        dataset_id: str,
+        dataset_id: int,
         memo: dict[str, int],
     ) -> int:
         known = memo.get(dataset_id)
@@ -886,7 +887,7 @@ class DatasetService:
         self,
         session,
         *,
-        dataset_id: str,
+        dataset_id: int,
         derivation: DatasetDerivationInput,
         now: datetime,
     ) -> None:
@@ -914,7 +915,7 @@ class DatasetService:
     def _resolve_project_id(
         self,
         session,
-        project_id: str | None,
+        project_id: int | None,
         *,
         source_datasets: list[DatasetRow],
     ) -> str:
@@ -922,7 +923,7 @@ class DatasetService:
         if len(source_project_ids) > 1:
             raise ValidationError("Dataset derivation inputs must belong to one project.")
         source_project_id = next(iter(source_project_ids), None)
-        normalized = project_id.strip() if project_id else ""
+        normalized = project_id
         if normalized:
             if self._projects.get(session, normalized) is None:
                 raise NotFoundError(f"Project '{normalized}' was not found.")
@@ -948,8 +949,8 @@ class DatasetService:
             return False
         return True
 
-    def _has_dataset_references(self, session, dataset_id: str) -> bool:
+    def _has_dataset_references(self, session, dataset_id: int) -> bool:
         return self._datasets.has_references(session, dataset_id)
 
-    def _delete_dataset_derivation(self, session, dataset_id: str) -> None:
+    def _delete_dataset_derivation(self, session, dataset_id: int) -> None:
         self._datasets.delete_derivation(session, dataset_id)

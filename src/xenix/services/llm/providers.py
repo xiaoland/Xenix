@@ -43,7 +43,7 @@ class ProviderMessage(SQLModel):
     # not a provider wire encoding; each adapter chooses its own carrier.
     tool_result_value: Any = None
     provider_payload: dict[str, Any] = Field(default_factory=dict)
-    source_message_id: str | None = None
+    source_message_id: int | None = None
 
     @field_validator("content_blocks", mode="before")
     @classmethod

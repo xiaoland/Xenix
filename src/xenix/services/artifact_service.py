@@ -36,7 +36,7 @@ class RegisterArtifactInput(SQLModel):
 
 
 class ResolvedArtifact(SQLModel):
-    artifact_id: str
+    artifact_id: int
     title: str
     kind: ArtifactKind
     absolute_path: str
@@ -50,7 +50,7 @@ class ResolvedArtifact(SQLModel):
 
 
 class ActivatedArtifact(SQLModel):
-    artifact_id: str
+    artifact_id: int
     title: str
     absolute_path: str
     opened: bool
@@ -65,13 +65,9 @@ def _open_file_with_os(path: Path) -> bool:
     return subprocess.run(["xdg-open", str(path)], check=False).returncode == 0
 
 
-def build_artifact_uri(artifact_id: str, *, view: str | None = None) -> str:
-    artifact_id = artifact_id.strip()
-    if not artifact_id:
-        raise ValidationError("Artifact id cannot be empty.")
-
+def build_artifact_uri(artifact_id: int, *, view: str | None = None) -> str:
     query = urlencode({"view": view}) if view else ""
-    return urlunparse(("artifact", artifact_id, "", "", query, ""))
+    return urlunparse(("artifact", str(artifact_id), "", "", query, ""))
 
 
 class ArtifactService:
@@ -123,7 +119,7 @@ class ArtifactService:
     def unregister_artifact_in_session(
         self,
         session: Session,
-        artifact_id: str,
+        artifact_id: int,
     ) -> bool:
         """Remove one registration inside an owner-coordinated transaction.
 
@@ -139,7 +135,10 @@ class ArtifactService:
             raise ValidationError("Artifact URI must use the artifact scheme.")
 
         artifact_id = parsed.netloc or parsed.path.lstrip("/").split("/", 1)[0]
-        artifact_id = artifact_id.strip()
+        try:
+            artifact_id = int(artifact_id)
+        except ValueError as exc:
+            raise ValidationError("Artifact URI requires an integer ID.") from exc
         if not artifact_id:
             raise ValidationError("Artifact URI is missing an artifact id.")
         view = parse_qs(parsed.query).get("view", [None])[0]

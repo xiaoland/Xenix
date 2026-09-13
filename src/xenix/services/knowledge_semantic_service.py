@@ -31,7 +31,8 @@ from .storage.knowledge_projection import (
     KnowledgeProjectionIdentity,
     KnowledgeProjectionSnapshot,
 )
-from .storage.models import KnowledgeVectorGenerationRow, generate_id
+from .storage.identity import reserve_ids
+from .storage.models import KnowledgeVectorGenerationRow
 from .storage.repositories.knowledge import KnowledgeRepository
 
 LOGGER = logging.getLogger(__name__)
@@ -43,7 +44,7 @@ class KnowledgeSemanticIndexState:
     profile_fingerprint: str | None
     corpus_fingerprint: str
     unit_count: int
-    generation_id: str | None
+    generation_id: int | None
 
     @property
     def ready(self) -> bool:
@@ -283,7 +284,7 @@ class KnowledgeSemanticService:
                 raise KnowledgeSemanticIntegrityError()
             dimensions = document_batch.dimensions
 
-            generation_id = generate_id()
+            generation_id = reserve_ids(self._session_factory)[0]
             relative_path = self._vector_store.write_generation(
                 generation_id=generation_id,
                 records=[
@@ -354,7 +355,7 @@ class KnowledgeSemanticService:
         profile_fingerprint: str,
         corpus_fingerprint: str,
         dimensions: int | None,
-        expected_unit_ids: Sequence[str],
+        expected_unit_ids: Sequence[int],
         expected_unit_count: int,
     ) -> KnowledgeVectorGenerationRow | None:
         with self._session_factory() as session:

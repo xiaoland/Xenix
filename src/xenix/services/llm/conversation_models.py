@@ -39,7 +39,7 @@ class CreateConversationThreadInput(SQLModel):
 
 
 class AppendUserMessageInput(SQLModel):
-    thread_id: str
+    thread_id: int
     client_submission_id: str
     content_blocks: list[CanonicalMessageBlock] = Field(default_factory=list)
 
@@ -58,25 +58,25 @@ class ConversationSnapshot(SQLModel):
 class ConversationUsageOverview:
     """A read-only usage projection for one completed User interaction."""
 
-    root_user_message_id: str
-    terminal_llm_message_id: str
+    root_user_message_id: int
+    terminal_llm_message_id: int
     terminal_sequence_index: int
     usage: LLMUsageAggregate
 
 
 @dataclass(frozen=True)
 class SubmissionClaim:
-    thread_id: str
-    expected_frontier_id: str | None
+    thread_id: int | None
+    expected_frontier_id: int | None
     client_submission_id: str
     initial_title_eligible: bool = False
-    existing_message_id: str | None = None
+    existing_message_id: int | None = None
 
 
 @dataclass(frozen=True)
 class PendingSampling:
-    pending_message_id: str
-    thread_id: str
+    pending_message_id: int
+    thread_id: int
     staged_calls: tuple[StagedToolCall, ...] = ()
     has_assistant_output: bool = False
 
@@ -84,15 +84,15 @@ class PendingSampling:
 @dataclass(frozen=True)
 class ConversationLiveEvent:
     kind: str
-    pending_message_id: str
+    pending_message_id: int
     retry: LLMRetryEvent | None = None
-    staged_call_id: str | None = None
+    staged_call_id: int | None = None
 
 
 class ThreadPausedError(ValidationError):
     """A runtime-only Thread pause prevented a new LLM provider request."""
 
-    def __init__(self, thread_id: str) -> None:
+    def __init__(self, thread_id: int) -> None:
         super().__init__(
             f"LLM sampling is paused for Thread '{thread_id}'.",
             error_code="llm_thread_paused",
@@ -108,16 +108,16 @@ class _ThreadControl:
 
 @dataclass
 class _PendingExchange:
-    pending_message_id: str
-    thread_id: str
+    pending_message_id: int
+    thread_id: int
     sequence_index: int
-    frontier_message_id: str
-    root_user_message_id: str | None
+    frontier_message_id: int
+    root_user_message_id: int | None
     scope: ToolScope
     scope_fingerprint: str
     output_items: tuple[ProviderOutputItem, ...] = ()
-    calls: dict[str, StagedToolCall] = field(default_factory=dict)
-    results: dict[str, TerminalToolResult] = field(default_factory=dict)
+    calls: dict[int, StagedToolCall] = field(default_factory=dict)
+    results: dict[int, TerminalToolResult] = field(default_factory=dict)
     tool_execution_started: bool = False
     cancelled: bool = False
 

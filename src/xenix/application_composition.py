@@ -172,7 +172,7 @@ def build_workbench_window(
             parent=owner,
         )
 
-    def create_dataset_audit(owner: QWidget, thread_id: str) -> DatasetAuditDialog:
+    def create_dataset_audit(owner: QWidget, thread_id: int) -> DatasetAuditDialog:
         return DatasetAuditDialog(
             harness=agent_services.harness,
             thread_id=thread_id,

@@ -91,7 +91,7 @@ class RainySeasonRestockCase:
             time.sleep(0.02)
         raise BenchmarkInputError("knowledge_rule_derivation_timeout")
 
-    def build_submission(self, *, thread_id: str, fq_model_key: str) -> SubmitUserTurnInput:
+    def build_submission(self, *, thread_id: int, fq_model_key: str) -> SubmitUserTurnInput:
         return SubmitUserTurnInput(
             thread_id=thread_id,
             text=(

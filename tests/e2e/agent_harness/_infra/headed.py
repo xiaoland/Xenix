@@ -55,7 +55,7 @@ class _HeadedKnowledgeDerivationAccess:
     def __init__(self, cell: HeadedBenchmarkCell) -> None:
         self._cell = cell
 
-    def status_for_import(self, import_id: str) -> Any:
+    def status_for_import(self, import_id: int) -> Any:
         self._cell.pump_events()
         return self._cell.runtime_services.knowledge_derivation.status_for_import(  # noqa: SLF001
             import_id
@@ -74,7 +74,7 @@ class _HeadedKnowledgeIndexAccess:
         self._cell.knowledge_index_task_ids.add(task_id)
         return task_id
 
-    def rebuild_now(self, task_id: str) -> Any:
+    def rebuild_now(self, task_id: int) -> Any:
         service = self._cell.runtime_services.knowledge_index  # noqa: SLF001
 
         def terminal_task() -> Any | None:
@@ -204,7 +204,7 @@ class HeadedBenchmarkCell:
             timeout=10.0,
             error_code="headed_thread_creation_failed",
         )
-        thread_id = str(self.window.conversation_thread_id)
+        thread_id = self.window.conversation_thread_id
         snapshot = self.harness.rename_thread(thread_id, title)
         self.window.refresh_history(selected_thread_id=thread_id)  # noqa: SLF001
         self._select_model(fq_model_key)
@@ -278,7 +278,7 @@ class HeadedBenchmarkCell:
         case: BenchmarkCase,
         services: BenchmarkCaseServices,
     ) -> None:
-        thread_id = str(getattr(submission, "thread_id", "") or "")
+        thread_id = getattr(submission, "thread_id", None)
         if thread_id != self.window.conversation_thread_id:
             raise HeadedBenchmarkError("headed_submission_thread_mismatch")
         fq_model_key = str(getattr(submission, "fq_model_key", "") or "")
@@ -350,7 +350,7 @@ class HeadedBenchmarkCell:
         snapshot = measurements.snapshot
         messages = list(getattr(snapshot, "messages", ())) if snapshot is not None else []
         terminal = messages[-1] if messages else None
-        terminal_id = str(getattr(terminal, "id", "") or "")
+        terminal_id = getattr(terminal, "id", None)
         rendered = bool(
             terminal_id
             and terminal_id in view.timeline.message_bubbles_by_id

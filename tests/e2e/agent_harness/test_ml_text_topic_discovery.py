@@ -190,7 +190,7 @@ class TextTopicDiscoveryCase:
     def validate_input(self) -> str:
         return _validate_fixture(self.source_path)
 
-    def build_submission(self, *, thread_id: str, fq_model_key: str) -> SubmitUserTurnInput:
+    def build_submission(self, *, thread_id: int, fq_model_key: str) -> SubmitUserTurnInput:
         return SubmitUserTurnInput(
             thread_id=thread_id,
             text=BUSINESS_PROMPT,
@@ -283,7 +283,7 @@ def _resolve_topic_outcomes(context: BenchmarkCaseContext) -> _TopicOutcome:
         digest=_EXPECTED_SHA256,
     )
     datasets = list(context.services.datasets.list_datasets())
-    by_id = {str(dataset.id): dataset for dataset in datasets}
+    by_id = {dataset.id: dataset for dataset in datasets}
     artifacts = _linked_artifacts(context)
     fit_dataset = fit_frame = fit_artifact = None
     apply_dataset = apply_frame = apply_artifact = None
@@ -318,7 +318,7 @@ def _resolve_topic_outcomes(context: BenchmarkCaseContext) -> _TopicOutcome:
             )
             if candidate_fit is not None and _artifact_matches_assignments(candidate_fit):
                 fit_dataset, fit_frame, fit_artifact = dataset, frame, candidate_fit
-    if fit_dataset is not None and apply_dataset is not None and str(fit_dataset.id) == str(apply_dataset.id):
+    if fit_dataset is not None and apply_dataset is not None and fit_dataset.id == apply_dataset.id:
         return _TopicOutcome(None, None, None, None, None, None)
     return _TopicOutcome(
         fit_dataset,
@@ -403,7 +403,7 @@ def _resolve_fit_artifact(
     artifacts: tuple[Any, ...],
     runtime_home: Path,
 ) -> Any | None:
-    task_id = str(getattr(dataset, "ml_task_id", "") or "")
+    task_id = getattr(dataset, "ml_task_id", None)
     if not task_id:
         return None
     for artifact in artifacts:
@@ -789,9 +789,9 @@ def _terminal_text(snapshot: Any | None) -> str:
 
 def _is_run_descendant(
     dataset: Any,
-    by_id: dict[str, Any],
-    source_ids: set[str],
-    run_ids: frozenset[str],
+    by_id: dict[int, Any],
+    source_ids: set[int],
+    run_ids: frozenset[int],
 ) -> bool:
     if dataset.id not in run_ids:
         return False

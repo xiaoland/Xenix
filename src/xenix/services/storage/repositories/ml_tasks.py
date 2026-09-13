@@ -15,10 +15,10 @@ class MLTaskRepository:
         session.refresh(row)
         return row
 
-    def get(self, session: Session, ml_task_id: str) -> MLTaskRow | None:
+    def get(self, session: Session, ml_task_id: int) -> MLTaskRow | None:
         return session.get(MLTaskRow, ml_task_id)
 
-    def list_by_dataset(self, session: Session, dataset_id: str) -> list[MLTaskRow]:
+    def list_by_dataset(self, session: Session, dataset_id: int) -> list[MLTaskRow]:
         statement = (
             select(MLTaskRow)
             .where(MLTaskRow.dataset_id == dataset_id)
@@ -29,7 +29,7 @@ class MLTaskRepository:
     def update_status(
         self,
         session: Session,
-        ml_task_id: str,
+        ml_task_id: int,
         from_status: MLTaskStatus,
         to_status: MLTaskStatus,
         now: datetime,
@@ -59,7 +59,7 @@ class MLTaskRepository:
     def complete(
         self,
         session: Session,
-        ml_task_id: str,
+        ml_task_id: int,
         result_payload: dict[str, Any],
         finished_at: datetime,
         artifacts: list[MLTaskArtifactRow],
@@ -80,7 +80,7 @@ class MLTaskRepository:
         session.refresh(row)
         return row
 
-    def fail(self, session: Session, ml_task_id: str, error_summary: str, finished_at: datetime) -> MLTaskRow | None:
+    def fail(self, session: Session, ml_task_id: int, error_summary: str, finished_at: datetime) -> MLTaskRow | None:
         row = self.get(session, ml_task_id)
         if row is None:
             return None
@@ -94,7 +94,7 @@ class MLTaskRepository:
         session.refresh(row)
         return row
 
-    def cancel(self, session: Session, ml_task_id: str, finished_at: datetime) -> MLTaskRow | None:
+    def cancel(self, session: Session, ml_task_id: int, finished_at: datetime) -> MLTaskRow | None:
         row = self.get(session, ml_task_id)
         if row is None:
             return None
@@ -107,7 +107,7 @@ class MLTaskRepository:
         session.refresh(row)
         return row
 
-    def list_artifacts(self, session: Session, ml_task_id: str) -> list[MLTaskArtifactRow]:
+    def list_artifacts(self, session: Session, ml_task_id: int) -> list[MLTaskArtifactRow]:
         statement = (
             select(MLTaskArtifactRow)
             .where(MLTaskArtifactRow.ml_task_id == ml_task_id)

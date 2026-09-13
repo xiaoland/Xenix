@@ -39,7 +39,7 @@ from xenix.services.ml.text_preparation import (
 FIXTURE_ROOT = FIXTURES_ROOT / "ml_rt_service" / "text_classification"
 
 
-def _resource(name: str, dataset_id: str) -> StagedTextResourceInput:
+def _resource(name: str, dataset_id: int) -> StagedTextResourceInput:
     path = FIXTURE_ROOT / name
     return StagedTextResourceInput(
         dataset_id=dataset_id,
@@ -52,8 +52,8 @@ def _preparation_input() -> TextPreparationInput:
     return TextPreparationInput(
         tokenizer_profile="multilingual_business_v1",
         phrase_mode="unigram_bigram",
-        custom_dictionary_resources=[_resource("custom_dictionary.csv", "dictionary-dataset")],
-        stopword_resources=[_resource("stopwords.csv", "stopword-dataset")],
+        custom_dictionary_resources=[_resource("custom_dictionary.csv", 108)],
+        stopword_resources=[_resource("stopwords.csv", 101)],
     )
 
 
@@ -104,12 +104,12 @@ def test_business_and_template_groups_form_one_privacy_safe_connected_union() ->
     specification = preparer.specification.model_dump(mode="json")
     assert specification["custom_dictionary_references"] == [
         {
-            "dataset_id": "dictionary-dataset",
-            "source_sha256": _resource("custom_dictionary.csv", "dictionary-dataset").source_sha256,
+            "dataset_id": 108,
+            "source_sha256": _resource("custom_dictionary.csv", 108).source_sha256,
             "term_count": 2,
         }
     ]
-    assert specification["stopword_references"][0]["dataset_id"] == "stopword-dataset"
+    assert specification["stopword_references"][0]["dataset_id"] == 101
     assert "absolute_path" not in json.dumps(specification, sort_keys=True)
 
 
@@ -188,7 +188,7 @@ def test_raw_apply_reports_empty_and_oov_rows_without_changing_the_retained_spec
 def test_active_adapter_fit_and_evaluate_recompute_the_private_grouped_truth(tmp_path: Path) -> None:
     source = FIXTURE_ROOT / "bilingual_training.csv"
     snapshot = DatasetSnapshotFact(
-        dataset_id="training-dataset",
+        dataset_id=103,
         source_sha256=hashlib.sha256(source.read_bytes()).hexdigest(),
         source_byte_size=source.stat().st_size,
         schema_digest="1" * 64,
@@ -205,8 +205,8 @@ def test_active_adapter_fit_and_evaluate_recompute_the_private_grouped_truth(tmp
         random_state=42,
     )
     common = {
-        "project_id": "project",
-        "dataset_id": "training-dataset",
+        "project_id": 102,
+        "dataset_id": 103,
         "dataset_source_path": str(source.resolve()),
         "evaluation_kind": EvaluationKind.CLASSIFICATION,
         "train_role_bindings": [
@@ -219,14 +219,14 @@ def test_active_adapter_fit_and_evaluate_recompute_the_private_grouped_truth(tmp
         "text_preparation": _preparation_input(),
     }
     fit_request = FitTaskRequest(
-        task_id="fit-task",
+        task_id=105,
         **common,
         manual_training=ManualTrainingPayload(
             model_key=MultilingualTextClassificationService.key,
             params={
                 "phrase_mode": "unigram_bigram",
-                "custom_dictionary_dataset_ids": ["dictionary-dataset"],
-                "stopword_dataset_ids": ["stopword-dataset"],
+                "custom_dictionary_dataset_ids": [108],
+                "stopword_dataset_ids": [101],
             },
         ),
     )
@@ -243,10 +243,10 @@ def test_active_adapter_fit_and_evaluate_recompute_the_private_grouped_truth(tmp
         MultilingualTextClassificationService.fit(mismatched_request, tmp_path / "mismatch")
     fit_result = MultilingualTextClassificationService.fit(fit_request, tmp_path / "fit")
     evaluate_request = EvaluateTaskRequest(
-        task_id="evaluate-task",
+        task_id=106,
         **common,
         evaluate_model=EvaluateModelPayload(
-            trained_model_id="trained-model",
+            trained_model_id=109,
             model_key=fit_result.model_key,
             trained_model_artifact_path=fit_result.model_artifact_path,
             holdout_artifact_path=str(fit_result.holdout_artifact_path),
@@ -254,13 +254,13 @@ def test_active_adapter_fit_and_evaluate_recompute_the_private_grouped_truth(tmp
     )
     evaluation = MultilingualTextClassificationService.evaluate(evaluate_request, tmp_path / "evaluate")
     apply_request = ApplyTaskRequest(
-        task_id="apply-task",
-        project_id="project",
-        dataset_id="apply-dataset",
+        task_id=107,
+        project_id=102,
+        dataset_id=104,
         dataset_source_path=str((FIXTURE_ROOT / "bilingual_apply.csv").resolve()),
         feature_columns=["message"],
         apply_model=ApplyModelPayload(
-            trained_model_id="trained-model",
+            trained_model_id=109,
             model_key=fit_result.model_key,
             trained_model_artifact_path=str(fit_result.final_model_artifact_path),
         ),
@@ -269,7 +269,7 @@ def test_active_adapter_fit_and_evaluate_recompute_the_private_grouped_truth(tmp
                 absolute_path=str((FIXTURE_ROOT / "bilingual_apply.csv").resolve()),
                 file_name="bilingual_apply.csv",
                 source_kind="dataset",
-                dataset_id="apply-dataset",
+                dataset_id=104,
             )
         ],
     )
@@ -291,7 +291,7 @@ def test_active_adapter_fit_and_evaluate_recompute_the_private_grouped_truth(tmp
     assert evaluation.text_classification_evaluation is not None
     assert evaluation.text_classification_evaluation.specification == fit_result.text_preparation_specification
     assert evaluation.text_classification_evaluation.leakage.train_connected_group_overlap_count == 0
-    assert apply_result.source_dataset_ids == ["apply-dataset"]
+    assert apply_result.source_dataset_ids == [104]
     assert apply_result.text_classification_apply_facts is not None
     assert apply_result.text_classification_apply_facts.specification == fit_result.text_preparation_specification
     assert apply_result.text_classification_apply_facts.preparation.empty_after_preparation_row_count == 1

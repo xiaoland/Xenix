@@ -9,7 +9,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from time import perf_counter
 from typing import Any
-from uuid import uuid4
 
 import duckdb
 from opentelemetry import context as otel_context
@@ -53,6 +52,7 @@ from .storage.layout import (
     task_request_path,
     task_result_path,
 )
+from .storage.identity import allocate_ids
 from .storage.models import (
     ArtifactKind,
     DatasetRow,
@@ -97,14 +97,15 @@ ALLOWED_TRANSITIONS: dict[MLTaskStatus, set[MLTaskStatus]] = {
 
 
 class CreateMLTaskInput(SQLModel):
-    project_id: str
-    dataset_id: str | None = None
+    id: int | None = None
+    project_id: int
+    dataset_id: int | None = None
     task_type: MLTaskType
     request_payload: dict[str, Any] = Field(default_factory=dict)
 
 
 class StartMLTaskInput(SQLModel):
-    ml_task_id: str
+    ml_task_id: int
 
 
 class MLTaskArtifactInput(SQLModel):
@@ -114,18 +115,18 @@ class MLTaskArtifactInput(SQLModel):
 
 
 class CompleteMLTaskInput(SQLModel):
-    ml_task_id: str
+    ml_task_id: int
     result_payload: dict[str, Any] = Field(default_factory=dict)
     artifacts: list[MLTaskArtifactInput] = Field(default_factory=list)
 
 
 class FailMLTaskInput(SQLModel):
-    ml_task_id: str
+    ml_task_id: int
     error_summary: str
 
 
 class CancelMLTaskInput(SQLModel):
-    ml_task_id: str
+    ml_task_id: int
 
 
 class MLTaskService:
@@ -159,6 +160,7 @@ class MLTaskService:
 
         now = _utc_now()
         row = MLTaskRow(
+            id=input_data.id,
             project_id=input_data.project_id,
             dataset_id=input_data.dataset_id,
             task_type=input_data.task_type,
@@ -185,7 +187,7 @@ class MLTaskService:
             self._record_task(row)
             return row
 
-    def set_request_payload(self, ml_task_id: str, request_payload: dict[str, Any]) -> MLTaskRow:
+    def set_request_payload(self, ml_task_id: int, request_payload: dict[str, Any]) -> MLTaskRow:
         """Persist a task's request payload once its task id is assigned."""
 
         with self._session_factory() as session:
@@ -202,7 +204,7 @@ class MLTaskService:
     def max_concurrent_tasks(self) -> int:
         return max(1, int(getattr(self._worker_runner, "max_concurrent_tasks", 1)))
 
-    def prepare_ml_task(self, ml_task_id: str) -> None:
+    def prepare_ml_task(self, ml_task_id: int) -> None:
         """Stage a pending task for dispatch: validate, write request, capture trace."""
         task = self.get_ml_task(ml_task_id)
         if task.status is not MLTaskStatus.PENDING:
@@ -222,7 +224,7 @@ class MLTaskService:
         with self._lock:
             self._trace_carriers[ml_task_id] = inject_context({})
 
-    def run_task(self, ml_task_id: str) -> MLTaskRow | None:
+    def run_task(self, ml_task_id: int) -> MLTaskRow | None:
         """Execute a queued task to completion and notify completion listeners."""
         from .runtime_activity import activity_coordinator
 
@@ -300,22 +302,22 @@ class MLTaskService:
             self._record_task(cancelled)
             return cancelled
 
-    def list_dataset_ml_tasks(self, dataset_id: str) -> list[MLTaskRow]:
+    def list_dataset_ml_tasks(self, dataset_id: int) -> list[MLTaskRow]:
         with self._session_factory() as session:
             return self._ml_tasks.list_by_dataset(session, dataset_id)
 
-    def get_ml_task(self, ml_task_id: str) -> MLTaskRow:
+    def get_ml_task(self, ml_task_id: int) -> MLTaskRow:
         with self._session_factory() as session:
             row = self._ml_tasks.get(session, ml_task_id)
             if row is None:
                 raise NotFoundError(f"ML task '{ml_task_id}' was not found.")
             return row
 
-    def list_ml_task_artifacts(self, ml_task_id: str) -> list[MLTaskArtifactRow]:
+    def list_ml_task_artifacts(self, ml_task_id: int) -> list[MLTaskArtifactRow]:
         with self._session_factory() as session:
             return self._ml_tasks.list_artifacts(session, ml_task_id)
 
-    def read_task_logs(self, ml_task_id: str) -> list[TaskLogEntry]:
+    def read_task_logs(self, ml_task_id: int) -> list[TaskLogEntry]:
         path = task_logs_path(self._paths, ml_task_id)
         if not path.exists():
             return []
@@ -325,7 +327,7 @@ class MLTaskService:
             if line.strip()
         ]
 
-    def _run_task(self, ml_task_id: str) -> MLTaskRow | None:
+    def _run_task(self, ml_task_id: int) -> MLTaskRow | None:
         task = self.get_ml_task(ml_task_id)
         if task.status is not MLTaskStatus.PENDING:
             return task
@@ -379,7 +381,7 @@ class MLTaskService:
             return run_apply_task
         raise ValidationError(f"ML task type '{task_type.value}' is not executable in this workflow.")
 
-    def _finalize_success(self, ml_task_id: str) -> MLTaskRow:
+    def _finalize_success(self, ml_task_id: int) -> MLTaskRow:
         with self._session_factory() as session:
             row = self._ml_tasks.get(session, ml_task_id)
             if row is None:
@@ -645,7 +647,7 @@ class MLTaskService:
         if lineage_dataset_id is not None and lineage_dataset is None:
             raise NotFoundError(f"Dataset '{lineage_dataset_id}' was not found.")
         result_name_owner = lineage_dataset or training_dataset
-        result_dataset_id = uuid4().hex
+        result_dataset_id = allocate_ids(session.connection())[0]
         result_dataset_path = self._materialize_apply_result_dataset(
             source_csv_path=canonical_path,
             dataset_id=result_dataset_id,
@@ -688,7 +690,7 @@ class MLTaskService:
         ]
         return payload, artifacts
 
-    def _materialize_apply_result_dataset(self, *, source_csv_path: Path, dataset_id: str) -> Path:
+    def _materialize_apply_result_dataset(self, *, source_csv_path: Path, dataset_id: int) -> Path:
         output_dir = self._paths.state / "datasets" / "derived"
         output_dir.mkdir(parents=True, exist_ok=True)
         output_path = output_dir / f"{dataset_id}.parquet"
@@ -712,7 +714,7 @@ class MLTaskService:
         source_dataset = self._datasets.get(session, row.dataset_id)
         if source_dataset is None:
             raise NotFoundError(f"Dataset '{row.dataset_id}' was not found.")
-        result_dataset_id = uuid4().hex
+        result_dataset_id = allocate_ids(session.connection())[0]
         result_dataset_path = self._materialize_apply_result_dataset(
             source_csv_path=source_csv_path,
             dataset_id=result_dataset_id,
@@ -743,7 +745,7 @@ class MLTaskService:
     def _sql_string(self, value: str) -> str:
         return "'" + value.replace("'", "''") + "'"
 
-    def _finalize_failure(self, ml_task_id: str, return_code: int) -> MLTaskRow:
+    def _finalize_failure(self, ml_task_id: int, return_code: int) -> MLTaskRow:
         result_path = task_result_path(self._paths, ml_task_id)
         error_summary = f"Worker process exited with code {return_code}."
         if result_path.exists():
@@ -831,7 +833,7 @@ class MLTaskService:
     @staticmethod
     def _public_artifact_title(row: MLTaskRow, artifact: MLTaskArtifactInput) -> str:
         label = artifact.artifact_kind.value.replace("_", " ").title()
-        return f"{label} · {row.id[:8]}"
+        return f"{label} · {row.id}"
 
     @staticmethod
     def _artifact_mime_type(path: Path) -> str | None:

@@ -22,10 +22,10 @@ _IMAGE_MEDIA_EXTENSIONS = {
 @dataclass(frozen=True)
 class CanonicalIdentity:
     library_id: str
-    document_id: str
-    import_id: str
-    canonical_generation_id: str
-    source_artifact_id: str
+    document_id: int
+    import_id: int
+    canonical_generation_id: int
+    source_artifact_id: int
     source_sha256: str
     source_format: str
     media_type: str | None

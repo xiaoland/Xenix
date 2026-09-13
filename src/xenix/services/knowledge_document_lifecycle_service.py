@@ -16,9 +16,9 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True)
 class KnowledgeDocumentRemovalReceipt:
-    document_id: str
+    document_id: int
     title: str
-    vector_rebuild_task_id: str | None
+    vector_rebuild_task_id: int | None
 
 
 class KnowledgeDocumentRemovalError(ValidationError):
@@ -58,12 +58,12 @@ class KnowledgeDocumentLifecycleService:
 
     def remove_document(
         self,
-        document_id: str,
+        document_id: int,
         *,
         library_id: str = "global",
     ) -> KnowledgeDocumentRemovalReceipt:
-        normalized_document_id = _required_identity(document_id)
-        normalized_library_id = _required_identity(library_id)
+        normalized_document_id = document_id
+        normalized_library_id = library_id.strip()
 
         with self._session_factory() as session:
             document = self._repository.get_document(
@@ -93,7 +93,7 @@ class KnowledgeDocumentLifecycleService:
                 raise KnowledgeDocumentNotFound()
             session.commit()
 
-        rebuild_task_id: str | None = None
+        rebuild_task_id: int | None = None
         if self._indexes is not None:
             rebuild_task_id = self._indexes.notify_corpus_changed(
                 normalized_library_id
@@ -103,13 +103,6 @@ class KnowledgeDocumentLifecycleService:
             title=title,
             vector_rebuild_task_id=rebuild_task_id,
         )
-
-
-def _required_identity(value: str) -> str:
-    normalized = value.strip() if isinstance(value, str) else ""
-    if not normalized:
-        raise KnowledgeDocumentNotFound()
-    return normalized
 
 
 __all__ = [

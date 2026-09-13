@@ -426,14 +426,14 @@ def test_forecast_service_bridge_fit_evaluate_apply(tmp_path: Path) -> None:
     options = _weekly_options()
     policy = get_default_policy(EvaluationKind.FORECASTING)
     snapshot = DatasetSnapshotFact(
-        dataset_id="weekly-dataset",
+        dataset_id=101,
         source_sha256="a" * 64,
         source_byte_size=source_path.stat().st_size,
         schema_digest="b" * 64,
     )
     fit_request = FitTaskRequest(
-        task_id="forecast-fit",
-        project_id="project-1",
+        task_id=102,
+        project_id=103,
         dataset_id=snapshot.dataset_id,
         dataset_source_path=str(source_path),
         evaluation_kind=EvaluationKind.FORECASTING,
@@ -465,8 +465,8 @@ def test_forecast_service_bridge_fit_evaluate_apply(tmp_path: Path) -> None:
     assert fit_result.forecast_preparation_facts is not None
 
     evaluate_request = EvaluateTaskRequest(
-        task_id="forecast-evaluate",
-        project_id="project-1",
+        task_id=104,
+        project_id=103,
         dataset_id=snapshot.dataset_id,
         dataset_source_path=str(source_path),
         evaluation_kind=EvaluationKind.FORECASTING,
@@ -475,7 +475,7 @@ def test_forecast_service_bridge_fit_evaluate_apply(tmp_path: Path) -> None:
         dataset_snapshot=snapshot,
         forecast_options=options,
         evaluate_model=EvaluateModelPayload(
-            trained_model_id="trained-forecast",
+            trained_model_id=106,
             model_key=HoltWintersForecastingService.key,
             trained_model_artifact_path=fit_result.model_artifact_path,
             holdout_artifact_path=fit_result.holdout_artifact_path or "",
@@ -490,12 +490,12 @@ def test_forecast_service_bridge_fit_evaluate_apply(tmp_path: Path) -> None:
     assert evaluate_result.evaluation.details["interval_method"] == "residual_quantile.v1"
 
     apply_request = ApplyTaskRequest(
-        task_id="forecast-apply",
-        project_id="project-1",
+        task_id=105,
+        project_id=103,
         dataset_id=snapshot.dataset_id,
         dataset_source_path=str(source_path),
         apply_model=ApplyModelPayload(
-            trained_model_id="trained-forecast",
+            trained_model_id=106,
             model_key=HoltWintersForecastingService.key,
             trained_model_artifact_path=fit_result.model_artifact_path,
         ),

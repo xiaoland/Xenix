@@ -32,7 +32,7 @@ class KnowledgeRepository:
         session.refresh(row)
         return row
 
-    def get_document(self, session: Session, document_id: str) -> KnowledgeDocumentRow | None:
+    def get_document(self, session: Session, document_id: int) -> KnowledgeDocumentRow | None:
         return session.get(KnowledgeDocumentRow, document_id)
 
     def get_document_by_source_sha256(
@@ -77,7 +77,7 @@ class KnowledgeRepository:
         session: Session,
         *,
         library_id: str,
-        document_id: str,
+        document_id: int,
         updated_at: datetime,
     ) -> bool:
         result = session.execute(
@@ -109,7 +109,7 @@ class KnowledgeRepository:
         self,
         session: Session,
         *,
-        document_id: str,
+        document_id: int,
     ) -> bool:
         row = session.execute(
             text(
@@ -175,9 +175,9 @@ class KnowledgeRepository:
         *,
         fts_query: str,
         library_id: str,
-        document_ids: Sequence[str],
+        document_ids: Sequence[int],
         limit: int,
-    ) -> list[str]:
+    ) -> list[int]:
         sql = (
             "SELECT f.unit_id FROM knowledge_unit_fts AS f "
             "JOIN knowledge_unit AS u ON u.id=f.unit_id "
@@ -199,9 +199,9 @@ class KnowledgeRepository:
             sql += f"AND d.id IN ({placeholders}) "
             params.update({f"document_{index}": value for index, value in enumerate(document_ids)})
         sql += "ORDER BY bm25(knowledge_unit_fts) LIMIT :limit"
-        return [str(row[0]) for row in session.execute(text(sql), params)]
+        return [int(row[0]) for row in session.execute(text(sql), params)]
 
-    def get_units(self, session: Session, unit_ids: Sequence[str]) -> list[KnowledgeUnitRow]:
+    def get_units(self, session: Session, unit_ids: Sequence[int]) -> list[KnowledgeUnitRow]:
         if not unit_ids:
             return []
         rows = list(session.exec(select(KnowledgeUnitRow).where(KnowledgeUnitRow.id.in_(unit_ids))))
@@ -211,8 +211,8 @@ class KnowledgeRepository:
     def get_documents(
         self,
         session: Session,
-        document_ids: Sequence[str],
-    ) -> dict[str, KnowledgeDocumentRow]:
+        document_ids: Sequence[int],
+    ) -> dict[int, KnowledgeDocumentRow]:
         if not document_ids:
             return {}
         rows = session.exec(
@@ -280,8 +280,8 @@ class KnowledgeRepository:
         )
         return [
             KnowledgeProjectionMetadata(
-                document_id=str(row[0]),
-                retrieval_generation_id=str(row[1]),
+                document_id=int(row[0]),
+                retrieval_generation_id=int(row[1]),
                 projection_version=int(row[2]),
                 content_fingerprint=str(row[3]),
                 unit_count=int(row[4]),
@@ -295,14 +295,18 @@ class KnowledgeRepository:
         *,
         library_id: str,
     ) -> KnowledgeProjectionIdentity:
-        return KnowledgeProjectionIdentity(
-            tuple(
-                self.list_current_projection_metadata(
-                    session,
-                    library_id=library_id,
-                )
+        metadata = tuple(self.list_current_projection_metadata(session, library_id=library_id))
+        unit_ids = tuple(session.exec(
+            select(KnowledgeUnitRow.id)
+            .join(KnowledgeDocumentRow, KnowledgeDocumentRow.id == KnowledgeUnitRow.document_id)
+            .where(
+                KnowledgeDocumentRow.id.in_([item.document_id for item in metadata]),
+                KnowledgeUnitRow.canonical_generation_id == KnowledgeDocumentRow.retrieval_generation_id,
             )
-        )
+            .order_by(KnowledgeUnitRow.document_id, KnowledgeUnitRow.ordinal, KnowledgeUnitRow.id)
+        ))
+        return KnowledgeProjectionIdentity(metadata, unit_ids)
+
 
     def load_projection_snapshot(
         self,
@@ -339,10 +343,10 @@ class KnowledgeRepository:
         ).mappings()
         metadata: list[KnowledgeProjectionMetadata] = []
         units: list[KnowledgeProjectionUnit] = []
-        seen_documents: set[str] = set()
+        seen_documents: set[int] = set()
         for row in rows:
-            document_id = str(row["document_id"])
-            generation_id = str(row["retrieval_generation_id"])
+            document_id = int(row["document_id"])
+            generation_id = int(row["retrieval_generation_id"])
             if document_id not in seen_documents:
                 metadata.append(
                     KnowledgeProjectionMetadata(
@@ -358,15 +362,15 @@ class KnowledgeRepository:
                 continue
             units.append(
                 KnowledgeProjectionUnit(
-                    id=str(row["unit_id"]),
+                    id=int(row["unit_id"]),
                     document_id=document_id,
-                    canonical_generation_id=str(row["unit_generation_id"]),
+                    canonical_generation_id=int(row["unit_generation_id"]),
                     ordinal=int(row["unit_ordinal"]),
                     text=str(row["unit_text"]),
                 )
             )
         return KnowledgeProjectionSnapshot(
-            identity=KnowledgeProjectionIdentity(tuple(metadata)),
+            identity=KnowledgeProjectionIdentity(tuple(metadata), tuple(unit.id for unit in units)),
             units=tuple(units),
         )
 
@@ -492,7 +496,7 @@ class KnowledgeRepository:
     def delete_vector_generation(
         self,
         session: Session,
-        generation_id: str,
+        generation_id: int,
     ) -> bool:
         row = session.get(KnowledgeVectorGenerationRow, generation_id)
         if row is None:
@@ -514,7 +518,7 @@ class KnowledgeRepository:
     def get_index_task(
         self,
         session: Session,
-        task_id: str,
+        task_id: int,
     ) -> KnowledgeIndexTaskRow | None:
         return session.get(KnowledgeIndexTaskRow, task_id)
 
@@ -561,7 +565,7 @@ class KnowledgeRepository:
         session.refresh(row)
         return row
 
-    def get_import(self, session: Session, import_id: str) -> KnowledgeImportRow | None:
+    def get_import(self, session: Session, import_id: int) -> KnowledgeImportRow | None:
         return session.get(KnowledgeImportRow, import_id)
 
     def list_imports(
@@ -613,7 +617,7 @@ class KnowledgeRepository:
         )
 
     def get_import_retry_of(
-        self, session: Session, *, retry_of_id: str,
+        self, session: Session, *, retry_of_id: int,
     ) -> KnowledgeImportRow | None:
         return session.exec(
             select(KnowledgeImportRow)
@@ -625,8 +629,8 @@ class KnowledgeRepository:
         self,
         session: Session,
         *,
-        planned_document_id: str,
-        excluding_import_id: str | None = None,
+        planned_document_id: int,
+        excluding_import_id: int | None = None,
     ) -> int:
         from sqlalchemy import func
         statement = select(func.max(KnowledgeImportRow.attempt_number)).where(
@@ -657,7 +661,7 @@ class KnowledgeRepository:
     def get_canonical_generation(
         self,
         session: Session,
-        generation_id: str,
+        generation_id: int,
     ) -> KnowledgeCanonicalGenerationRow | None:
         return session.get(KnowledgeCanonicalGenerationRow, generation_id)
 
@@ -665,7 +669,7 @@ class KnowledgeRepository:
         self,
         session: Session,
         *,
-        document_id: str,
+        document_id: int,
     ) -> KnowledgeCanonicalGenerationRow | None:
         document = self.get_document(session, document_id)
         if document is None:
@@ -676,7 +680,7 @@ class KnowledgeRepository:
         self,
         session: Session,
         *,
-        document_id: str,
+        document_id: int,
     ) -> list[KnowledgeCanonicalGenerationRow]:
         return list(
             session.exec(
@@ -699,7 +703,7 @@ class KnowledgeRepository:
     def get_derivation(
         self,
         session: Session,
-        derivation_id: str,
+        derivation_id: int,
     ) -> KnowledgeDerivationRow | None:
         return session.get(KnowledgeDerivationRow, derivation_id)
 
@@ -707,8 +711,8 @@ class KnowledgeRepository:
         self,
         session: Session,
         *,
-        document_id: str,
-        canonical_generation_id: str | None = None,
+        document_id: int,
+        canonical_generation_id: int | None = None,
     ) -> list[KnowledgeDerivationRow]:
         statement = select(KnowledgeDerivationRow).where(
             KnowledgeDerivationRow.document_id == document_id
@@ -742,7 +746,7 @@ class KnowledgeRepository:
         session: Session,
         *,
         document: KnowledgeDocumentRow,
-        generation_id: str | None,
+        generation_id: int | None,
         status: str,
     ) -> KnowledgeDocumentRow:
         document.retrieval_generation_id = generation_id

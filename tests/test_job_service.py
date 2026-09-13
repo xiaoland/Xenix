@@ -17,12 +17,12 @@ from xenix.services.storage.models import (
 def test_job_query_projects_and_filters_domain_authorities(storage) -> None:
     now = datetime.now(timezone.utc)
     with storage.session_factory() as session:
-        session.add(ProjectRow(id="project-1", name="Forecasting"))
+        session.add(ProjectRow(id=101, name="Forecasting"))
         session.commit()
         session.add(
             DatasetRow(
-                id="dataset-1",
-                project_id="project-1",
+                id=102,
+                project_id=101,
                 name="Quarterly sales",
                 source_path="sales.csv",
                 source_format=DatasetSourceFormat.CSV,
@@ -31,9 +31,9 @@ def test_job_query_projects_and_filters_domain_authorities(storage) -> None:
         session.commit()
         session.add(
             MLTaskRow(
-                id="ml-1",
-                project_id="project-1",
-                dataset_id="dataset-1",
+                id=103,
+                project_id=101,
+                dataset_id=102,
                 task_type=MLTaskType.FIT,
                 status=MLTaskStatus.RUNNING,
                 updated_at=now,
@@ -42,7 +42,7 @@ def test_job_query_projects_and_filters_domain_authorities(storage) -> None:
         session.commit()
         session.add(
             KnowledgeImportRow(
-                id="import-1",
+                id=104,
                 original_file_name="Policy.pdf",
                 source_format="pdf",
                 status="failed",
@@ -57,7 +57,7 @@ def test_job_query_projects_and_filters_domain_authorities(storage) -> None:
     service = JobQueryService(storage.session_factory)
     jobs = service.list_jobs()
 
-    assert [job.reference for job in jobs] == ["ml:ml-1", "knowledge:import:import-1"]
+    assert [job.reference for job in jobs] == ["ml:103", "knowledge:import:104"]
     assert jobs[0].domain is JobDomain.ML
     assert jobs[0].target == "Quarterly sales"
     assert jobs[0].status is JobStatus.RUNNING
@@ -71,12 +71,12 @@ def test_job_query_projects_and_filters_domain_authorities(storage) -> None:
 
 def test_job_query_maps_pending_ml_status_to_queued(storage) -> None:
     with storage.session_factory() as session:
-        session.add(ProjectRow(id="project-1", name="Forecasting"))
+        session.add(ProjectRow(id=101, name="Forecasting"))
         session.commit()
         session.add(
             MLTaskRow(
-                id="ml-pending",
-                project_id="project-1",
+                id=105,
+                project_id=101,
                 dataset_id=None,
                 task_type=MLTaskType.FIT,
                 status=MLTaskStatus.PENDING,
@@ -95,7 +95,7 @@ def test_job_query_normalizes_completed_knowledge_states(storage) -> None:
     with storage.session_factory() as session:
         session.add(
             KnowledgeImportRow(
-                id="import-ready",
+                id=106,
                 original_file_name="Ready.txt",
                 source_format="txt",
                 status="retrieval_ready",
@@ -113,26 +113,27 @@ def test_job_query_normalizes_completed_knowledge_states(storage) -> None:
 def test_job_filters_find_older_matches_before_paging_both_domains(storage):
     now = datetime.now(timezone.utc)
     with storage.session_factory() as session:
-        session.add(ProjectRow(id="recent", name="Recent"))
-        session.add(ProjectRow(id="archived-target", name="Archived"))
+        session.add(ProjectRow(id=1000000007, name="Recent"))
+        session.add(ProjectRow(id=1000000008, name="Archived-target"))
         session.commit()
         for index in range(502):
             old = index == 501
             updated = now - timedelta(minutes=index)
             session.add(MLTaskRow(
-                id=f"ml-{index}", project_id="archived-target" if old else "recent",
+                id=1000 + index, project_id=1000000008 if old else 1000000007,
                 task_type=MLTaskType.FIT,
                 status=MLTaskStatus.FAILED if old else MLTaskStatus.SUCCEEDED,
                 updated_at=updated,
             ))
             session.add(KnowledgeImportRow(
-                id=f"import-{index}", original_file_name="archived-target.txt" if old else "recent.txt",
+                id=2000 + index, original_file_name="archived-target.txt" if old else "recent.txt",
                 source_format="txt", status="failed" if old else "retrieval_ready",
                 phase="completed", updated_at=updated,
             ))
         session.commit()
     service = JobQueryService(storage.session_factory)
-    for domain, reference in ((JobDomain.ML, "ml:ml-501"), (JobDomain.KNOWLEDGE, "knowledge:import:import-501")):
-        for filters in ({"status": "failed"}, {"search": " ARCHIVED-TARGET "}, {"status": "failed", "search": "archived"}):
+    for domain, reference in ((JobDomain.ML, "ml:1501"), (JobDomain.KNOWLEDGE, "knowledge:import:2501")):
+        search = "1000000008" if domain is JobDomain.ML else "ARCHIVED-TARGET"
+        for filters in ({"status": "failed"}, {"search": f" {search} "}, {"status": "failed", "search": search}):
             assert [job.reference for job in service.list_jobs(domain=domain.value, limit=1, **filters)] == [reference]
         assert len(service.list_jobs(domain=domain, limit=550)) == 502

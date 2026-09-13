@@ -46,7 +46,7 @@ class ProjectService:
         with self._session_factory() as session:
             return self._projects.list_all(session)
 
-    def get_project(self, project_id: str) -> ProjectRow:
+    def get_project(self, project_id: int) -> ProjectRow:
         with self._session_factory() as session:
             row = self._projects.get(session, project_id)
             if row is None:

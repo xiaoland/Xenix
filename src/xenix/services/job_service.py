@@ -16,7 +16,7 @@ class JobItem:
     """Stable presentation projection over a domain-owned unit of work."""
 
     reference: str
-    raw_reference: str
+    raw_reference: int
     domain: JobDomain
     kind: str
     target: str
@@ -114,7 +114,7 @@ class JobQueryService:
                 domain=JobDomain.ML,
                 kind=task.task_type.value,
                 target=(
-                    datasets.get(task.dataset_id, task.dataset_id) if task.dataset_id is not None else task.project_id
+                    datasets.get(task.dataset_id, str(task.dataset_id)) if task.dataset_id is not None else str(task.project_id)
                 ),
                 status=ml_job_status(task.status.value),
                 phase=task.status.value,

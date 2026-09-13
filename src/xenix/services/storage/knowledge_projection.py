@@ -7,17 +7,16 @@ from dataclasses import dataclass
 
 
 RETRIEVAL_PROJECTION_VERSION = 4
-CORPUS_FINGERPRINT_SCHEMA = 4
+CORPUS_FINGERPRINT_SCHEMA = 5
 
 _PROJECTION_FINGERPRINT_DOMAIN = "xenix.knowledge-projection/v4"
-_CORPUS_FINGERPRINT_DOMAIN = "xenix.knowledge-corpus/v4"
-_UNIT_ID_DOMAIN = "xenix.knowledge-unit/v4"
+_CORPUS_FINGERPRINT_DOMAIN = "xenix.knowledge-corpus/v5"
 
 
 @dataclass(frozen=True)
 class KnowledgeProjectionMetadata:
-    document_id: str
-    retrieval_generation_id: str
+    document_id: int
+    retrieval_generation_id: int
     projection_version: int
     content_fingerprint: str
     unit_count: int
@@ -25,39 +24,28 @@ class KnowledgeProjectionMetadata:
 
 @dataclass(frozen=True)
 class KnowledgeProjectionUnit:
-    id: str
-    document_id: str
-    canonical_generation_id: str
+    id: int
+    document_id: int
+    canonical_generation_id: int
     ordinal: int
     text: str
 
 
 @dataclass(frozen=True)
 class KnowledgeProjectionIdentity:
-    """Bounded authority for one exact retrieval corpus revision."""
+    """Metadata and persisted Unit identities for one retrieval corpus revision."""
 
     metadata: tuple[KnowledgeProjectionMetadata, ...]
+    unit_ids: tuple[int, ...]
 
     @property
     def corpus_fingerprint(self) -> str:
-        return corpus_fingerprint(self.metadata)
+        return corpus_fingerprint(self.metadata, self.unit_ids)
 
     @property
     def unit_count(self) -> int:
         return sum(item.unit_count for item in self.metadata)
 
-    @property
-    def unit_ids(self) -> tuple[str, ...]:
-        return tuple(
-            knowledge_unit_id(
-                document_id=item.document_id,
-                canonical_generation_id=item.retrieval_generation_id,
-                ordinal=ordinal,
-                projection_version=item.projection_version,
-            )
-            for item in sorted(self.metadata, key=lambda value: value.document_id)
-            for ordinal in range(item.unit_count)
-        )
 
 
 @dataclass(frozen=True)
@@ -66,36 +54,6 @@ class KnowledgeProjectionSnapshot:
 
     identity: KnowledgeProjectionIdentity
     units: tuple[KnowledgeProjectionUnit, ...]
-
-    def __post_init__(self) -> None:
-        actual_ids = tuple(unit.id for unit in self.units)
-        if actual_ids != self.identity.unit_ids:
-            raise ValueError("Knowledge projection units do not match their identity.")
-
-
-def knowledge_unit_id(
-    *,
-    document_id: str,
-    canonical_generation_id: str,
-    ordinal: int,
-    projection_version: int = RETRIEVAL_PROJECTION_VERSION,
-) -> str:
-    """Derive row identity from the retrieval projection authority."""
-
-    payload = json.dumps(
-        {
-            "canonical_generation_id": canonical_generation_id,
-            "document_id": document_id,
-            "ordinal": int(ordinal),
-            "projection_version": int(projection_version),
-            "schema": _UNIT_ID_DOMAIN,
-        },
-        ensure_ascii=False,
-        sort_keys=True,
-        separators=(",", ":"),
-    ).encode("utf-8")
-    return "ku_" + hashlib.sha256(payload).hexdigest()
-
 
 def retrieval_content_fingerprint(
     units: Iterable[tuple[int, str, Mapping[str, object]]],
@@ -121,11 +79,12 @@ def retrieval_content_fingerprint(
     return digest.hexdigest()
 
 
-def corpus_fingerprint(metadata: Sequence[KnowledgeProjectionMetadata]) -> str:
-    """Fingerprint current corpus state using bounded per-document metadata only."""
+def corpus_fingerprint(metadata: Sequence[KnowledgeProjectionMetadata], unit_ids: Sequence[int]) -> str:
+    """Fingerprint document revisions and Unit IDs without loading text bodies."""
 
     payload = {
         "schema": _CORPUS_FINGERPRINT_DOMAIN,
+        "unit_ids": list(unit_ids),
         "documents": [
             {
                 "content_fingerprint": item.content_fingerprint,
@@ -154,6 +113,5 @@ __all__ = [
     "KnowledgeProjectionUnit",
     "RETRIEVAL_PROJECTION_VERSION",
     "corpus_fingerprint",
-    "knowledge_unit_id",
     "retrieval_content_fingerprint",
 ]

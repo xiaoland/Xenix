@@ -118,11 +118,11 @@ class BenchmarkCaseAssessment:
 
 
 class BenchmarkDatasetAccess(Protocol):
-    def get_dataset(self, dataset_id: str) -> Any: ...
+    def get_dataset(self, dataset_id: int) -> Any: ...
 
     def list_datasets(self) -> list[Any]: ...
 
-    def get_dataset_audit(self, dataset_id: str) -> Any: ...
+    def get_dataset_audit(self, dataset_id: int) -> Any: ...
 
 
 class BenchmarkArtifactAccess(Protocol):
@@ -130,9 +130,9 @@ class BenchmarkArtifactAccess(Protocol):
 
 
 class BenchmarkModelAccess(Protocol):
-    def get_task_details(self, ml_task_id: str) -> Any: ...
+    def get_task_details(self, ml_task_id: int) -> Any: ...
 
-    def get_trained_model(self, trained_model_id: str) -> Any: ...
+    def get_trained_model(self, trained_model_id: int) -> Any: ...
 
 
 class BenchmarkKnowledgeImportAccess(Protocol):
@@ -140,13 +140,13 @@ class BenchmarkKnowledgeImportAccess(Protocol):
 
 
 class BenchmarkKnowledgeDerivationAccess(Protocol):
-    def status_for_import(self, import_id: str) -> Any: ...
+    def status_for_import(self, import_id: int) -> Any: ...
 
 
 class BenchmarkKnowledgeIndexAccess(Protocol):
     def enqueue_rebuild(self, index_kinds: Any, *, trigger: str) -> str: ...
 
-    def rebuild_now(self, task_id: str) -> Any: ...
+    def rebuild_now(self, task_id: int) -> Any: ...
 
 
 @dataclass(frozen=True)
@@ -174,7 +174,7 @@ class BenchmarkCaseContext:
     snapshot: Any | None
     services: BenchmarkCaseServices
     source_state: Any | None
-    run_dataset_ids: frozenset[str]
+    run_dataset_ids: frozenset[int]
     runtime_home: Path
     turns: tuple[BenchmarkTurnObservation, ...] = ()
 
@@ -192,7 +192,7 @@ class BenchmarkCase(Protocol):
 
     def validate_input(self) -> str: ...
 
-    def build_submission(self, *, thread_id: str, fq_model_key: str) -> Any: ...
+    def build_submission(self, *, thread_id: int, fq_model_key: str) -> Any: ...
 
     def capture_source_state(self, *, snapshot: Any, services: BenchmarkCaseServices) -> Any: ...
 

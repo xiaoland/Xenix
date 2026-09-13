@@ -103,7 +103,7 @@ class MainWindow(QMainWindow):
     def conversation_idle(self) -> bool:
         return self._chat_workspace.conversation_idle
 
-    def refresh_history(self, *, selected_thread_id: str | None = None) -> None:
+    def refresh_history(self, *, selected_thread_id: int | None = None) -> None:
         self._chat_workspace.refresh_history(selected_thread_id=selected_thread_id)
 
     # Shell, layout, navigation ----------------------------------------------

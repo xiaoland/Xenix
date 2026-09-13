@@ -247,6 +247,8 @@ def read_evaluation_context(
 
 
 def dataset_snapshot_digest(snapshot: DatasetSnapshotFact) -> str:
+    if snapshot.sampling_fingerprint is not None:
+        return snapshot.sampling_fingerprint
     serialized = json.dumps(
         snapshot.model_dump(mode="json"),
         ensure_ascii=False,

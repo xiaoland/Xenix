@@ -31,13 +31,13 @@ class ToolCallDetailView(QDialog):
         self,
         *,
         ml_service: MLService,
-        task_ids: list[str],
+        task_ids: list[int],
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
         self._ml_service = ml_service
         self._task_ids = list(dict.fromkeys(task_ids))
-        self._selected_task_id: str | None = None
+        self._selected_task_id: int | None = None
         self._selected_artifact_path: str | None = None
 
         self._title_label = QLabel(self)
@@ -115,7 +115,7 @@ class ToolCallDetailView(QDialog):
     def refresh(self) -> None:
         current_task_id = self._selected_task_id
         self._task_tree.clear()
-        running_task_ids: list[str] = []
+        running_task_ids: list[int] = []
         read_failed = False
         first_task_item: QTreeWidgetItem | None = None
         selected_item: QTreeWidgetItem | None = None
@@ -127,7 +127,7 @@ class ToolCallDetailView(QDialog):
                 read_failed = True
                 if not isinstance(exc, XenixError):
                     report_exception(exc)
-                item = QTreeWidgetItem([task_id, self.tr("Error"), "", "", ""])
+                item = QTreeWidgetItem([str(task_id), self.tr("Error"), "", "", ""])
                 item.setData(0, Qt.UserRole, {"task_id": task_id})
                 self._task_tree.addTopLevelItem(item)
                 self._status_label.setText(str(exc))
@@ -196,7 +196,7 @@ class ToolCallDetailView(QDialog):
             self._open_button.setEnabled(False)
             self._log_view.clear()
             return
-        self._selected_task_id = str(payload.get("task_id") or "") or None
+        self._selected_task_id = payload.get("task_id")
         self._selected_artifact_path = str(payload.get("artifact_path") or "") or None
         self._open_button.setEnabled(bool(self._selected_artifact_path))
         if self._selected_task_id is None:

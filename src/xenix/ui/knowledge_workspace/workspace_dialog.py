@@ -95,7 +95,7 @@ class KnowledgeWorkspaceDialog(QDialog):
         self._documents_pending = False
         self._status_pending = False
         self._removal_task: _DocumentRemovalTask | None = None
-        self._removing_document_id: str | None = None
+        self._removing_document_id: int | None = None
         self._active = False
         self._document_state = _DocumentViewportState.COLD
         self._last_documents: KnowledgeWorkspaceDocuments | None = None

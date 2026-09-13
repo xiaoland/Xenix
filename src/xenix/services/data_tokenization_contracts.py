@@ -16,7 +16,7 @@ class StagedTextResourceInput(BaseModel):
 
     model_config = ConfigDict(extra="forbid", strict=True)
 
-    dataset_id: str = Field(min_length=1, max_length=128)
+    dataset_id: int = Field(ge=1)
     absolute_path: str = Field(min_length=1)
     source_sha256: Sha256
 

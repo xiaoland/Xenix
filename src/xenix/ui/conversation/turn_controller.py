@@ -50,15 +50,15 @@ class ConversationTurnController:
     """Own the UI-local turn gate and classify one Harness event at a time."""
 
     def __init__(self) -> None:
-        self._thread_id: str | None = None
+        self._thread_id: int | None = None
         self._pending: _PendingSubmission | None = None
         self._active_submission_id: str | None = None
-        self._active_pending_message_id: str | None = None
-        self._paused_thread_ids: set[str] = set()
+        self._active_pending_message_id: int | None = None
+        self._paused_thread_ids: set[int] = set()
         self._closed = False
 
     @property
-    def thread_id(self) -> str | None:
+    def thread_id(self) -> int | None:
         return self._thread_id
 
     @property
@@ -80,7 +80,7 @@ class ConversationTurnController:
             self._paused_thread_ids.discard(self._thread_id)
         return True
 
-    def select_thread(self, thread_id: str | None) -> None:
+    def select_thread(self, thread_id: int | None) -> None:
         if self._closed:
             return
         self._thread_id = thread_id
@@ -129,7 +129,7 @@ class ConversationTurnController:
             return StopDisposition.NO_THREAD
         return StopDisposition.PAUSE
 
-    def mark_paused(self, thread_id: str) -> None:
+    def mark_paused(self, thread_id: int) -> None:
         if not self._closed:
             self._paused_thread_ids.add(thread_id)
 

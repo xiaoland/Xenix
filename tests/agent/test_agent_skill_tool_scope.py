@@ -50,10 +50,10 @@ def test_unknown_activated_skill_fails_closed_to_initial_scope() -> None:
 
 
 def _snapshot_with_activated_skill(skill_name: str) -> SimpleNamespace:
-    activation = SimpleNamespace(id="activation-1", tool_id="agent.skill.activate", arguments_payload={"name": skill_name})
+    activation = SimpleNamespace(id=101, tool_id="agent.skill.activate", arguments_payload={"name": skill_name})
     result = SimpleNamespace(
-        id="result-1",
-        tool_call_message_id="activation-1",
+        id=102,
+        tool_call_message_id=101,
         result_status="succeeded",
         value_payload={"skill_name": skill_name},
     )

@@ -36,7 +36,7 @@ def _paths(root: Path) -> AppPaths:
     )
 
 
-def _resource(path: Path, dataset_id: str) -> StagedTextResourceInput:
+def _resource(path: Path, dataset_id: int) -> StagedTextResourceInput:
     return StagedTextResourceInput(
         dataset_id=dataset_id,
         absolute_path=str(path.resolve()),
@@ -84,8 +84,8 @@ def test_multilingual_profile_retains_safe_spec_and_bilingual_quality(tmp_path: 
         text_column="text",
         tokenizer_profile="multilingual_business_v1",
         phrase_mode="unigram_bigram",
-        custom_dictionary_resources=[_resource(dictionary, "dictionary-dataset")],
-        stopword_resources=[_resource(stopwords, "stopword-dataset")],
+        custom_dictionary_resources=[_resource(dictionary, 103)],
+        stopword_resources=[_resource(stopwords, 104)],
     )
 
     result = service.tokenize_dataset(request)
@@ -100,12 +100,12 @@ def test_multilingual_profile_retains_safe_spec_and_bilingual_quality(tmp_path: 
     assert result.report["empty_token_row_count"] == 1
     delivered = render_xenix_table_tool_result(
         tool_name="data.tokenize", status="succeeded",
-        payload={"dataset_id": "tokens", "artifact_id": "workbook", "tokenization_report": result.report,
+        payload={"dataset_id": 101, "artifact_id": 102, "tokenization_report": result.report,
                  "inspection": {"preview_columns": [], "preview_rows": [], "row_count": result.report["output_row_count"]}},
     )
     assert delivered is not None
     assert f"token_count: {result.report['token_count']}" in delivered
-    assert "dictionary-dataset" in delivered
+    assert "103" in delivered
     assert "preparation_quality:" in delivered
     specification = result.report["preparation_specification"]
     assert isinstance(specification, dict)
@@ -129,7 +129,7 @@ def test_staged_text_resources_fail_closed_on_digest_mismatch(tmp_path: Path) ->
         tokenizer_profile="multilingual_business_v1",
         custom_dictionary_resources=[
             StagedTextResourceInput(
-                dataset_id="dictionary-dataset",
+                dataset_id=103,
                 absolute_path=str(dictionary.resolve()),
                 source_sha256="0" * 64,
             )
@@ -150,7 +150,7 @@ def test_tokenization_contract_rejects_unversioned_profiles_and_ambiguous_resour
                 "tokenizer_profile": "unversioned-profile",
             }
         )
-    resource = _resource(FIXTURE_ROOT / "custom_dictionary.csv", "shared-resource")
+    resource = _resource(FIXTURE_ROOT / "custom_dictionary.csv", 105)
     with pytest.raises(PydanticValidationError, match="both a custom dictionary and a stopword"):
         TextPreparationInput(
             custom_dictionary_resources=[resource],

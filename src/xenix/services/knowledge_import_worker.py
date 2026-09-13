@@ -36,7 +36,7 @@ from .windows_process_tree import arm_current_process_tree
 
 _MAX_RESULT_BYTES = 256 * 1024
 _DEFAULT_OPERATION_TIMEOUT_SECONDS = 15 * 60
-TaskId = Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{32}$")]
+TaskId = PositiveInt
 Sha256 = Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{64}$")]
 EventToken = Annotated[str, StringConstraints(pattern=r"^[a-z0-9_.-]{1,80}$")]
 BoundedWarning = Annotated[str, StringConstraints(max_length=200)]
@@ -170,7 +170,7 @@ class LocalKnowledgeImportWorkerRunner:
         process = context.Process(
             target=_managed_knowledge_import_worker_entry,
             args=(self._entrypoint, request, event_queue),
-            name=f"xenix-knowledge-import-{request.import_id[:8]}",
+            name=f"xenix-knowledge-import-{request.import_id}",
         )
         timed_out = False
         cancelled = False

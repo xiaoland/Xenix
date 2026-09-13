@@ -6,7 +6,7 @@ from typing import Any, Literal, Protocol
 import joblib
 import numpy as np
 import pandas as pd
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, PositiveInt, field_validator
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 
@@ -105,14 +105,12 @@ class MultilingualTextClassificationParams(BaseModel):
     max_features: int = Field(default=5000, ge=200, le=50000)
     minimum_document_frequency: int = Field(default=1, ge=1, le=20)
     class_weight: Literal["balanced", "none"] = "balanced"
-    custom_dictionary_dataset_ids: list[str] = Field(default_factory=list, max_length=4)
-    stopword_dataset_ids: list[str] = Field(default_factory=list, max_length=4)
+    custom_dictionary_dataset_ids: list[PositiveInt] = Field(default_factory=list, max_length=4)
+    stopword_dataset_ids: list[PositiveInt] = Field(default_factory=list, max_length=4)
 
     @field_validator("custom_dictionary_dataset_ids", "stopword_dataset_ids")
     @classmethod
-    def _resource_dataset_ids_must_be_bounded_references(cls, values: list[str]) -> list[str]:
-        if any(not value.strip() or len(value) > 128 for value in values):
-            raise ValueError("Text preparation Dataset IDs must contain 1 to 128 non-whitespace characters.")
+    def _resource_dataset_ids_must_be_unique(cls, values: list[int]) -> list[int]:
         if len(set(values)) != len(values):
             raise ValueError("Text preparation Dataset IDs cannot contain duplicates.")
         return values
@@ -200,24 +198,22 @@ class _TextDiscoveryParams(Protocol):
     def phrase_mode(self) -> str: ...
 
     @property
-    def custom_dictionary_dataset_ids(self) -> list[str]: ...
+    def custom_dictionary_dataset_ids(self) -> list[int]: ...
 
     @property
-    def stopword_dataset_ids(self) -> list[str]: ...
+    def stopword_dataset_ids(self) -> list[int]: ...
 
 
 class _MultilingualDiscoveryParamsBase(BaseModel):
     preparation_profile: Literal["multilingual_business_v1"] = "multilingual_business_v1"
     phrase_mode: Literal["unigram", "unigram_bigram"] = "unigram"
     max_features: int = Field(default=5000, ge=200, le=50000)
-    custom_dictionary_dataset_ids: list[str] = Field(default_factory=list, max_length=4)
-    stopword_dataset_ids: list[str] = Field(default_factory=list, max_length=4)
+    custom_dictionary_dataset_ids: list[PositiveInt] = Field(default_factory=list, max_length=4)
+    stopword_dataset_ids: list[PositiveInt] = Field(default_factory=list, max_length=4)
 
     @field_validator("custom_dictionary_dataset_ids", "stopword_dataset_ids")
     @classmethod
-    def _resource_ids_are_bounded_and_unique(cls, values: list[str]) -> list[str]:
-        if any(not value.strip() or len(value) > 128 for value in values):
-            raise ValueError("Text preparation Dataset IDs must contain 1 to 128 non-whitespace characters.")
+    def _resource_ids_are_unique(cls, values: list[int]) -> list[int]:
         if len(values) != len(set(values)):
             raise ValueError("Text preparation Dataset IDs cannot contain duplicates.")
         return values

@@ -20,6 +20,7 @@ from xenix.services.storage.migrations import (
     migrate_v25_to_v26,
     migrate_v26_to_v27,
 )
+from xenix.services.storage.identity import reserve_ids
 from xenix.services.storage.models import (
     ArtifactKind,
     ArtifactRow,
@@ -735,16 +736,15 @@ def _sqlite_user_version(db_path: Path) -> int:
 
 def _assert_current_round_trip(context, *, suffix: str) -> None:
     repository = KnowledgeRepository()
-    document_id = f"document-current-{suffix}"
-    import_id = f"import-current-{suffix}"
-    generation_id = f"canonical-current-{suffix}"
+    document_id, import_id, generation_id, unit_id = reserve_ids(context.session_factory, 4)
     with context.session_factory() as session:
+        artifact_id = session.exec(select(ArtifactRow.id)).first()
         document = repository.create_document(
             session,
             KnowledgeDocumentRow(
                 id=document_id,
                 title="当前规则",
-                source_artifact_id="artifact-1",
+                source_artifact_id=artifact_id,
                 source_sha256=(suffix * 64)[:64],
                 source_format="txt",
                 canonical_generation_id=generation_id,
@@ -763,7 +763,7 @@ def _assert_current_round_trip(context, *, suffix: str) -> None:
                 phase="publish",
                 planned_document_id=document_id,
                 document_id=document_id,
-                source_artifact_id="artifact-1",
+                source_artifact_id=artifact_id,
                 canonical_generation_id=generation_id,
                 envelope_sha256="d" * 64,
                 content_ir_sha256="e" * 64,
@@ -775,7 +775,7 @@ def _assert_current_round_trip(context, *, suffix: str) -> None:
                 id=generation_id,
                 document_id=document_id,
                 import_id=import_row.id,
-                source_artifact_id="artifact-1",
+                source_artifact_id=artifact_id,
                 library_id="global",
                 source_sha256=document.source_sha256 or "",
                 source_format="txt",
@@ -792,7 +792,6 @@ def _assert_current_round_trip(context, *, suffix: str) -> None:
         first = repository.create_derivation(
             session,
             KnowledgeDerivationRow(
-                id=f"derivation-1-{suffix}",
                 document_id=document_id,
                 canonical_generation_id=canonical.id,
                 import_id=import_id,
@@ -805,7 +804,6 @@ def _assert_current_round_trip(context, *, suffix: str) -> None:
         retry = repository.create_derivation(
             session,
             KnowledgeDerivationRow(
-                id=f"derivation-2-{suffix}",
                 document_id=document_id,
                 canonical_generation_id=canonical.id,
                 import_id=import_id,
@@ -820,7 +818,7 @@ def _assert_current_round_trip(context, *, suffix: str) -> None:
             document=document,
             units=[
                 KnowledgeUnitRow(
-                    id=f"unit-current-{suffix}",
+                    id=unit_id,
                     document_id=document_id,
                     canonical_generation_id=generation_id,
                     ordinal=0,
@@ -844,22 +842,21 @@ def _assert_current_round_trip(context, *, suffix: str) -> None:
         assert loaded.pipeline_payload == {"parser": "docling"}
         assert loaded.warnings_payload == ["legacy_safe"]
         assert repository.get_derivation(session, retry.id).retry_of == first.id  # type: ignore[union-attr]
-        assert [row.id for row in repository.list_current_units(session, library_id="global") if row.document_id == document_id] == [f"unit-current-{suffix}"]
+        assert [row.id for row in repository.list_current_units(session, library_id="global") if row.document_id == document_id] == [unit_id]
         assert repository.search_unit_ids(
             session,
             fts_query='"当前"',
             library_id="global",
             document_ids=[document_id],
             limit=5,
-        ) == [f"unit-current-{suffix}"]
+        ) == [unit_id]
         assert session.exec(text("PRAGMA foreign_key_check")).all() == []
 
         with pytest.raises(IntegrityError):
             repository.create_import(
                 session,
                 KnowledgeImportRow(
-                    id=f"import-duplicate-{suffix}",
-                    original_file_name="duplicate.txt",
+                        original_file_name="duplicate.txt",
                     source_format="txt",
                     planned_document_id=document_id,
                     attempt_number=1,
@@ -886,7 +883,7 @@ def test_fresh_v23_schema_is_orm_fts_fk_and_unique_readable(
 
     context = StorageBootstrapService().initialize(paths)
 
-    assert get_user_version(context.engine) == CURRENT_SCHEMA_VERSION == 27
+    assert get_user_version(context.engine) == CURRENT_SCHEMA_VERSION
     assert {
         "knowledge_canonical_generation",
         "knowledge_derivation",
@@ -895,7 +892,6 @@ def test_fresh_v23_schema_is_orm_fts_fk_and_unique_readable(
     with context.session_factory() as session:
         session.add(
             ArtifactRow(
-                id="artifact-1",
                 kind=ArtifactKind.FILE,
                 title="source.txt",
                 absolute_path="C:/xenix/artifacts/knowledge/source.txt",
@@ -916,15 +912,15 @@ def test_static_supported_fixture_upgrades_with_orm_fts_and_fk_proof(
 
     context = StorageBootstrapService().initialize(paths)
 
-    assert get_user_version(context.engine) == CURRENT_SCHEMA_VERSION == 27
+    assert get_user_version(context.engine) == CURRENT_SCHEMA_VERSION
     with context.session_factory() as session:
-        artifact = session.get(ArtifactRow, "artifact-1")
+        artifact = session.exec(select(ArtifactRow)).one()
         assert artifact is not None and artifact.kind is ArtifactKind.FILE
         assert session.exec(text("PRAGMA foreign_key_check")).all() == []
         if version >= 16:
-            document = session.get(KnowledgeDocumentRow, "document-1")
-            unit = session.get(KnowledgeUnitRow, "unit-1")
-            import_row = session.get(KnowledgeImportRow, "import-1")
+            document = session.exec(select(KnowledgeDocumentRow)).one()
+            unit = session.exec(select(KnowledgeUnitRow)).one()
+            import_row = session.exec(select(KnowledgeImportRow)).one()
             assert document is not None
             assert document.retrieval_generation_id is None
             assert document.retrieval_status == "pending"
@@ -936,14 +932,14 @@ def test_static_supported_fixture_upgrades_with_orm_fts_and_fk_proof(
             assert import_row.status == "canonical_ready"
             assert import_row.phase == "completed"
             assert import_row.attempt_number == 1
-            assert import_row.planned_document_id == "document-1"
-            assert import_row.canonical_generation_id == "canonical-generation-1"
+            assert import_row.planned_document_id == document.id
+            assert import_row.canonical_generation_id == document.canonical_generation_id
             assert import_row.canonical_path == "objects/legacy/canonical.json.zst"
-            assert session.get(KnowledgeCanonicalGenerationRow, "canonical-generation-1") is None
+            assert session.get(KnowledgeCanonicalGenerationRow, document.canonical_generation_id) is None
         if version in {18, 19, 20, 21}:
-            vector = session.get(KnowledgeVectorGenerationRow, "vector-generation-1")
+            vector = session.exec(select(KnowledgeVectorGenerationRow)).one()
             assert vector is not None and vector.dimensions == 3
-            assert vector.corpus_fingerprint_schema == 1
+            assert vector.corpus_fingerprint_schema == 0
     _assert_current_round_trip(context, suffix=str(version)[-1])
 
 
@@ -983,14 +979,13 @@ def test_v20_migration_deterministically_repairs_duplicate_import_attempt_number
         rows = list(
             session.exec(
                 select(KnowledgeImportRow)
-                .where(KnowledgeImportRow.planned_document_id == "document-1")
+
                 .order_by(KnowledgeImportRow.attempt_number)
             )
         )
-        assert [(row.id, row.attempt_number) for row in rows] == [
-            ("import-1", 1),
-            ("import-duplicate", 2),
-        ]
+        assert [row.attempt_number for row in rows] == [1, 2]
+        assert rows[1].retry_of == rows[0].id
+        assert rows[1].planned_document_id == rows[0].planned_document_id
 
 
 def test_supported_version_with_incomplete_source_shape_is_preserved(

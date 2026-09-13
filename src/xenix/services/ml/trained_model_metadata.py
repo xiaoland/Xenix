@@ -59,7 +59,7 @@ class TrainedModelMetadata(BaseModel):
     tuning_grid: dict[str, list[Any]] = Field(default_factory=dict)
     evaluation_model_training_scope: str | None = None
     apply_model_training_scope: str | None = None
-    evaluation_ml_task_id: str | None = None
+    evaluation_ml_task_id: int | None = None
     evaluation_facts_authority: str | None = None
     evaluation_primary_metric_name: str | None = None
     evaluation_primary_metric_value: float | None = None
@@ -86,12 +86,12 @@ def build_artifact_file_name(
     run_name: str,
     model_display_name: str,
     created_at: datetime,
-    ml_task_id: str,
+    ml_task_id: int,
 ) -> str:
     run_slug = _slugify(run_name)
     model_slug = _slugify(model_display_name)
     timestamp = created_at.strftime(_SAVE_FILE_DATETIME_FORMAT)
-    task_suffix = ml_task_id[:8]
+    task_suffix = str(ml_task_id)
     return f"{run_slug}-{model_slug}-{timestamp}-{task_suffix}.joblib"
 
 
@@ -106,7 +106,7 @@ def with_evaluation(
     metadata: TrainedModelMetadata,
     evaluation: Any,
     *,
-    evaluation_ml_task_id: str | None = None,
+    evaluation_ml_task_id: int | None = None,
 ) -> TrainedModelMetadata:
     update = {
         "schema_version": max(metadata.schema_version, 6),
@@ -126,7 +126,7 @@ def with_evaluation(
 
 def with_evaluation_task(
     metadata: TrainedModelMetadata,
-    evaluation_ml_task_id: str,
+    evaluation_ml_task_id: int,
 ) -> TrainedModelMetadata:
     return metadata.model_copy(
         update={

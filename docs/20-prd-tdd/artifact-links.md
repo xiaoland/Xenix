@@ -14,6 +14,8 @@ Artifact links use one authority:
 artifact://<artifact_id>
 ```
 
+`artifact_id` is the Artifact's persistent integer ID written in decimal, for example `artifact://42`. It is the same ID returned by services and Tools, with no separate short-name mapping.
+
 Dataset ids identify registered data for later service or tool input. They are not
 link authorities. A derived dataset intended for user download must also have a
 ready export artifact.
@@ -57,8 +59,7 @@ requests a normal openable artifact. Both retain the same artifact id authority.
   after local finalization and registration.
 - A missing registration or registered file is a service error and activation
   fails.
-- Tool results expose identities, not prebuilt artifact URI strings; conversation
-  presentation owns markdown construction.
+- Tool results expose integer identities and may include the canonical Artifact URI; conversation presentation owns Markdown construction.
 
 ## Verification
 

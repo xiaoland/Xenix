@@ -41,7 +41,7 @@ def test_dataset_audit_block_is_rendered_in_tool_detail(explanation, qtbot) -> N
                 {
                     "type": "dataset_audit",
                     "name": "clean`data",
-                    "dataset_id": "dataset-2",
+                    "dataset_id": 101,
                     "operation_name": "clean_dataset",
                     "generation": 2,
                     "created_at": "2026-09-03T10:00:00+08:00",
@@ -49,7 +49,7 @@ def test_dataset_audit_block_is_rendered_in_tool_detail(explanation, qtbot) -> N
                         {
                             "position": 0,
                             "name": "raw",
-                            "dataset_id": "dataset-1",
+                            "dataset_id": 102,
                             "alias": "source",
                         }
                     ],
@@ -61,8 +61,8 @@ def test_dataset_audit_block_is_rendered_in_tool_detail(explanation, qtbot) -> N
     )
 
     assert "### Dataset audit" in markdown
-    assert "Dataset: `clean\\`data` (`dataset-2`)" in markdown
-    assert "Input 1: `raw` (`dataset-1`) — alias `source`" in markdown
+    assert "Dataset: `clean\\`data` (`101`)" in markdown
+    assert "Input 1: `raw` (`102`) — alias `source`" in markdown
     assert '"drop_nulls": true' in markdown
     if explanation:
         assert explanation in markdown
@@ -75,12 +75,12 @@ def test_dataset_audit_block_is_rendered_in_tool_detail(explanation, qtbot) -> N
         id="history-tool", kind=ChatbotEventKind.TOOL, author=ChatbotEventAuthor.TOOL,
         tool_name="data.clean", summary="Cleaned dataset",
         detail_blocks=[{
-            "type": "dataset_audit", "dataset_id": "dataset-2",
+            "type": "dataset_audit", "dataset_id": 101,
             "name": "Cleaned data", "agent_explanation": explanation,
         }],
     )])
     from PySide6.QtWidgets import QTextBrowser
-    assert any("dataset-2" in browser.toPlainText() for browser in view.findChildren(QTextBrowser))
+    assert any("101" in browser.toPlainText() for browser in view.findChildren(QTextBrowser))
 
 
 def test_send_action_accessible_name_tracks_visual_state(qtbot: QtBot, tmp_path) -> None:

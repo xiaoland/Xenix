@@ -19,7 +19,7 @@ from .knowledge_index_status import KnowledgeIndexStatusRequest
 
 
 class KnowledgeIndexRebuildDialog(QDialog):
-    submitted = Signal(str)
+    submitted = Signal(object)
 
     def __init__(
         self,

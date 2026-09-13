@@ -24,7 +24,7 @@ def _make_service(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> DataQueryT
 def _binding(source_path: Path) -> DatasetSqlBinding:
     return DatasetSqlBinding(
         alias="input",
-        dataset_id="dataset-1",
+        dataset_id=101,
         source_path=str(source_path.resolve()),
     )
 

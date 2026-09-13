@@ -19,7 +19,7 @@ from ..models import (
 
 
 class DatasetRepository:
-    def list_by_ml_tasks(self, session: Session, task_ids: Collection[str]) -> list[DatasetRow]:
+    def list_by_ml_tasks(self, session: Session, task_ids: Collection[int]) -> list[DatasetRow]:
         return list(session.exec(select(DatasetRow).where(DatasetRow.ml_task_id.in_(task_ids))))
 
     def create(self, session: Session, row: DatasetRow) -> DatasetRow:
@@ -28,10 +28,10 @@ class DatasetRepository:
         session.refresh(row)
         return row
 
-    def get(self, session: Session, dataset_id: str) -> DatasetRow | None:
+    def get(self, session: Session, dataset_id: int) -> DatasetRow | None:
         return session.get(DatasetRow, dataset_id)
 
-    def list_by_project(self, session: Session, project_id: str) -> list[DatasetRow]:
+    def list_by_project(self, session: Session, project_id: int) -> list[DatasetRow]:
         statement = (
             select(DatasetRow)
             .where(DatasetRow.project_id == project_id)
@@ -47,7 +47,7 @@ class DatasetRepository:
     # derived_from_dataset_id, and ml_task_id all NULL, and no derivation row);
     # copies carry copied_from; generated datasets carry derived_from_dataset_id,
     # ml_task_id, or a derivation row. The list families must partition rows.
-    def list_source_by_project(self, session: Session, project_id: str) -> list[DatasetRow]:
+    def list_source_by_project(self, session: Session, project_id: int) -> list[DatasetRow]:
         statement = (
             select(DatasetRow)
             .where(
@@ -78,7 +78,7 @@ class DatasetRepository:
         )
         return list(session.exec(statement))
 
-    def list_generated_by_project(self, session: Session, project_id: str) -> list[DatasetRow]:
+    def list_generated_by_project(self, session: Session, project_id: int) -> list[DatasetRow]:
         statement = (
             select(DatasetRow)
             .where(
@@ -109,7 +109,7 @@ class DatasetRepository:
         )
         return list(session.exec(statement))
 
-    def list_copies_by_source(self, session: Session, source_dataset_id: str) -> list[DatasetRow]:
+    def list_copies_by_source(self, session: Session, source_dataset_id: int) -> list[DatasetRow]:
         statement = (
             select(DatasetRow)
             .where(DatasetRow.copied_from == source_dataset_id)
@@ -117,7 +117,7 @@ class DatasetRepository:
         )
         return list(session.exec(statement))
 
-    def list_derived_by_source(self, session: Session, source_dataset_id: str) -> list[DatasetRow]:
+    def list_derived_by_source(self, session: Session, source_dataset_id: int) -> list[DatasetRow]:
         statement = (
             select(DatasetRow)
             .where(
@@ -134,11 +134,11 @@ class DatasetRepository:
         )
         return list(session.exec(statement))
 
-    def get_by_ml_task(self, session: Session, ml_task_id: str) -> DatasetRow | None:
+    def get_by_ml_task(self, session: Session, ml_task_id: int) -> DatasetRow | None:
         statement = select(DatasetRow).where(DatasetRow.ml_task_id == ml_task_id)
         return session.exec(statement).first()
 
-    def rename(self, session: Session, dataset_id: str, new_name: str, now: datetime) -> DatasetRow | None:
+    def rename(self, session: Session, dataset_id: int, new_name: str, now: datetime) -> DatasetRow | None:
         row = self.get(session, dataset_id)
         if row is None:
             return None
@@ -170,18 +170,18 @@ class DatasetRepository:
         session.refresh(row)
         return row
 
-    def get_import(self, session: Session, import_id: str) -> DatasetImportRow | None:
+    def get_import(self, session: Session, import_id: int) -> DatasetImportRow | None:
         return session.get(DatasetImportRow, import_id)
 
     # ------------------------------------------------------------------
     # Derivation provenance
     # ------------------------------------------------------------------
 
-    def get_derivation(self, session: Session, dataset_id: str) -> DatasetDerivationRow | None:
+    def get_derivation(self, session: Session, dataset_id: int) -> DatasetDerivationRow | None:
         return session.get(DatasetDerivationRow, dataset_id)
 
     def list_derivations_by_tool_calls(
-        self, session: Session, tool_call_message_ids: Collection[str],
+        self, session: Session, tool_call_message_ids: Collection[int],
     ) -> list[DatasetDerivationRow]:
         statement = (
             select(DatasetDerivationRow)
@@ -191,7 +191,7 @@ class DatasetRepository:
         return list(session.exec(statement))
 
     def list_derivation_inputs(
-        self, session: Session, dataset_id: str,
+        self, session: Session, dataset_id: int,
     ) -> list[DatasetDerivationInputRow]:
         statement = (
             select(DatasetDerivationInputRow)
@@ -201,7 +201,7 @@ class DatasetRepository:
         return list(session.exec(statement))
 
     def list_derivation_input_ids(
-        self, session: Session, dataset_id: str,
+        self, session: Session, dataset_id: int,
     ) -> list[str]:
         statement = select(DatasetDerivationInputRow.input_dataset_id).where(
             DatasetDerivationInputRow.derivation_dataset_id == dataset_id,
@@ -221,7 +221,7 @@ class DatasetRepository:
             session.add(input_row)
         session.flush()
 
-    def has_references(self, session: Session, dataset_id: str) -> bool:
+    def has_references(self, session: Session, dataset_id: int) -> bool:
         reference_statements = [
             select(DatasetRow.id).where(DatasetRow.copied_from == dataset_id),
             select(DatasetRow.id).where(DatasetRow.derived_from_dataset_id == dataset_id),
@@ -236,7 +236,7 @@ class DatasetRepository:
         ]
         return any(session.exec(statement).first() is not None for statement in reference_statements)
 
-    def delete_derivation(self, session: Session, dataset_id: str) -> None:
+    def delete_derivation(self, session: Session, dataset_id: int) -> None:
         input_rows = session.exec(
             select(DatasetDerivationInputRow).where(
                 DatasetDerivationInputRow.derivation_dataset_id == dataset_id,

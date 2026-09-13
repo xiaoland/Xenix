@@ -83,8 +83,8 @@ class ChatbotBlock(BaseModel):
     path: str = ""
     file_name: str = ""
     file_path: str = ""
-    artifact_id: str = ""
-    dataset_id: str = ""
+    artifact_id: int | None = None
+    dataset_id: int | None = None
     name: str = ""
     operation_name: str = ""
     generation: int = 0
@@ -99,7 +99,7 @@ class ChatbotBlock(BaseModel):
     tool_name: str = ""
     status: str = ""
     error_summary: str = ""
-    source_group_id: str = ""
+    source_group_id: int | None = None
     retry_events: list[RetryEvent] = Field(default_factory=list)
 
 
@@ -153,7 +153,7 @@ def render_content_blocks(
                 else:
                     parts.append(f"`{file_name}`")
                 continue
-            artifact_id = block.artifact_id.strip()
+            artifact_id = block.artifact_id
             if artifact_id and file_name:
                 parts.append(f"[{escape_markdown_link_label(file_name)}](artifact://{artifact_id})")
             elif file_name:
@@ -201,7 +201,7 @@ def _dataset_audit_markdown(block: ChatbotBlock) -> str:
         "",
         QCoreApplication.translate(
             "DatasetAudit", "Dataset: `{name}` (`{dataset_id}`)"
-        ).format(name=_markdown_code(block.name), dataset_id=_markdown_code(block.dataset_id)),
+        ).format(name=_markdown_code(block.name), dataset_id=_markdown_code(str(block.dataset_id))),
         QCoreApplication.translate("DatasetAudit", "Generation: {generation}").format(
             generation=block.generation
         ),

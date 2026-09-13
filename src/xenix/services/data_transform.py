@@ -129,7 +129,7 @@ ColumnReferenceMode = Literal["names", "indexes"]
 
 class DatasetSqlBinding(SQLModel):
     alias: str
-    dataset_id: str
+    dataset_id: int
     source_path: str
 
 

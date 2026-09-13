@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
+from pydantic import BaseModel, ConfigDict, Field, PositiveInt, StringConstraints, model_validator
 
 from ..analysis_profile import (
     DEFAULT_CORRELATION_COLUMN_LIMIT,
@@ -34,7 +34,7 @@ class AgentToolInput(BaseModel):
 
 
 class DataIntegrateInput(AgentToolInput):
-    dataset_ids: Annotated[list[RequiredString], Field(min_length=2)]
+    dataset_ids: Annotated[list[PositiveInt], Field(min_length=2)]
     name: OptionalString | None = None
 
 
@@ -151,7 +151,7 @@ class WordCloudSpec(AgentToolInput):
 
 
 class AnalysisGraphInput(AgentToolInput):
-    dataset_id: RequiredString = Field(
+    dataset_id: PositiveInt = Field(
         description=(
             "Use one registered dataset. For word clouds, this dataset should already be a "
             "chart-ready frequency table."
@@ -185,7 +185,7 @@ class AnalysisGraphInput(AgentToolInput):
 
 class AnalysisLambdaInput(AgentToolInput):
     code: RequiredString
-    datasets: Annotated[dict[str, RequiredString], Field(min_length=1)] = Field(
+    datasets: Annotated[dict[str, PositiveInt], Field(min_length=1)] = Field(
         description="Mapping from dataset alias to registered dataset_id."
     )
     params: dict[str, Any] = Field(default_factory=dict)
@@ -201,7 +201,7 @@ class AnalysisLambdaInput(AgentToolInput):
 
 
 class AnalysisProfileInput(AgentToolInput):
-    dataset_id: RequiredString = Field(description="Registered Dataset to profile.")
+    dataset_id: PositiveInt = Field(description="Registered Dataset to profile.")
     field_limit: Annotated[int, Field(ge=1, le=MAX_PROFILE_FIELD_LIMIT)] = Field(
         default=DEFAULT_PROFILE_FIELD_LIMIT,
         description="Maximum ordered field facts returned by the whole-Dataset profile.",
@@ -240,7 +240,7 @@ class CleaningOperationInput(AgentToolInput):
 
 
 class DataCleanInput(AgentToolInput):
-    dataset_id: RequiredString
+    dataset_id: PositiveInt
     name: OptionalString | None = None
     operations: list[CleaningOperationInput] = Field(
         default_factory=list,
@@ -257,7 +257,7 @@ class DataCleanMetadataInput(AgentToolInput):
 
 
 class DataTokenizeInput(AgentToolInput):
-    dataset_id: RequiredString
+    dataset_id: PositiveInt
     name: OptionalString | None = None
     text_column: RequiredString | None = Field(
         default=None,
@@ -304,14 +304,14 @@ class DataTokenizeInput(AgentToolInput):
         description="Use short phrases only with multilingual_business_v1.",
     )
     custom_dictionary_dataset_ids: Annotated[
-        list[RequiredString],
+        list[PositiveInt],
         Field(max_length=4),
     ] = Field(
         default_factory=list,
         description="Optional registered one-column term Datasets; at most four.",
     )
     stopword_dataset_ids: Annotated[
-        list[RequiredString],
+        list[PositiveInt],
         Field(max_length=4),
     ] = Field(
         default_factory=list,
@@ -353,13 +353,13 @@ class DatasetBindingInput(AgentToolInput):
     alias: RequiredString = Field(
         description="SQL table alias for this registered dataset, such as orders or customers."
     )
-    dataset_id: RequiredString = Field(
+    dataset_id: PositiveInt = Field(
         description="Registered dataset id bound to this SQL alias."
     )
 
 
 class DataQueryInput(AgentToolInput):
-    dataset_id: RequiredString | None = Field(
+    dataset_id: PositiveInt | None = Field(
         default=None,
         description=(
             "Use for one input dataset, which will be available in SQL as input. "
@@ -394,7 +394,7 @@ class DataQueryInput(AgentToolInput):
 
 
 class DataTransformInput(AgentToolInput):
-    dataset_id: RequiredString | None = Field(
+    dataset_id: PositiveInt | None = Field(
         default=None,
         description=(
             "Use for one input dataset, which will be available in SQL as input. "
@@ -461,7 +461,7 @@ class RoleBindingInput(AgentToolInput):
 
 
 class DataFeatureSelectInput(AgentToolInput):
-    dataset_id: RequiredString = Field(
+    dataset_id: PositiveInt = Field(
         description="Registered dataset id whose columns will be role-bound."
     )
     model_key: RequiredString | None = Field(
@@ -522,7 +522,7 @@ class ModelMetadataInput(AgentToolInput):
 
 
 class ModelTrainInput(AgentToolInput):
-    binding_id: RequiredString = Field(
+    binding_id: PositiveInt = Field(
         description="Column role-binding id returned by data.feature.select."
     )
     models: Annotated[list[RequiredString], Field(min_length=1)] = Field(
@@ -548,7 +548,7 @@ class ModelTrainInput(AgentToolInput):
 
 
 class ModelHyperTrainInput(AgentToolInput):
-    binding_id: RequiredString = Field(
+    binding_id: PositiveInt = Field(
         description="Column role-binding id returned by data.feature.select."
     )
     param_grids_by_model: Annotated[
@@ -570,8 +570,8 @@ class InlineApplyRowsInput(AgentToolInput):
 
 
 class ModelApplyInput(AgentToolInput):
-    trained_model_id: RequiredString
-    input_sources: list[RequiredString] = Field(default_factory=list)
+    trained_model_id: PositiveInt
+    input_sources: list[int | str] = Field(default_factory=list)
     input_rows: InlineApplyRowsInput | None = None
     horizon: Annotated[int, Field(ge=1, le=365)] | None = Field(
         default=None,
@@ -594,7 +594,7 @@ class ModelApplyInput(AgentToolInput):
 
 
 class ModelTaskQueryInput(AgentToolInput):
-    task_ids: Annotated[list[RequiredString], Field(min_length=1, max_length=20)] = Field(
+    task_ids: Annotated[list[PositiveInt], Field(min_length=1, max_length=20)] = Field(
         description="One or more explicit ML task ids to inspect."
     )
     include_logs: bool = Field(
@@ -609,7 +609,7 @@ class ModelTaskQueryInput(AgentToolInput):
 
 
 class ModelTaskStopInput(AgentToolInput):
-    task_ids: Annotated[list[RequiredString], Field(min_length=1, max_length=20)] = Field(
+    task_ids: Annotated[list[PositiveInt], Field(min_length=1, max_length=20)] = Field(
         description="One or more explicit ML task ids to stop (cancel)."
     )
 

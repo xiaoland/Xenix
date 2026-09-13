@@ -55,7 +55,7 @@ class PaddleOcrStatus:
     reason_code: str | None = None
     runtime_id: str | None = None
     model_pack_id: str | None = None
-    generation_id: str | None = None
+    generation_id: int | None = None
 
 
 @dataclass(frozen=True)
@@ -186,7 +186,7 @@ class ReleasePaddleOcrBundleSource:
 
 @dataclass(frozen=True)
 class PaddleOcrRuntime:
-    generation_id: str
+    generation_id: int
     generation_path: Path
     executable_path: Path
     detection_model_path: Path
@@ -211,7 +211,7 @@ class PaddleOcrRuntime:
 
 @dataclass(frozen=True)
 class PaddleOcrRuntimeDescriptor:
-    generation_id: str
+    generation_id: int
     runtime_id: str
     model_pack_id: str
     engine: str
@@ -556,7 +556,7 @@ class PaddleOcrDeploymentService:
         self,
         generation_path: Path,
         *,
-        generation_id: str,
+        generation_id: int,
         expected_catalog: PaddleOcrBundleCatalog | None,
         verify_all_files: bool,
     ) -> PaddleOcrRuntime:

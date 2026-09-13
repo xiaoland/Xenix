@@ -49,7 +49,7 @@ class TitleGenerationMixin:
     def has_thread_title_model(self) -> bool:
         return self._thread_title_fq_model_key() is not None
 
-    def generate_thread_title(self, thread_id: str) -> str:
+    def generate_thread_title(self, thread_id: int) -> str:
         """Return a manual title proposal without changing the Thread."""
 
         if not self.has_thread_title_model():
@@ -66,7 +66,7 @@ class TitleGenerationMixin:
         self,
         *,
         claim: SubmissionClaim,
-        first_user_message_id: str,
+        first_user_message_id: int,
         appended_snapshot: ConversationSnapshot | None = None,
     ) -> ConversationSnapshot | None:
         """Persist metadata for a just-appended first UserMessage when eligible.
@@ -145,7 +145,7 @@ class TitleGenerationMixin:
             LOGGER.warning("Initial Thread title model failed; using deterministic fallback: %s", exc)
             return fallback
 
-    def _model_thread_title(self, prompt: str, *, thread_id: str) -> str | None:
+    def _model_thread_title(self, prompt: str, *, thread_id: int) -> str | None:
         response = self._complete_thread_title(
             [
                 ProviderMessage(role="system", content=THREAD_TITLE_SYSTEM_PROMPT),
@@ -159,7 +159,7 @@ class TitleGenerationMixin:
         self,
         messages: list[ProviderMessage],
         *,
-        thread_id: str,
+        thread_id: int,
     ) -> ProviderResponse:
         fq_model_key = self._thread_title_fq_model_key()
         if fq_model_key is None:
@@ -204,7 +204,7 @@ class TitleGenerationMixin:
         return value.strip() or None
 
     @staticmethod
-    def _is_initial_title_target(snapshot: ConversationSnapshot, first_user_message_id: str) -> bool:
+    def _is_initial_title_target(snapshot: ConversationSnapshot, first_user_message_id: int) -> bool:
         final_messages = [
             message
             for message in snapshot.messages

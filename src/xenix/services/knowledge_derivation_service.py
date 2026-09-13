@@ -20,7 +20,6 @@ from .knowledge_service import (
 )
 from .storage.knowledge_projection import (
     RETRIEVAL_PROJECTION_VERSION,
-    knowledge_unit_id,
     retrieval_content_fingerprint,
 )
 from .storage.models import (
@@ -42,16 +41,16 @@ LOGGER = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class DerivationResult:
-    job_id: str
-    document_id: str
-    canonical_generation_id: str
+    job_id: int
+    document_id: int
+    canonical_generation_id: int
     retrieval_ready: bool
     unit_count: int
 
 
 @dataclass(frozen=True)
 class KnowledgeDerivationView:
-    job_id: str
+    job_id: int
     status: str
     phase: str
     error_code: str | None
@@ -90,10 +89,10 @@ class KnowledgeDerivationService:
                 for job_id in pending:
                     self.notify(job_id)
 
-    def notify(self, job_id: str) -> None:
+    def notify(self, job_id: int) -> None:
         self._submit(job_id)
 
-    def _submit(self, job_id: str) -> None:
+    def _submit(self, job_id: int) -> None:
         if self._scheduler is not None:
             self._scheduler.enqueue(
                 JobDomain.KNOWLEDGE,
@@ -105,10 +104,10 @@ class KnowledgeDerivationService:
 
     def enqueue_generation(
         self,
-        document_id: str,
-        canonical_generation_id: str,
-        import_id: str | None,
-    ) -> str:
+        document_id: int,
+        canonical_generation_id: int,
+        import_id: int | None,
+    ) -> int:
         """Idempotently materialize the canonical-ready event as a derivation job."""
 
         with self._session_factory() as session:
@@ -155,7 +154,7 @@ class KnowledgeDerivationService:
             self.notify(job_id)
         return job_id
 
-    def status_for_import(self, import_id: str) -> KnowledgeDerivationView | None:
+    def status_for_import(self, import_id: int) -> KnowledgeDerivationView | None:
         with self._session_factory() as session:
             row = session.exec(
                 select(KnowledgeDerivationRow)
@@ -172,7 +171,7 @@ class KnowledgeDerivationService:
                 retryable=row.retryable,
             )
 
-    def retry_for_import(self, import_id: str) -> str:
+    def retry_for_import(self, import_id: int) -> int:
         """Create a new retrieval attempt without reparsing canonical content."""
 
         with self._session_factory() as session:
@@ -207,7 +206,7 @@ class KnowledgeDerivationService:
         self.notify(job.id)
         return job.id
 
-    def derive_now(self, job_id: str) -> DerivationResult:
+    def derive_now(self, job_id: int) -> DerivationResult:
         with self._session_factory() as session:
             job = session.get(KnowledgeDerivationRow, job_id)
             if job is None:
@@ -280,11 +279,6 @@ class KnowledgeDerivationService:
 
             rows = [
                 KnowledgeUnitRow(
-                    id=knowledge_unit_id(
-                        document_id=document.id,
-                        canonical_generation_id=generation.id,
-                        ordinal=ordinal,
-                    ),
                     document_id=document.id,
                     canonical_generation_id=generation.id,
                     ordinal=ordinal,
@@ -363,17 +357,17 @@ class KnowledgeDerivationService:
             finally:
                 self._queue.task_done()
 
-    def run_unit(self, job_id: str) -> None:
+    def run_unit(self, job_id: int) -> None:
         self.derive_now(job_id)
 
-    def job_outcome(self, job_id: str) -> tuple[str, str | None]:
+    def job_outcome(self, job_id: int) -> tuple[str, str | None]:
         with self._session_factory() as session:
             row = session.get(KnowledgeDerivationRow, job_id)
             if row is None:
                 return ("failed", "Knowledge derivation job is missing.")
             return (row.status, row.error_summary)
 
-    def recover_pending(self) -> list[str]:
+    def recover_pending(self) -> list[int]:
         pending: list[str] = []
         with self._session_factory() as session:
             rows = list(
@@ -441,7 +435,7 @@ class KnowledgeDerivationService:
             session.commit()
         return pending
 
-    def _record_failure(self, job_id: str, error_code: str) -> DerivationResult:
+    def _record_failure(self, job_id: int, error_code: str) -> DerivationResult:
         with self._session_factory() as session:
             job = session.get(KnowledgeDerivationRow, job_id)
             if job is None:

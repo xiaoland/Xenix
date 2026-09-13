@@ -18,7 +18,7 @@ class KnowledgeWorkspaceDocumentsState(StrEnum):
 
 @dataclass(frozen=True)
 class KnowledgeWorkspaceDocument:
-    document_id: str
+    document_id: int
     title: str
     source_format: str
     content_state: str

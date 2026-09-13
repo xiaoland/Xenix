@@ -48,7 +48,7 @@ class _ProfileModel(SQLModel):
 
 
 class ProfileDatasetInput(_ProfileModel):
-    dataset_id: str = Field(min_length=1)
+    dataset_id: int = Field(ge=1)
     field_limit: int = Field(
         default=DEFAULT_PROFILE_FIELD_LIMIT,
         ge=1,
@@ -135,7 +135,7 @@ class ProfileTruncation(_ProfileModel):
 
 
 class ProfileDatasetResult(_ProfileModel):
-    dataset_id: str
+    dataset_id: int
     scope: ProfileScope = "whole_dataset"
     basic: ProfileBasicFacts
     fields: list[ProfileFieldFact] = Field(default_factory=list)
@@ -152,7 +152,7 @@ class AnalysisProfileService:
     def profile_dataset(self, input_data: ProfileDatasetInput) -> ProfileDatasetResult:
         started_at = perf_counter()
         with start_span("analysis.profile"):
-            dataset_id = input_data.dataset_id.strip()
+            dataset_id = input_data.dataset_id
             if not dataset_id:
                 raise ValidationError("Dataset id cannot be empty.")
             dataset = self._dataset_service.get_dataset(dataset_id)
@@ -216,7 +216,7 @@ class AnalysisProfileService:
     def _load_frame(
         self,
         *,
-        dataset_id: str,
+        dataset_id: int,
         source_path: Path,
         source_format: DatasetSourceFormat,
     ) -> pl.DataFrame:
@@ -248,7 +248,7 @@ class AnalysisProfileService:
     def _tabular_runtime_validation_error(
         self,
         *,
-        dataset_id: str,
+        dataset_id: int,
         source_format: DatasetSourceFormat,
         exc: Exception,
         phase: str | None = None,

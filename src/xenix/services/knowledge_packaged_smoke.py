@@ -203,16 +203,16 @@ def run_knowledge_packaged_smoke(paths: AppPaths) -> None:
 
         vector_store = LanceKnowledgeVectorStore(smoke_paths)
         relative_path = vector_store.write_generation(
-            generation_id="packaged-smoke",
+            generation_id=104,
             records=(
-                KnowledgeVectorRecord("unit-a", (1.0, 0.0, 0.0)),
-                KnowledgeVectorRecord("unit-b", (0.0, 1.0, 0.0)),
+                KnowledgeVectorRecord(105, (1.0, 0.0, 0.0)),
+                KnowledgeVectorRecord(106, (0.0, 1.0, 0.0)),
             ),
             dimensions=3,
             corpus_fingerprint="corpus-smoke",
             profile_fingerprint="profile-smoke",
         )
-        if vector_store.search(relative_path, query_vector=(0.9, 0.1, 0.0), limit=1) != ["unit-a"]:
+        if vector_store.search(relative_path, query_vector=(0.9, 0.1, 0.0), limit=1) != [105]:
             raise RuntimeError("LanceDB packaged Knowledge search failed.")
 
         ocr_archive_value = os.environ.get("XENIX_KNOWLEDGE_OCR_SMOKE_ARCHIVE", "").strip()
@@ -337,7 +337,7 @@ def run_knowledge_packaged_smoke(paths: AppPaths) -> None:
 
 def _wait_for_derivation_handoff(
     service: KnowledgeDerivationService,
-    import_id: str,
+    import_id: int,
     *,
     failure_message: str,
     timeout: float = 10.0,

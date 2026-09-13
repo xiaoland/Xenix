@@ -13,7 +13,7 @@ from xenix.ui.semantic_identity import item_reference
 
 class _Port:
     def __init__(self) -> None:
-        self.threads = [HistoryThreadSummary("thread-a", "Alpha"), HistoryThreadSummary("thread-b", None)]
+        self.threads = [HistoryThreadSummary(102, "Alpha"), HistoryThreadSummary(101, None)]
         self.deleted: list[str] = []
         self.renamed: list[tuple[str, str | None]] = []
 
@@ -34,11 +34,11 @@ def test_rows_expose_static_and_repeated_semantic_identity(qtbot: QtBot) -> None
     panel = HistoryPanel(_Port(), is_thread_running=lambda _id: False)
     qtbot.addWidget(panel)
     panel.refresh()
-    assert panel.first_thread_id == "thread-a"
+    assert panel.first_thread_id == 102
     assert panel._list.objectName() == "historyList"
     assert panel._list.accessibleIdentifier() == "main.history.thread-list"
     rows = panel._list.findChildren(type(panel._list.itemWidget(panel._list.item(0))))
-    assert {item_reference(row) for row in rows} == {"thread-a", "thread-b"}
+    assert {item_reference(row) for row in rows} == {"102", "101"}
     assert all(row.accessibleIdentifier() == "main.history.thread-item" for row in rows)
 
 
@@ -48,9 +48,9 @@ def test_open_and_refresh_preserve_only_existing_selection(qtbot: QtBot) -> None
     qtbot.addWidget(panel)
     panel.refresh()
     with qtbot.waitSignal(panel.thread_open_requested) as signal:
-        panel.open_thread("thread-b")
-    assert signal.args == ["thread-b"]
-    assert panel.selected_thread_id == "thread-b"
+        panel.open_thread(101)
+    assert signal.args == [101]
+    assert panel.selected_thread_id == 101
     port.threads = [port.threads[0]]
     panel.refresh()
     assert panel.selected_thread_id is None
@@ -64,7 +64,7 @@ def test_row_overlay_keeps_list_clickable(qtbot: QtBot) -> None:
     item = panel._list.item(1)
     with qtbot.waitSignal(panel.thread_open_requested) as signal:
         qtbot.mouseClick(panel._list.viewport(), Qt.MouseButton.LeftButton, pos=panel._list.visualItemRect(item).center())
-    assert signal.args == ["thread-b"]
+    assert signal.args == [101]
 
 
 def test_late_title_completion_after_shutdown_has_no_service_effect(qtbot: QtBot) -> None:
@@ -76,7 +76,7 @@ def test_late_title_completion_after_shutdown_has_no_service_effect(qtbot: QtBot
     panel = HistoryPanel(port, is_thread_running=lambda _id: False, title_executor=executor)
     qtbot.addWidget(panel)
     panel.refresh()
-    panel._start_title("thread-a")
+    panel._start_title(102)
     panel.shutdown()
     callbacks["succeeded"]("Late")
     qtbot.wait(10)
@@ -94,16 +94,16 @@ def test_delete_invalidates_late_title_completion(qtbot: QtBot, monkeypatch) -> 
     panel = HistoryPanel(port, is_thread_running=lambda _id: False, title_executor=executor)
     qtbot.addWidget(panel)
     panel.refresh()
-    panel._start_title("thread-a")
+    panel._start_title(102)
     monkeypatch.setattr(
         QMessageBox,
         "question",
         lambda *_args: QMessageBox.StandardButton.Yes,
     )
-    panel._delete("thread-a")
+    panel._delete(102)
     callbacks["succeeded"]("Late")
     qtbot.wait(10)
-    assert port.deleted == ["thread-a"]
+    assert port.deleted == [102]
     assert port.renamed == []
 
 
@@ -117,7 +117,7 @@ def test_true_cpp_deletion_ignores_late_title_callback(qtbot: QtBot) -> None:
     panel = HistoryPanel(_Port(), is_thread_running=lambda _id: False, title_executor=executor)
     qtbot.addWidget(panel)
     panel.refresh()
-    panel._start_title("thread-a")
+    panel._start_title(102)
     panel.deleteLater()
     QApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
     assert not isValid(panel)
@@ -137,12 +137,12 @@ def test_retranslate_does_not_query_port(qtbot: QtBot) -> None:
 
 def test_running_thread_delete_is_guarded_before_confirmation(qtbot: QtBot, monkeypatch) -> None:
     port = _Port()
-    panel = HistoryPanel(port, is_thread_running=lambda thread_id: thread_id == "thread-a")
+    panel = HistoryPanel(port, is_thread_running=lambda thread_id: thread_id == 102)
     qtbot.addWidget(panel)
     panel.refresh()
     messages: list[str] = []
     monkeypatch.setattr(QMessageBox, "information", lambda *_args: messages.append("blocked"))
-    panel._delete("thread-a")
+    panel._delete(102)
     assert messages == ["blocked"]
     assert port.deleted == []
 
@@ -160,10 +160,10 @@ def test_delete_port_exception_shows_warning_and_keeps_thread(qtbot: QtBot, monk
     monkeypatch.setattr(QMessageBox, "warning", lambda *_args: warnings.append("warned"))
     monkeypatch.setattr(QMessageBox, "question", lambda *_args: QMessageBox.StandardButton.Yes)
 
-    panel._delete("thread-a")
+    panel._delete(102)
 
     assert warnings == ["warned"]
-    assert "thread-a" in panel._threads
+    assert 102 in panel._threads
     assert port.deleted == []
 
 
@@ -180,7 +180,7 @@ def test_rename_port_exception_shows_warning(qtbot: QtBot, monkeypatch) -> None:
     monkeypatch.setattr(QMessageBox, "warning", lambda *_args: warnings.append("warned"))
     monkeypatch.setattr(QInputDialog, "getText", lambda *_args, **kwargs: ("New title", True))
 
-    panel._rename("thread-a")
+    panel._rename(102)
 
     assert warnings == ["warned"]
     assert port.renamed == []

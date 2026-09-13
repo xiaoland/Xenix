@@ -161,7 +161,7 @@ def test_analysis_profile_is_registered_as_one_atomic_read_only_tool(
     outcome = registry.execute(
         "analysis.profile",
         {"dataset_id": dataset.id},
-        ToolExecutionContext(thread_id="thread-profile", dataset_ids=(dataset.id,)),
+        ToolExecutionContext(thread_id=101, dataset_ids=(dataset.id,)),
     )
 
     assert isinstance(outcome.value, dict)

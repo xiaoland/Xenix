@@ -142,7 +142,7 @@ class ToolThenTextProvider:
             return ProviderResponse(
                 tool_calls=[ProviderToolCall(
                     provider_call_id="provider-call-1", tool_name="data.inspect",
-                    provider_name="data_inspect", arguments={"dataset_id": "dataset-1"},
+                    provider_name="data_inspect", arguments={"dataset_id": 101},
                 )]
             )
         return ProviderResponse(assistant_content_blocks=[{"type": "text", "text": "Dataset inspected."}])
@@ -171,7 +171,7 @@ def test_harness_coordinates_tool_but_llm_service_commits_messages(monkeypatch, 
     ]
     call, result = snapshot.messages[1:3]
     assert result.tool_call_message_id == call.id
-    assert result.value_payload == {"dataset_id": "dataset-1", "ok": True}
+    assert result.value_payload == {"dataset_id": 101, "ok": True}
     assert provider.calls == 2
 
     harness.delete_thread(snapshot.thread.id)

@@ -23,7 +23,7 @@ class ConversationRepository:
         session.refresh(row)
         return row
 
-    def get_thread(self, session: Session, thread_id: str) -> ConversationThreadRow | None:
+    def get_thread(self, session: Session, thread_id: int) -> ConversationThreadRow | None:
         return session.get(ConversationThreadRow, thread_id)
 
     def list_threads(self, session: Session) -> list[ConversationThreadRow]:
@@ -33,7 +33,7 @@ class ConversationRepository:
     def rename_thread(
         self,
         session: Session,
-        thread_id: str,
+        thread_id: int,
         title: str | None,
         now: datetime,
     ) -> ConversationThreadRow | None:
@@ -51,7 +51,7 @@ class ConversationRepository:
         self,
         session: Session,
         *,
-        thread_id: str,
+        thread_id: int,
         title: str,
         now: datetime,
     ) -> ConversationThreadRow | None:
@@ -73,7 +73,7 @@ class ConversationRepository:
         session.expire_all()
         return self.get_thread(session, thread_id)
 
-    def next_message_sequence(self, session: Session, thread_id: str) -> int:
+    def next_message_sequence(self, session: Session, thread_id: int) -> int:
         statement = select(func.max(col(ConversationMessageRow.sequence_index))).where(
             ConversationMessageRow.thread_id == thread_id
         )
@@ -91,10 +91,10 @@ class ConversationRepository:
         session.refresh(row)
         return row
 
-    def get_message(self, session: Session, message_id: str) -> ConversationMessageRow | None:
+    def get_message(self, session: Session, message_id: int) -> ConversationMessageRow | None:
         return session.get(ConversationMessageRow, message_id)
 
-    def list_messages(self, session: Session, thread_id: str) -> list[ConversationMessageRow]:
+    def list_messages(self, session: Session, thread_id: int) -> list[ConversationMessageRow]:
         statement = (
             select(ConversationMessageRow)
             .where(ConversationMessageRow.thread_id == thread_id)
@@ -102,7 +102,7 @@ class ConversationRepository:
         )
         return list(session.exec(statement))
 
-    def list_pending(self, session: Session, thread_id: str) -> list[ConversationMessageRow]:
+    def list_pending(self, session: Session, thread_id: int) -> list[ConversationMessageRow]:
         statement = (
             select(ConversationMessageRow)
             .where(
@@ -113,7 +113,7 @@ class ConversationRepository:
         )
         return list(session.exec(statement))
 
-    def delete_thread(self, session: Session, thread_id: str) -> ConversationThreadRow | None:
+    def delete_thread(self, session: Session, thread_id: int) -> ConversationThreadRow | None:
         row = self.get_thread(session, thread_id)
         if row is None:
             return None

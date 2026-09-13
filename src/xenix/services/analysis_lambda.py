@@ -33,7 +33,7 @@ class AnalysisLambdaDataset(SQLModel):
     model_config = ConfigDict(extra="forbid")
 
     alias: str
-    dataset_id: str
+    dataset_id: int
     dataset_name: str
     source_path: str
 

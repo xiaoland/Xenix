@@ -85,7 +85,7 @@ def test_feature_scenarios_use_production_semantic_contracts(qapp, qtbot, ui_art
     ui_artifacts.register(history.root, name="history-panel")
     assert {item_reference(widget) for widget in _widgets_with_role(
         history.root, "main.history.thread-item"
-    )} == {"thread:synthetic:001", "thread:synthetic:002", "thread:synthetic:003"}
+    )} == {"1", "2", "3"}
     history.cleanup()
 
     _scenario, settings = _build_scenario(qapp, qtbot, "settings.provider-and-ocr")

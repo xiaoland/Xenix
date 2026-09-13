@@ -27,7 +27,7 @@ def run_smoke_checks(paths: AppPaths) -> None:
             bindings=[
                 DatasetSqlBinding(
                     alias="input",
-                    dataset_id="smoke-dataset",
+            dataset_id=1,
                     source_path=str(duckdb_smoke_path.resolve()),
                 )
             ],

@@ -100,7 +100,7 @@ class _StreamMeasurements:
     snapshot: Any | None = None
     source_state: Any | None = None
     source_state_captured: bool = False
-    pending_message_ids: set[str] | None = None
+    pending_message_ids: set[int] | None = None
     provider_retry_count: int = 0
     title_event_count: int = 0
     final_snapshot_seen: bool = False
@@ -111,7 +111,7 @@ class _StreamMeasurements:
 
     def observe(self, event: Any, *, case: BenchmarkCase, services: BenchmarkCaseServices) -> None:
         pending_message_id = getattr(event, "pending_message_id", None)
-        if isinstance(pending_message_id, str) and pending_message_id:
+        if isinstance(pending_message_id, int) and pending_message_id:
             self.pending_message_ids.add(pending_message_id)
         event_kind = getattr(event, "kind", None)
         if event_kind == "connection":
@@ -827,7 +827,7 @@ def _run_model_cell(
         paths = _benchmark_paths(Path(temporary_root) / "runtime")
         cell: Any | None = None
         case_services: BenchmarkCaseServices | None = None
-        thread_id: str | None = None
+        thread_id: int | None = None
         turn_seconds = 0.0
         try:
             with trace_recorder.span(
@@ -1190,7 +1190,7 @@ def _collect_metrics(
     snapshot: Any | None,
     turn_seconds: float,
     assessment_seconds: float | None,
-    pending_message_ids: set[str],
+    pending_message_ids: set[int],
     provider_retry_count: int,
     terminal_shape: tuple[int, int] | None,
     budget: BenchmarkBudgetController,

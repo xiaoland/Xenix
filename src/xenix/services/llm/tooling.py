@@ -61,7 +61,7 @@ class ToolScope:
     """Provider-neutral scope selected for one sampling request."""
 
     tool_names: tuple[str, ...] = ()
-    dataset_ids: tuple[str, ...] = ()
+    dataset_ids: tuple[int, ...] = ()
 
 
 def scope_fingerprint(scope: ToolScope, specs: list[AgentToolSpec]) -> str:
@@ -87,9 +87,9 @@ def scope_fingerprint(scope: ToolScope, specs: list[AgentToolSpec]) -> str:
 class ToolExecutionContext:
     """Bounded live context supplied to an injected implementation."""
 
-    thread_id: str
-    tool_call_message_id: str | None = None
-    dataset_ids: tuple[str, ...] = ()
+    thread_id: int
+    tool_call_message_id: int | None = None
+    dataset_ids: tuple[int, ...] = ()
     cancel_requested: Callable[[], bool] = lambda: False
 
 
@@ -150,7 +150,7 @@ class ResultPageInput(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    result_id: str = Field(min_length=1, max_length=64)
+    result_id: int = Field(ge=1)
     offset: int = Field(default=0, ge=0)
     limit: int = Field(default=TOOL_RESULT_PAGE_SIZE_CHARS, ge=1, le=TOOL_RESULT_PAGE_LIMIT_CHARS)
 
@@ -462,8 +462,8 @@ def _freeze_tool_spec(spec: AgentToolSpec) -> tuple[AgentToolSpec, Draft202012Va
 class StagedToolCall:
     """Immutable in-memory call awaiting an LLM-owned invocation."""
 
-    pending_message_id: str
-    staged_call_id: str
+    pending_message_id: int
+    staged_call_id: int
     provider_call_id: str
     tool_name: str
     provider_name: str
@@ -471,7 +471,7 @@ class StagedToolCall:
     scope_fingerprint: str
 
     def __post_init__(self) -> None:
-        if not self.pending_message_id.strip() or not self.staged_call_id.strip():
+        if self.pending_message_id < 1 or self.staged_call_id < 1:
             raise ValidationError("Staged tool call identity cannot be empty.")
         if not self.provider_call_id.strip() or not self.tool_name.strip():
             raise ValidationError("Staged tool call provider identity cannot be empty.")
@@ -609,7 +609,7 @@ class AgentToolRegistry:
             }
         )
 
-    def delete_thread_results(self, thread_id: str) -> int:
+    def delete_thread_results(self, thread_id: int) -> int:
         if self._page_store is None:
             return 0
         return self._page_store.delete_for_thread(thread_id)
@@ -729,6 +729,8 @@ class AgentToolRegistry:
             raise ValidationError(
                 "Tool result exceeds the inline payload bound and paged results are unavailable."
             )
+        if context.tool_call_message_id is None:
+            raise ValidationError("Paged results require a reserved ToolCall identity.")
         result_id = self._page_store.save(
             thread_id=context.thread_id,
             tool_call_message_id=context.tool_call_message_id,

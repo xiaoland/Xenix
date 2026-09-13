@@ -38,7 +38,7 @@ class DatasetAuditDialog(QDialog):
         self,
         *,
         harness: AgentHarnessService,
-        thread_id: str,
+        thread_id: int,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
@@ -86,7 +86,7 @@ class DatasetAuditDialog(QDialog):
         self.retranslate_ui()
         self.refresh()
 
-    def set_thread_id(self, thread_id: str) -> None:
+    def set_thread_id(self, thread_id: int) -> None:
         self._thread_id = thread_id
         self.refresh()
 

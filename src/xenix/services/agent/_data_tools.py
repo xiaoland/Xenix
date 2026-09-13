@@ -392,9 +392,9 @@ class DataTools:
 
     def _staged_text_resources(
         self,
-        dataset_ids: list[str],
+        dataset_ids: list[int],
         *,
-        project_id: str,
+        project_id: int,
     ) -> list[StagedTextResourceInput]:
         resources: list[StagedTextResourceInput] = []
         for dataset_id in dataset_ids:
@@ -508,7 +508,7 @@ class DataTools:
         name: str,
         summary: str,
         derivation: DatasetDerivationInput,
-        compatibility_parent_dataset_id: str | None = None,
+        compatibility_parent_dataset_id: int | None = None,
         metadata_payload: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         resolved_output_path = output_path.resolve()

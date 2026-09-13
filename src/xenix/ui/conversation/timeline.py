@@ -44,7 +44,7 @@ class ChatTimeline(QWidget):
         super().__init__(parent)
         self._thinking_bubble: ChatMessageBubble | None = None
         self._event_widgets_by_id: dict[str, QWidget] = {}
-        self._message_bubbles_by_id: dict[str, ChatMessageBubble] = {}
+        self._message_bubbles_by_id: dict[int | str, ChatMessageBubble] = {}
         self._artifact_resolver: ArtifactResolver | None = None
         self._auto_follow_latest = True
         self._scroll_to_latest_token = 0
@@ -119,7 +119,7 @@ class ChatTimeline(QWidget):
         return self._scroll_to_bottom_button
 
     @property
-    def message_bubbles_by_id(self) -> dict[str, ChatMessageBubble]:
+    def message_bubbles_by_id(self) -> dict[int | str, ChatMessageBubble]:
         return self._message_bubbles_by_id
 
     def render_events(self, events: list[ChatbotEvent]) -> None:
@@ -145,7 +145,7 @@ class ChatTimeline(QWidget):
         author: str,
         blocks: list[ChatbotBlock],
         *,
-        message_id: str | None = None,
+        message_id: int | str | None = None,
         event_id: str | None = None,
         auto_scroll: bool = True,
     ) -> ChatMessageBubble:

@@ -26,7 +26,7 @@ class KnowledgeImportLogDialog(QDialog):
         self.setWindowModality(Qt.NonModal)
         self.setAttribute(Qt.WA_DeleteOnClose, False)
         self._service = import_service
-        self._import_id: str | None = None
+        self._import_id: int | None = None
         self._file_name = ""
         self._content = QPlainTextEdit(self)
         self._content.setReadOnly(True)
@@ -44,7 +44,7 @@ class KnowledgeImportLogDialog(QDialog):
         self.resize(700, 420)
         self.retranslate_ui()
 
-    def show_import(self, import_id: str, file_name: str) -> None:
+    def show_import(self, import_id: int, file_name: str) -> None:
         self._import_id = import_id
         self._file_name = file_name
         self.retranslate_ui()

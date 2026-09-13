@@ -129,9 +129,9 @@ def test_lazily_creates_windows_wires_updates_and_preserves_parent(qtbot: QtBot)
     coordinator.show_settings()
     coordinator.show_settings(tab=SettingsTab.KNOWLEDGE_BASE)
     coordinator.show_knowledge()
-    coordinator.show_tool_call_detail(task_ids=["task-1"])
-    coordinator.show_dataset_audit(thread_id="thread-1")
-    coordinator.show_dataset_audit(thread_id="thread-2")
+    coordinator.show_tool_call_detail(task_ids=[101])
+    coordinator.show_dataset_audit(thread_id=102)
+    coordinator.show_dataset_audit(thread_id=103)
 
     assert len(settings) == 1
     assert settings[0].parent() is owner
@@ -142,7 +142,7 @@ def test_lazily_creates_windows_wires_updates_and_preserves_parent(qtbot: QtBot)
     assert len(details) == 1
     assert len(dataset_audits) == 1
     assert dataset_audits[0].parent() is owner
-    assert dataset_audits[0].thread_ids == ["thread-1", "thread-2"]
+    assert dataset_audits[0].thread_ids == [102, 103]
     settings[0].agent_settings_saved.emit()
     settings[0].software_update_requested.emit()
     assert saved == [None]
@@ -170,13 +170,13 @@ def test_retranslate_shutdown_and_post_shutdown_requests_are_safe(qtbot: QtBot) 
     )
     coordinator.show_settings()
     coordinator.show_knowledge()
-    coordinator.show_tool_call_detail(task_ids=["task-1"])
+    coordinator.show_tool_call_detail(task_ids=[101])
     coordinator.retranslate_ui()
     coordinator.shutdown()
     coordinator.shutdown()
     coordinator.show_settings()
     coordinator.show_knowledge()
-    coordinator.show_tool_call_detail(task_ids=["task-2"])
+    coordinator.show_tool_call_detail(task_ids=[104])
 
     assert settings[0].retranslate_calls == 1
     assert knowledge[0].retranslate_calls == 1

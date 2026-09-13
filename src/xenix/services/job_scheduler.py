@@ -42,7 +42,7 @@ class JobHandler(Protocol):
     @property
     def concurrency_limit(self) -> int: ...
 
-    def recover(self, session: Session, jobs: list[JobRow]) -> list[str]:
+    def recover(self, session: Session, jobs: list[JobRow]) -> list[int]:
         """Reconcile queued/running jobs after restart; return references to dispatch."""
         ...
 
@@ -75,7 +75,7 @@ class JobScheduler:
         self._handlers: dict[tuple[JobDomain, str | None], JobHandler] = {}
         self._lock = threading.Condition()
         self._stop = threading.Event()
-        self._armed: set[tuple[JobDomain, str]] = set()
+        self._armed: set[tuple[JobDomain, int]] = set()
         self._active_counts: dict[JobDomain, int] = {}
         self._dispatch_thread: threading.Thread | None = None
         self._worker_threads: set[threading.Thread] = set()
@@ -123,11 +123,11 @@ class JobScheduler:
         self,
         domain: JobDomain,
         kind: str,
-        reference: str,
+        reference: int,
         *,
         phase: str = "queued",
         error_summary: str | None = None,
-    ) -> str:
+    ) -> int:
         """Register a unit of domain work as a queued job and arm it for dispatch."""
         # Serialize registration and claim/cancel in this process. The database
         # constraint remains the durable authority for (domain, reference).
@@ -162,7 +162,7 @@ class JobScheduler:
             self._lock.notify_all()
         return job.id
 
-    def capabilities(self, domain: JobDomain, reference: str) -> JobCapabilities:
+    def capabilities(self, domain: JobDomain, reference: int) -> JobCapabilities:
         """Return the management capabilities for a specific job."""
         with self._session_factory() as session:
             job = self._find(session, domain, reference)
@@ -171,7 +171,7 @@ class JobScheduler:
             handler = self._handler_for(domain, job.kind)
             return handler.capabilities(job) if handler is not None else JobCapabilities()
 
-    def request_cancel(self, domain: JobDomain, reference: str) -> None:
+    def request_cancel(self, domain: JobDomain, reference: int) -> None:
         """Cancel a queued or running job through its domain handler."""
         with self._lock, self._session_factory() as session:
             job = self._find(session, domain, reference)
@@ -290,7 +290,7 @@ class JobScheduler:
         worker = threading.Thread(
             target=self._run_worker,
             args=(handler, job.domain, job.reference),
-            name=f"xenix-job-{job.reference[:8]}",
+            name=f"xenix-job-{job.reference}",
             daemon=True,
         )
         self._worker_threads.add(worker)
@@ -300,7 +300,7 @@ class JobScheduler:
         self,
         handler: JobHandler,
         domain: JobDomain,
-        reference: str,
+        reference: int,
     ) -> None:
         try:
             with self._session_factory() as session:
@@ -339,7 +339,7 @@ class JobScheduler:
     def _find(
         session: Session,
         domain: JobDomain,
-        reference: str,
+        reference: int,
     ) -> JobRow | None:
         return session.exec(
             select(JobRow).where(

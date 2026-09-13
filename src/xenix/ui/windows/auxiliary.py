@@ -28,9 +28,9 @@ SettingsWindowFactory: TypeAlias = Callable[[QWidget], "SettingsDialog"]
 KnowledgeWindowFactory: TypeAlias = Callable[
     [QWidget, Callable[[], None]], "KnowledgeWorkspaceDialog"
 ]
-DetailWindowFactory: TypeAlias = Callable[[QWidget, list[str]], "ToolCallDetailView"]
+DetailWindowFactory: TypeAlias = Callable[[QWidget, list[int]], "ToolCallDetailView"]
 JobCenterWindowFactory: TypeAlias = Callable[[QWidget], "JobCenterDialog"]
-DatasetAuditWindowFactory: TypeAlias = Callable[[QWidget, str], "DatasetAuditDialog"]
+DatasetAuditWindowFactory: TypeAlias = Callable[[QWidget, int], "DatasetAuditDialog"]
 
 
 class AuxiliaryWindowCoordinator(QObject):
@@ -122,7 +122,7 @@ class AuxiliaryWindowCoordinator(QObject):
             dialog.destroyed.connect(self._forget_job_center_dialog)
         self._show_and_activate(dialog)
 
-    def show_tool_call_detail(self, *, task_ids: list[str]) -> None:
+    def show_tool_call_detail(self, *, task_ids: list[int]) -> None:
         if self._shutdown or not task_ids:
             return
         view = self._detail_factory(self._owner, task_ids)
@@ -132,7 +132,7 @@ class AuxiliaryWindowCoordinator(QObject):
         self._detail_views.append(view)
         self._show_and_activate(view)
 
-    def show_dataset_audit(self, *, thread_id: str | None) -> None:
+    def show_dataset_audit(self, *, thread_id: int | None) -> None:
         if self._shutdown:
             return
         if not thread_id:

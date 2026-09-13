@@ -63,7 +63,7 @@ LOGGER = logging.getLogger(__name__)
 
 
 class DatasetAttachmentInput(SQLModel):
-    dataset_id: str
+    dataset_id: int
     name: str
     row_count: int
     column_count: int
@@ -76,7 +76,7 @@ class SourceAttachmentInput(SQLModel):
 
 
 class SubmitUserTurnInput(SQLModel):
-    thread_id: str | None = None
+    thread_id: int | None = None
     text: str
     dataset_attachments: list[DatasetAttachmentInput] = Field(default_factory=list)
     source_attachments: list[SourceAttachmentInput] = Field(default_factory=list)
@@ -115,8 +115,8 @@ class _InitialTitleTask:
 @dataclass(frozen=True)
 class AgentHarnessStreamEvent:
     kind: str
-    thread_id: str | None = None
-    pending_message_id: str | None = None
+    thread_id: int | None = None
+    pending_message_id: int | None = None
     client_submission_id: str | None = None
     attachment_import: AttachmentImportProgress | None = None
     chatbot_event: ChatbotEvent | None = None
@@ -148,8 +148,8 @@ class AgentHarnessService:
         # It never receives a writer capability and the Conversation service
         # still freezes/validates the resulting scope for each provider call.
         self._tool_name_scope_provider = tool_name_scope_provider
-        self._cancel_events: dict[str, threading.Event] = {}
-        self._pending_threads: dict[str, str] = {}
+        self._cancel_events: dict[int, threading.Event] = {}
+        self._pending_threads: dict[int, int] = {}
         # The local maps are only a live callback aid.  No helper recurses
         # through this lock; the Conversation service remains the sole source
         # of truth for whether a pending Message exists.
@@ -173,13 +173,13 @@ class AgentHarnessService:
     def list_threads(self) -> list[ConversationThreadRow]:
         return self._conversation_service.list_threads()
 
-    def rename_thread(self, thread_id: str, title: str | None) -> ConversationSnapshot:
+    def rename_thread(self, thread_id: int, title: str | None) -> ConversationSnapshot:
         return self._conversation_service.rename_thread(thread_id, title)
 
-    def delete_thread(self, thread_id: str) -> None:
+    def delete_thread(self, thread_id: int) -> None:
         self._conversation_service.delete_thread(thread_id)
 
-    def get_thread_snapshot(self, thread_id: str) -> ConversationSnapshot:
+    def get_thread_snapshot(self, thread_id: int) -> ConversationSnapshot:
         return self._conversation_service.get_thread_snapshot(thread_id)
 
     def list_llm_model_options(self) -> list[LLMModelOption]:
@@ -188,7 +188,7 @@ class AgentHarnessService:
     def default_fq_model_key(self) -> str | None:
         return self._conversation_service.default_fq_model_key() if self._llm_service is not None else None
 
-    def set_thread_model(self, thread_id: str, fq_model_key: str) -> ConversationSnapshot:
+    def set_thread_model(self, thread_id: int, fq_model_key: str) -> ConversationSnapshot:
         return self._conversation_service.set_thread_model(thread_id, fq_model_key)
 
     def project_chatbot_events(self, snapshot: ConversationSnapshot) -> list[ChatbotEvent]:
@@ -206,7 +206,7 @@ class AgentHarnessService:
         events: list[ChatbotEvent] = []
         for event in canonical_events:
             events.append(event)
-            usage_event = usage_by_terminal.pop(event.id, None)
+            usage_event = usage_by_terminal.pop(int(event.id), None) if event.id.isdecimal() else None
             if usage_event is not None:
                 events.append(usage_event)
         return events
@@ -241,16 +241,16 @@ class AgentHarnessService:
 
     def resolve_session_dataset_audits(
         self,
-        thread_id: str,
+        thread_id: int,
     ) -> list[DatasetAuditPresentation]:
         """Compose session membership from canonical messages and domain records."""
 
         if self._dataset_service is None:
             return []
         snapshot = self._conversation_service.get_thread_snapshot(thread_id)
-        tool_call_ids: list[str] = []
-        dataset_ids: set[str] = set()
-        task_ids: set[str] = set()
+        tool_call_ids: list[int] = []
+        dataset_ids: set[int] = set()
+        task_ids: set[int] = set()
         for message in snapshot.messages:
             if message.kind.value == "tool_call":
                 tool_call_ids.append(message.id)
@@ -265,13 +265,13 @@ class AgentHarnessService:
                 # still owns provenance, including outputs completed after a timeout.
                 value = message.value_payload
                 for key in ("dataset_id", "result_dataset_id"):
-                    if isinstance(value.get(key), str):
+                    if isinstance(value.get(key), int):
                         dataset_ids.add(value[key])
-                if isinstance(value.get("ml_task_id"), str):
+                if isinstance(value.get("ml_task_id"), int):
                     task_ids.add(value["ml_task_id"])
                 task_ids.update(
                     task_id for task_id in value.get("task_ids", [])
-                    if isinstance(task_id, str)
+                    if isinstance(task_id, int)
                 )
         return self._dataset_service.resolve_session_dataset_audits(
             dataset_ids=dataset_ids,
@@ -285,10 +285,10 @@ class AgentHarnessService:
     def has_thread_title_provider(self) -> bool:
         return self._conversation_service.has_thread_title_model()
 
-    def generate_thread_title(self, thread_id: str) -> str:
+    def generate_thread_title(self, thread_id: int) -> str:
         return self._conversation_service.generate_thread_title(thread_id)
 
-    def pause_thread(self, thread_id: str) -> None:
+    def pause_thread(self, thread_id: int) -> None:
         """Pause future sampling for one Thread without cancelling a Tool.
 
         Pending-message cancellation remains an internal cleanup capability.  A
@@ -299,11 +299,11 @@ class AgentHarnessService:
 
         self._conversation_service.pause_thread(thread_id)
 
-    def is_thread_paused(self, thread_id: str) -> bool:
+    def is_thread_paused(self, thread_id: int) -> bool:
         checker = getattr(self._conversation_service, "is_thread_paused", None)
         return bool(checker(thread_id)) if callable(checker) else False
 
-    def cancel_sampling(self, pending_message_id: str) -> None:
+    def cancel_sampling(self, pending_message_id: int) -> None:
         with self._cancel_lock:
             event = self._cancel_events.get(pending_message_id)
             if event is not None:
@@ -456,8 +456,8 @@ class AgentHarnessService:
 
     def _sample_until_client_frontier(
         self,
-        thread_id: str,
-        frontier_id: str,
+        thread_id: int,
+        frontier_id: int,
         *,
         client_submission_id: str | None = None,
     ) -> Iterator[AgentHarnessStreamEvent]:
@@ -475,7 +475,7 @@ class AgentHarnessService:
                 return
             scope = self._sampling_tool_scope(thread_id)
             pending: PendingSampling | None = None
-            active_pending_id: str | None = None
+            active_pending_id: int | None = None
             try:
                 if self._provider is not None:
                     retry_events: list[dict[str, Any]] = []
@@ -644,8 +644,8 @@ class AgentHarnessService:
 
     def _sampling_started_events(
         self,
-        thread_id: str,
-        pending_message_id: str,
+        thread_id: int,
+        pending_message_id: int,
         retry_events: list[dict[str, Any]],
         *,
         client_submission_id: str | None = None,
@@ -674,7 +674,7 @@ class AgentHarnessService:
         self,
         event: ConversationLiveEvent,
         *,
-        thread_id: str,
+        thread_id: int,
         client_submission_id: str | None = None,
     ) -> Iterator[AgentHarnessStreamEvent]:
         if event.kind == "sampling_started":
@@ -719,11 +719,11 @@ class AgentHarnessService:
             return self._conversation_service.default_fq_model_key()
         return selected
 
-    def _frontier_id(self, thread_id: str) -> str | None:
+    def _frontier_id(self, thread_id: int) -> int | None:
         snapshot = self.get_thread_snapshot(thread_id)
         return snapshot.messages[-1].id if snapshot.messages else None
 
-    def _snapshot_if_thread_exists(self, thread_id: str) -> ConversationSnapshot | None:
+    def _snapshot_if_thread_exists(self, thread_id: int) -> ConversationSnapshot | None:
         try:
             return self.get_thread_snapshot(thread_id)
         except NotFoundError:
@@ -734,8 +734,8 @@ class AgentHarnessService:
 
     def _cancelled_pending_events(
         self,
-        thread_id: str,
-        pending_message_id: str,
+        thread_id: int,
+        pending_message_id: int,
         *,
         client_submission_id: str | None = None,
     ) -> Iterator[AgentHarnessStreamEvent]:
@@ -755,8 +755,8 @@ class AgentHarnessService:
 
     def _paused_pending_events(
         self,
-        thread_id: str,
-        pending_message_id: str | None,
+        thread_id: int,
+        pending_message_id: int | None,
         *,
         client_submission_id: str | None = None,
     ) -> Iterator[AgentHarnessStreamEvent]:
@@ -784,7 +784,7 @@ class AgentHarnessService:
             is_final=True,
         )
 
-    def _sampling_tool_scope(self, thread_id: str) -> ToolScope:
+    def _sampling_tool_scope(self, thread_id: int) -> ToolScope:
         snapshot = self.get_thread_snapshot(thread_id)
         tool_names: tuple[str, ...] = ()
         if self._tool_name_scope_provider is not None:
@@ -808,8 +808,8 @@ class AgentHarnessService:
         return tuple(normalized)
 
     @staticmethod
-    def _dataset_ids_from_snapshot(snapshot: ConversationSnapshot) -> list[str]:
-        found: list[str] = []
+    def _dataset_ids_from_snapshot(snapshot: ConversationSnapshot) -> list[int]:
+        found: list[int] = []
         for message in snapshot.messages:
             payload = message.content_payload if isinstance(message.content_payload, dict) else None
             for block in blocks_from_payload(payload):
@@ -844,7 +844,7 @@ class AgentHarnessService:
         self,
         *,
         claim: SubmissionClaim,
-        first_user_message_id: str,
+        first_user_message_id: int,
         appended_snapshot: ConversationSnapshot,
     ) -> _InitialTitleTask:
         completed = threading.Event()
@@ -870,7 +870,7 @@ class AgentHarnessService:
         threading.Thread(target=run, name="xenix-initial-thread-title", daemon=True).start()
         return _InitialTitleTask(completed=completed, outcomes=outcomes)
 
-    def _resolve_dataset_source_presentation(self, dataset_id: str) -> DatasetSourcePresentation | None:
+    def _resolve_dataset_source_presentation(self, dataset_id: int) -> DatasetSourcePresentation | None:
         """Read presentation metadata without allowing it to affect replay."""
 
         if self._dataset_service is None:
@@ -885,17 +885,17 @@ class AgentHarnessService:
         lookup = getattr(self._tool_presentation_registry, "tool_presentation", None)
         return cast(ToolPresentation, lookup(tool_name)) if callable(lookup) else tool_presentation_for_name(tool_name)
 
-    def _register_cancel_event(self, pending_message_id: str, thread_id: str) -> None:
+    def _register_cancel_event(self, pending_message_id: int, thread_id: int) -> None:
         with self._cancel_lock:
             self._cancel_events.setdefault(pending_message_id, threading.Event())
             self._pending_threads[pending_message_id] = thread_id
 
-    def _clear_cancel_event(self, pending_message_id: str) -> None:
+    def _clear_cancel_event(self, pending_message_id: int) -> None:
         with self._cancel_lock:
             self._cancel_events.pop(pending_message_id, None)
             self._pending_threads.pop(pending_message_id, None)
 
-    def _cancel_requested(self, pending_message_id: str) -> Callable[[], bool]:
+    def _cancel_requested(self, pending_message_id: int) -> Callable[[], bool]:
         with self._cancel_lock:
             event = self._cancel_events.get(pending_message_id)
 

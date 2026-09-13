@@ -132,7 +132,7 @@ class ChatWorkspace(QObject):
     def composer_attachments(self) -> dict[str, _ComposerAttachmentRecord]:
         return self._composer_attachments
 
-    def refresh_history(self, *, selected_thread_id: str | None = None) -> None:
+    def refresh_history(self, *, selected_thread_id: int | None = None) -> None:
         self._history_panel.refresh(selected_thread_id)
 
     def open_initial_thread(self) -> None:
@@ -472,7 +472,7 @@ class ChatWorkspace(QObject):
         raw_task_ids = action.get("task_ids")
         if not isinstance(raw_task_ids, list):
             return
-        task_ids = [str(task_id) for task_id in raw_task_ids if str(task_id).strip()]
+        task_ids = [task_id for task_id in raw_task_ids if isinstance(task_id, int)]
         if not task_ids:
             return
         if action_type == "open_tool_call_detail":
@@ -513,20 +513,20 @@ class ChatWorkspace(QObject):
         self._thread_detail_view.render_events(self._agent_harness_service.project_chatbot_events(snapshot))
         self.refresh_history(selected_thread_id=snapshot.thread.id)
 
-    def _open_history_thread(self, thread_id: str) -> None:
+    def _open_history_thread(self, thread_id: int) -> None:
         snapshot = self._agent_harness_service.get_thread_snapshot(thread_id)
         self._select_conversation_thread(thread_id)
         self._sync_thread_model_picker(snapshot)
         self._thread_detail_view.render_events(self._agent_harness_service.project_chatbot_events(snapshot))
 
-    def _select_conversation_thread(self, thread_id: str | None) -> None:
+    def _select_conversation_thread(self, thread_id: int | None) -> None:
         self._conversation.select_thread(thread_id)
         self._submission_attachment_paths = ()
         self._thread_detail_view.clear_operation_notification()
         self._thread_detail_view.abort_composer_submission()
         self._thread_detail_view.set_running(False)
 
-    def _on_history_thread_deleted(self, thread_id: str) -> None:
+    def _on_history_thread_deleted(self, thread_id: int) -> None:
         if self.conversation_thread_id != thread_id:
             self.refresh_history(selected_thread_id=self.conversation_thread_id)
             return
