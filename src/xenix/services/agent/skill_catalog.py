@@ -66,30 +66,16 @@ class AgentSkillCatalog:
         if not self._skills:
             return None
         activated = set(activated_skill_names or set())
-        entries = [
-            {
-                "name": skill.name,
-                "description": skill.description,
-                "active": skill.name in activated,
-                "reference_count": len(skill.resources.get("references", [])),
-                "asset_count": len(skill.resources.get("assets", [])),
-            }
-            for skill in self.list_skills()
-        ]
-        content = (
-            "Xenix provides built-in data preparation, analysis, and modeling tools through Agent Skills. "
-            "Tools are disclosed progressively: activate a matching skill to make its tools available on the next "
-            "request. An absent tool in the current list does not mean the application lacks that capability. "
-            "For a matching inactive skill, call "
-            f"`{AGENT_SKILL_ACTIVATE_TOOL_NAME}` before proceeding and follow its returned instructions. "
-            "When a result is paged, use `result.page` to read the remaining instructions. "
-            "After activation, read a listed needed resource with "
-            f"`{AGENT_SKILL_READ_REFERENCE_TOOL_NAME}` or `{AGENT_SKILL_READ_ASSET_TOOL_NAME}`.\n"
-            "<available_agent_skills>"
-            f"{json.dumps(entries, ensure_ascii=False, separators=(',', ':'))}"
-            "</available_agent_skills>"
-        )
-        return ProviderMessage(role="system", content=content)
+        active = [skill.name for skill in self.list_skills() if skill.name in activated]
+        inactive = [skill for skill in self.list_skills() if skill.name not in activated]
+        lines = ["Active skills: " + (", ".join(active) or "none")]
+        if inactive:
+            lines.append(
+                f"More tools are available through `{AGENT_SKILL_ACTIVATE_TOOL_NAME}`. "
+                "Activate a skill below when its capabilities are needed; its tools appear on the next request."
+            )
+            lines.extend(f"- {skill.name}: {skill.description}" for skill in inactive)
+        return ProviderMessage(role="system", content="\n".join(lines))
 
     def activation_tool_spec(self, *, activated_skill_names: set[str] | None = None) -> AgentToolSpec | None:
         tool = self.activation_tool(activated_skill_names=activated_skill_names)
@@ -118,8 +104,7 @@ class AgentSkillCatalog:
             name=AGENT_SKILL_ACTIVATE_TOOL_NAME,
             provider_name=AGENT_SKILL_ACTIVATE_PROVIDER_NAME,
             description=(
-                "Activate one built-in Xenix Agent Skill when the user task matches its description. "
-                "Returns its instructions and makes the skill's data or modeling tools available on the next request."
+                "Load a skill's guidance and resource index; its tools become available on the next request."
             ),
             input_model=AgentSkillActivateInput,
             implementation=activate,
@@ -150,8 +135,7 @@ class AgentSkillCatalog:
                     tool_name=AGENT_SKILL_READ_REFERENCE_TOOL_NAME,
                     provider_name=AGENT_SKILL_READ_REFERENCE_PROVIDER_NAME,
                     description=(
-                        "Read one reference listed by an already activated Xenix Agent Skill. "
-                        "This returns only UTF-8 reference text embedded in the generated catalog."
+                        "Read a reference from an active skill's resource index."
                     ),
                     skill_names=[skill.name for skill in active_skills if skill.resources.get("references")],
                     resource_reader=self.read_reference,
@@ -164,8 +148,7 @@ class AgentSkillCatalog:
                     tool_name=AGENT_SKILL_READ_ASSET_TOOL_NAME,
                     provider_name=AGENT_SKILL_READ_ASSET_PROVIDER_NAME,
                     description=(
-                        "Read one asset listed by an already activated Xenix Agent Skill. "
-                        "This returns only UTF-8 asset text embedded in the generated catalog."
+                        "Read a template or example from an active skill's resource index."
                     ),
                     skill_names=[skill.name for skill in active_skills if skill.resources.get("assets")],
                     resource_reader=self.read_asset,
@@ -212,9 +195,7 @@ class AgentSkillCatalog:
             raise NotFoundError(f"Agent Skill '{skill_name}' was not found.")
         return {
             "skill_name": skill.name,
-            "description": skill.description,
             "instructions": skill.body,
-            "metadata": dict(skill.metadata),
             "resources": {key: sorted(value) for key, value in skill.resources.items()},
         }
 

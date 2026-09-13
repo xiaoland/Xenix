@@ -95,9 +95,7 @@ def _index_agent_tools(
         provider_name = tool.spec.provider_name
         owner = provider_name_owners.get(provider_name)
         if owner is not None:
-            raise ValidationError(
-                f"Provider tool name '{provider_name}' is already registered by '{owner}'."
-            )
+            raise ValidationError(f"Provider tool name '{provider_name}' is already registered by '{owner}'.")
         indexed[tool_name] = tool
         provider_name_owners[provider_name] = tool_name
     return indexed
@@ -109,11 +107,7 @@ def _tool_input_error_message(exc: PydanticValidationError) -> str:
     if isinstance(context, dict) and isinstance(context.get("error"), ValueError):
         return str(context["error"])
     location = error.get("loc")
-    field_name = (
-        str(location[0])
-        if isinstance(location, tuple | list) and location
-        else "Tool input"
-    )
+    field_name = str(location[0]) if isinstance(location, tuple | list) and location else "Tool input"
     message = str(error.get("msg") or "is invalid.")
     if field_name == "id_columns":
         return "data.tokenize id_columns must be a list of strings."
@@ -261,7 +255,7 @@ class AgentToolRegistry:
         return self._tool(
             name="data.integrate",
             provider_name="data_integrate",
-            description="Combine two or more registered datasets into a generated derived dataset.",
+            description="Append rows from two or more Datasets into a derived Dataset.",
             input_model=DataIntegrateInput,
             handler=self._data_tools._data_integrate,
         )
@@ -271,10 +265,7 @@ class AgentToolRegistry:
             name="analysis.graph",
             provider_name="analysis_graph",
             description=(
-                "Draw one bounded static SVG artifact for a registered dataset. Pass exactly one graph mode: "
-                "`spec` for ordinary Vega-Lite charts, or `wordcloud_spec` for the dedicated word-cloud path. "
-                "`wordcloud_spec` is the dedicated word-cloud path and expects an upstream chart-ready "
-                "frequency table from data.query or data.transform."
+                "Render a chart or word cloud from a Dataset and return its image Artifact. Uses Vega-Lite JSON or term-frequency wordcloud_spec."
             ),
             input_model=AnalysisGraphInput,
             handler=self._analysis_tools._analysis_graph,
@@ -285,10 +276,7 @@ class AgentToolRegistry:
             name="analysis.profile",
             provider_name="analysis_profile",
             description=(
-                "Return typed, bounded quality facts for one registered Dataset with scope=whole_dataset. "
-                "The read-only result includes ordered field structure, missingness, cardinality, bounded "
-                "numeric/date summaries, correlations, and explicit truncation. It returns no sample rows, "
-                "category/group values, identifier values, Dataset, or Artifact. data.query can inspect values."
+                "Summarize Dataset structure, missing values, duplicates, numeric distributions and correlations."
             ),
             input_model=AnalysisProfileInput,
             handler=self._analysis_tools._analysis_profile,
@@ -320,15 +308,7 @@ class AgentToolRegistry:
             name="data.clean",
             provider_name="data_clean",
             description=(
-                "Create a new whole-Dataset derived dataset by applying atomic predefined business-cleaning "
-                "operations to one registered dataset. Operations execute strictly left-to-right against the "
-                "current intermediate dataset; each operation sees every earlier change. Use advertised "
-                "validation operations for supported row checks or rejection, including non-negative, min/max, "
-                "not-null, allowed-values, and regex rules. SQL transformations are also available through data.transform. "
-                "Stateful imputation, encoding, and scaling here fit "
-                "the whole Dataset. Column names or zero-based indexes identify fields in the current table. "
-                "After missing.drop_high_missing_columns or encoding.one_hot, use names or a new "
-                "data.query/data.clean call before using indexes."
+                "Apply ordered cleaning operations to a new Dataset; returns its ID, public Artifact and change summary. Transforms the whole Dataset; learned model preprocessing belongs inside training."
             ),
             input_model=DataCleanInput,
             handler=self._data_tools._data_clean,
@@ -340,15 +320,10 @@ class AgentToolRegistry:
         return self._tool(
             name="data.clean.metadata",
             provider_name="data_clean_metadata",
-            description=(
-                "Return a compact data.clean operation catalog. Request only relevant groups when an "
-                "operation or parameter is uncertain."
-            ),
+            description=("Describe data.clean operations and parameters, optionally filtered by group."),
             input_model=DataCleanMetadataInput,
             handler=self._data_tools._data_clean_metadata,
-            provider_field_enums=(
-                ("groups", cleaning_operation_group_names()),
-            ),
+            provider_field_enums=(("groups", cleaning_operation_group_names()),),
         )
 
     def _build_data_tokenize_tool(self) -> ConcreteAgentTool[DataTokenizeInput]:
@@ -356,12 +331,8 @@ class AgentToolRegistry:
             name="data.tokenize",
             provider_name="data_tokenize",
             description=(
-                "Create a derived token Dataset with legacy zh_business_v1 or retained "
-                "multilingual_business_v1 preparation. The multilingual profile can use bounded "
-                "registered one-column custom-dictionary/stopword Datasets. Use output=token_text to keep source rows and append "
-                "token_text for downstream text models, or output=token_rows to explode one token per row. "
-                "Select the text and optional identifier columns by names or zero-based source indexes; "
-                "do not mix the two forms for one selector."
+                "Tokenize text into a derived Dataset with optional stopwords and custom dictionaries. "
+                "Raw-text models handle their own preparation."
             ),
             input_model=DataTokenizeInput,
             handler=self._data_tools._data_tokenize,
@@ -372,13 +343,7 @@ class AgentToolRegistry:
             name="data.query",
             provider_name="data_query",
             description=(
-                "Run a read-only SELECT/CTE query over registered datasets. "
-                "Pass either dataset_id for one input aliased as input, or bindings for explicit SQL aliases. "
-                "At least one input source is required. If both are present, bindings wins. "
-                "When column_reference=indexes, each bound relation exposes zero-based c0, c1, ... SQL "
-                "columns instead of source names; use this for punctuation-heavy or Unicode headers. "
-                "CSV dates may be strings; cast explicitly for date comparisons or arithmetic. "
-                "Returns bounded rows and does not create a derived dataset or artifact."
+                "Query Datasets with DuckDB SQL; returns a row-limited result without saving a Dataset. Cast string dates for date arithmetic."
             ),
             input_model=DataQueryToolInput,
             handler=self._data_tools._data_query,
@@ -391,13 +356,7 @@ class AgentToolRegistry:
             name="data.transform",
             provider_name="data_transform",
             description=(
-                "Create a new derived dataset from bounded DuckDB SQL over registered datasets. "
-                "Supports filters, calculated columns, joins, aggregates, reshaping, and grain changes. "
-                "Use dataset_id for one input aliased as input, or bindings for explicit aliases. "
-                "At least one input source is required. If both are present, bindings wins. "
-                "When column_reference=indexes, each bound relation exposes zero-based c0, c1, ... SQL "
-                "columns instead of source names; use this for punctuation-heavy or Unicode headers. "
-                "A script's final SELECT becomes the result; scripts without a final query use the TEMP relation output."
+                "Save DuckDB SQL results as a derived Dataset and user-openable Artifact. Supports filters, joins, calculations and aggregates."
             ),
             input_model=DataTransformToolInput,
             handler=self._data_tools._data_transform,
@@ -409,11 +368,7 @@ class AgentToolRegistry:
         return self._tool(
             name="data.feature.select",
             provider_name="data_feature_select",
-            description=(
-                "Bind registered dataset columns to semantic roles required by a model/analyzer. "
-                "Accepts column names or zero-based column_indexes; Xenix resolves them against the "
-                "current dataset schema and persists canonical names."
-            ),
+            description=("Save Dataset column roles for model training; returns a binding ID."),
             input_model=DataFeatureSelectInput,
             handler=self._data_tools._data_feature_select,
         )
@@ -422,10 +377,7 @@ class AgentToolRegistry:
         return self._tool(
             name="model.metadata",
             provider_name="model_metadata",
-            description=(
-                "Browse a lightweight model directory by model_family, or inspect one chosen model's role "
-                "and parameter schema with model_key. include_details=true includes schemas for all family candidates."
-            ),
+            description=("Describe models, accepted column roles and parameters. Choose a model_key or model_family."),
             input_model=ModelMetadataInput,
             handler=self._model_tools._model_metadata,
         )
@@ -435,8 +387,7 @@ class AgentToolRegistry:
             name="model.train",
             provider_name="model_train",
             description=(
-                "Train and evaluate one or more models for a persisted dataset column role binding. "
-                "Completed results group parameters and evaluation evidence by retained model, with public Artifact links."
+                "Train selected models and return saved model IDs, evaluation evidence and public Artifacts. Unfinished work returns task IDs."
             ),
             input_model=ModelTrainInput,
             handler=self._model_tools._model_train,
@@ -449,8 +400,7 @@ class AgentToolRegistry:
             name="model.hyper_train",
             provider_name="model_hyper_train",
             description=(
-                "Run hyperparameter training for one or more models. "
-                "model.metadata can describe supported parameter grids with include_param_grid_schema=true."
+                "Tune models over parameter grids; returns retained models, evaluation evidence and Artifacts, or task IDs while pending."
             ),
             input_model=ModelHyperTrainInput,
             handler=self._model_tools._model_hyper_train,
@@ -461,9 +411,7 @@ class AgentToolRegistry:
             name="model.apply",
             provider_name="model_apply",
             description=(
-                "Apply a retained model to registered dataset/artifact inputs or inline rows, "
-                "or pass horizon alone to create a native future forecast. Completed results include "
-                "result_dataset_id and a public Artifact link; pending work returns task IDs."
+                "Apply a saved model to Datasets, Artifacts or inline rows, or forecast a future horizon. Returns a result Dataset and Artifact, or pending task IDs."
             ),
             input_model=ModelApplyInput,
             handler=self._model_tools._model_apply,
@@ -476,8 +424,7 @@ class AgentToolRegistry:
             name="model.task.query",
             provider_name="model_task_query",
             description=(
-                "Query ML task status, result summaries, public Artifact links and errors. "
-                "Training queries include related evaluation tasks. Full diagnostics and logs are optional."
+                "Read task status, summaries, errors and Artifact links, including follow-up evaluations. Logs and full diagnostics are optional."
             ),
             input_model=ModelTaskQueryInput,
             handler=self._model_tools._model_task_query,
@@ -489,11 +436,7 @@ class AgentToolRegistry:
         return self._tool(
             name="model.task.stop",
             provider_name="model_task_stop",
-            description=(
-                "Stop (cancel) one or more running ML tasks by explicit task ids. "
-                "Use it when model.train/model.hyper_train/model.apply reports timed_out "
-                "and the reported status/logs show the task should not continue."
-            ),
+            description=("Cancel the specified ML tasks."),
             input_model=ModelTaskStopInput,
             handler=self._model_tools._model_task_stop,
         )

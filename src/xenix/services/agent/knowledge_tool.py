@@ -47,10 +47,8 @@ def knowledge_lookup_tool(service: KnowledgeService) -> AgentTool[KnowledgeLooku
         name=KNOWLEDGE_LOOKUP_TOOL_NAME,
         provider_name="knowledge_lookup",
         description=(
-            "Search the user's Knowledge Library for business rules, definitions, "
-            "assumptions, and experience relevant to the current data task. Ask in "
-            "business language; choose a retrieval mode only when useful, and use "
-            "returned source excerpts as guidance alongside computed data evidence."
+            "Search the user's Knowledge Library for business rules, definitions and experience; "
+            "returns relevant source excerpts."
         ),
         input_model=KnowledgeLookupInput,
         implementation=lookup,

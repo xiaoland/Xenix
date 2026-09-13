@@ -53,11 +53,6 @@ class AnalysisTools:
     ) -> ToolSuccess:
         _raise_if_cancelled(self._ml_service, context)
         dataset = self._dataset_service.get_dataset(input_data.dataset_id)
-        raw_spec = (
-            input_data.spec.model_dump(by_alias=True, exclude_none=True)
-            if input_data.spec is not None
-            else None
-        )
         raw_wordcloud_spec = (
             input_data.wordcloud_spec.model_dump(exclude_none=True)
             if input_data.wordcloud_spec is not None
@@ -67,7 +62,7 @@ class AnalysisTools:
             GraphDatasetInput(
                 source_path=dataset.source_path,
                 dataset_name=dataset.name,
-                spec=raw_spec,
+                spec=input_data.spec,
                 wordcloud_spec=raw_wordcloud_spec,
             )
         )
