@@ -18,7 +18,6 @@ from sqlmodel import Field, SQLModel
 from ...exceptions import report_exception
 from ..llm.messages import blocks_from_payload, blocks_to_json
 from ..llm.tooling import canonical_tool_result_value
-from .skill_catalog import is_agent_skill_tool
 from .tool_presentations import ToolPresentation, tool_presentation_for_name
 
 
@@ -168,7 +167,8 @@ def project_chatbot_events(
         elif kind == "tool_call":
             result = result_by_call.get(getattr(message, "id", None))
             tool_name = _tool_name(message)
-            if tool_name and (not is_agent_skill_tool(tool_name) or should_project_agent_skill_tools()):
+            internal = tool_name.startswith(("agent.skill.", "agent.tools.")) if tool_name else False
+            if tool_name and (not internal or should_project_agent_context_tools()):
                 events.append(project_tool_chatbot_event(
                     message, result_message=result,
                     tool_presentation_lookup=tool_presentation_lookup,
@@ -426,11 +426,10 @@ def project_tool_chatbot_event(
     )
 
 
-def should_project_agent_skill_tools() -> bool:
-    """Hide internal agent.skill.* orchestration from the production Chatbot.
+def should_project_agent_context_tools() -> bool:
+    """Show Skill reading and Tool activation details in development only.
 
-    Skill activation/read tools are prompt-only scaffolding for the Agent, not
-    user-meaningful actions, so their tool events are omitted from the Chatbot
+    Context loading does not produce a business deliverable, so its events are omitted from the Chatbot
     projection unless the development environment flag is set for inspection.
     """
     return os.environ.get("XENIX_ENV", "").strip().lower() in {"development", "dev"}

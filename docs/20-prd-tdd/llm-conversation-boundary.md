@@ -68,7 +68,7 @@ Tool modules.
   identifies its ToolCall; neither Artifact nor observability becomes
   conversation provenance.
 - Tool identity, scope, and typed arguments are validated at invocation. Invalid model arguments become a canonical failed ToolResult with field-level details, allowing the next sample to repair the call; they do not abort sampling before the ToolResult exists.
-- Skill activation is derived from the successful canonical ToolCall's arguments and paired terminal status, independently of whether its result was paged. The built-in `result.page` remains available in every tool scope and returns the requested page directly without repaging its envelope.
+- Skill reading and Tool activation are independent operations. Skill reading returns domain guidance and a resource index without changing business Tool visibility; Tool activation changes visibility without loading Skill content. Each is projected from its own successful canonical ToolCall arguments and paired terminal status, independently of whether its result was paged. The built-in `result.page` remains available in every tool scope and returns the requested page directly without repaging its envelope.
 - Completed training and tuning Tools associate each retained model with its evaluation facts and public Artifact handles, so delivering an evaluation report does not require a second status query. Pending work remains discoverable through `model.task.query`, which returns related evaluation status and result summaries; full persisted diagnostics are available on explicit request.
 - A ToolResult stores one bounded direct JSON value. Tabular Tools choose XTT
   before returning; known and normalized failures use the typed `ToolFailure`
@@ -241,7 +241,7 @@ Dataset authority; the Chatbot block remains only its read-only UI projection.
 
 - Harness coordination, Tool sequencing, direct ToolResult/XTT continuity, and
   the command/snapshot boundary: `tests/agent/test_agent_harness_first_slice.py`.
-- Agent skill scope and Tool guidance: `tests/agent/test_agent_skill_tool_scope.py` and `tests/agent/test_agent_data_cleaning_guidance.py`.
+- Skill reading, independent Tool activation and history reload: `tests/agent/test_agent_harness_first_slice.py`.
 - ToolResult paging: `tests/llm/test_tool_result_pagination.py`.
 - Chatbot projection of Dataset audit evidence: `tests/ui/test_chatbot_contract.py`.
 - Knowledge retrieval and the lookup Tool:

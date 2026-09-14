@@ -296,7 +296,7 @@ class AnalysisGraphService:
         self._validate_visual_shape(user_spec)
         self._validate_no_wordcloud_transform(user_spec)
         spec = copy.deepcopy(user_spec)
-        self._drop_user_data_declarations(spec)
+        self._validate_dataset_sources(spec)
         self._validate_no_external_urls(spec)
         self._validate_dimensions(spec)
         spec.setdefault("width", _DEFAULT_WIDTH)
@@ -320,7 +320,8 @@ class AnalysisGraphService:
         render_frame = frame.head(_MAX_RENDER_ROWS) if truncated else frame
         spec.setdefault("$schema", "https://vega.github.io/schema/vega-lite/v5.json")
         spec.setdefault("title", dataset_name)
-        spec["data"] = {"values": self._records(render_frame)}
+        spec["datasets"] = {"data": self._records(render_frame)}
+        spec.setdefault("data", {"name": "data"})
         warnings = self._static_warnings(spec)
         if truncated:
             warnings.append(
@@ -510,21 +511,36 @@ class AnalysisGraphService:
             for child in value:
                 self._validate_no_wordcloud_transform_value(child)
 
-    def _drop_user_data_declarations(self, value: Any, path: str = "spec") -> None:
-        if isinstance(value, dict):
-            for key in list(value):
-                child = value[key]
-                child_path = f"{path}.{key}"
-                if key == "data":
-                    del value[key]
-                    continue
-                if key == "datasets":
-                    del value[key]
-                    continue
-                self._drop_user_data_declarations(child, child_path)
-        elif isinstance(value, list):
-            for index, child in enumerate(value):
-                self._drop_user_data_declarations(child, f"{path}[{index}]")
+    def _validate_dataset_sources(self, spec: dict[str, Any], path: str = "spec") -> None:
+        # Visit source-bearing Vega-Lite nodes, not arbitrary objects: a datum,
+        # parameter or user metadata may legitimately contain a key named data.
+        if "data" in spec and spec["data"] != {"name": "data"}:
+            raise ValidationError(
+                f"analysis.graph {path}.data conflicts with the selected Dataset. "
+                'Omit data or use {"name":"data"} to reference that Dataset. '
+                "Inline values and other sources are not substituted for it."
+            )
+        if spec.get("datasets"):
+            raise ValidationError(
+                f"analysis.graph {path}.datasets conflicts with the selected Dataset. "
+                'Xenix binds that Dataset as "data"; omit datasets.'
+            )
+        for key in ("layer", "hconcat", "vconcat", "concat"):
+            children = spec.get(key)
+            if isinstance(children, list):
+                for index, child in enumerate(children):
+                    if isinstance(child, dict):
+                        self._validate_dataset_sources(child, f"{path}.{key}[{index}]")
+        child_spec = spec.get("spec")
+        if isinstance(child_spec, dict):
+            self._validate_dataset_sources(child_spec, f"{path}.spec")
+        transforms = spec.get("transform")
+        if isinstance(transforms, list):
+            for index, transform in enumerate(transforms):
+                if isinstance(transform, dict) and "lookup" in transform:
+                    source = transform.get("from")
+                    if isinstance(source, dict):
+                        self._validate_dataset_sources(source, f"{path}.transform[{index}].from")
 
     # LLM-authored specs must stay local-only: reject every "url" key so rendering
     # cannot fetch remote data (SSRF / exfiltration via Vega-Lite url loading).

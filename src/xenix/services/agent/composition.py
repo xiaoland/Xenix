@@ -8,7 +8,7 @@ benchmark process.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
@@ -31,49 +31,7 @@ if TYPE_CHECKING:
     from ..ml_task_service import MLTaskService
     from .harness_service import AgentHarnessService
     from .skill_catalog import AgentSkillCatalog
-
-
-# This is an advertisement policy, not a second tool registry.  The LLM
-# boundary remains the authority for registered definitions and validates the
-# frozen scope before accepting or invoking any provider Tool Call.
-_AGENT_SKILL_COMMON_TOOL_NAMES = (
-    "agent.skill.activate",
-    "agent.skill.read_reference",
-    "agent.skill.read_asset",
-    "data.query",
-    "knowledge.lookup",
-)
-_AGENT_SKILL_INITIAL_TOOL_NAMES = (
-    "agent.skill.activate",
-    "knowledge.lookup",
-)
-_AGENT_SKILL_TOOL_NAMES: dict[str, tuple[str, ...]] = {
-    "xenix-data-preprocessing": (
-        "analysis.profile",
-        "data.integrate",
-        "data.clean",
-        "data.clean.metadata",
-        "data.tokenize",
-        "data.transform",
-        "data.feature.select",
-    ),
-    "xenix-data-analysis": (
-        "analysis.profile",
-        "data.transform",
-        "analysis.graph",
-    ),
-    "xenix-data-modeling": (
-        "analysis.profile",
-        "data.transform",
-        "data.feature.select",
-        "model.metadata",
-        "model.train",
-        "model.hyper_train",
-        "model.apply",
-        "model.task.query",
-        "analysis.graph",
-    ),
-}
+    from .tool_catalog import AgentToolCatalog
 
 
 @dataclass(frozen=True)
@@ -134,6 +92,7 @@ def build_headless_agent_services(
     from .lazy_tools import LazyAgentToolRegistry
     from .knowledge_tool import register_knowledge_lookup_tool
     from .skill_catalog import AgentSkillCatalog
+    from .tool_catalog import AgentToolCatalog
 
     def create_datasets() -> DatasetService:
         from ..dataset_service import DatasetService
@@ -208,7 +167,7 @@ def build_headless_agent_services(
         session_factory=session_factory,
         llm_service=llm,
         tool_registry=llm_tools,
-        context_messages_provider=lambda snapshot: agent_skill_context_messages(skill_catalog, snapshot),
+        context_messages_provider=lambda snapshot: agent_context_messages(skill_catalog, tool_catalog, snapshot),
         usage_observability=usage_observability,
     )
     register_agent_skill_tools(
@@ -218,10 +177,8 @@ def build_headless_agent_services(
             conversation.get_thread_snapshot(thread_id)
         ),
     )
-    validate_agent_skill_tool_scopes(
-        (spec.name for spec in llm_tools.list_specs()),
-        skill_names=(skill.name for skill in skill_catalog.list_skills()),
-    )
+    tool_catalog = AgentToolCatalog(llm_tools.list_specs())
+    llm_tools.register(tool_catalog.activation_tool())
     conversation.discard_stale_pending_messages()
 
     harness = AgentHarnessService(
@@ -230,7 +187,7 @@ def build_headless_agent_services(
         provider=None,
         llm_service=llm,
         dataset_service=datasets,
-        tool_name_scope_provider=agent_skill_tool_scope_names,
+        tool_name_scope_provider=tool_catalog.scope_names,
     )
     if start_scheduler:
         scheduler.start()
@@ -303,35 +260,11 @@ def agent_skill_context_messages(catalog: AgentSkillCatalog, snapshot: Any) -> l
     return [message] if message is not None else []
 
 
-def agent_skill_tool_scope_names(snapshot: Any) -> tuple[str, ...] | None:
-    """Project relevant Tool names after a known Skill becomes active."""
-
-    active = agent_skill_activated_skill_names(snapshot)
-    if not active.intersection(_AGENT_SKILL_TOOL_NAMES):
-        return _AGENT_SKILL_INITIAL_TOOL_NAMES
-    names = list(_AGENT_SKILL_COMMON_TOOL_NAMES)
-    for skill_name, skill_tools in _AGENT_SKILL_TOOL_NAMES.items():
-        if skill_name in active:
-            names.extend(skill_tools)
-    return tuple(dict.fromkeys(names))
-
-
-def validate_agent_skill_tool_scopes(
-    registered_tool_names: Iterable[str],
-    *,
-    skill_names: Iterable[str] | None = None,
-) -> None:
-    """Reject production Skill scopes that advertise an unregistered Tool."""
-
-    registered = set(registered_tool_names)
-    configured_skills = (
-        set(_AGENT_SKILL_TOOL_NAMES) if skill_names is None else set(skill_names) & set(_AGENT_SKILL_TOOL_NAMES)
-    )
-    referenced: set[str] = set()
-    if configured_skills:
-        referenced.update(_AGENT_SKILL_COMMON_TOOL_NAMES)
-    for skill_name in configured_skills:
-        referenced.update(_AGENT_SKILL_TOOL_NAMES[skill_name])
-    missing = sorted(referenced - registered)
-    if missing:
-        raise RuntimeError("Agent Skill Tool scopes reference unregistered Tools: " + ", ".join(missing))
+def agent_context_messages(
+    skills: AgentSkillCatalog, tools: AgentToolCatalog, snapshot: Any,
+) -> list[Any]:
+    messages = agent_skill_context_messages(skills, snapshot)
+    directory = tools.provider_message(snapshot)
+    if directory is not None:
+        messages.append(directory)
+    return messages

@@ -404,6 +404,12 @@ class KnowledgeLookupInput(AgentToolInput):
     )
 
 
+class AgentToolsActivateInput(AgentToolInput):
+    names: Annotated[list[RequiredString], Field(min_length=1)] = Field(
+        description="Tool names or namespaces; each selects itself and dot-separated descendants.",
+    )
+
+
 class AgentSkillActivateInput(AgentToolInput):
     name: RequiredString = Field(description="Skill name from the directory.")
 

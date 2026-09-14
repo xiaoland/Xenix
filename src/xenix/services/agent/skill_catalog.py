@@ -68,11 +68,11 @@ class AgentSkillCatalog:
         activated = set(activated_skill_names or set())
         active = [skill.name for skill in self.list_skills() if skill.name in activated]
         inactive = [skill for skill in self.list_skills() if skill.name not in activated]
-        lines = ["Active skills: " + (", ".join(active) or "none")]
+        lines = ["Loaded Skill guidance: " + (", ".join(active) or "none")]
         if inactive:
             lines.append(
-                f"More tools are available through `{AGENT_SKILL_ACTIVATE_TOOL_NAME}`. "
-                "Activate a skill below when its capabilities are needed; its tools appear on the next request."
+                f"Read optional domain guidance through `{AGENT_SKILL_ACTIVATE_TOOL_NAME}`. "
+                "Reading a Skill does not activate tools."
             )
             lines.extend(f"- {skill.name}: {skill.description}" for skill in inactive)
         return ProviderMessage(role="system", content="\n".join(lines))
@@ -104,7 +104,7 @@ class AgentSkillCatalog:
             name=AGENT_SKILL_ACTIVATE_TOOL_NAME,
             provider_name=AGENT_SKILL_ACTIVATE_PROVIDER_NAME,
             description=(
-                "Load a skill's guidance and resource index; its tools become available on the next request."
+                "Read a Skill's guidance and resource index. Does not activate tools."
             ),
             input_model=AgentSkillActivateInput,
             implementation=activate,
@@ -272,10 +272,6 @@ class AgentSkillCatalog:
             "content": content,
             "size_bytes": len(data),
         }
-
-
-def is_agent_skill_tool(tool_name: str) -> bool:
-    return tool_name.startswith("agent.skill.")
 
 
 def _default_catalog_path() -> Path:
