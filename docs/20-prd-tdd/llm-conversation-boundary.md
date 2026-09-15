@@ -44,13 +44,14 @@ Tool modules.
 
 - `LLMConversationService` is the sole canonical Thread/Message writer. It
   owns the provider-facing transcript, pending/final Message lifecycle, and
-  the `AgentTool` protocol, registry, scope validation, and invocation.
+  the `AgentTool` protocol, registry, definition visibility, and invocation.
 - A production AgentTool's strict typed input model is the single call-contract
   authority. The provider-facing JSON Schema is a bounded portable projection
   of that model, never a separately maintained definition; invocation validates
   the admitted arguments into that model before calling its typed
   implementation. Cross-field rules remain model validation rather than
   provider-schema combinators.
+- Registration and invocation depend on the typed Tool contract, while provider definitions are a derived display projection. Skill guidance history likewise controls context presentation only; reading a catalog resource by Skill name and path does not require a prior guidance read or a committed activation record.
 - Agent Harness owns transient application coordination only: source import,
   the decision to sample, Thread-pause requests, and snapshot-to-Chatbot-event
   projection. It does not directly write or mutate canonical Messages, dispatch
@@ -67,7 +68,8 @@ Tool modules.
   an Assistant Message when the provider emitted one. A ToolResult directly
   identifies its ToolCall; neither Artifact nor observability becomes
   conversation provenance.
-- Tool identity, scope, and typed arguments are validated at invocation. Invalid model arguments become a canonical failed ToolResult with field-level details, allowing the next sample to repair the call; they do not abort sampling before the ToolResult exists.
+- Provider parsing preserves the requested wire Tool name without requiring it to appear in the advertised definitions. Conversation resolves that name through the full registry; invocation checks registration and typed arguments, independently of definition visibility. Unknown Tools and invalid arguments, including malformed JSON or a non-object root, become canonical failed ToolResults without losing the response's usage or blocking other valid calls in that response. Registered Tools with valid arguments may execute before their definitions have been activated.
+- An undecodable Tool call retains its original argument text in canonical content and has no decoded argument payload. Invocation returns its parse failure, including the JSON error position when available, without executing the Tool. History replay sends the original argument text and its paired failed result so the model can correct the call through the ordinary Harness loop. Complete and streaming responses use the same argument parser; empty argument text is an invalid call, not an implicit empty object. Unusable response envelopes or missing call identities remain Provider errors.
 - Skill reading and Tool activation are independent operations. Skill reading returns domain guidance and a resource index without changing business Tool visibility; Tool activation changes visibility without loading Skill content. Each is projected from its own successful canonical ToolCall arguments and paired terminal status, independently of whether its result was paged. The built-in `result.page` remains available in every tool scope and returns the requested page directly without repaging its envelope.
 - Completed training and tuning Tools associate each retained model with its evaluation facts and public Artifact handles, so delivering an evaluation report does not require a second status query. Pending work remains discoverable through `model.task.query`, which returns related evaluation status and result summaries; full persisted diagnostics are available on explicit request.
 - A ToolResult stores one bounded direct JSON value. Tabular Tools choose XTT

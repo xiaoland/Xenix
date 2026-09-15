@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 from queue import SimpleQueue
-from typing import Any, Iterator, cast
+from typing import Any, Iterator
 from uuid import uuid4
 
 from sqlmodel import Field, SQLModel
@@ -44,7 +44,7 @@ from ..llm import (
 )
 from ..llm.providers import AgentProvider, LLMRetryEvent
 from ..llm.service import LLMModelOption, LLMService
-from ..llm.tooling import ToolScope
+from ..llm.tool_protocol import ToolScope
 from ..storage.models import ConversationThreadRow
 from .chatbot_events import (
     ChatbotEvent,
@@ -57,7 +57,7 @@ from .chatbot_events import (
     enrich_chatbot_events_with_source_attachments,
     project_chatbot_events,
 )
-from .tool_presentations import ToolPresentation, tool_presentation_for_name
+from .tool_presentations import tool_presentation_for_name
 
 LOGGER = logging.getLogger(__name__)
 
@@ -132,21 +132,19 @@ class AgentHarnessService:
         self,
         *,
         conversation_service: LLMConversationService,
-        tool_presentation_registry: Any | None = None,
         provider: AgentProvider | None = None,
         llm_service: LLMService | None = None,
         dataset_service: DatasetService | None = None,
         tool_name_scope_provider: Callable[[ConversationSnapshot], tuple[str, ...] | None] | None = None,
     ) -> None:
         self._conversation_service = conversation_service
-        self._tool_presentation_registry = tool_presentation_registry
         self._provider = provider
         self._llm_service = llm_service
         self._dataset_service = dataset_service
         # The composition root may project a bounded advertised tool set from
-        # finalized Conversation state (for example, active Agent Skills).
-        # It never receives a writer capability and the Conversation service
-        # still freezes/validates the resulting scope for each provider call.
+        # finalized Conversation state (successful Tool activation calls).
+        # Conversation freezes definitions per request; visibility does not
+        # restrict execution of registered Tools.
         self._tool_name_scope_provider = tool_name_scope_provider
         self._cancel_events: dict[int, threading.Event] = {}
         self._pending_threads: dict[int, int] = {}
@@ -192,7 +190,7 @@ class AgentHarnessService:
         return self._conversation_service.set_thread_model(thread_id, fq_model_key)
 
     def project_chatbot_events(self, snapshot: ConversationSnapshot) -> list[ChatbotEvent]:
-        canonical_events = project_chatbot_events(snapshot, tool_presentation_lookup=self._tool_presentation)
+        canonical_events = project_chatbot_events(snapshot, tool_presentation_lookup=tool_presentation_for_name)
         canonical_events = enrich_chatbot_events_with_source_attachments(
             snapshot,
             canonical_events,
@@ -880,10 +878,6 @@ class AgentHarnessService:
         except Exception as exc:
             report_exception(exc)
             return None
-
-    def _tool_presentation(self, tool_name: str) -> ToolPresentation:
-        lookup = getattr(self._tool_presentation_registry, "tool_presentation", None)
-        return cast(ToolPresentation, lookup(tool_name)) if callable(lookup) else tool_presentation_for_name(tool_name)
 
     def _register_cancel_event(self, pending_message_id: int, thread_id: int) -> None:
         with self._cancel_lock:

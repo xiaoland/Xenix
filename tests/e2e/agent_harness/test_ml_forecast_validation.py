@@ -3,25 +3,22 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-import json
 import math
 from pathlib import Path
-import re
 from typing import Any, Final
 
 import polars as pl
 import pytest
 
 from xenix.services.agent import SourceAttachmentInput, SubmitUserTurnInput
-from xenix.services.tabular import load_tabular_frame
 
 from ._infra.case_support import (
     AttachedSourceState,
     attached_source_unchanged,
     canonical_completion,
     capture_attached_source_state,
-    enum_value,
-    is_within,
+    linked_tables,
+    linked_json_reports,
     sha256_file,
 )
 from ._infra.contracts import (
@@ -66,7 +63,6 @@ _OUTPUT_COLUMNS = {
     "interval_level",
     "horizon",
 }
-_ARTIFACT_URI = re.compile(r"artifact://[A-Za-z0-9]+(?:\?[^)\s>]+)?")
 
 BUSINESS_PROMPT = (
     "请根据这份各地区月度需求历史，为两个区域分别预测 2026 年 1—6 月的需求，"
@@ -134,8 +130,7 @@ class ForecastValidationCase:
         )
 
     def assess(self, *, context: BenchmarkCaseContext) -> BenchmarkCaseAssessment:
-        dataset, frame, selected_model = _resolve_forecast_outcome(context)
-        apply_artifact = _resolve_apply_artifact(context, dataset)
+        frame, selected_model = _resolve_forecast_outcome(context)
         report_artifact, report_payload = _resolve_evaluation_report(
             context,
             selected_model,
@@ -154,8 +149,8 @@ class ForecastValidationCase:
             ),
             OutcomeCheck(
                 "public_future_artifact",
-                apply_artifact is not None,
-                "linked_future_artifact_observed" if apply_artifact is not None else "linked_future_artifact_missing",
+                frame is not None,
+                "linked_future_artifact_observed" if frame is not None else "linked_future_artifact_missing",
             ),
             OutcomeCheck(
                 "public_temporal_evaluation",
@@ -193,27 +188,16 @@ class ForecastValidationCase:
         )
 
 
-def _resolve_forecast_outcome(
-    context: BenchmarkCaseContext,
-) -> tuple[Any | None, pl.DataFrame | None, str | None]:
-    datasets = list(context.services.datasets.list_datasets())
-    by_id = {dataset.id: dataset for dataset in datasets}
-    source_ids = _source_ids(context)
-    for dataset in datasets:
-        if not _is_run_descendant(dataset, by_id, source_ids, context.run_dataset_ids):
-            continue
-        try:
-            frame = load_tabular_frame(Path(dataset.source_path), dataset.source_format)
-        except Exception:
-            continue
+def _resolve_forecast_outcome(context: BenchmarkCaseContext) -> tuple[pl.DataFrame | None, str | None]:
+    for frame in linked_tables(context).values():
         selected_model = _matching_forecast_model(frame)
         if selected_model is not None:
-            return dataset, frame, selected_model
-    return None, None, None
+            return frame, selected_model
+    return None, None
 
 
 def _matching_forecast_model(frame: pl.DataFrame) -> str | None:
-    if frame.height != 12 or set(frame.columns) != _OUTPUT_COLUMNS:
+    if frame.height != 12 or not _OUTPUT_COLUMNS.issubset(frame.columns):
         return None
     expected_keys = {
         (group, forecast_month) for group in _EXPECTED_GROUPS for forecast_month in _EXPECTED_FORECAST_MONTHS
@@ -257,36 +241,15 @@ def _date_value(value: Any) -> str:
     return normalized[:10]
 
 
-def _resolve_apply_artifact(context: BenchmarkCaseContext, dataset: Any | None) -> Any | None:
-    if dataset is None:
-        return None
-    for artifact in _linked_artifacts(context):
-        metadata = getattr(artifact, "metadata_payload", {})
-        path = Path(str(getattr(artifact, "absolute_path", "")))
-        if (
-            enum_value(getattr(artifact, "kind", None)) == "prediction"
-            and bool(getattr(artifact, "ready_to_open", False))
-            and bool(getattr(artifact, "exists", False))
-            and is_within(path, context.runtime_home)
-            and isinstance(metadata, dict)
-            and metadata.get("result_dataset_id") == dataset.id
-        ):
-            return artifact
-    return None
-
-
 def _resolve_evaluation_report(
     context: BenchmarkCaseContext,
     selected_model: str | None,
 ) -> tuple[Any | None, dict[str, Any] | None]:
     if selected_model is None:
         return None, None
-    for artifact in _linked_artifacts(context):
-        if enum_value(getattr(artifact, "kind", None)) != "report":
-            continue
-        payload = _read_json_artifact(artifact, context.runtime_home)
+    for uri, payload in linked_json_reports(context).items():
         if payload is not None and _matches_evaluation_report(payload, selected_model):
-            return artifact, payload
+            return uri, payload
     return None, None
 
 
@@ -403,40 +366,6 @@ def _build_judge_input(
     )
 
 
-def _linked_artifacts(context: BenchmarkCaseContext) -> tuple[Any, ...]:
-    artifacts: list[Any] = []
-    seen: set[str] = set()
-    for uri in _ARTIFACT_URI.findall(_terminal_text(context.snapshot)):
-        try:
-            artifact = context.services.artifacts.resolve_uri(uri)
-        except Exception:
-            continue
-        artifact_id = str(getattr(artifact, "artifact_id", "") or uri)
-        if artifact_id in seen:
-            continue
-        seen.add(artifact_id)
-        artifacts.append(artifact)
-    return tuple(artifacts)
-
-
-def _read_json_artifact(artifact: Any, runtime_home: Path) -> dict[str, Any] | None:
-    path = Path(str(getattr(artifact, "absolute_path", "")))
-    if not (
-        bool(getattr(artifact, "ready_to_open", False))
-        and bool(getattr(artifact, "exists", False))
-        and is_within(path, runtime_home)
-        and path.suffix.lower() == ".json"
-    ):
-        return None
-    try:
-        if path.stat().st_size > 524_288:
-            return None
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except OSError, UnicodeError, json.JSONDecodeError:
-        return None
-    return payload if isinstance(payload, dict) else None
-
-
 def _terminal_text(snapshot: Any | None) -> str:
     messages = list(getattr(snapshot, "messages", [])) if snapshot is not None else []
     if not messages:
@@ -444,44 +373,15 @@ def _terminal_text(snapshot: Any | None) -> str:
     return str(getattr(messages[-1], "text", "") or "")
 
 
-def _source_ids(context: BenchmarkCaseContext) -> set[int]:
-    state = context.source_state
-    return set(state.source_dataset_ids) if isinstance(state, AttachedSourceState) else set()
-
-
-def _is_run_descendant(
-    dataset: Any,
-    by_id: dict[int, Any],
-    source_ids: set[int],
-    run_ids: frozenset[int],
-) -> bool:
-    if dataset.id not in run_ids:
-        return False
-    parent_id = getattr(dataset, "derived_from_dataset_id", None)
-    seen: set[str] = set()
-    while isinstance(parent_id, str) and parent_id and parent_id not in seen:
-        if parent_id in source_ids:
-            return True
-        seen.add(parent_id)
-        parent = by_id.get(parent_id)
-        if parent is None or parent_id not in run_ids:
-            return False
-        parent_id = getattr(parent, "derived_from_dataset_id", None)
-    return False
-
-
 def _source_unchanged(source_path: Path, context: BenchmarkCaseContext) -> bool:
     state = context.source_state
     if not isinstance(state, AttachedSourceState) or not state.source_dataset_ids:
         return False
-    try:
-        return attached_source_unchanged(
-            source_path=source_path,
-            source_state=state,
-            services=context.services,
-        )
-    except Exception:
-        return False
+    return attached_source_unchanged(
+        source_path=source_path,
+        source_state=state,
+        services=context.services,
+    )
 
 
 def test_ml_forecast_validation(agent_harness_benchmark) -> None:

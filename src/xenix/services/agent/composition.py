@@ -8,7 +8,6 @@ benchmark process.
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
@@ -25,6 +24,7 @@ if TYPE_CHECKING:
     from ..job_scheduler import JobScheduler
     from ..knowledge_semantic_service import KnowledgeSemanticService
     from ..llm import LLMService
+    from ..llm.tool_registry import AgentToolRegistry
     from ..knowledge_service import KnowledgeService
     from ..ml.worker_settings import MLWorkerSettingsService
     from ..ml_service import MLService
@@ -71,9 +71,8 @@ def build_headless_agent_services(
     handlers, then starts the complete graph once. No worker starts before the
     graph has been assembled successfully.
 
-    Lazy proxies intentionally match desktop startup behavior.  They defer
-    domain implementation loading, but resolve to the same services and worker
-    policy when a Tool needs them.  The supplied ``llm`` remains the only real
+    Domain service factories retain desktop lazy construction while Tool
+    registrations are assembled immediately. The supplied ``llm`` is the only
     provider gateway: leaving Harness ``provider`` as ``None`` preserves its
     Conversation -> ``LLMService.stream`` path.
     """
@@ -89,7 +88,7 @@ def build_headless_agent_services(
     from ..llm import AgentToolRegistry as LLMToolRegistry
     from ..llm import LLMConversationService
     from .harness_service import AgentHarnessService
-    from .lazy_tools import LazyAgentToolRegistry
+    from .tools import build_agent_tools
     from .knowledge_tool import register_knowledge_lookup_tool
     from .skill_catalog import AgentSkillCatalog
     from .tool_catalog import AgentToolCatalog
@@ -147,7 +146,7 @@ def build_headless_agent_services(
         semantic_search=semantic_knowledge,
     )
 
-    concrete_tools = LazyAgentToolRegistry(
+    domain_tools = build_agent_tools(
         paths=paths,
         dataset_service=datasets,
         data_cleaning_service=data_cleaning_service,
@@ -156,9 +155,9 @@ def build_headless_agent_services(
         artifact_service=artifacts,
     )
     llm_tools = LLMToolRegistry(
+        domain_tools,
         paged_results_dir=paths.state / "paged_results",
     )
-    concrete_tools.register_with_llm(llm_tools)
     register_knowledge_lookup_tool(llm_tools, knowledge)
     llm_tools.collect_garbage(max_age_seconds=7 * 24 * 60 * 60)
 
@@ -170,20 +169,13 @@ def build_headless_agent_services(
         context_messages_provider=lambda snapshot: agent_context_messages(skill_catalog, tool_catalog, snapshot),
         usage_observability=usage_observability,
     )
-    register_agent_skill_tools(
-        llm_tools,
-        skill_catalog,
-        activated_skill_names_provider=lambda thread_id: agent_skill_activated_skill_names(
-            conversation.get_thread_snapshot(thread_id)
-        ),
-    )
+    register_agent_skill_tools(llm_tools, skill_catalog)
     tool_catalog = AgentToolCatalog(llm_tools.list_specs())
     llm_tools.register(tool_catalog.activation_tool())
     conversation.discard_stale_pending_messages()
 
     harness = AgentHarnessService(
         conversation_service=conversation,
-        tool_presentation_registry=concrete_tools,
         provider=None,
         llm_service=llm,
         dataset_service=datasets,
@@ -205,28 +197,12 @@ def build_headless_agent_services(
     )
 
 
-def register_agent_skill_tools(
-    registry: Any,
-    catalog: AgentSkillCatalog,
-    *,
-    activated_skill_names_provider: Callable[[str], set[str]] | None = None,
-) -> None:
-    """Register catalog-backed Skill operations with the LLM-owned registry."""
-
+def register_agent_skill_tools(registry: AgentToolRegistry, catalog: AgentSkillCatalog) -> None:
+    """Register guidance and resource readers without consulting conversation history."""
     activation = catalog.activation_tool()
     if activation is not None:
         registry.register(activation)
-
-    def active_skill_names(context: Any) -> set[str]:
-        if activated_skill_names_provider is None:
-            return set()
-        return set(activated_skill_names_provider(context.thread_id))
-
-    all_skill_names = {skill.name for skill in catalog.list_skills()}
-    for tool in catalog.resource_tools(
-        activated_skill_names=all_skill_names,
-        active_skill_names_provider=active_skill_names,
-    ):
+    for tool in catalog.resource_tools():
         registry.register(tool)
 
 

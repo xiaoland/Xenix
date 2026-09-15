@@ -1,0 +1,45 @@
+{
+  "linked_cleaning_without_lineage_or_metadata": {
+    "accepts_valid_delivery": true,
+    "rejects_mutation": true
+  },
+  "unexpected_io_observable": true,
+  "seasonal_forecast": {
+    "accepts_valid_delivery": true,
+    "rejects_mutation": true
+  },
+  "keyword_frequency": {
+    "accepts_valid_delivery": true,
+    "rejects_mutation": true
+  },
+  "cluster_public_partition": {
+    "accepts_valid_delivery": true,
+    "rejects_mutation": true
+  },
+  "forecast_public_values": {
+    "accepts_valid_delivery": true,
+    "rejects_mutation": true
+  },
+  "grouped_predictions": {
+    "accepts_valid_delivery": true,
+    "rejects_mutation": true
+  },
+  "recommendations_without_internal_columns": {
+    "accepts_valid_delivery": true,
+    "rejects_mutation": true
+  },
+  "algorithm_independent_topics": {
+    "accepts_valid_delivery": true,
+    "rejects_mutation": true
+  },
+  "public_report_without_metadata": true,
+  "april_real_business_multiplicity": {
+    "accepts_valid_delivery": true,
+    "rejects_mutation": true
+  },
+  "april_rows": {
+    "business": 486119,
+    "deduplicated": 485789,
+    "omitted_empty_columns": 3
+  }
+}

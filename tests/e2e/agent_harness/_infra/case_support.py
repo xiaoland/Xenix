@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from hashlib import sha256
+import json
 from pathlib import Path
 import re
 from typing import Any
@@ -18,8 +19,8 @@ from xenix.services.tabular import load_tabular_frame
 from .contracts import BenchmarkCaseContext, BenchmarkCaseServices, BenchmarkInputError
 
 
-def linked_tables(context: BenchmarkCaseContext) -> dict[str, pl.DataFrame]:
-    """Read tables actually delivered by link, independent of Dataset lineage.
+def linked_artifacts(context: BenchmarkCaseContext) -> dict[str, Any]:
+    """Resolve final deliveries without consulting intermediate ToolResults.
 
     Invalid or unavailable links provide no delivery. Unexpected service or
     table-reading errors propagate as measurement failures.
@@ -27,7 +28,7 @@ def linked_tables(context: BenchmarkCaseContext) -> dict[str, pl.DataFrame]:
     messages = list(getattr(context.snapshot, "messages", ()))
     final_text = str(getattr(messages[-1], "text", "") or "") if messages else ""
     uris = re.findall(r"artifact://[A-Za-z0-9-]+(?:\?[^)\s>\]]+)?", final_text)
-    tables = {}
+    artifacts = {}
     for uri in dict.fromkeys(uris):
         try:
             artifact = context.services.artifacts.resolve_uri(uri)
@@ -38,10 +39,35 @@ def linked_tables(context: BenchmarkCaseContext) -> dict[str, pl.DataFrame]:
         path = Path(artifact.absolute_path)
         if not is_within(path, context.runtime_home):
             continue
+        artifacts[uri] = artifact
+    return artifacts
+
+
+def linked_tables(context: BenchmarkCaseContext) -> dict[str, pl.DataFrame]:
+    """Read delivered tables independently of Dataset lineage and export kind."""
+    tables = {}
+    for uri, artifact in linked_artifacts(context).items():
+        path = Path(artifact.absolute_path)
         source_format = detect_source_format(path)
         if source_format.value != "unknown":
             tables[uri] = load_tabular_frame(path, source_format)
     return tables
+
+
+def linked_json_reports(context: BenchmarkCaseContext) -> dict[str, dict[str, Any]]:
+    """Read public JSON facts; unexpected I/O failures remain measurement errors."""
+    reports = {}
+    for uri, artifact in linked_artifacts(context).items():
+        path = Path(artifact.absolute_path)
+        if path.suffix.lower() != ".json":
+            continue
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (UnicodeError, json.JSONDecodeError):
+            continue
+        if isinstance(payload, dict):
+            reports[uri] = payload
+    return reports
 
 
 @dataclass(frozen=True)
@@ -85,7 +111,7 @@ def attached_source_unchanged(
             sha256_file(Path(services.datasets.get_dataset(dataset_id).source_path)) == digest
             for dataset_id, digest in source_state.registered_dataset_sha256.items()
         )
-    except Exception:
+    except (NotFoundError, FileNotFoundError):
         return False
 
 

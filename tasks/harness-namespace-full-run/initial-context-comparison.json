@@ -1,0 +1,22 @@
+[
+  {
+    "case_id": "business.campaign.v1.standard",
+    "baseline_first_input_tokens": 1096,
+    "candidate_first_input_tokens": 1982
+  },
+  {
+    "case_id": "business.restock.v1.standard",
+    "baseline_first_input_tokens": 1253,
+    "candidate_first_input_tokens": 2139
+  },
+  {
+    "case_id": "business.revenue.v1.standard",
+    "baseline_first_input_tokens": 1229,
+    "candidate_first_input_tokens": 2115
+  },
+  {
+    "case_id": "business.routing.v1.standard",
+    "baseline_first_input_tokens": 1118,
+    "candidate_first_input_tokens": 2004
+  }
+]

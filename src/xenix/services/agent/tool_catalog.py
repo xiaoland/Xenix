@@ -7,7 +7,12 @@ from typing import Any
 
 from ...exceptions import ValidationError
 from ..llm.providers import ProviderMessage
-from ..llm.tooling import AgentTool, AgentToolSpec, ToolExecutionContext, ToolSuccess
+from ..llm.tool_protocol import (
+    AgentTool,
+    AgentToolSpec,
+    ToolExecutionContext,
+    ToolSuccess,
+)
 from .tool_inputs import AgentToolsActivateInput
 
 
@@ -41,7 +46,7 @@ class AgentToolCatalog:
         return AgentTool(
             name=AGENT_TOOLS_ACTIVATE_NAME,
             provider_name="agent_tools_activate",
-            description="Activate tools in one batch for the next request. Does not load Skill guidance.",
+            description="Load full tool definitions in one batch for subsequent requests. Does not read Skills.",
             input_model=AgentToolsActivateInput,
             implementation=activate,
             provider_field_enums=(("names", tuple(sorted(self._selections))),),
@@ -72,8 +77,8 @@ class AgentToolCatalog:
         if not inactive:
             return None
         lines = [
-            f"Available tools: call `{AGENT_TOOLS_ACTIVATE_NAME}` with a list of tool names or namespaces to expose definitions "
-            "on the next request. Skill reading is independent."
+            f"Available tools: use `{AGENT_TOOLS_ACTIVATE_NAME}` with tool names or namespaces when you need their full "
+            "parameter definitions. You may call a tool directly when its arguments are known. Skill reading is independent."
         ]
         lines.extend(f"- {name}: {self._specs[name].description}" for name in sorted(inactive))
         return ProviderMessage(role="system", content="\n".join(lines))

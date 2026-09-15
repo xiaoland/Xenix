@@ -39,7 +39,6 @@ dependencies = [
     "lancedb<1,>=0.34",
     "pikepdf<11,>=10.10",
     "msoffcrypto-tool<7,>=6.0",
-    "jsonschema<5,>=4.26",
 ]
 
 [dependency-groups]
@@ -49,7 +48,6 @@ dev = [
     "PyYAML>=6.0.0",
     "ruff>=0.16.0",
     "mypy>=2.3.0",
-    "types-jsonschema>=4.26.0.20260518",
     "pytest-testmon>=2.2.0",
     "pytest-qt==4.5.0",
 ]
@@ -169,7 +167,9 @@ files = [
     "src/xenix/services/knowledge_document_lifecycle_service.py",
     "src/xenix/services/knowledge_formats.py",
     "src/xenix/services/knowledge_import_worker.py",
-    "src/xenix/services/llm/tooling.py",
+    "src/xenix/services/llm/tool_protocol.py",
+    "src/xenix/services/llm/tool_schema.py",
+    "src/xenix/services/llm/tool_registry.py",
     "src/xenix/services/ml/contracts.py",
     "src/xenix/services/ml/registry.py",
     "src/xenix/services/ml/types.py",

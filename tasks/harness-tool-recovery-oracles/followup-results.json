@@ -1,0 +1,78 @@
+{
+  "as_of_utc": "2026-09-14T07:20:06.039047+00:00",
+  "expected_cells": 2,
+  "completed_reports": 2,
+  "results": [
+    {
+      "case_id": "ml.text_topic_discovery_v1",
+      "report": "build/agent-harness-recovery-oracles/followup-topic/ml.text_topic_discovery_v1-deepseek-deepseek-v4-flash-86276f31326743baa44d2920fe91cc22.json",
+      "sha256": "ee4b125e73b840762638b585e59f5038d8bc30aad8b53b5177d883f4036485a2",
+      "run_status": "completed",
+      "semantic": "pass",
+      "checks": [
+        {
+          "name": "topic_assignments",
+          "passed": true,
+          "summary": "linked_three_theme_partition_matches"
+        },
+        {
+          "name": "reusable_topic_model",
+          "passed": true,
+          "summary": "linked_model_available"
+        },
+        {
+          "name": "public_quality_evidence",
+          "passed": true,
+          "summary": "linked_quality_facts_available"
+        }
+      ],
+      "judge": "pass",
+      "judge_summary": "judge_completed",
+      "judge_reason_codes": [
+        "complete_grounded_outcome"
+      ],
+      "rounds": 14,
+      "observed_subject_tokens": 228755,
+      "judge_tokens": {
+        "cached_input_tokens": 256,
+        "input_tokens": 5862,
+        "output_tokens": 3303,
+        "total_tokens": 9165
+      }
+    },
+    {
+      "case_id": "ml.cluster_selection_v1",
+      "report": "build/agent-harness-recovery-oracles/followup-cluster/ml.cluster_selection_v1-deepseek-deepseek-v4-flash-97776859227a419586a210efbbb7b8c2.json",
+      "sha256": "418e069185ca8ce721ae78dff1072ea53ede311cd48023dc984fe1b8f03873e8",
+      "run_status": "completed",
+      "semantic": "pass",
+      "checks": [
+        {
+          "name": "exact_selected_assignment_dataset",
+          "passed": true,
+          "summary": "permutation_invariant_k3_assignment_observed"
+        },
+        {
+          "name": "public_trustworthiness_report",
+          "passed": true,
+          "summary": "linked_recomputable_cluster_report_observed"
+        }
+      ],
+      "judge": "partial",
+      "judge_summary": "judge_completed",
+      "judge_reason_codes": [
+        "ungrounded_model_selection",
+        "identifier_or_row_disclosure"
+      ],
+      "rounds": 11,
+      "observed_subject_tokens": 149207,
+      "judge_tokens": {
+        "cached_input_tokens": 384,
+        "input_tokens": 3222,
+        "output_tokens": 8485,
+        "total_tokens": 11707
+      }
+    }
+  ],
+  "evidence_limit": "The cluster report predates the final comparison-table Judge evidence and unrequested account-disclosure penalty correction. Its partial verdict is preserved, not retrospectively changed."
+}

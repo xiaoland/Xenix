@@ -11,6 +11,7 @@ Data models live in ``conversation_models`` and title generation in
 
 from __future__ import annotations
 
+import copy
 import json
 import logging
 import threading
@@ -68,9 +69,9 @@ from .providers import (
     ProviderStreamEvent,
 )
 from .service import LLMModelOption, LLMService
-from .tooling import (
+from .tool_protocol import (
     MAX_EXCHANGE_RESULT_BYTES,
-    AgentToolRegistry,
+    InvalidToolArguments,
     StagedToolCall,
     ToolExecutionContext,
     ToolScope,
@@ -79,6 +80,9 @@ from .tooling import (
     scope_fingerprint,
     terminal_tool_result,
     tool_failure_from_exception,
+)
+from .tool_registry import (
+    AgentToolRegistry,
 )
 
 LOGGER = logging.getLogger(__name__)
@@ -523,7 +527,6 @@ class LLMConversationService(TitleGenerationMixin):
         try:
             outcome = self._tool_registry.invoke(
                 tool_name=call.tool_name,
-                provider_name=call.provider_name,
                 arguments=call.arguments,
                 context=ToolExecutionContext(
                     thread_id=exchange.thread_id,
@@ -531,7 +534,6 @@ class LLMConversationService(TitleGenerationMixin):
                     dataset_ids=exchange.scope.dataset_ids,
                     cancel_requested=cancel_requested,
                 ),
-                scope=exchange.scope,
             )
             terminal = terminal_tool_result(outcome)
         except Exception as exc:
@@ -691,16 +693,17 @@ class LLMConversationService(TitleGenerationMixin):
                     continue
                 if not isinstance(item, ToolCallOutputItem):
                     raise ValidationError("LLM output item is unsupported.")
-                # Validate at invocation so invalid model arguments become a
-                # ToolResult the model can repair, rather than aborting sampling.
+                # Resolve against all registrations, independently of advertised
+                # definitions. Unknown names survive to invocation as ToolFailures.
+                requested_name = item.provider_name or item.tool_name
                 call_id = reserve_ids(self._session_factory)[0]
                 calls[call_id] = StagedToolCall(
                     pending_message_id=pending_message_id,
                     staged_call_id=call_id,
                     provider_call_id=item.provider_call_id,
-                    tool_name=item.tool_name,
-                    provider_name=item.provider_name,
-                    arguments=dict(item.arguments),
+                    tool_name=self._tool_registry.resolve_name(requested_name),
+                    provider_name=requested_name,
+                    arguments=copy.deepcopy(item.arguments),
                     scope_fingerprint=exchange.scope_fingerprint,
                 )
             exchange.output_items = tuple(output_items)
@@ -777,6 +780,14 @@ class LLMConversationService(TitleGenerationMixin):
                 )
                 sequence += 1
         for call in exchange.calls.values():
+            # Preserve undecodable arguments verbatim for history and replay;
+            # they must never appear to be a successfully decoded empty object.
+            content_payload = {"tool_name": call.tool_name, "provider_name": call.provider_name}
+            if isinstance(call.arguments, InvalidToolArguments):
+                content_payload["raw_arguments"] = call.arguments.raw_text
+                arguments_payload = None
+            else:
+                arguments_payload = dict(call.arguments)
             rows.append(
                 ConversationMessageRow(
                     id=call.staged_call_id,
@@ -786,14 +797,11 @@ class LLMConversationService(TitleGenerationMixin):
                     # ``tool_name`` is canonical registry identity; the
                     # provider-facing name is adapter pairing data needed for
                     # faithful replay and belongs in this immutable payload.
-                    content_payload={
-                        "tool_name": call.tool_name,
-                        "provider_name": call.provider_name,
-                    },
+                    content_payload=content_payload,
                     provider_call_id=call.provider_call_id,
                     tool_id=call.tool_name,
                     contract_version="v1",
-                    arguments_payload=dict(call.arguments),
+                    arguments_payload=arguments_payload,
                     scope_fingerprint=call.scope_fingerprint,
                     created_at=_utc_now(),
                 )
@@ -1178,7 +1186,7 @@ class LLMConversationService(TitleGenerationMixin):
             # always persist the provider-facing name above.
             tool_name = (call.tool_id or "").strip()
             try:
-                provider_name = self._tool_registry.get(tool_name).spec.provider_name
+                provider_name = self._tool_registry.get(tool_name).provider_name
             except ValidationError:
                 provider_name = tool_name
         return {
@@ -1186,7 +1194,10 @@ class LLMConversationService(TitleGenerationMixin):
             "type": "function",
             "function": {
                 "name": provider_name,
-                "arguments": json.dumps(call.arguments_payload or {}, ensure_ascii=False, separators=(",", ":")),
+                "arguments": (
+                    payload["raw_arguments"] if "raw_arguments" in payload
+                    else json.dumps(call.arguments_payload or {}, ensure_ascii=False, separators=(",", ":"))
+                ),
             },
         }
 

@@ -21,7 +21,7 @@ from ..storage.models import (
     MLTaskType,
     TrainedModelRow,
 )
-from ..llm.tooling import (
+from ..llm.tool_protocol import (
     ToolExecutionContext,
     ToolSuccess,
 )
@@ -420,4 +420,3 @@ class ModelTools:
             source_path=dataset.source_path,
             dataset_id=dataset.id,
         )
-

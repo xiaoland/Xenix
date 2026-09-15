@@ -31,7 +31,7 @@ from ..dataset_service import (
 from ..ml_service import (
     CreateColumnBindingInput,
 )
-from ..llm.tooling import (
+from ..llm.tool_protocol import (
     ToolExecutionContext,
     ToolSuccess,
 )
@@ -526,4 +526,3 @@ class DataTools:
         if source_format.value == "unknown":
             raise ValidationError("Only .csv, .parquet, .xlsx, and .xls dataset files are supported.")
         return load_dataframe(path, source_format)
-

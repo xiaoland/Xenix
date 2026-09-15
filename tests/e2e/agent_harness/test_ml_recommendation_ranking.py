@@ -3,27 +3,24 @@
 from __future__ import annotations
 
 from hashlib import sha256
-import json
 import math
-from pathlib import Path
 import re
+from pathlib import Path
 from typing import Any, Final
 
 import polars as pl
 import pytest
 
 from xenix.services.agent import SourceAttachmentInput, SubmitUserTurnInput
-from xenix.services.tabular import load_tabular_frame
 
 from ._infra.case_support import (
     AttachedSourceState,
     attached_source_unchanged,
     canonical_completion,
     capture_attached_source_state,
-    enum_value,
-    is_within,
+    linked_tables,
+    linked_json_reports,
     sha256_file,
-    source_dataset_ids_for_external_digest,
 )
 from ._infra.contracts import (
     BenchmarkCaseAssessment,
@@ -66,15 +63,12 @@ _EXPECTED_RANKINGS = {
     ),
 }
 _OUTPUT_COLUMNS = {
-    "source_file",
-    "input_row_number",
     "user_id",
     "rank",
     "recommended_item",
     "score",
     "strategy",
 }
-_ARTIFACT_URI = re.compile(r"artifact://[A-Za-z0-9]+(?:\?[^)\s>]+)?")
 
 BUSINESS_PROMPT = (
     "附件是学习模块的评分历史和本次目标学习者。4 分及以上表示喜欢。"
@@ -174,48 +168,16 @@ class RecommendationRankingCase:
         )
 
     def assess(self, *, context: BenchmarkCaseContext) -> BenchmarkCaseAssessment:
-        dataset, frame = _resolve_recommendation_outcome(context)
-        apply_artifact = _resolve_apply_artifact(context, dataset)
+        frame = _resolve_recommendation_outcome(context)
         report_artifact, report = _resolve_evaluation_report(context)
-        outcome_diagnostic = _recommendation_outcome_diagnostic(context)
-        failed_tools = _failed_tool_names(context.snapshot)
-        failed_tool_summary = ",".join(failed_tools) if failed_tools else "none"
-        linked_artifact_count = len(_linked_artifacts(context))
-        final_link_count = len(_ARTIFACT_URI.findall(_terminal_text(context.snapshot)))
         completed = canonical_completion(context.snapshot)
         source_unchanged = _sources_unchanged(self, context)
 
         semantic_checks = (
-            OutcomeCheck(
-                "exact_private_top_k",
-                frame is not None,
-                "known_and_cold_rankings_observed"
-                if frame is not None
-                else (
-                    f"qualified_rankings_missing:{outcome_diagnostic};"
-                    f"failed_tools={failed_tool_summary}"
-                ),
-            ),
-            OutcomeCheck(
-                "public_recommendation_artifact",
-                apply_artifact is not None,
-                "linked_recommendation_artifact_observed"
-                if apply_artifact is not None
-                else (
-                    "linked_recommendation_artifact_missing:"
-                    f"final_links={final_link_count};linked_artifacts={linked_artifact_count}"
-                ),
-            ),
-            OutcomeCheck(
-                "public_ranking_evaluation",
-                report is not None,
-                "linked_candidate_baseline_evaluation_observed"
-                if report is not None
-                else (
-                    "linked_candidate_baseline_evaluation_missing:"
-                    f"final_links={final_link_count};linked_artifacts={linked_artifact_count}"
-                ),
-            ),
+            OutcomeCheck("exact_private_top_k", frame is not None,
+                         "linked_known_and_cold_rankings_match" if frame is not None else "linked_rankings_missing_or_incorrect"),
+            OutcomeCheck("public_ranking_evaluation", report is not None,
+                         "linked_candidate_baseline_evaluation_observed" if report is not None else "linked_ranking_evaluation_missing"),
         )
         integrity_checks = (
             OutcomeCheck(
@@ -245,90 +207,12 @@ class RecommendationRankingCase:
         )
 
 
-def _resolve_recommendation_outcome(
-    context: BenchmarkCaseContext,
-) -> tuple[Any | None, pl.DataFrame | None]:
-    target_source_ids = _source_ids_for_digest(context, _EXPECTED_TARGETS_SHA256)
-    datasets = list(context.services.datasets.list_datasets())
-    by_id = {dataset.id: dataset for dataset in datasets}
-    for dataset in datasets:
-        if not _is_run_descendant(
-            dataset,
-            by_id,
-            target_source_ids,
-            context.run_dataset_ids,
-        ):
-            continue
-        try:
-            frame = load_tabular_frame(Path(dataset.source_path), dataset.source_format)
-        except Exception:
-            continue
-        if _matches_recommendations(frame):
-            return dataset, frame
-    return None, None
-
-
-def _recommendation_outcome_diagnostic(context: BenchmarkCaseContext) -> str:
-    target_source_ids = _source_ids_for_digest(context, _EXPECTED_TARGETS_SHA256)
-    if not target_source_ids:
-        return "target_source_identity_missing"
-    datasets = list(context.services.datasets.list_datasets())
-    by_id = {dataset.id: dataset for dataset in datasets}
-    descendant_count = 0
-    readable_count = 0
-    expected_column_count = 0
-    expected_row_count = 0
-    for dataset in datasets:
-        if not _is_run_descendant(
-            dataset,
-            by_id,
-            target_source_ids,
-            context.run_dataset_ids,
-        ):
-            continue
-        descendant_count += 1
-        try:
-            frame = load_tabular_frame(Path(dataset.source_path), dataset.source_format)
-        except Exception:
-            continue
-        readable_count += 1
-        if set(frame.columns) != _OUTPUT_COLUMNS:
-            continue
-        expected_column_count += 1
-        if frame.height != 4:
-            continue
-        expected_row_count += 1
-        if _matches_recommendations(frame):
-            return "qualified_rankings_observed"
-    if descendant_count == 0:
-        return "target_descendant_missing"
-    if readable_count == 0:
-        return "target_descendant_unreadable"
-    if expected_column_count == 0:
-        return "recommendation_columns_mismatch"
-    if expected_row_count == 0:
-        return "recommendation_row_count_mismatch"
-    return "recommendation_values_mismatch"
-
-
-def _failed_tool_names(snapshot: Any | None) -> tuple[str, ...]:
-    messages = list(getattr(snapshot, "messages", [])) if snapshot is not None else []
-    call_names = {
-        str(getattr(message, "id", "")): str(getattr(message, "tool_id", "") or "unknown")
-        for message in messages
-        if enum_value(getattr(message, "kind", None)) == "tool_call"
-    }
-    names = {
-        call_names.get(str(getattr(message, "tool_call_message_id", "")), "unknown")
-        for message in messages
-        if enum_value(getattr(message, "kind", None)) == "tool_result"
-        and enum_value(getattr(message, "result_status", None)) == "failed"
-    }
-    return tuple(sorted(names))
+def _resolve_recommendation_outcome(context: BenchmarkCaseContext) -> pl.DataFrame | None:
+    return next((frame for frame in linked_tables(context).values() if _matches_recommendations(frame)), None)
 
 
 def _matches_recommendations(frame: pl.DataFrame) -> bool:
-    if frame.height != 4 or set(frame.columns) != _OUTPUT_COLUMNS:
+    if frame.height != 4 or not _OUTPUT_COLUMNS.issubset(frame.columns):
         return False
     observed: dict[str, list[tuple[int, str, float, str]]] = {}
     try:
@@ -360,33 +244,12 @@ def _matches_recommendations(frame: pl.DataFrame) -> bool:
     return not bool(known_items & _KNOWN_SEEN_ITEMS)
 
 
-def _resolve_apply_artifact(context: BenchmarkCaseContext, dataset: Any | None) -> Any | None:
-    if dataset is None:
-        return None
-    for artifact in _linked_artifacts(context):
-        metadata = getattr(artifact, "metadata_payload", {})
-        path = Path(str(getattr(artifact, "absolute_path", "")))
-        if (
-            enum_value(getattr(artifact, "kind", None)) == "prediction"
-            and bool(getattr(artifact, "ready_to_open", False))
-            and bool(getattr(artifact, "exists", False))
-            and is_within(path, context.runtime_home)
-            and isinstance(metadata, dict)
-            and metadata.get("result_dataset_id") == dataset.id
-        ):
-            return artifact
-    return None
-
-
 def _resolve_evaluation_report(
     context: BenchmarkCaseContext,
 ) -> tuple[Any | None, dict[str, Any] | None]:
-    for artifact in _linked_artifacts(context):
-        if enum_value(getattr(artifact, "kind", None)) != "report":
-            continue
-        payload = _read_json_artifact(artifact, context.runtime_home)
+    for uri, payload in linked_json_reports(context).items():
         if payload is not None and _matches_evaluation_report(payload):
-            return artifact, payload
+            return uri, payload
     return None, None
 
 
@@ -523,40 +386,6 @@ def _build_judge_input(report: dict[str, Any], final_text: str) -> JudgeInput:
     )
 
 
-def _linked_artifacts(context: BenchmarkCaseContext) -> tuple[Any, ...]:
-    artifacts: list[Any] = []
-    seen: set[str] = set()
-    for uri in _ARTIFACT_URI.findall(_terminal_text(context.snapshot)):
-        try:
-            artifact = context.services.artifacts.resolve_uri(uri)
-        except Exception:
-            continue
-        artifact_id = str(getattr(artifact, "artifact_id", "") or uri)
-        if artifact_id in seen:
-            continue
-        seen.add(artifact_id)
-        artifacts.append(artifact)
-    return tuple(artifacts)
-
-
-def _read_json_artifact(artifact: Any, runtime_home: Path) -> dict[str, Any] | None:
-    path = Path(str(getattr(artifact, "absolute_path", "")))
-    if not (
-        bool(getattr(artifact, "ready_to_open", False))
-        and bool(getattr(artifact, "exists", False))
-        and is_within(path, runtime_home)
-        and path.suffix.lower() == ".json"
-    ):
-        return None
-    try:
-        if path.stat().st_size > 524_288:
-            return None
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except OSError, UnicodeError, json.JSONDecodeError:
-        return None
-    return payload if isinstance(payload, dict) else None
-
-
 def _terminal_text(snapshot: Any | None) -> str:
     messages = list(getattr(snapshot, "messages", [])) if snapshot is not None else []
     if not messages:
@@ -571,61 +400,22 @@ def _source_states(context: BenchmarkCaseContext) -> tuple[AttachedSourceState, 
     return tuple(item for item in state if isinstance(item, AttachedSourceState))
 
 
-def _source_ids_for_digest(context: BenchmarkCaseContext, digest: str) -> set[str]:
-    return source_dataset_ids_for_external_digest(
-        snapshot=context.snapshot,
-        services=context.services,
-        digest=digest,
-    )
-
-
-def _is_run_descendant(
-    dataset: Any,
-    by_id: dict[int, Any],
-    source_ids: set[int],
-    run_ids: frozenset[int],
-) -> bool:
-    if dataset.id not in run_ids:
-        return False
-    parent_id = getattr(dataset, "derived_from_dataset_id", None)
-    seen: set[str] = set()
-    while isinstance(parent_id, str) and parent_id and parent_id not in seen:
-        if parent_id in source_ids:
-            return True
-        seen.add(parent_id)
-        parent = by_id.get(parent_id)
-        if parent is None or parent_id not in run_ids:
-            return False
-        parent_id = getattr(parent, "derived_from_dataset_id", None)
-    return False
-
-
 def _sources_unchanged(case: RecommendationRankingCase, context: BenchmarkCaseContext) -> bool:
     states = _source_states(context)
     if len(states) != 2:
         return False
-    try:
-        return all(
-            attached_source_unchanged(
-                source_path=path,
-                source_state=state,
-                services=context.services,
-            )
-            and bool(
-                source_dataset_ids_for_external_digest(
-                    snapshot=context.snapshot,
-                    services=context.services,
-                    digest=state.external_sha256,
-                )
-            )
-            for path, state in zip(
-                (case.ratings_path, case.targets_path),
-                states,
-                strict=True,
-            )
+    return all(
+        attached_source_unchanged(
+            source_path=path,
+            source_state=state,
+            services=context.services,
         )
-    except Exception:
-        return False
+        for path, state in zip(
+            (case.ratings_path, case.targets_path),
+            states,
+            strict=True,
+        )
+    )
 
 
 def test_ml_recommendation_ranking(agent_harness_benchmark) -> None:

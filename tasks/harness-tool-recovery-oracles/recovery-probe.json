@@ -1,0 +1,32 @@
+[
+  {
+    "stream": false,
+    "samples": 4,
+    "executed": [
+      2,
+      3
+    ],
+    "usage_samples": 4,
+    "replay": [
+      "model_hyper_train",
+      "imaginary_tool",
+      "model_hyper_train",
+      "model_hyper_train"
+    ]
+  },
+  {
+    "stream": true,
+    "samples": 4,
+    "executed": [
+      2,
+      3
+    ],
+    "usage_samples": 4,
+    "replay": [
+      "model_hyper_train",
+      "imaginary_tool",
+      "model_hyper_train",
+      "model_hyper_train"
+    ]
+  }
+]

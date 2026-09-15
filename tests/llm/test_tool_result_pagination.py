@@ -4,17 +4,22 @@ import os
 from pathlib import Path
 
 import pytest
+from pydantic import BaseModel, ConfigDict
 
 from xenix.exceptions import ValidationError
 from xenix.services.llm.tool_result_page_store import ToolResultPageStore
-from xenix.services.llm.tooling import (
-    AgentToolRegistry,
-    AgentToolSpec,
+from xenix.services.llm.tool_registry import AgentToolRegistry
+from xenix.services.llm.tool_protocol import (
+    AgentTool,
     MAX_TOOL_PAYLOAD_BYTES,
     ToolExecutionContext,
     ToolSuccess,
     tool_failure_from_exception,
 )
+
+
+class EmptyToolInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
 
 
 def _context() -> ToolExecutionContext:
@@ -64,13 +69,16 @@ def test_store_delete_for_thread_and_gc(tmp_path: Path) -> None:
 
 def test_invoke_returns_small_result_inline(tmp_path: Path) -> None:
     registry = _registry(tmp_path)
-    registry.register(
-        AgentToolSpec(name="data.small", provider_name="data_small", description="small"),
-        lambda _args, _ctx: ToolSuccess(value={"ok": True}),
-    )
+    registry.register(AgentTool(
+        name="data.small",
+        provider_name="data_small",
+        description="small",
+        input_model=EmptyToolInput,
+        implementation=lambda _args, _ctx: ToolSuccess(value={"ok": True}),
+    ))
     outcome = registry.invoke(
         tool_name="data.small",
-        provider_name="data_small",
+
         arguments={},
         context=_context(),
     )
@@ -82,17 +90,23 @@ def test_inline_budget_counts_serialized_unicode_bytes(tmp_path: Path) -> None:
     registry = _registry(tmp_path)
     # JSON quotes take two bytes; each Chinese code point takes three.
     text = "中" * ((MAX_TOOL_PAYLOAD_BYTES - 2) // 3)
-    registry.register(
-        AgentToolSpec(name="data.inline", provider_name="data_inline", description="inline"),
-        lambda _args, _ctx: ToolSuccess(value=text),
-    )
-    registry.register(
-        AgentToolSpec(name="data.paged", provider_name="data_paged", description="paged"),
-        lambda _args, _ctx: ToolSuccess(value=text + "中"),
-    )
+    registry.register(AgentTool(
+        name="data.inline",
+        provider_name="data_inline",
+        description="inline",
+        input_model=EmptyToolInput,
+        implementation=lambda _args, _ctx: ToolSuccess(value=text),
+    ))
+    registry.register(AgentTool(
+        name="data.paged",
+        provider_name="data_paged",
+        description="paged",
+        input_model=EmptyToolInput,
+        implementation=lambda _args, _ctx: ToolSuccess(value=text + "中"),
+    ))
     inline = registry.invoke(
         tool_name="data.inline",
-        provider_name="data_inline",
+
         arguments={},
         context=_context(),
     )
@@ -101,7 +115,7 @@ def test_inline_budget_counts_serialized_unicode_bytes(tmp_path: Path) -> None:
 
     paged = registry.invoke(
         tool_name="data.paged",
-        provider_name="data_paged",
+
         arguments={},
         context=_context(),
     )
@@ -112,13 +126,16 @@ def test_inline_budget_counts_serialized_unicode_bytes(tmp_path: Path) -> None:
 def test_invoke_pages_oversized_result_and_reads_next_page(tmp_path: Path) -> None:
     registry = _registry(tmp_path)
     large = "中文" * 600_000
-    registry.register(
-        AgentToolSpec(name="data.big", provider_name="data_big", description="big"),
-        lambda _args, _ctx: ToolSuccess(value=large),
-    )
+    registry.register(AgentTool(
+        name="data.big",
+        provider_name="data_big",
+        description="big",
+        input_model=EmptyToolInput,
+        implementation=lambda _args, _ctx: ToolSuccess(value=large),
+    ))
     outcome = registry.invoke(
         tool_name="data.big",
-        provider_name="data_big",
+
         arguments={},
         context=_context(),
     )
@@ -132,7 +149,7 @@ def test_invoke_pages_oversized_result_and_reads_next_page(tmp_path: Path) -> No
 
     page = registry.invoke(
         tool_name="result.page",
-        provider_name="result_page",
+
         arguments={"result_id": value["result_id"], "offset": 1024, "limit": 1024},
         context=_context(),
     )
@@ -143,7 +160,7 @@ def test_invoke_pages_oversized_result_and_reads_next_page(tmp_path: Path) -> No
 
     tail = registry.invoke(
         tool_name="result.page",
-        provider_name="result_page",
+
         arguments={"result_id": value["result_id"], "offset": len(large) - 10, "limit": 1024},
         context=_context(),
     )
@@ -153,14 +170,17 @@ def test_invoke_pages_oversized_result_and_reads_next_page(tmp_path: Path) -> No
 
 def test_invoke_without_store_rejects_oversized_result(tmp_path: Path) -> None:
     registry = AgentToolRegistry()
-    registry.register(
-        AgentToolSpec(name="data.big", provider_name="data_big", description="big"),
-        lambda _args, _ctx: ToolSuccess(value="x" * MAX_TOOL_PAYLOAD_BYTES),
-    )
+    registry.register(AgentTool(
+        name="data.big",
+        provider_name="data_big",
+        description="big",
+        input_model=EmptyToolInput,
+        implementation=lambda _args, _ctx: ToolSuccess(value="x" * MAX_TOOL_PAYLOAD_BYTES),
+    ))
     with pytest.raises(ValidationError):
         registry.invoke(
             tool_name="data.big",
-            provider_name="data_big",
+
             arguments={},
             context=_context(),
         )

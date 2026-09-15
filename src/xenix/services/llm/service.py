@@ -19,7 +19,9 @@ from .providers import (
     ProviderResponse,
     ProviderStreamEvent,
 )
-from .tooling import AgentToolSpec
+from .tool_protocol import (
+    AgentToolSpec,
+)
 
 SETTINGS_FILE_NAME = "agent_settings.json"
 DEFAULT_PROVIDER_KEY = "openai"

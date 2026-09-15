@@ -998,6 +998,10 @@ def _run_model_cell(
                         "name": message.tool_id,
                         "provider_call_id": message.provider_call_id,
                         "arguments": message.arguments_payload,
+                        **(
+                            {"raw_arguments": message.content_payload["raw_arguments"]}
+                            if "raw_arguments" in (message.content_payload or {}) else {}
+                        ),
                         "status": getattr(results.get(message.id), "result_status", None),
                         "delivery": _delivery_diagnostics(getattr(results.get(message.id), "value_payload", None)),
                         "failure": (

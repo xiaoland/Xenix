@@ -1,0 +1,28 @@
+{
+  "case_id": "ml.cluster_selection_v1",
+  "observed_assignment_matches": true,
+  "model_parameters": {
+    "max_iter": 300,
+    "n_clusters": 3,
+    "n_init": 10,
+    "random_state": 42
+  },
+  "report_profile_features": [
+    "z_orders",
+    "z_return",
+    "z_service"
+  ],
+  "quality": {
+    "calinski_harabasz": 213.0003436352095,
+    "cluster_count": 3,
+    "davies_bouldin": 0.25169552756752345,
+    "evaluated_row_count": 18,
+    "noise_row_count": 0,
+    "silhouette": 0.791935228362471,
+    "unavailable_reason": null
+  },
+  "stability": 1.0,
+  "null_margin": 0.9369074521351356,
+  "diagnosis": "Report profile gate expects original column names and medians, but subject fit standardized z-score columns and delivered correct original rows. Model report must describe its actual feature space; original-scale interpretation can be recomputed from the delivered table.",
+  "evidence_limit": "Profile facts are retained Tool delivery diagnostics, not a reread of the deleted public report file."
+}

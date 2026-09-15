@@ -1,0 +1,38 @@
+{
+  "source_report": "build/agent-harness-recovery-oracles/followup-cluster/ml.cluster_selection_v1-deepseek-deepseek-v4-flash-97776859227a419586a210efbbb7b8c2.json",
+  "source_report_sha256": "418e069185ca8ce721ae78dff1072ea53ede311cd48023dc984fe1b8f03873e8",
+  "comparison_rows": [
+    {
+      "k_clusters": 2,
+      "silhouette": 0.6575,
+      "calinski_harabasz": 49.98,
+      "davies_bouldin": 0.4228,
+      "mean_stability_ari": 0.5962,
+      "min_stability_ari": -0.0714,
+      "largest_cluster": 12,
+      "smallest_cluster": 6
+    },
+    {
+      "k_clusters": 3,
+      "silhouette": 0.7919,
+      "calinski_harabasz": 213.0,
+      "davies_bouldin": 0.2517,
+      "mean_stability_ari": 1.0,
+      "min_stability_ari": 1.0,
+      "largest_cluster": 6,
+      "smallest_cluster": 6
+    },
+    {
+      "k_clusters": 4,
+      "silhouette": 0.7043,
+      "calinski_harabasz": 241.71,
+      "davies_bouldin": 0.3847,
+      "mean_stability_ari": 0.9771,
+      "min_stability_ari": 0.8714,
+      "largest_cluster": 6,
+      "smallest_cluster": 2
+    }
+  ],
+  "verification": "Actual linked CSV reads feed all three comparison rows to Judge; assignment rows are excluded from aggregate evidence. Business rubric has no unrequested account-disclosure penalty.",
+  "evidence_limit": "Comparison file reconstructed from retained SQL; assignment labels reconstructed from known correct partitions. No new Subject run or Judge rescore; stored follow-up remains partial."
+}

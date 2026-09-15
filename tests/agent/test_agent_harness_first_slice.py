@@ -8,7 +8,6 @@ from xenix.exceptions import NotFoundError
 from xenix.services.agent import AgentHarnessService, SubmitUserTurnInput
 from xenix.services.llm import (
     AgentToolRegistry,
-    AgentToolSpec,
     AppendUserMessageInput,
     LLMConversationService,
     ProviderResponse,
@@ -16,7 +15,11 @@ from xenix.services.llm import (
     ToolSuccess,
 )
 from xenix.services.storage import StorageBootstrapService
-from xenix.services.llm.tooling import AgentTool
+from xenix.services.llm.tool_protocol import AgentTool
+
+
+class EmptyToolInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
 
 
 def test_harness_returns_invalid_arguments_to_model_for_repair(storage) -> None:
@@ -83,16 +86,18 @@ def test_paged_skill_reading_and_tool_activation_survive_history_reload(storage,
     ])
     executed = []
     for name in ("data.query", "data.transform"):
-        registry.register(
-            AgentToolSpec(name=name, provider_name=name.replace(".", "_"), description=name),
-            lambda _args, context: executed.append(context.tool_call_message_id) or ToolSuccess({"ok": True}),
-        )
+        registry.register(AgentTool(
+            name=name,
+            provider_name=name.replace(".", "_"),
+            description=name,
+            input_model=EmptyToolInput,
+            implementation=lambda _args, context: executed.append(context.tool_call_message_id) or ToolSuccess({"ok": True}),
+        ))
     conversation = LLMConversationService(
         session_factory=storage.session_factory, tool_registry=registry,
         context_messages_provider=lambda snapshot: agent_context_messages(catalog, tools_catalog, snapshot),
     )
-    register_agent_skill_tools(registry, catalog, activated_skill_names_provider=lambda thread_id:
-        agent_skill_activated_skill_names(conversation.get_thread_snapshot(thread_id)))
+    register_agent_skill_tools(registry, catalog)
     tools_catalog = AgentToolCatalog(registry.list_specs())
     registry.register(tools_catalog.activation_tool())
 
@@ -138,6 +143,11 @@ def test_paged_skill_reading_and_tool_activation_survive_history_reload(storage,
     assert executed == [snapshot.messages[-3].id]
 
 
+class InspectDatasetInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    dataset_id: int
+
+
 class ToolThenTextProvider:
     def __init__(self) -> None:
         self.calls = 0
@@ -158,10 +168,13 @@ def test_harness_coordinates_tool_but_llm_service_commits_messages(monkeypatch, 
     monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
     context = StorageBootstrapService().initialize(ensure_app_dirs(get_app_paths()))
     registry = AgentToolRegistry()
-    registry.register(
-        AgentToolSpec(name="data.inspect", provider_name="data_inspect", description="inspect"),
-        lambda arguments, context: {"dataset_id": arguments["dataset_id"], "ok": True},
-    )
+    registry.register(AgentTool(
+        name="data.inspect",
+        provider_name="data_inspect",
+        description="inspect",
+        input_model=InspectDatasetInput,
+        implementation=lambda arguments, _context: ToolSuccess({"dataset_id": arguments.dataset_id, "ok": True}),
+    ))
     provider = ToolThenTextProvider()
     harness = AgentHarnessService(
         conversation_service=LLMConversationService(
@@ -203,10 +216,13 @@ def test_direct_xtt_tool_result_has_one_value_across_storage_provider_and_chatbo
         "| 1 | 42 |"
     )
     registry = AgentToolRegistry()
-    registry.register(
-        AgentToolSpec(name="data.query", provider_name="data_query", description="query"),
-        lambda _arguments, _context: ToolSuccess(value=canonical_xtt),
-    )
+    registry.register(AgentTool(
+        name="data.query",
+        provider_name="data_query",
+        description="query",
+        input_model=EmptyToolInput,
+        implementation=lambda _arguments, _context: ToolSuccess(value=canonical_xtt),
+    ))
     class _CapturingProvider:
         def __init__(self) -> None:
             self.calls = 0

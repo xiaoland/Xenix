@@ -1,0 +1,133 @@
+{
+  "scope": "Feasibility probe on the original fixture with private correct labels; not an exact replay of live derived-dataset hashes or model labels",
+  "rows": 36,
+  "connected_groups": 12,
+  "groups_per_class": {
+    "0": 4,
+    "1": 4,
+    "2": 4
+  },
+  "hash_split_attempts": [
+    {
+      "seed": 0,
+      "passed": false,
+      "message": "Group-safe classification requires every target class in both training and holdout partitions."
+    },
+    {
+      "seed": 1,
+      "passed": true,
+      "train_rows": 27,
+      "holdout_rows": 9
+    },
+    {
+      "seed": 2,
+      "passed": false,
+      "message": "Group-safe classification requires every target class in both training and holdout partitions."
+    },
+    {
+      "seed": 3,
+      "passed": false,
+      "message": "Group-safe classification requires every target class in both training and holdout partitions."
+    },
+    {
+      "seed": 4,
+      "passed": false,
+      "message": "Group-safe classification requires every target class in both training and holdout partitions."
+    },
+    {
+      "seed": 5,
+      "passed": false,
+      "message": "Group-safe classification requires every target class in both training and holdout partitions."
+    },
+    {
+      "seed": 6,
+      "passed": false,
+      "message": "Group-safe classification requires every target class in both training and holdout partitions."
+    },
+    {
+      "seed": 7,
+      "passed": true,
+      "train_rows": 27,
+      "holdout_rows": 9
+    },
+    {
+      "seed": 8,
+      "passed": false,
+      "message": "Group-safe classification requires every target class in both training and holdout partitions."
+    },
+    {
+      "seed": 9,
+      "passed": false,
+      "message": "Group-safe classification requires every target class in both training and holdout partitions."
+    },
+    {
+      "seed": 10,
+      "passed": true,
+      "train_rows": 27,
+      "holdout_rows": 9
+    },
+    {
+      "seed": 11,
+      "passed": false,
+      "message": "Group-safe classification requires every target class in both training and holdout partitions."
+    },
+    {
+      "seed": 12,
+      "passed": true,
+      "train_rows": 27,
+      "holdout_rows": 9
+    },
+    {
+      "seed": 13,
+      "passed": false,
+      "message": "Group-safe classification requires every target class in both training and holdout partitions."
+    },
+    {
+      "seed": 14,
+      "passed": true,
+      "train_rows": 27,
+      "holdout_rows": 9
+    },
+    {
+      "seed": 15,
+      "passed": false,
+      "message": "Group-safe classification requires every target class in both training and holdout partitions."
+    },
+    {
+      "seed": 16,
+      "passed": false,
+      "message": "Group-safe classification requires every target class in both training and holdout partitions."
+    },
+    {
+      "seed": 17,
+      "passed": true,
+      "train_rows": 27,
+      "holdout_rows": 9
+    },
+    {
+      "seed": 18,
+      "passed": false,
+      "message": "Group-safe classification requires every target class in both training and holdout partitions."
+    },
+    {
+      "seed": 19,
+      "passed": false,
+      "message": "Group-safe classification requires every target class in both training and holdout partitions."
+    }
+  ],
+  "constructive_partition": {
+    "train_rows": 27,
+    "holdout_rows": 9,
+    "train_classes": [
+      "0",
+      "1",
+      "2"
+    ],
+    "holdout_classes": [
+      "0",
+      "1",
+      "2"
+    ],
+    "group_overlap": 0
+  }
+}

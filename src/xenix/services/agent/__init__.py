@@ -36,7 +36,7 @@ _EXPORTS = {
     "LLMService": "..llm",
     "LLMSettings": "..llm",
     "LLMSettingsService": "..llm",
-    "AgentToolRegistry": ".tools",
+    "build_agent_tools": ".tools",
     "HeadlessAgentServices": ".composition",
     "build_headless_agent_services": ".composition",
     "ToolPresentation": ".tool_presentations",

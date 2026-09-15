@@ -17,7 +17,7 @@ from sqlmodel import Field, SQLModel
 
 from ...exceptions import report_exception
 from ..llm.messages import blocks_from_payload, blocks_to_json
-from ..llm.tooling import canonical_tool_result_value
+from ..llm.tool_protocol import canonical_tool_result_value
 from .tool_presentations import ToolPresentation, tool_presentation_for_name
 
 
@@ -515,8 +515,13 @@ def _tool_actions(tool_name: str, payload: dict[str, Any] | None) -> list[dict[s
 def _tool_detail_blocks(tool_call: Any, result_value: Any, result_status: str | None) -> list[dict[str, Any]]:
     tool_name = _tool_name(tool_call)
     lines = [f"### {tool_name}", "", f"Status: `{result_status or 'pending'}`"]
-    arguments = getattr(tool_call, "arguments_payload", None) or {}
-    lines.extend(["", "#### Arguments", "```json", _json_dump(arguments), "```"])
+    content = getattr(tool_call, "content_payload", None) or {}
+    arguments = content.get("raw_arguments")
+    if arguments is None:
+        arguments = _json_dump(getattr(tool_call, "arguments_payload", None) or {})
+    elif len(arguments) > 12000:
+        arguments = arguments[:12000] + f"\n... <truncated {len(arguments) - 12000} chars>"
+    lines.extend(["", "#### Arguments", "```json", arguments, "```"])
     if result_value is not None:
         lines.extend(["", "#### Result"])
         if isinstance(result_value, str):

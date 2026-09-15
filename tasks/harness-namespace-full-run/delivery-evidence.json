@@ -1,0 +1,2448 @@
+[
+  {
+    "case_id": "business.campaign.v1.contact_interval",
+    "outcome": "pass",
+    "report": "build/agent-harness-namespace-d7bbe8d/business/business.campaign.v1.contact_interval-deepseek-deepseek-v4-flash-71ce421deba54c5fbaf131b420ce541b.json",
+    "final_texts": [
+      "已完成。我按知识库中**七月活动**的《老客回访活动规则》（2026-07-01 至 2026-07-31 有效）对当日快照 32 名客户逐条判定，交付可下载名单表：\n\n**下载：[老客回访名单表_20260701](artifact://40)**（含全部 32 行，逐行标记「是否入选 / 不入选原因」）\n\n## 采用的规则依据（七月活动，含首尾日）\n1. 城市仅限**南京、苏州**；\n2. 必须为**在营**客户（active = true）；\n3. 近 90 日净消费 **≥ 1000 元**；\n4. 距上次回访 **≥ 45 天或从未回访**（即 last_contact_date ≤ 2026-05-17，或为空）；\n5. **无未结服务单**（open_service_cases = 0）；\n6. **VIP 仅免消费门槛**，城市、在营、间隔、未结服务单要求仍适用。\n\n> 六月活动规则（门槛 800 元、间隔 14 天）不适用，因本次为七月活动。\n\n## 入选结果：8 名客户\n| 客户 | 城市 | 净消费 | 上次回访 | VIP | 入选关键点 |\n|---|---|---:|---|---|---|\n| C06 | 南京 | 200 | 2026-05-01 | 是 | VIP 免消费门槛，间隔达标 |\n| C08 | 苏州 | 0 | 从未 | 是 | VIP 免门槛，从未回访 |\n| C11 | 苏州 | 1100 | 从未 | 否 | 消费+从未回访达标 |\n| C15 | 苏州 | 1000 | 从未 | 否 | 消费达标，从未回访 |\n| C16 | 南京 | 2500 | 2026-01-01 | 否 | 间隔早已满足 |\n| C19 | 南京 | 1199.99 | 2026-05-15 | 否 | 恰在 45 天边界内（≤05-17） |\n| C23 | 南京 | -120 | 从未 | 是 | VIP 免门槛（净消费为负仍入选，见下） |\n| C31 | 苏州 | 1199.99 | 从未 | 否 | 消费达标，从未回访 |\n\n## 影响入选的主要例外（24 名未入选，按触发条件统计，可重叠）\n- **距上次回访未满 45 天（最主要，14 人）**：C01、C03、C04、C07、C12、C13、C14、C20、C21、C24、C27、C28、C29、C30。多名高消费、本应优先回访的客户（如 C21 消费 3000、C03 消费 1600）因近期刚回访被排除。\n- **非南京/苏州（6 人）**：C09、C17、C18、C25、C26、C30（杭州、上海、无锡）。\n- **净消费未达 1000 且非 VIP（4 人）**：C02、C12、C13、C32。其中 **C02 = 999.99 元，仅差 0.01 元**擦线落选。\n- **有未结服务单（4 人）**：C05、C14（VIP）、C22（消费 5000 的头部客户，3 张服务单）、C25。\n- **非在营（2 人）**：C10（南京，2200 元）、C24（苏州 VIP）。\n\n## 需要提请注意的三处边界\n1. **C23（VIP，净消费 -120 元）入选**：按「VIP 仅免消费门槛」的字面规则，负净消费也被免门槛。若业务意图是 VIP 仍需正消费，需人工复核。\n2. **C19（消费 1199.99、上次回访 2026-05-15）刚好入选**：05-17 为 45 天边界，05-15 在界内；同日之后即落选。\n3. **C02 差 0.01 元落选**：若贵司对门槛四舍五入或允许 1 元容差，结论会改变。\n\n如需要，我可以再出一份「仅入选客户」的干净名单表，或加入按城市/VIP 的排序与汇总。"
+    ],
+    "tool_failures": [],
+    "context_calls": [
+      {
+        "arguments": {
+          "names": [
+            "analysis.profile",
+            "data.query",
+            "data.transform",
+            "data.clean",
+            "data.feature.select"
+          ]
+        },
+        "delivery": {
+          "serialized_bytes": 133
+        },
+        "failure": null,
+        "name": "agent.tools.activate",
+        "provider_call_id": "call_01_UKAEzyVNatddpB7KUe5u5028",
+        "status": "succeeded"
+      }
+    ]
+  },
+  {
+    "case_id": "business.campaign.v1.spending_threshold",
+    "outcome": "pass",
+    "report": "build/agent-harness-namespace-d7bbe8d/business/business.campaign.v1.spending_threshold-deepseek-deepseek-v4-flash-5e2c0342a6dc4638b2c6917d6d276bb1.json",
+    "final_texts": [
+      "已完成。本次回访名单已生成，可下载查看。\n\n**[下载：2026-07 老客回访名单.xlsx](artifact://36)**（含全部 32 位客户，逐条标注「入选/未入选」及原因，便于核对）\n\n## 采用的规则依据\n知识库中有两套「老客回访活动规则」。**今天为 2026-07-01，适用的是「客户运营七月活动」规则（有效期 2026-07-01 至 2026-07-31）**，而非六月活动（已于 6-30 失效）。入选需同时满足：\n\n1. **城市**：仅南京、苏州；\n2. **在营**：active = true；\n3. **净消费**：近 90 日净消费 ≥ 1200 元；\n4. **回访间隔**：距上次回访 ≥ 30 天，或从未回访（last_contact_date 为空）；\n5. **服务单**：有未结服务单（open_service_cases > 0）的客户不回访；\n6. **VIP 例外**：VIP 仅免「消费门槛」，城市、在营、间隔、未结服务单四项要求仍须满足；\n7. **日期含首尾**：以 2026-07-01 为基准，间隔 ≥30 天即 last_contact_date ≤ 2026-06-01（6-01 当天算 30 天，符合）。\n\n## 入选结果：5 位客户\n| 客户 | 城市 | 近90日净消费 | 上次回访 | VIP | 说明 |\n|---|---|---:|---|---|---|\n| C03 | 苏州 | 1600 | 2026-05-31 | 否 | 正常达标 |\n| C06 | 南京 | 200 | 2026-05-01 | 是 | VIP 免消费门槛 |\n| C08 | 苏州 | 0 | 从未 | 是 | VIP ＋ 从未回访 |\n| C16 | 南京 | 2500 | 2026-01-01 | 否 | 正常达标 |\n| C23 | 南京 | -120 | 从未 | 是 | VIP 免门槛（净消费为负） |\n\n## 主要例外（共 27 位未入选，影响入选的关键点）\n- **消费未达标（9 位，最主要剔除原因）**：非 VIP 且 < 1200 元，如 C11/C15（1100/1000）、C19/C31（均 1199.99，差 0.01 元）、C02（999.99）、C13（800）等。\n- **间隔不足（6 位）**：如 C21（2026-06-18）、C20（2026-06-17）、C28（2026-06-16）、C29（2026-06-17）；**C04（2026-06-02，仅差 1 天）**最接近达标。\n- **城市不符（4 位）**：C09/C17（上海/杭州，消费虽高但非南京、苏州）、C18/C30（杭州）。\n- **有未结服务单（3 位）**：C05、C14（VIP，2 单）、**C22（苏州，消费 5000 元为全场最高，但 3 单未结，仍排除）**。\n- **非在营（2 位）**：C10（南京）、C24（苏州，VIP）。\n\n**需要留意的边界与组合情形**\n- **VIP 不等于必入选**：VIP 只免消费门槛——C07（间隔仅 21 天）、C14（有未结服务单）被排除；反之 C06、C08、C23 因 VIP 免门槛而入选（其中 C23 净消费为负、C08 为 0，均据「免门槛」规则列入）。\n- **多重不达标叠加**：C25（城市不符＋有服务单）、C17（城市不符＋间隔不足）、C12（消费不足＋间隔不足）等同时触发多项，已在表中逐项标明。\n- **临界值口径**：1200 元与 1199.99 元、6-01 与 6-02、30 天整等均为紧贴阈值的分界案例，按规则「≥/含首尾」判定，请留意其敏感性。\n\n如需仅输出入选客户版本，或按城市拆分名单，我可以再导出。\n\n（说明：金额为快照给定的近 90 日净消费，未重算；规则来自知识库「客户运营七月活动」，与六月规则的差异为消费门槛 1200 vs 800、间隔 30 天 vs 14 天——若误用六月规则，入选名单会明显不同。）"
+    ],
+    "tool_failures": [],
+    "context_calls": [
+      {
+        "arguments": {
+          "names": [
+            "data.query",
+            "data.transform",
+            "analysis.profile",
+            "data.clean"
+          ]
+        },
+        "delivery": {
+          "serialized_bytes": 110
+        },
+        "failure": null,
+        "name": "agent.tools.activate",
+        "provider_call_id": "call_01_iSlidjf7SbPw3bsMcBm16922",
+        "status": "succeeded"
+      }
+    ]
+  },
+  {
+    "case_id": "business.campaign.v1.standard",
+    "outcome": "pass",
+    "report": "build/agent-harness-namespace-d7bbe8d/business/business.campaign.v1.standard-deepseek-deepseek-v4-flash-397227c092a34d14b97c5504cbcfbf7e.json",
+    "final_texts": [
+      "已按知识库中的**七月**老客回访规则（活动期 2026-07-01 至 2026-07-31，今日 2026-07-01 适用）对快照逐条判定。可下载名单表已生成：\n\n**📄 [本次回访名单表（含入选标记与排除原因）](artifact://44)** — 32 行全表，含 `eligible`（是否入选）与 `exclusion_reason`（未入选原因）两列；筛选 `eligible = true` 即得回访名单。\n\n## 采用的规则依据\n来源：知识库「客户运营七月活动」（2026-07-01 至 2026-07-31 有效）。入选须**同时**满足：\n1. **城市**：仅南京、苏州；\n2. **在营**：`active = true`；\n3. **无未结服务单**：`open_service_cases = 0`（有未结服务单的客户不回访）；\n4. **消费门槛**：近 90 日净消费 ≥ 1000 元，**或 VIP**（VIP 仅免消费门槛）；\n5. **回访间隔**：从未回访（`last_contact_date` 为空），或距上次回访 ≥ 30 天。\n- 范围含首尾日，故上次回访为 2026-06-01 的正好满 30 天，视为达标。\n- 注：库中另有「六月活动」规则（门槛 800 元、间隔 14 天），因当前为 7 月，**未采用**。\n\n## 结果\n- 入选 **11 人**：C01, C03, C06, C08, C11, C15, C16, C19, C23, C27, C31\n- 未入选 **21 人**\n\n## 影响入选的主要例外\n- **紧贴边界的间隔（最常见，6 人）**：C04（29 天，差 1 天）、C20、C21、C28、C29 因 30 天内已回访被排除（C12 另叠加消费不足）。\n- **未结服务单（4 人）**：C05、C14、C22、C25 —— 即使 C22 净消费 5000 元、C14 为 VIP 也一并排除，体现\"服务单要求仍适用\"。\n- **消费门槛未过（4 人）**：C02（999.99，差 0.01 元，最接近门槛者）、C13、C32、C12（非 VIP）。\n- **非在营（2 人）**：C10、C24。\n- **城市不符（6 人）**：C09、C17、C18、C25、C26、C30（上海/杭州/无锡）。\n\n## 需要留意的判断点\n- **VIP 只免消费门槛**：C06、C08、C23 正是靠 VIP 豁免、净消费虽低（甚至 C23 为 -120 元）仍入选；反之 VIP 客户 C07（间隔不足）、C14（服务单）、C18/C25/C26（城市）、C24（非在营）仍被排除。\n- **C02 是最易生歧义的一例**：净消费 999.99 元，差 0.01 元未达 1000 元门槛，本表按\"≥1000\"规则判为不入选；若业务口径允许四舍五入到元，可人工复核。\n- 本表为规则判定，未含名单人数上限等未在知识库出现的约束；如有其他口径请告知，我可即时更新。"
+    ],
+    "tool_failures": [],
+    "context_calls": [
+      {
+        "arguments": {
+          "names": [
+            "data.query",
+            "data.transform",
+            "analysis.profile",
+            "analysis.graph"
+          ]
+        },
+        "delivery": {
+          "serialized_bytes": 91
+        },
+        "failure": null,
+        "name": "agent.tools.activate",
+        "provider_call_id": "call_02_kfG7X4ATyUwjfRdyDTh68051",
+        "status": "succeeded"
+      }
+    ]
+  },
+  {
+    "case_id": "business.restock.v1.arrival_earlier",
+    "outcome": "pass",
+    "report": "build/agent-harness-namespace-d7bbe8d/business/business.restock.v1.arrival_earlier-deepseek-deepseek-v4-flash-acdd8080e7fd45e7b13b768afd56eb6d.json",
+    "final_texts": [
+      "## 结论：本次下单，最高预计增量毛利 2,050 元\n\n在 11 个可采购报价（到货日 ≤ 2026-09-25）中，我对所有整数批数组合作了完整枚举并核对约束，得到的最优方案唯一地达到最大毛利 **2,050 元**（枚举结果中没有任何组合能超过该值）。\n\n**采购表**：[store_event_replenishment_plan](artifact://29)（可下载工作表，含报价编号、采购批数与合计行）\n\n| 报价编号 | 商品 | 采购批数 | 单批成本 | 成本小计 | 单批毛利 | 毛利小计 | 单批箱数 | 箱数小计 | 到货日 |\n|---|---|---:|---:|---:|---:|---:|---:|---:|---|\n| Q203 | 每日坚果 | 2 | 520 | 1,040 | 360 | 720 | 3 | 6 | 2026-09-22 |\n| Q612 | 混合果汁 | 2 | 560 | 1,120 | 420 | 840 | 3 | 6 | 2026-09-24 |\n| Q509 | 挂耳咖啡 | 1 | 680 | 680 | 430 | 430 | 4 | 4 | 2026-09-23 |\n| Q305 | 纸杯 | 1 | 150 | 150 | 60 | 60 | 1 | 1 | 2026-09-23 |\n| **合计** | | **6 批** | | **2,990** | | **2,050** | | **17** | |\n\n### 预算与仓容使用量\n- 采购预算：**2,990 / 3,000 元**（剩余 10 元，未花完，符合\"不要求花完\"的要求）\n- 新增仓容：**17 / 18 箱**（剩余 1 箱）\n- 预计增量毛利合计：**2,050 元**（该口径已扣采购及本次业务费用，未重复扣减采购成本）\n\n### 选择依据\n- **到货筛选**：Q407（保温袋，到货 2026-09-26）超出截止日，已排除；其余 11 个报价均可用。\n- **批数上限**：所选 4 项均未超 max_batches（Q203 用满 2、Q612 用满 2、Q509 用满 1、Q305 用 1 批上限 3）。\n- **为什么是这个组合**：18 箱仓容与 3,000 元预算同时偏紧，约束瓶颈在\"每箱毛利\"和\"每箱成本\"的搭配。Q612（140 元/箱）与 Q203（120 元/箱）是箱效最高的两项，优先用满；余下仓容/预算由箱效较高的 Q509（约 108 元/箱）承接，剩余 10 元预算已无任何批次可装入 1 箱余量（最便宜的 Q305 单批 150 元，已订满其 3 批中的 1 批后仍无第 2 批空间内可行资金——再订 1 批需 150 元，超出剩余预算）。\n- **次优方案**（供对照）：Q203×2 + Q612×2 再搭配 Q102 或 Q101 各 1 批，毛利均为 2,020 元、占用 17 箱、成本约 2,920–2,940 元，低于本方案 30 元。\n\n### 说明与不确定性\n- 预计毛利来自已确认的报价参数，是计划期参数，**不保证实际销售收益**；实际毛利会随动销、损耗与门店需求波动。\n- 采购成本、毛利、箱数均按批数线性相加，未包含运费、组合折扣或最低订单额（按给定假设）。\n- 若到货截止日放宽至 2026-09-26（纳入 Q407），最优组合可能变化；如需该情形下的对比方案，我可以再算一版。"
+    ],
+    "tool_failures": [],
+    "context_calls": [
+      {
+        "arguments": {
+          "name": "xenix-data-analysis"
+        },
+        "delivery": {
+          "serialized_bytes": 1086
+        },
+        "failure": null,
+        "name": "agent.skill.activate",
+        "provider_call_id": "call_00_Zg5qjbft2OyrlbzhtcoR8005",
+        "status": "succeeded"
+      },
+      {
+        "arguments": {
+          "names": [
+            "analysis.profile",
+            "data.query",
+            "data.transform",
+            "data.clean.metadata"
+          ]
+        },
+        "delivery": {
+          "serialized_bytes": 96
+        },
+        "failure": null,
+        "name": "agent.tools.activate",
+        "provider_call_id": "call_01_ep3YnTRau2uJE7H9wNyL3172",
+        "status": "succeeded"
+      }
+    ]
+  },
+  {
+    "case_id": "business.restock.v1.budget_tight",
+    "outcome": "pass",
+    "report": "build/agent-harness-namespace-d7bbe8d/business/business.restock.v1.budget_tight-deepseek-deepseek-v4-flash-7975e7da89d745f38698151ef4bed552.json",
+    "final_texts": [
+      "## Recommendation: place the order (4 batches across 3 offers)\n\nThe purchase table is ready to download: [store_campaign_replenishment_plan](artifact://45) (also available as dataset 43). Chart: ![plan composition](artifact://51)\n\n| Offer ID | Product | Batches | Arrival | Cost/batch | Margin/batch | Boxes/batch | Total cost | Total boxes | Total margin |\n|---|---|---:|---|---:|---:|---:|---:|---:|---:|\n| Q102 | 无糖茶 | 1 | 2026-09-24 | 760 | 460 | 5 | 760 | 5 | 460 |\n| Q203 | 每日坚果 | 2 | 2026-09-22 | 520 | 360 | 3 | 1,040 | 6 | 720 |\n| Q204 | 燕麦饼干 | 1 | 2026-09-25 | 440 | 235 | 3 | 440 | 3 | 235 |\n| **Total** | | **4** | | | | | **2,240** | **14** | **1,415** |\n\n### Constraint usage\n- **Budget:** 2,240 of 2,250 yuan used (99.6%); 10 yuan left — not enough for any batch (cheapest available batch is 150 yuan).\n- **Warehouse capacity:** 14 of 18 boxes used (77.8%); 4 boxes spare.\n- **Delivery window:** all three offers arrive on or before 2026-09-25.\n\n### Basis for the selection\n- I searched all feasible integer batch combinations across the eligible offers (1,296 feasible combinations) and maximized expected incremental margin. **The optimum is 1,415 yuan and it is unique**, so no tie-break was needed. The next-best plan reaches 1,405 yuan (+0.7% below).\n- **The budget is the binding constraint, not capacity.** Re-solving with the 18-box limit removed returns the identical plan, so 4 spare boxes cannot be converted into extra margin.\n- Offer-by-offer logic: Q203 has the best return in the eligible set on both measures (120 yuan/box, 0.692 yuan margin per yuan spent), so both available batches (max_batches = 2) are taken. Q102 is chosen over Q101 because both give 460 yuan margin and 5 boxes, but Q102 costs 760 vs 780 yuan per batch (0.605 vs 0.590 per yuan). Q204 (0.534 per yuan) is the best remaining offer that fits the leftover budget and capacity, leaving only 10 yuan.\n\n### Offers not purchased, and why\n- **Excluded by the delivery deadline (2 offers):** Q612 混合果汁 (arrives 2026-09-29) and Q407 保温袋 (arrives 2026-09-26). Note Q612 actually has the highest margin per box in the whole file (140 yuan/box) — the only reason it is out is the arrival date.\n- **Eligible but below the optimum:** Q509, Q101, Q510, Q408, Q305, Q306, Q611 — all have lower margin per yuan and/or a worse box footprint; each substitution lowers total margin (e.g., the best plan using Q509 gives 1,405 yuan; plans built around Q408 节日礼盒 use 9 boxes for only 71 yuan/box of margin).\n- No eligible offer had exhausted supply (max_batches = 0), so nothing was dropped for lack of supply, and no empty file was needed.\n\n### Caveat\nThe 1,415 yuan is the confirmed *expected* incremental margin used as this plan's parameter; it is a planning figure and does not guarantee actual sales profit. Costs, margins and box counts add up strictly per batch with no shipping, bundling discount, demand overlap or minimum-order effects, and batches are not splittable — only whole batches were ordered."
+    ],
+    "tool_failures": [
+      {
+        "arguments": {
+          "datasets": {
+            "o": 2
+          },
+          "limit": 15,
+          "sql": "WITH RECURSIVE el AS (\n  SELECT row_number() OVER (ORDER BY offer_id) AS rn, * FROM o WHERE arrival_date <= DATE '2026-09-25'\n),\ndp AS (\n  SELECT 0 AS rn, 0 AS cost, 0 AS boxes, 0 AS margin, '' AS path\n  UNION ALL\n  SELECT d.rn+1, d.cost + g.k*e.cost_yuan, d.boxes + g.k*e.boxes, d.margin + g.k*e.margin,\n         d.path || e.offer_id || ':' || g.k || ';'\n  FROM dp d JOIN el e ON e.rn = d.rn+1, generate_series(0, e.max_batches) AS g(k)\n  WHERE d.cost + g.k*e.cost_yuan <= 2250 AND d.boxes + g.k*e.boxes <= 18\n)\nSELECT margin AS best_margin, cost, boxes, path\nFROM dp WHERE rn = (SELECT max(rn) FROM el)\nORDER BY margin DESC, cost ASC LIMIT 15;"
+        },
+        "delivery": {
+          "serialized_bytes": 343
+        },
+        "failure": {
+          "code": "tool_execution_failed",
+          "message": "Binder Error: Cannot compare values of type VARCHAR and type DATE - an explicit cast is required\n\nLINE 2: ...() OVER (ORDER BY offer_id) AS rn, * FROM o WHERE arrival_date <= DATE '2026-09-25'\n                                                                          ^",
+          "type": "tool_failure"
+        },
+        "name": "data.query",
+        "provider_call_id": "call_00_yynovBFbyzP24fmLSKdn5068",
+        "status": "failed"
+      },
+      {
+        "arguments": {
+          "datasets": {
+            "o": 2
+          },
+          "limit": 5,
+          "sql": "WITH RECURSIVE el AS (\n  SELECT row_number() OVER (ORDER BY offer_id) AS rn, * FROM o WHERE arrival_date <= DATE '2026-09-25'\n),\ndp AS (\n  SELECT 0 AS rn, 0 AS cost, 0 AS boxes, 0 AS margin\n  UNION ALL\n  SELECT d.rn+1, d.cost + g.k*e.cost_yuan, d.boxes + g.k*e.boxes, d.margin + g.k*e.margin\n  FROM dp d JOIN el e ON e.rn = d.rn+1, generate_series(0, e.max_batches) AS g(k)\n  WHERE d.cost + g.k*e.cost_yuan <= 2250 AND d.boxes + g.k*e.boxes <= 18\n),\nfin AS (SELECT * FROM dp WHERE rn = (SELECT max(rn) FROM el))\nSELECT (SELECT count(*) FROM fin) AS feasible_combos,\n       (SELECT max(margin) FROM fin) AS best_margin,\n       (SELECT count(*) FROM fin WHERE margin = (SELECT max(margin) FROM fin)) AS tie_count,\n       (SELECT count(*) FROM o) AS all_rows,\n       (SELECT count(*) FROM o WHERE arrival_date <= DATE '2026-09-25') AS eligible_rows,\n       (SELECT count(*) FROM o WHERE arrival_date <= DATE '2026-09-25' AND max_batches > 0) AS eligible_with_supply,\n       (SELECT count(*) FROM o WHERE arrival_date > DATE '2026-09-25') AS excluded_late;"
+        },
+        "delivery": {
+          "serialized_bytes": 343
+        },
+        "failure": {
+          "code": "tool_execution_failed",
+          "message": "Binder Error: Cannot compare values of type VARCHAR and type DATE - an explicit cast is required\n\nLINE 2: ...() OVER (ORDER BY offer_id) AS rn, * FROM o WHERE arrival_date <= DATE '2026-09-25'\n                                                                          ^",
+          "type": "tool_failure"
+        },
+        "name": "data.query",
+        "provider_call_id": "call_01_43B3mcRpZog9eoTC2w112213",
+        "status": "failed"
+      },
+      {
+        "arguments": {
+          "datasets": {
+            "o": 2
+          },
+          "limit": 15,
+          "sql": "WITH RECURSIVE el AS (\n  SELECT row_number() OVER (ORDER BY offer_id) AS rn, * FROM o WHERE CAST(arrival_date AS DATE) <= DATE '2026-09-25'\n),\ndp AS (\n  SELECT 0 AS rn, 0 AS cost, 0 AS boxes, 0 AS margin, '' AS path\n  UNION ALL\n  SELECT d.rn+1, d.cost + g.k*e.cost_yuan, d.boxes + g.k*e.boxes, d.margin + g.k*e.margin,\n         d.path || e.offer_id || ':' || g.k || ';'\n  FROM dp d JOIN el e ON e.rn = d.rn+1, generate_series(0, e.max_batches) AS g(k)\n  WHERE d.cost + g.k*e.cost_yuan <= 2250 AND d.boxes + g.k*e.boxes <= 18\n)\nSELECT margin AS best_margin, cost, boxes, path\nFROM dp WHERE rn = (SELECT max(rn) FROM el)\nORDER BY margin DESC, cost ASC LIMIT 15;"
+        },
+        "delivery": {
+          "serialized_bytes": 307
+        },
+        "failure": {
+          "code": "tool_execution_failed",
+          "message": "Binder Error: Values list \"e\" does not have a column named \"margin\"\n\nLINE 7: ....cost + g.k*e.cost_yuan, d.boxes + g.k*e.boxes, d.margin + g.k*e.margin,\n                                                                          ^",
+          "type": "tool_failure"
+        },
+        "name": "data.query",
+        "provider_call_id": "call_00_RIZnxtXpe8OJFfQHjcat1351",
+        "status": "failed"
+      },
+      {
+        "arguments": {
+          "datasets": {
+            "o": 2
+          },
+          "limit": 5,
+          "sql": "WITH RECURSIVE el AS (\n  SELECT row_number() OVER (ORDER BY offer_id) AS rn, * FROM o WHERE CAST(arrival_date AS DATE) <= DATE '2026-09-25'\n),\ndp AS (\n  SELECT 0 AS rn, 0 AS cost, 0 AS boxes, 0 AS margin\n  UNION ALL\n  SELECT d.rn+1, d.cost + g.k*e.cost_yuan, d.boxes + g.k*e.boxes, d.margin + g.k*e.margin\n  FROM dp d JOIN el e ON e.rn = d.rn+1, generate_series(0, e.max_batches) AS g(k)\n  WHERE d.cost + g.k*e.cost_yuan <= 2250 AND d.boxes + g.k*e.boxes <= 18\n),\nfin AS (SELECT * FROM dp WHERE rn = (SELECT max(rn) FROM el))\nSELECT (SELECT count(*) FROM fin) AS feasible_combos,\n       (SELECT max(margin) FROM fin) AS best_margin,\n       (SELECT count(*) FROM fin WHERE margin = (SELECT max(margin) FROM fin)) AS tie_count,\n       (SELECT count(*) FROM o) AS all_rows,\n       (SELECT count(*) FROM o WHERE CAST(arrival_date AS DATE) <= DATE '2026-09-25') AS eligible_rows,\n       (SELECT count(*) FROM o WHERE CAST(arrival_date AS DATE) <= DATE '2026-09-25' AND max_batches > 0) AS eligible_with_supply,\n       (SELECT count(*) FROM o WHERE CAST(arrival_date AS DATE) > DATE '2026-09-25') AS excluded_late,\n       (SELECT count(*) FROM o WHERE CAST(arrival_date AS DATE) <= DATE '2026-09-25' AND max_batches = 0) AS eligible_zero_supply;"
+        },
+        "delivery": {
+          "serialized_bytes": 306
+        },
+        "failure": {
+          "code": "tool_execution_failed",
+          "message": "Binder Error: Values list \"e\" does not have a column named \"margin\"\n\nLINE 7: ....cost + g.k*e.cost_yuan, d.boxes + g.k*e.boxes, d.margin + g.k*e.margin\n                                                                          ^",
+          "type": "tool_failure"
+        },
+        "name": "data.query",
+        "provider_call_id": "call_01_zlFGFQM76bq4n4AgPBt49068",
+        "status": "failed"
+      }
+    ],
+    "context_calls": [
+      {
+        "arguments": {
+          "names": [
+            "data.query",
+            "data.transform",
+            "analysis.profile",
+            "analysis.graph"
+          ]
+        },
+        "delivery": {
+          "serialized_bytes": 91
+        },
+        "failure": null,
+        "name": "agent.tools.activate",
+        "provider_call_id": "call_00_OP3OXuFAIWbLchW54he87374",
+        "status": "succeeded"
+      }
+    ]
+  },
+  {
+    "case_id": "business.restock.v1.margin_higher",
+    "outcome": "fail",
+    "report": "build/agent-harness-namespace-d7bbe8d/business/business.restock.v1.margin_higher-deepseek-deepseek-v4-flash-282c7419d9c8405d81b6d97ca1bc6170.json",
+    "final_texts": [
+      ""
+    ],
+    "tool_failures": [],
+    "context_calls": []
+  },
+  {
+    "case_id": "business.restock.v1.margin_lower",
+    "outcome": "pass",
+    "report": "build/agent-harness-namespace-d7bbe8d/business/business.restock.v1.margin_lower-deepseek-deepseek-v4-flash-02c9b98a644845439c1fd7d4b62f8009.json",
+    "final_texts": [
+      "## 结论：可以下单，最优方案预计增量毛利 1,690 元\n\n### 采购表（可下载）\n\n**[门店活动补货采购表](artifact://54)**（列含 offer_id、商品、批数、单批成本/毛利/箱数、到货日、行小计；末行为合计）\n\n| 报价编号 | 商品 | 采购批数 | 单批成本 | 单批毛利 | 单批箱数 | 到货日 | 行成本 | 行毛利 | 行箱数 |\n|---|---|---:|---:|---:|---:|---|---:|---:|---:|\n| Q102 | 无糖茶 | 2 | 760 | 460 | 5 | 2026-09-24 | 1,520 | 920 | 10 |\n| Q509 | 挂耳咖啡 | 1 | 680 | 430 | 4 | 2026-09-23 | 680 | 430 | 4 |\n| Q510 | 小点心 | 1 | 380 | 195 | 2 | 2026-09-24 | 380 | 195 | 2 |\n| Q611 | 便携餐具 | 1 | 290 | 145 | 2 | 2026-09-25 | 290 | 145 | 2 |\n| **合计** | **3 个报价 / 5 批** | **5** | | | | 均 ≤ 09-25 | **2,870** | **1,690** | **18** |\n\n- **预算使用：2,870 / 3,000 元（95.7%），余 130 元**\n- **仓容使用：18 / 18 箱（100%，正好用满）**\n- **预计增量毛利：1,690 元**（毛利已扣采购及本次业务费用，未再减一次采购成本）\n\n### 选择依据\n\n**1. 先按到货日筛掉不可用批次（2 条被排除，与性价比无关）：**\n- Q407 保温袋：2026-09-26 到货，晚于 09-25 截止日 → 排除\n- Q612 混合果汁：2026-09-29 到货 → 排除。注意它的单位箱毛利 140 元/箱是全场最高，但到货太晚，不能用于本次。\n\n**2. 其余 10 条报价（到货 ≤ 2026-09-25）在\"预算 ≤3000 元 + 箱容 ≤18 箱\"下做穷举择优：** 共枚举 23,328 种整数批数组合，其中 2,823 种可行；最高预计毛利为 **1,690 元**。入选的 4 条报价正是\"每箱毛利\"最高的几条（Q509 107.5、Q510 97.5、Q101/Q102 92、Q611 72.5 元/箱），且能刚好填满 18 箱。\n\n**3. 并列最优有 3 个方案，任取其一均可（毛利同为 1,690 元、箱数同为 18），我选了成本最低的一个：**\n\n| 方案 | 组成 | 成本 | 毛利 | 箱数 |\n|---|---|---:|---:|---:|\n| **采用** | Q102×2 + Q509 + Q510 + Q611 | **2,870** | 1,690 | 18 |\n| 并列 | Q101×1 + Q102×1 + Q509 + Q510 + Q611 | 2,890 | 1,690 | 18 |\n| 并列 | Q101×2 + Q509 + Q510 + Q611 | 2,910 | 1,690 | 18 |\n\n三者差别只在气泡水报价 Q101 与无糖茶报价 Q102 的替换：两者单批毛利同为 460 元、箱数同为 5，但 Q102 每批便宜 20 元，所以全用 Q102（2 批）成本最低、省 40 元，毛利不变。多花预算并不能换来更高毛利（次优方案为 1,665 元），因此不必花完 3,000 元。\n\n### 口径与不确定性\n- 批数取非负整数、批次不拆分，`max_batches` 全部满足（Q102 上限 2、其余 3 条上限均 ≥1）。\n- 成本、毛利、箱数按批数线性相加，无运费、组合折扣或最低订单额；不同报价编号互不去重（Q101 与 Q102 视为两个独立报价）。\n- 1,690 元是本次计划的预计参数，不保证实际销售收益；最坏情况下若实际销量偏低，18 箱仓容已全部占用，会锁定 2,870 元采购支出。\n\n如果需要，我可以再出一版\"给预算留更多余量\"或\"只求每箱毛利最高、不追求总量\"的对比方案。"
+    ],
+    "tool_failures": [
+      {
+        "arguments": {
+          "datasets": {
+            "o": 2
+          },
+          "limit": 20,
+          "sql": "WITH opt AS (\n  SELECT seq, offer_id, cost, margin, boxes, q\n  FROM (VALUES\n   (1,'Q101',780,460,5,2),(2,'Q102',760,460,5,2),(3,'Q203',520,220,3,2),\n   (4,'Q204',440,235,3,2),(5,'Q305',150,60,1,3),(6,'Q306',210,90,2,2),\n   (7,'Q408',1250,640,9,1),(8,'Q509',680,430,4,1),(9,'Q510',380,195,2,1),\n   (10,'Q611',290,145,2,2)\n  ) t(seq,offer_id,cost,margin,boxes,mx),\n  g AS (SELECT unnest(range(0,4)) AS q),\n  r AS (SELECT seq, offer_id, cost, margin, boxes, q FROM opt, g WHERE q <= mx)\nSELECT\n  o1.q AS q101, o2.q AS q102, o3.q AS q203, o4.q AS q204, o5.q AS q305,\n  o6.q AS q306, o7.q AS q408, o8.q AS q509, o9.q AS q510, o10.q AS q611,\n  o1.cost*o1.q+o2.cost*o2.q+o3.cost*o3.q+o4.cost*o4.q+o5.cost*o5.q+o6.cost*o6.q+o7.cost*o7.q+o8.cost*o8.q+o9.cost*o9.q+o10.cost*o10.q AS total_cost,\n  o1.margin*o1.q+o2.margin*o2.q+o3.margin*o3.q+o4.margin*o4.q+o5.margin*o5.q+o6.margin*o6.q+o7.margin*o7.q+o8.margin*o8.q+o9.margin*o9.q+o10.margin*o10.q AS total_margin,\n  o1.boxes*o1.q+o2.boxes*o2.q+o3.boxes*o3.q+o4.boxes*o4.q+o5.boxes*o5.q+o6.boxes*o6.q+o7.boxes*o7.q+o8.boxes*o8.q+o9.boxes*o9.q+o10.boxes*o10.q AS total_boxes\nFROM r o1, r o2, r o3, r o4, r o5, r o6, r o7, r o8, r o9, r o10\nWHERE o1.seq=1 AND o2.seq=2 AND o3.seq=3 AND o4.seq=4 AND o5.seq=5\n  AND o6.seq=6 AND o7.seq=7 AND o8.seq=8 AND o9.seq=9 AND o10.seq=10\n  AND (o1.cost*o1.q+o2.cost*o2.q+o3.cost*o3.q+o4.cost*o4.q+o5.cost*o5.q+o6.cost*o6.q+o7.cost*o7.q+o8.cost*o8.q+o9.cost*o9.q+o10.cost*o10.q) <= 3000\n  AND (o1.boxes*o1.q+o2.boxes*o2.q+o3.boxes*o3.q+o4.boxes*o4.q+o5.boxes*o5.q+o6.boxes*o6.q+o7.boxes*o7.q+o8.boxes*o8.q+o9.boxes*o9.q+o10.boxes*o10.q) <= 18\nORDER BY total_margin DESC, total_cost ASC, total_boxes ASC\nLIMIT 20;"
+        },
+        "delivery": {
+          "serialized_bytes": 185
+        },
+        "failure": {
+          "code": "tool_execution_failed",
+          "message": "Parser Error: syntax error at or near \"(\"\n\nLINE 9:   g AS (SELECT unnest(range(0,4)) AS q),\n               ^",
+          "type": "tool_failure"
+        },
+        "name": "data.query",
+        "provider_call_id": "call_00_0RjaxtpE3Bh3J6GQSadd1798",
+        "status": "failed"
+      },
+      {
+        "arguments": {
+          "datasets": {
+            "o": 2
+          },
+          "limit": 20,
+          "sql": "WITH r AS (\n  SELECT seq, offer_id, cost, margin, boxes, q\n  FROM (VALUES\n   (1,'Q101',780,460,5,2),(2,'Q102',760,460,5,2),(3,'Q203',520,220,3,2),\n   (4,'Q204',440,235,3,2),(5,'Q305',150,60,1,3),(6,'Q306',210,90,2,2),\n   (7,'Q408',1250,640,9,1),(8,'Q509',680,430,4,1),(9,'Q510',380,195,2,1),\n   (10,'Q611',290,145,2,2)\n  ) t(seq,offer_id,cost,margin,boxes,mx),\n  v(q) AS (VALUES (0),(1),(2),(3)),\n  o AS (SELECT seq, offer_id, cost, margin, boxes, q FROM r, v WHERE q <= mx)\nSELECT\n  o1.q AS q101, o2.q AS q102, o3.q AS q203, o4.q AS q204, o5.q AS q305,\n  o6.q AS q306, o7.q AS q408, o8.q AS q509, o9.q AS q510, o10.q AS q611,\n  o1.cost*o1.q+o2.cost*o2.q+o3.cost*o3.q+o4.cost*o4.q+o5.cost*o5.q+o6.cost*o6.q+o7.cost*o7.q+o8.cost*o8.q+o9.cost*o9.q+o10.cost*o10.q AS total_cost,\n  o1.margin*o1.q+o2.margin*o2.q+o3.margin*o3.q+o4.margin*o4.q+o5.margin*o5.q+o6.margin*o6.q+o7.margin*o7.q+o8.margin*o8.q+o9.margin*o9.q+o10.margin*o10.q AS total_margin,\n  o1.boxes*o1.q+o2.boxes*o2.q+o3.boxes*o3.q+o4.boxes*o4.q+o5.boxes*o5.q+o6.boxes*o6.q+o7.boxes*o7.q+o8.boxes*o8.q+o9.boxes*o9.q+o10.boxes*o10.q AS total_boxes\nFROM o o1, o o2, o o3, o o4, o o5, o o6, o o7, o o8, o o9, o o10\nWHERE o1.seq=1 AND o2.seq=2 AND o3.seq=3 AND o4.seq=4 AND o5.seq=5\n  AND o6.seq=6 AND o7.seq=7 AND o8.seq=8 AND o9.seq=9 AND o10.seq=10\n  AND (o1.cost*o1.q+o2.cost*o2.q+o3.cost*o3.q+o4.cost*o4.q+o5.cost*o5.q+o6.cost*o6.q+o7.cost*o7.q+o8.cost*o8.q+o9.cost*o9.q+o10.cost*o10.q) <= 3000\n  AND (o1.boxes*o1.q+o2.boxes*o2.q+o3.boxes*o3.q+o4.boxes*o4.q+o5.boxes*o5.q+o6.boxes*o6.q+o7.boxes*o7.q+o8.boxes*o8.q+o9.boxes*o9.q+o10.boxes*o10.q) <= 18\nORDER BY total_margin DESC, total_cost ASC, total_boxes ASC\nLIMIT 20;"
+        },
+        "delivery": {
+          "serialized_bytes": 191
+        },
+        "failure": {
+          "code": "tool_execution_failed",
+          "message": "Parser Error: syntax error at or near \"(\"\n\nLINE 9:   v(q) AS (VALUES (0),(1),(2),(3)),\n                          ^",
+          "type": "tool_failure"
+        },
+        "name": "data.query",
+        "provider_call_id": "call_00_TF154Wk6zby2FidT5h8z4205",
+        "status": "failed"
+      },
+      {
+        "arguments": {
+          "datasets": {
+            "o": 2
+          },
+          "limit": 20,
+          "sql": "WITH r AS (\n  SELECT seq, offer_id, cost, margin, boxes, q\n  FROM (VALUES\n   (1,'Q101',780,460,5,2),(2,'Q102',760,460,5,2),(3,'Q203',520,220,3,2),\n   (4,'Q204',440,235,3,2),(5,'Q305',150,60,1,3),(6,'Q306',210,90,2,2),\n   (7,'Q408',1250,640,9,1),(8,'Q509',680,430,4,1),(9,'Q510',380,195,2,1),\n   (10,'Q611',290,145,2,2)\n  ) t(seq,offer_id,cost,margin,boxes,mx),\n  v AS (SELECT q FROM (VALUES (0),(1),(2),(3)) u(q)),\n  o AS (SELECT seq, offer_id, cost, margin, boxes, q FROM r, v WHERE q <= mx)\nSELECT\n  o1.q AS q101, o2.q AS q102, o3.q AS q203, o4.q AS q204, o5.q AS q305,\n  o6.q AS q306, o7.q AS q408, o8.q AS q509, o9.q AS q510, o10.q AS q611,\n  o1.cost*o1.q+o2.cost*o2.q+o3.cost*o3.q+o4.cost*o4.q+o5.cost*o5.q+o6.cost*o6.q+o7.cost*o7.q+o8.cost*o8.q+o9.cost*o9.q+o10.cost*o10.q AS total_cost,\n  o1.margin*o1.q+o2.margin*o2.q+o3.margin*o3.q+o4.margin*o4.q+o5.margin*o5.q+o6.margin*o6.q+o7.margin*o7.q+o8.margin*o8.q+o9.margin*o9.q+o10.margin*o10.q AS total_margin,\n  o1.boxes*o1.q+o2.boxes*o2.q+o3.boxes*o3.q+o4.boxes*o4.q+o5.boxes*o5.q+o6.boxes*o6.q+o7.boxes*o7.q+o8.boxes*o8.q+o9.boxes*o9.q+o10.boxes*o10.q AS total_boxes\nFROM o o1, o o2, o o3, o o4, o o5, o o6, o o7, o o8, o o9, o o10\nWHERE o1.seq=1 AND o2.seq=2 AND o3.seq=3 AND o4.seq=4 AND o5.seq=5\n  AND o6.seq=6 AND o7.seq=7 AND o8.seq=8 AND o9.seq=9 AND o10.seq=10\n  AND (o1.cost*o1.q+o2.cost*o2.q+o3.cost*o3.q+o4.cost*o4.q+o5.cost*o5.q+o6.cost*o6.q+o7.cost*o7.q+o8.cost*o8.q+o9.cost*o9.q+o10.cost*o10.q) <= 3000\n  AND (o1.boxes*o1.q+o2.boxes*o2.q+o3.boxes*o3.q+o4.boxes*o4.q+o5.boxes*o5.q+o6.boxes*o6.q+o7.boxes*o7.q+o8.boxes*o8.q+o9.boxes*o9.q+o10.boxes*o10.q) <= 18\nORDER BY total_margin DESC, total_cost ASC, total_boxes ASC\nLIMIT 20;"
+        },
+        "delivery": {
+          "serialized_bytes": 198
+        },
+        "failure": {
+          "code": "tool_execution_failed",
+          "message": "Parser Error: syntax error at or near \"(\"\n\nLINE 9:   v AS (SELECT q FROM (VALUES (0),(1),(2),(3)) u(q)),\n               ^",
+          "type": "tool_failure"
+        },
+        "name": "data.query",
+        "provider_call_id": "call_00_cUcLn7AZdudirbGpyJC35689",
+        "status": "failed"
+      }
+    ],
+    "context_calls": [
+      {
+        "arguments": {
+          "names": [
+            "data.query",
+            "data.transform",
+            "analysis.profile",
+            "analysis.graph"
+          ]
+        },
+        "delivery": {
+          "serialized_bytes": 91
+        },
+        "failure": null,
+        "name": "agent.tools.activate",
+        "provider_call_id": "call_00_jU3299QFfueHeuRZ3nUX2995",
+        "status": "succeeded"
+      },
+      {
+        "arguments": {
+          "name": "xenix-data-analysis"
+        },
+        "delivery": {
+          "serialized_bytes": 1086
+        },
+        "failure": null,
+        "name": "agent.skill.activate",
+        "provider_call_id": "call_01_WqIaIp0FxiPLVwzpgVXD2316",
+        "status": "succeeded"
+      }
+    ]
+  },
+  {
+    "case_id": "business.restock.v1.no_purchase",
+    "outcome": "pass",
+    "report": "build/agent-harness-namespace-d7bbe8d/business/business.restock.v1.no_purchase-deepseek-deepseek-v4-flash-b8991637aa924adeae51495021c06fe5.json",
+    "final_texts": [
+      "## 结论：本次不下单\n\n在您给定条件（预算 ≤120 元、新增货物 ≤18 箱、只采购 2026-09-25 及之前到货的批次、批数取非负整数）下，**没有任何可采购的批次，最高预计增量毛利为 0 元**，因此本次不生成采购表（空表无意义）。\n\n### 决定性的原因：预算低于最低单批成本\n- 12 项报价中，**10 项**通过时间窗与供应检查（到货 ≤2026-09-25 且 max_batches>0）；**2 项被到货日期排除**：Q407 保温袋（2026-09-26）、Q612 混合果汁（2026-09-29）。没有任何一项是 max_batches=0。\n- 这 10 项里**最便宜的单批报价是 150 元**（Q305 纸杯，1 箱/批），比 120 元预算**高出 30 元**。采购表只能按整批下，所以 120 元买不到任何一批。\n- 我对这 10 项报价的**全部 23,328 种整数批数组合**做了穷举（含每项 max_batches 上限、箱数 ≤18）：**成本 ≤120 元的方案中，毛利大于 0 的组合数为 0**，最高毛利即为“什么都不买”的 0 元。\n\n### 预算与仓容使用量\n| 指标 | 上限 | 本次使用 | 说明 |\n|---|---:|---:|---|\n| 采购预算 | 120 元 | 0 元 | 最低单批成本 150 元，预算缺口 30 元 |\n| 新增仓容 | 18 箱 | 0 箱 | 仓容不是瓶颈：预算连 1 箱（Q305 需 1 箱）都无法覆盖 |\n| 预计增量毛利 | — | 0 元 | 无可行批次，最优解为不下单 |\n\n**未花完预算**符合您“不要求花完预算”的说明；这里的限制是预算不足，而不是仓容或到货时间。\n\n### 依据与证据文件（可下载）\n- [报价筛选核对表](artifact://52)：12 项报价逐条列出单批成本、单批毛利、箱数、到货日、可订批数，以及“可采购/不可采购”和具体原因，作为本次不下单的审计记录。\n- [预算敏感性分析](artifact://55)：在同一批时间窗内报价上，按不同预算给出可达到的最高预计增量毛利与对应方案。\n\n敏感性要点（供决策参考，均为枚举计算的确定值）：\n\n| 预算 | 最高预计增量毛利 | 对应方案 | 成本 | 箱数 |\n|---:|---:|---|---:|---:|\n| 120 元（现状） | 0 元 | 无可行批次 | 0 | 0 |\n| 150 元 | 60 元 | Q305:1 | 150 元 | 1 |\n| 300 元 | 145 元 | Q611:1 | 300 元 | 2 |\n| 1,000 元 | 595 元 | Q203:1 Q204:1 | 960 元 | 6 |\n| 3,010 元 | 1,865 元 | Q102:1 Q203:2 Q305:1 Q509:1 Q510:1 | 3,010 元 | 18（打满仓容） |\n\n### 如果要让本次能下单，需要改动的是预算\n- 放松到货时间窗**无效**：Q407（610 元）、Q612（560 元）本身就比 120 元贵得多，即使并入，最便宜的单批仍是 150 元。\n- 只有把预算提到 **≥150 元**才会出现第一个可行方案（Q305 1 批：成本 150 元、占 1 箱、预计增量毛利 60 元）；预算到约 3,010 元时仓容先被打满，毛利上限约 1,865 元。\n- 说明：预计毛利是本次计划的计划参数，非实际收益承诺。若您可以上调预算或接受更晚到货，请告知新的预算上限，我立即出正式采购表（含报价编号与采购批数）。"
+    ],
+    "tool_failures": [
+      {
+        "arguments": {
+          "datasets": {
+            "o": 2
+          },
+          "sql": "WITH elig AS (\n  SELECT * FROM o WHERE arrival_date <= DATE '2026-09-25' AND max_batches > 0\n)\nSELECT COUNT(*) AS eligible_offers,\n       MIN(cost_yuan) AS min_batch_cost,\n       SUM(CASE WHEN cost_yuan <= 120 THEN 1 ELSE 0 END) AS offers_affordable_at_120\nFROM elig"
+        },
+        "delivery": {
+          "serialized_bytes": 305
+        },
+        "failure": {
+          "code": "tool_execution_failed",
+          "message": "Binder Error: Cannot compare values of type VARCHAR and type DATE - an explicit cast is required\n\nLINE 2:   SELECT * FROM o WHERE arrival_date <= DATE '2026-09-25' AND max_batches > 0\n                                             ^",
+          "type": "tool_failure"
+        },
+        "name": "data.query",
+        "provider_call_id": "call_00_mHD3fatKCLFVOas7gfRd1346",
+        "status": "failed"
+      },
+      {
+        "arguments": {
+          "datasets": {
+            "o": 2
+          },
+          "sql": "WITH RECURSIVE items(idx, offer_id, cost, margin, boxes, maxb) AS (\n  SELECT * FROM (VALUES\n    (1,'Q101',780.0,460.0,5,2),(2,'Q102',760.0,460.0,5,2),(3,'Q203',520.0,360.0,3,2),\n    (4,'Q204',440.0,235.0,3,2),(5,'Q305',150.0,60.0,1,3),(6,'Q306',210.0,90.0,2,2),\n    (7,'Q408',1250.0,640.0,9,1),(8,'Q509',680.0,430.0,4,1),(9,'Q510',380.0,195.0,2,1),\n    (10,'Q611',290.0,145.0,2,2)\n  ) AS v(idx, offer_id, cost, margin, boxes, maxb)\n),\nenum(idx, cost, margin, boxes, plan) AS (\n  SELECT 1, 0.0, 0.0, 0, ''::VARCHAR\n  UNION ALL\n  SELECT e.idx+1,\n         e.cost + i.cost * n.b,\n         e.margin + i.margin * n.b,\n         e.boxes + i.boxes * n.b,\n         e.plan || CASE WHEN n.b > 0 THEN i.offer_id || ':' || n.b || ' ' ELSE '' END\n  FROM enum e\n  JOIN items i ON i.idx = e.idx\n  JOIN (VALUES (0),(1),(2),(3),(4)) n(b) ON n.b <= i.maxb\n  WHERE e.idx <= 10\n),\nplans AS (SELECT * FROM enum WHERE idx = 11)\nSELECT\n  (SELECT COUNT(*) FROM plans) AS total_combinations,\n  (SELECT ROUND(MAX(margin),1) FROM plans WHERE cost <= 120 AND boxes <= 18) AS best_margin_within_budget,\n  (SELECT COUNT(*) FROM plans WHERE cost <= 120 AND boxes <= 18 AND margin > 0) AS feasible_positive_plans,\n  (SELECT ROUND(MAX(margin),1) FROM plans WHERE boxes <= 18) AS best_margin_ignoring_budget,\n  (SELECT MIN(cost) FROM plans WHERE boxes <= 18 AND margin = (SELECT MAX(margin) FROM plans WHERE boxes <= 18)) AS min_cost_of_box_capacity_optimum"
+        },
+        "delivery": {
+          "serialized_bytes": 238
+        },
+        "failure": {
+          "code": "tool_execution_failed",
+          "message": "Conversion Error: Casting value \"1560.0\" to type DECIMAL(2,1) failed: value is out of range!\n\nLINE 13:          e.cost + i.cost * n.b,\n                         ^",
+          "type": "tool_failure"
+        },
+        "name": "data.query",
+        "provider_call_id": "call_01_zXbwzwOKGcvnG4d68r8P5794",
+        "status": "failed"
+      },
+      {
+        "arguments": {
+          "datasets": {
+            "o": 2
+          },
+          "sql": "WITH RECURSIVE items(idx, offer_id, cost, margin, boxes, maxb) AS (\n  SELECT * FROM (VALUES\n    (1,'Q101',CAST(780 AS DOUBLE),CAST(460 AS DOUBLE),5,2),(2,'Q102',CAST(760 AS DOUBLE),CAST(460 AS DOUBLE),5,2),\n    (3,'Q203',CAST(520 AS DOUBLE),CAST(360 AS DOUBLE),3,2),(4,'Q204',CAST(440 AS DOUBLE),CAST(235 AS DOUBLE),3,2),\n    (5,'Q305',CAST(150 AS DOUBLE),CAST(60 AS DOUBLE),1,3),(6,'Q306',CAST(210 AS DOUBLE),CAST(90 AS DOUBLE),2,2),\n    (7,'Q408',CAST(1250 AS DOUBLE),CAST(640 AS DOUBLE),9,1),(8,'Q509',CAST(680 AS DOUBLE),CAST(430 AS DOUBLE),4,1),\n    (9,'Q510',CAST(380 AS DOUBLE),CAST(195 AS DOUBLE),2,1),(10,'Q611',CAST(290 AS DOUBLE),CAST(145 AS DOUBLE),2,2)\n  ) AS v(idx, offer_id, cost, margin, boxes, maxb)\n),\nenum(idx, cost, margin, boxes, plan) AS (\n  SELECT 1, 0.0, 0.0, 0, ''::VARCHAR\n  UNION ALL\n  SELECT e.idx+1,\n         e.cost + i.cost * n.b,\n         e.margin + i.margin * n.b,\n         e.boxes + i.boxes * n.b,\n         e.plan || CASE WHEN n.b > 0 THEN i.offer_id || ':' || n.b || ' ' ELSE '' END\n  FROM enum e\n  JOIN items i ON i.idx = e.idx\n  JOIN (VALUES (0),(1),(2),(3),(4)) n(b) ON n.b <= i.maxb\n  WHERE e.idx <= 10\n),\nplans AS (SELECT * FROM enum WHERE idx = 11)\nSELECT\n  (SELECT COUNT(*) FROM plans) AS total_combinations,\n  (SELECT MAX(margin) FROM plans WHERE cost <= 120 AND boxes <= 18) AS best_margin_within_budget,\n  (SELECT COUNT(*) FROM plans WHERE cost <= 120 AND boxes <= 18 AND margin > 0) AS feasible_positive_plans,\n  (SELECT MAX(margin) FROM plans WHERE boxes <= 18) AS best_margin_ignoring_budget,\n  (SELECT MIN(cost) FROM plans WHERE boxes <= 18 AND margin = (SELECT MAX(margin) FROM plans WHERE boxes <= 18)) AS min_cost_at_box_capacity_optimum"
+        },
+        "delivery": {
+          "serialized_bytes": 210
+        },
+        "failure": {
+          "code": "tool_execution_failed",
+          "message": "Conversion Error: Could not cast value 1560.000000 to DECIMAL(2,1)\n\nLINE 14:          e.cost + i.cost * n.b,\n                         ^",
+          "type": "tool_failure"
+        },
+        "name": "data.query",
+        "provider_call_id": "call_01_x22orqTAVeLgoTpUJnCx5188",
+        "status": "failed"
+      }
+    ],
+    "context_calls": [
+      {
+        "arguments": {
+          "names": [
+            "data.query",
+            "data.transform"
+          ]
+        },
+        "delivery": {
+          "serialized_bytes": 53
+        },
+        "failure": null,
+        "name": "agent.tools.activate",
+        "provider_call_id": "call_00_iDTkcMZ8P4D1PFA1lMEP6467",
+        "status": "succeeded"
+      }
+    ]
+  },
+  {
+    "case_id": "business.restock.v1.standard",
+    "outcome": "pass",
+    "report": "build/agent-harness-namespace-d7bbe8d/business/business.restock.v1.standard-deepseek-deepseek-v4-flash-f692e6d37efc484e81b7b79b1581b9ff.json",
+    "final_texts": [
+      "## Decision\n\nPlace the order — 10 of the 12 quotes have supply on or before 2026-09-25, so the \"no order\" branch does not apply. **Buy 5 batches across 4 quotes: expected incremental margin ¥1,845, cost ¥2,920, warehouse use 18/18 boxes.**\n\nThis is the proven optimum, not a heuristic: I enumerated every combination of whole batches up to each `max_batches` (23,328 combinations, 2,823 feasible under both limits) and took the maximum margin.\n\n## Purchase table (downloadable)\n\n[Restock plan 2026-09-25 (purchase sheet)](artifact://33)\n\n| Offer ID | Product | Batches | Cost/batch | Margin/batch | Boxes/batch | Line cost | Line margin | Line boxes | Arrival |\n|---|---|---:|---:|---:|---:|---:|---:|---:|---|\n| Q203 | 每日坚果 (nut mix) | 2 | 520 | 360 | 3 | 1,040 | 720 | 6 | 2026-09-22 |\n| Q509 | 挂耳咖啡 (drip coffee) | 1 | 680 | 430 | 4 | 680 | 430 | 4 | 2026-09-23 |\n| Q102 | 无糖茶 (unsweetened tea) | 1 | 760 | 460 | 5 | 760 | 460 | 5 | 2026-09-24 |\n| Q204 | 燕麦饼干 (oat biscuits) | 1 | 440 | 235 | 3 | 440 | 235 | 3 | 2026-09-25 |\n| **TOTAL** | **4 offers** | **5** | | | | **2,920** | **1,845** | **18** | |\n\n![Incremental margin by selected batch](artifact://39)\n\n## Basis for the selection\n\n- **Only quotes arriving by 2026-09-25 were considered** (10 offers). Excluded on date: Q407 保温袋 (2026-09-26) and Q612 混合果汁 (2026-09-29).\n- **Warehouse capacity is the binding constraint, not budget.** The plan fills all 18 boxes; ¥80 of budget remains, but the cheapest batch costs ¥150, so the leftover 80 is genuinely unusable. Any additional batch would need ≥1 box and breach the capacity limit.\n- **The plan is anchored on the two highest margin-per-box eligible quotes** — Q203 at ¥120/box and Q509 at ¥107.5/box — then filled with the best remaining combinations (Q102 ¥92/box, Q204 ¥78.3/box) under both limits. Q203 uses its full allowance of 2 batches.\n- **Two plans tie at ¥1,845** and both use 18 boxes: the one above (Q102, ¥2,920) and a variant swapping Q102 for Q101 气泡水 (¥2,940). Per your instruction that either is acceptable, I took the **cheaper** one — same margin, same space, ¥20 less spend. That ¥20 difference is the only thing separating Q101 from Q102.\n- **Why the others are out (all eligible but unused):** Q101 气泡水, Q305 纸杯 (¥60/box), Q306 便携湿巾 (¥45/box), Q408 节日礼盒 (¥640 margin but 9 boxes → ¥71.1/box, blocks two smaller high-yield batches), Q510 小点心 (¥97.5/box), Q611 便携餐具 (¥72.5/box). The runner-up plan using Q510 reaches ¥1,835, i.e. ¥10 less.\n\n## Usage against your limits\n\n| Limit | Used | Limit | Utilization |\n|---|---|---|---|\n| Purchase budget | ¥2,920 | ¥3,000 | 97.3% (¥80 unusable) |\n| New warehouse space | 18 boxes | 18 boxes | 100% (no slack) |\n\n## What to watch\n\n- **The deadline is expensive.** If arrival by 2026-09-25 were relaxed (or if Q612 could be expedited), the best plan rises to **¥2,050 (+¥205, ≈ +11%)**, driven by Q612 混合果汁 x2 — the single best margin-per-box quote in the file at ¥140/box, currently excluded only because it arrives 2026-09-29. Q407 保温袋 (09-26) is also date-excluded. Flagging this as the one decision worth revisiting with the supplier.\n- **Margins are confirmed planning parameters, not realized results** — actual sales returns may differ. No freight, discounts, demand overlap or minimum order value were assumed, per your brief.\n- **Zero capacity slack:** if the event needs any extra stock, something in this plan must be dropped first."
+    ],
+    "tool_failures": [
+      {
+        "arguments": {
+          "datasets": {
+            "o": 2
+          },
+          "limit": 5,
+          "sql": "WITH RECURSIVE\nelig AS (\n  SELECT row_number() OVER (ORDER BY offer_id) AS rn, *\n  FROM o WHERE CAST(arrival_date AS DATE) <= DATE '2026-09-25'\n),\nopt AS (\n  SELECT e.rn, e.offer_id, g.k::INT AS k,\n         e.cost_yuan * g.k AS cost,\n         e.margin_yuan * g.k AS margin,\n         e.boxes * g.k AS boxes\n  FROM elig e, generate_series(0, e.max_batches) AS g(k)\n),\nplans AS (\n  SELECT 1 AS rn, 0.0 AS cost, 0.0 AS margin, 0.0 AS boxes, '' AS plan\n  UNION ALL\n  SELECT p.rn + 1, p.cost + q.cost, p.margin + q.margin, p.boxes + q.boxes,\n         p.plan || CASE WHEN q.k > 0 THEN q.offer_id || 'x' || q.k || ' ' ELSE '' END\n  FROM plans p JOIN opt q ON q.rn = p.rn\n  WHERE p.rn <= (SELECT max(rn) FROM elig)\n)\nSELECT cost, margin, boxes, plan\nFROM plans\nWHERE rn = (SELECT max(rn) + 1 FROM elig)\n  AND cost <= 3000 AND boxes <= 18\nORDER BY margin DESC, cost ASC\nLIMIT 5"
+        },
+        "delivery": {
+          "serialized_bytes": 264
+        },
+        "failure": {
+          "code": "tool_execution_failed",
+          "message": "Conversion Error: Could not cast value 1560.000000 to DECIMAL(2,1)\n\nLINE 16:   SELECT p.rn + 1, p.cost + q.cost, p.margin + q.margin, p.boxes + q.boxes,\n                                   ^",
+          "type": "tool_failure"
+        },
+        "name": "data.query",
+        "provider_call_id": "call_00_K2ISR2GVX4BNXFH1m3YC1207",
+        "status": "failed"
+      }
+    ],
+    "context_calls": [
+      {
+        "arguments": {
+          "names": [
+            "data.query",
+            "data.transform",
+            "analysis.profile",
+            "data.clean",
+            "analysis.graph"
+          ]
+        },
+        "delivery": {
+          "serialized_bytes": 128
+        },
+        "failure": null,
+        "name": "agent.tools.activate",
+        "provider_call_id": "call_00_bqVuvfJba0jWrHgYC7d96970",
+        "status": "succeeded"
+      },
+      {
+        "arguments": {
+          "name": "xenix-data-analysis"
+        },
+        "delivery": {
+          "serialized_bytes": 1086
+        },
+        "failure": null,
+        "name": "agent.skill.activate",
+        "provider_call_id": "call_01_9DfgoXgcjpj5Cg0toFjD3169",
+        "status": "succeeded"
+      }
+    ]
+  },
+  {
+    "case_id": "business.revenue.v1.standard",
+    "outcome": "pass",
+    "report": "build/agent-harness-namespace-d7bbe8d/business/business.revenue.v1.standard-deepseek-deepseek-v4-flash-0fea4e1af43f4dd5940a9bbc17f8bcdf.json",
+    "final_texts": [
+      "## 结论:东区 6 月净回款最好\n\n按你的月结口径(仅计入 6 月本地日期 `2026-06-01`–`2026-06-30` 的已支付订单金额,减去同期发生的退款),四个区域汇总如下:\n\n| 区域 | 本月已支付订单金额 | 本月退款金额 | **净回款(元)** |\n|---|---:|---:|---:|\n| 东区 | 49,350.50 | 8,600.50 | **40,750.00** |\n| 西区 | 37,300.25 | 4,400.25 | **32,900.00** |\n| 北区 | 22,000.00 | 0.00 | **22,000.00** |\n| 南区 | 0.00 | 1,200.00 | **−1,200.00** |\n| 合计 | 108,650.75 | 14,200.75 | **84,450.00** |\n\n**东区净回款 40,750 元,排名第一**,比第二名西区(32,900 元)高约 24%。北区销售规模较小但零退款,净回款完整保留。南区是唯一为负的区域:本月没有已支付订单,却发生了一笔 1,200 元退款,净额为 −1,200 元。\n\n可下载、可继续使用的产出:\n- [区域净回款汇总_2026年6月(汇总表)](artifact://34)\n- [净回款逐笔明细_2026年6月(逐笔核对表)](artifact://43)\n\n## 会影响结论的数据处理(已按口径执行)\n\n1. **按业务编号去重。** 订单表 25 行 → 24 笔唯一订单(订货单号 `O12` 有一行完全重复,只计一次);退款表 17 行 → 16 笔唯一退款(退款号 `R09` 重复,只计一次)。反之,同一订单 `O22` 的两笔退款 `R16`、`R17` 金额相同但编号不同,视为两笔交易,均计入(共 200 元)。\n2. **只有 6 月的已支付订单算本月销售。** 订单 `O10`、`O20` 状态为 `cancelled`,未收到款项,已排除;`O08`(5-31)、`O09`(7-01)、`O15`(4-30)、`O18`(5-20)、`O19`(7-02)、`O24`(5-01)按发生日期不属于 6 月,不计入本月销售。这正是南区本月销售额为 0 的原因(`O20` 被取消)。\n3. **退款按\"退款发生日\"归属,不看原订单月份。** 因此 5 月/更早订单在 6 月产生的退款照减,例如 `R03`(原订单 `O08`,5 月)——西区 2,000 元、`R12`(原订单 `O15`,4 月)——南区 1,200 元,都冲减了本月。反过来,6 月订单在 7 月才退款的不算本月,例如 `R02`(原订单 `O02`,东区,退款日 07-03)未计入。\n4. **区域以门店表映射。** 东区 = S01/S04/S08,西区 = S02/S03/S07,北区 = S05,南区 = S06;门店表四个区域全部列出,无销售也保留(南区)。\n5. **一笔订单可多次退款**,`O22` 即为此例,退款逐笔累加。\n\n**不确定性提示:** 金额均为人民币元,数据中未发现缺失值;结论(东区领先)对上述去重与月份归属规则敏感度低——即使把重复行当作独立交易重算,东区仍领先。如果你希望把退款改按\"原订单所属月份\"归属,西区和南区的净额会明显改善,我可以按该备选口径再出一版对比表。",
+      "## 更新后的结论:排序已改变,西区升至第一\n\n按你的规则(同 `refund_id` 以本次文件为准,未在本文件出现的原退款保留;仍沿用 6 月月结口径),更新后四个区域为:\n\n| 区域 | 本月已支付订单金额 | 本月退款金额 | **净回款(元)** | 排名 |\n|---|---:|---:|---:|---:|\n| **西区** | 37,300.25 | 4,400.25 | **32,900.00** | 1 |\n| 东区 | 49,350.50 | 19,600.50 | **29,750.00** | 2 |\n| 北区 | 22,000.00 | 0.00 | **22,000.00** | 3 |\n| 南区 | 0.00 | 900.00 | **−900.00** | 4 |\n| 合计 | 108,650.75 | 24,900.75 | **83,750.00** | |\n\n**区域排序改变了。** 上一版是 东区(40,750)> 西区(32,900)> 北区 > 南区;本版变为 **西区(32,900)> 东区(29,750)> 北区 > 南区**——东区与西区互换,西区成为净回款最高区域。北区、南区名次不变。\n\n## 各区域相对上一版的变化\n\n| 区域 | 上一版净回款 | 更新版净回款 | 变化 | 排名变化 |\n|---|---:|---:|---:|---|\n| 西区 | 32,900.00 | 32,900.00 | 0 | 2 → **1** ▲ |\n| 东区 | 40,750.00 | 29,750.00 | **−11,000.00** | 1 → **2** ▼ |\n| 北区 | 22,000.00 | 22,000.00 | 0 | 3 → 3 |\n| 南区 | −1,200.00 | −900.00 | **+300.00** | 4 → 4 |\n\n变化来源(逐条对应本次文件):\n\n- **东区 −11,000 元**:①`R07`(原订单 `O07`)由 7,000 更正为 **9,000**,多冲减 2,000;②新增退款 **`R10`(订单 `O02`,6-30,9,000)**,全额落入 6 月。两条都属东区,使其本月退款从 8,600.5 升到 19,600.5,净回款被大幅拉低,丢掉第一。\n- **南区 +300 元**:`R12`(原订单 `O15`)由 1,200 更正为 **900**,少冲减 300,净额从 −1,200 改善到 −900,但仍为唯一负值区域。\n- **西区、北区不变**:本次文件中 `R11`(订单 `O05`,西区)退款日为 **2026-07-01**、`R19`(订单 `O13`,北区)退款日为 **2026-07-02**,均不在 6 月区间内,按\"退款按发生日归属\"的口径不计入本月,因此两区本月退款额零变化。\n\n## 数据处理说明(影响结论的要点)\n\n- **更正 vs 新增的区分**:`R07`、`R12` 是对已有编号的**更正**(覆盖旧值),`R10`、`R11`、`R19` 是**新登记**编号,直接并入;其余未在本次文件出现的原退款(如 `R01`、`R03`、`R09` 等)按原值保留。\n- **两次去重规则不变**:订单按 `order_id`、退款按 `refund_id` 各计一次;本次 5 行无重复编号,去重后仍为 5 条。原退款表 `R09` 的重复行依旧只计一次。\n- **月份归属不变**:退款按退款发生日归入 6 月,与订单月份无关;`R11`、`R19` 虽为 6 月订单的退款,但发生日在 7 月,故不计入 6 月。这是西区、北区本次不变的关键原因。\n- **本月订单销售未变动**:6 月已支付订单金额未受本次退款文件影响(东区 49,350.50、西区 37,300.25、北区 22,000、南区 0)。\n\n产出文件(均可在上一版基础上继续使用):\n- [区域净回款汇总_2026年6月_更新版](artifact://69)\n- [净回款区域对比_上一版vs更新版](artifact://75)\n- 上一版:[汇总表](artifact://34) · [逐笔明细](artifact://43)\n\n**提示与不确定性:** 结论对\"退款按发生日 vs 按原订单月份\"这一口径较敏感。本次使东区排名下滑的两笔(合计 11,000)中,`R10` 的原订单 `O02` 本身就是 6 月订单,改按订单月份归属也不会改变;但若整体改用\"按原订单月份\"口径,历史订单产生的退款会被移出 6 月,四区数字会明显不同。如需要,我可以按该备选口径再出一版对比。"
+    ],
+    "tool_failures": [],
+    "context_calls": [
+      {
+        "arguments": {
+          "names": [
+            "data.query",
+            "data.transform",
+            "analysis.profile",
+            "data.clean"
+          ]
+        },
+        "delivery": {
+          "serialized_bytes": 110
+        },
+        "failure": null,
+        "name": "agent.tools.activate",
+        "provider_call_id": "call_00_J5tEWDPaxCGlnURWPmIO3903",
+        "status": "succeeded"
+      }
+    ]
+  },
+  {
+    "case_id": "business.routing.v1.standard",
+    "outcome": "pass",
+    "report": "build/agent-harness-namespace-d7bbe8d/business/business.routing.v1.standard-deepseek-deepseek-v4-flash-27fec935c56a48bea7da7eba0456fce9.json",
+    "final_texts": [
+      "已完成建模与评估。核心结论如下。\n\n## 交付物（可直接用于后续批次）\n\n| 用途 | 打开 |\n|---|---|\n| 分流分析器（已保存模型，入口） | [分流分析器模型 artifact://78](artifact://78) |\n| 评估报告 | [评估报告 artifact://83](artifact://83) |\n| 后续批次分流结果表（含建议队列、置信度、处置建议） | [工单分流结果表 artifact://166](artifact://166) |\n| 各配置留存表现对比表 | [模型评估对比 artifact://169](artifact://169) |\n| 可视化：候选配置留存表现 | [chart artifact://176](artifact://176) |\n| 可视化：置信度分布与复核池 | [chart artifact://177](artifact://177) |\n\n用法：把新批次工单的 `message` 原文列交给这个已保存模型（模型 77），输出 `prediction`（建议队列）与 `prediction_score`（置信度）；建议按 ≥0.5 自动分流、<0.5 转人工复核。分析器只吃文本，不再需要 channel 等信息。\n\n## 一个必须先说清的关键判断：不要用 channel 定队列\n\n历史 90 单里 channel 与 queue 是 1:1 的（微信=物流、邮件=发票、电话=退换货），**\"按 channel 直接定队列\"在历史数据上命中 90/90 = 100%**，比任何文本模型都漂亮。但这是记录方式的产物，不是分流规则：\n\n- 队列说明写明 channel 只是联系入口，不决定队列；\n- 这 90 条数据中两者从不冲突，因此**数据本身无法验证**这条规则——它看起来完美只是因为没有被挑战过；\n- 一旦有客户换个渠道提同样的问题，该规则的准确率会直接崩塌，而文本模型不受影响。\n\n所以我把 channel 完全排除在模型输入之外（分析器的输入只有工单原文），仅把它当作历史记录的描述字段保留在交付表里。\n\n## 评估证据与是否值得采用的判断\n\n评估方式：按 `customer_batch` 做分组隔离的留存评估——历史上没见过的 3 个客户批次、18 张工单用来打分，训练时完全没见过这些批次（分组重叠 = 0），因此不会被同批相似工单\"泄题\"。\n\n| 候选配置 | 留存准确率 | 留存 f1_weighted | 词表规模 |\n|---|---:|---:|---:|\n| **C 保留：unigram + 词频剪枝（min_df=2）** | **0.944** | **0.944** | 78 |\n| D/E/F/G 同类剪枝的 4 个变体 | 0.944 | 0.944 | 78–85 |\n| A 未剪枝 unigram | 0.778 | 0.764 | 309 |\n| B 未剪枝 unigram+bigram | 0.778 | 0.764 | 693 |\n| 内置基线（多数类） | 0.333 | 0.167 | — |\n\n![chart](artifact://176)\n\n采用建议：**采用**。理由是三条互相独立的证据方向一致：\n\n1. **达到目标**：留存准确率 94.4%（17/18），高于 90% 门槛；宏平均与加权 f1 同为 0.944，每类都能分，不是靠偏向某一大类刷分。\n2. **超过简单基线**：比内置多数类基线（f1 0.167）提升约 0.78；且对最诱人的\"按渠道猜\"规则保持独立。\n3. **不是一次划分的偶然**：5 个不同参数组合（词表上限 500/1000/2000、是否用二元词、是否类别加权）全部落在 0.944，错分的是同一类工单；而 2 个未剪枝配置稳定落在 0.778。说明差异来自\"是否剪掉只出现一次的长尾词\"，这个结论在小样本下是可复现的，不是碰运气。\n\n必须同时说明两点不确定性：留存样本只有 18 张工单，94.4% 的 95% 置信区间约为 74%–99%，所以\"≥90%\"是当前最佳估计、尚不算被证明；另外历史回放一致率是 90/90 = 100%，这个数字偏乐观（回放用的是在全量数据上拟合的模型），判断采用与否应以 94.4% 的留存结果为准。\n\n错分集中在**物流 与 退换货 的边界**：留存集里 6 张物流有 1 张被判去退换货（物流召回 0.833、精确率 1.0；另两类召回都 1.0）。历史上跨主题混提的工单只有 3 张（如\"退款后需要红字发票用于财务冲销\"→发票、\"退货包裹已经签收，退款什么时候到账\"→退换货），这类\"提到别的事项\"的写法正是风险点，也是需要持续盯的样本。\n\n## 大约多少需要人工改队列\n\n按\"全部自动分流\"的方式运行：\n\n- **最佳估计：每 100 张约有 6 张落错队列**，需要人工改队列（来自留存 1/18 = 5.6%）；\n- 受样本量限制，真实值可能在每 100 张 1–26 张之间，建议用接下来 100 张按批次回看一次再收紧判断。\n\n如果愿意配一个复核池（置信度 <0.5 转人工确认）：**约每 100 张 8 张需要人工过一遍**，其余 92 张自动落地；这样人工负担仍很低，且能把低置信度的模糊单（如\"鞋子尺码太小，想换大一码\"\"这个配件不兼容我的设备，想退掉\"这类短句）拦下来。置信度 0.6 以上才自动分流会把复核量推到 37%，不划算。\n\n## 使用限制\n\n- 分析器只能输出这三个队列；若队列定义变更或新增队列，需要用新数据重新训练。\n- 预测是文本内容到队列的估计，不含客户层级信息；同一 `customer_batch` 内可能有相似或关联工单，模型不会把它们绑定到同一队列，如需按批次合并处理请在流程侧处理。\n- 建议上线后按批记录实际改队列率，与上述 6% 的估计对比，作为是否继续采用和何时重训的依据。",
+      "已用保存的方案完成新批次分流。\n\n## 交付物\n\n**[新工单分流结果_30单（可下载）](artifact://216)** — 每行含工单编号、建议队列、置信度、处置建议、渠道惯例核对，另附客户批次、渠道与原始工单内容。\n\n![chart](artifact://222)\n\n## 结果概览\n\n| 项目 | 结果 |\n|---|---|\n| 工单数 | 30（10 个客户批次 × 3） |\n| 建议队列分布 | 发票 11、退换货 11、物流 8 |\n| 自动分流（置信度 ≥0.5） | 24 张（80%） |\n| 转人工复核（置信度 <0.5） | 6 张（20%） |\n| 平均置信度 | 0.583（历史批次 0.622） |\n\n| 工单编号 | 建议队列 | 置信度 | 处置建议 |\n|---|---|---:|---|\n| T-8114249E | 退换货 | 0.711 | 自动分流 |\n| T-A27415D8 | 退换货 | 0.699 | 自动分流 |\n| T-DAD1F781 | 退换货 | 0.730 | 自动分流 |\n| T-2201A4E7 | 物流 | 0.663 | 自动分流 |\n| T-3ED3C02B | 退换货 | 0.632 | 自动分流 |\n| T-E40B42EB | 退换货 | 0.632 | 自动分流 |\n| T-A7B37B01 | 退换货 | 0.613 | 自动分流 |\n| T-293A8082 | 物流 | 0.610 | 自动分流 |\n| T-2FD501F5 | 物流 | 0.589 | 自动分流 |\n| T-FC12EE0A | 退换货 | 0.583 | 自动分流 |\n| T-4F8DE4AE | 发票 | 0.580 | 自动分流 |\n| T-774E62C7 | 发票 | 0.578 | 自动分流 |\n| T-DDD0DCFF | 物流 | 0.570 | 自动分流 |\n| T-678C5432 | 发票 | 0.563 | 自动分流 |\n| T-C375A2CF | 退换货 | 0.554 | 自动分流 |\n| T-8906EAD4 | 物流 | 0.552 | 自动分流 |\n| T-379D94A0 | 物流 | 0.537 | 自动分流 |\n| T-AE626697 | 物流 | 0.518 | 自动分流 |\n| T-C06BB35A | 退换货 | 0.509 | 自动分流 |\n| T-40126812 | 发票 | 0.483 | 人工复核 |\n| T-60CF1C49 | 退换货 | 0.446 | 人工复核 |\n| T-64C02E3F | 物流 | 0.445 | 人工复核 |\n| T-BA9E6A62 | 发票 | 0.420 | 人工复核 |\n| T-ADB30E47 | 发票 | 0.393 | 人工复核 |\n| T-B5B5C2B8 | 退换货 | 0.383 | 人工复核 |\n\n（完整字段见交付表；T-C95ADED5、T-A3614CE4、T-C3FB2D14、T-708260C5、T-B4AF95A7 五张为高置信度发票单，0.62–0.79。）\n\n## 这批工单正好验证了不用 channel 的判断\n\n新批次的渠道与内容已经**故意错开**：邮件里有大量物流问题、微信里全是退换货和开票问题、电话里全是发票问题。结果：\n\n- \"按渠道惯例定队列\"**只与内容模型在 1/30 张工单上一致（3.3%）**，即这条捷径会把大约 29 张工单送错队列；\n- 唯一\"对上\"的那张恰好是模型最没把握的一张（T-ADB30E47，0.393，读起来像物流）。\n\n如果按历史渠道惯例做分流，这批会大面积出错；内容模型则照常按客户当前要办的事判队列，例如\"退款已经到账，请补一张红字发票冲账\"→发票、\"已退货三件但只退了两件的钱\"→退换货。\n\n## 需要人工过一遍的 6 张（我的快速判读）\n\n| 工单 | 模型建议 | 我的判读 |\n|---|---|---|\n| T-ADB30E47 订单拆单后另一个箱子一直未揽收 | 发票 0.393 | **建议改物流**，内容讲的是包裹未被揽收，未体现开票诉求 |\n| T-60CF1C49 收件人今天住院，可以延迟两天再派件吗 | 退换货 0.446 | **建议改物流**，是配送时间请求 |\n| T-BA9E6A62 分别开票给各分公司 | 发票 0.420 | 判断正确，低置信度来自英文短句 |\n| T-40126812 退款已到账，请补红字发票冲账 | 发票 0.483 | 判断正确，因提到\"退款\"而降分 |\n| T-64C02E3F 更新送达楼层 | 物流 0.445 | 判断正确 |\n| T-B5B5C2B8 杯盖漏水，能换新吗 | 退换货 0.383 | 判断正确，短句信息量少 |\n\n需要说明：**这批新工单没有实际队列标签，我无法计算真实准确率**，上面只是我逐条读内容后的提示，最终以人工确认为准。按历史留存水平（94.4%）推算，30 张里预期约 1–2 张需要真正改队列，与我读出来的可疑数量一致。\n\n## 使用提醒\n\n- 本批 24 张可直接按建议队列派发，6 张走人工复核；平均置信度略低于历史（0.583 vs 0.622），且有 1 张出现训练词表外的词，属轻度的措辞陌生信号，建议继续按批记录实际改队列率。\n- 分析器只输出物流/退换货/发票三类；如需新增队列或调整队列口径，需要重新训练后再用于后续批次。"
+    ],
+    "tool_failures": [],
+    "context_calls": [
+      {
+        "arguments": {
+          "names": [
+            "data.query",
+            "data.transform",
+            "analysis.profile",
+            "analysis.graph",
+            "model.train",
+            "model.metadata",
+            "model.hyper_train",
+            "model.apply",
+            "model.task.query",
+            "data.feature.select",
+            "model.task"
+          ]
+        },
+        "delivery": {
+          "serialized_bytes": 222
+        },
+        "failure": null,
+        "name": "agent.tools.activate",
+        "provider_call_id": "call_00_JIFmTgpIwo0pe94cKEOn7517",
+        "status": "succeeded"
+      },
+      {
+        "arguments": {
+          "name": "xenix-data-modeling"
+        },
+        "delivery": {
+          "serialized_bytes": 1231
+        },
+        "failure": null,
+        "name": "agent.skill.activate",
+        "provider_call_id": "call_01_s4OCylqwvznQVFRCF84H6253",
+        "status": "succeeded"
+      },
+      {
+        "arguments": {
+          "path": "references/text-classification.md",
+          "skill_name": "xenix-data-modeling"
+        },
+        "delivery": {
+          "serialized_bytes": 1209
+        },
+        "failure": null,
+        "name": "agent.skill.read_reference",
+        "provider_call_id": "call_00_YbZWW4sNcbeidFFfL3Ou0485",
+        "status": "succeeded"
+      }
+    ]
+  },
+  {
+    "case_id": "business.campaign.v1.confirmation",
+    "outcome": "pass",
+    "report": "build/agent-harness-namespace-d7bbe8d/confirmation/business.campaign.v1.confirmation-deepseek-deepseek-v4-flash-fb0020ab6c3a460b9b4c866d764deb86.json",
+    "final_texts": [
+      "The August rule set applies (today, 2026-08-01, is the first day of that activity window). Here is the delivered list and the reasoning.\n\n## Downloadable output\n[老客回访名单_2026-08](artifact://54) — 32 rows, one per customer, with a `decision` column (入选 / 不入选) and a `reason` column, so both the call list and the full audit trail are in one file. Dataset ID for follow-up: 52.\n\n## Rule basis (from Knowledge Library: 客户运营八月活动)\nThe valid rule is the August 2026 老客回访活动规则 (2026-08-01 to 2026-08-31, endpoints inclusive). All must hold:\n\n| # | Condition (August version) |\n|---|---|\n| 1 | City in scope: **杭州 (newly added), 南京, 苏州** |\n| 2 | Customer is 在营 (active = true) |\n| 3 | Net spend last 90 days ≥ **1200 元** (raised from 1000 in July) — **waived for VIP** |\n| 4 | ≥ **45 days** since last contact, **or never contacted** (last_contact_date empty) |\n| 5 | **No open service cases** (open_service_cases = 0) |\n| 6 | VIP exemption applies **only** to the spend threshold; city, active, interval and service-case rules still apply |\n\nAnchor date 2026-08-01; the 45-day boundary falls on 2026-06-17.\n\n## Result: 12 of 32 customers are 入选\nC03, C04, C06, C07, C08, C16, C17, C18, C20, C23, C28, C29\n\nSelected rows: C03/C04/C16/C20/C28/C29 (南京/苏州, non-VIP), C17 (杭州, non-VIP), and C06/C07/C08/C18/C23 (VIP, spend threshold waived).\n\n## Exceptions that drive the exclusions (20 customers)\n| Reason | Count | Customers |\n|---|---:|---|\n| 净消费<1200 且非 VIP | 10 | C01, C02, C11, C12, C13, C15, C19, C27, C31, C32 |\n| 有未结服务单 | 4 | C05, C14, C22, C25 |\n| 距上次回访<45天 | 2 | C21, C30 |\n| 城市不在范围 | 2 | C09 (上海), C26 (无锡) |\n| 非在营客户 | 2 | C10, C24 |\n\n**Edge cases worth noting when you review the list:**\n- **VIP is not a blanket pass.** C14 and C25 are VIP but still excluded — their open service cases (2 and 1) block them; VIP only waives the spend bar. Conversely C06, C07, C08, C18 and C23 qualify on VIP status alone despite net spend of 200, 400, 0, 0 and −120.\n- **Spend threshold is a hard ≥ 1200.** C20 and C28 (exactly 1200) and C19/C31 (1199.99) sit right on the line — only the exact 1200 cases pass.\n- **Interval is a hard ≥ 45 days.** C20 and C29 land exactly on the boundary (45 days) and qualify; C21 and C30 at 44 days (last contact 2026-06-18) fall just short.\n- **Scope changes this month:** the two 杭州 customers (C17, C18) are only reachable because Hangzhou was added in August; 上海 (C09) and 无锡 (C26) remain out of scope.\n\nObservations are computed directly from the snapshot; the only assumption is that today's date (2026-08-01) is the correct anchor for the contact-interval and threshold comparisons, per the August activity window."
+    ],
+    "tool_failures": [],
+    "context_calls": [
+      {
+        "arguments": {
+          "names": [
+            "analysis.profile",
+            "data.query",
+            "data.transform",
+            "data.clean",
+            "data.clean.metadata"
+          ]
+        },
+        "delivery": {
+          "serialized_bytes": 110
+        },
+        "failure": null,
+        "name": "agent.tools.activate",
+        "provider_call_id": "call_02_7tNZH0paHq2wWgBMTsbY1365",
+        "status": "succeeded"
+      },
+      {
+        "arguments": {
+          "name": "xenix-data-analysis"
+        },
+        "delivery": {
+          "serialized_bytes": 1086
+        },
+        "failure": null,
+        "name": "agent.skill.activate",
+        "provider_call_id": "call_03_H8fin6bei04zzlBdKJnu5884",
+        "status": "succeeded"
+      }
+    ]
+  },
+  {
+    "case_id": "business.restock.v1.confirmation",
+    "outcome": "fail",
+    "report": "build/agent-harness-namespace-d7bbe8d/confirmation/business.restock.v1.confirmation-deepseek-deepseek-v4-flash-dab06b8186724e01b8f3135009c61aa0.json",
+    "final_texts": [],
+    "tool_failures": [],
+    "context_calls": []
+  },
+  {
+    "case_id": "business.revenue.v1.confirmation",
+    "outcome": "pass",
+    "report": "build/agent-harness-namespace-d7bbe8d/confirmation/business.revenue.v1.confirmation-deepseek-deepseek-v4-flash-2ddd62f510a0484a94c60ee0a5d3293f.json",
+    "final_texts": [
+      "## Result: East region (东区) performs best in June 2026\n\n**Net collection by region, 2026-06-01 to 2026-06-30 (CNY)**\n\n| Region | Paid orders (June) | Refunds (June) | Net collection | Rank |\n|---|---:|---:|---:|---:|\n| 东区 East | 49,350.50 | 8,600.50 | **40,750.00** | 1 |\n| 西区 West | 37,300.25 | 4,400.25 | 32,900.00 | 2 |\n| 北区 North | 22,000.00 | 0.00 | 22,000.00 | 3 |\n| 南区 South | 0.00 | 1,200.00 | **−1,200.00** | 4 |\n| **Total** | **108,650.75** | **14,200.75** | **94,450.00** | |\n\n![2026 年 6 月各区域净回款（元）](artifact://63)\n\n**Deliverables**\n- [Regional summary (regional net collection, 4 rows)](artifact://44) — the main table above, ready to refresh/extend\n- [Store-level audit detail (8 rows)](artifact://54) — same logic broken down so each store's contribution can be traced\n- [Chart: net collection by region](artifact://63)\n\n### Why East wins — and the caveats that matter\n\nEast leads on both gross paid amount and net collection, so its win is not just a refund artefact. West is second (about 80% of East's net). North collected nothing in refunds but starts from a lower base. South is negative.\n\nThree things in the data materially change the picture:\n\n1. **Duplicates were collapsed by business ID, not by row.** One order row (O12, 2,000 yuan) and one refund row (R09, 100 yuan) each appear twice. Counting the O12 copy would have overstated East's paid amount by 2,000 and made the headline wrong. Two refund IDs (R16, R17, 100 each) look identical but are distinct IDs, so both count — per your rule, identical-looking rows with different IDs are separate transactions. Order IDs O13/O14 (same store, date, amount, 11,000) are likewise two real orders.\n2. **Refunds sit in the month they occur, not the month of the order.** R03 (2,000, West) refunds a May-31 order and R12 (1,200, South) refunds an April order; both land in June, which is exactly what pushes South negative despite zero June sales. Conversely, R02 (3,000, East, for a June order) is dated 2026-07-03 and falls outside the window — including it would cut East's net to 37,750 (still first), and it will hit July instead. Refunds dated 2026-05-31 (R08, R18) were excluded.\n3. **Cancelled orders carry no cash.** O10 (3,000, East) and O20 (2,700, South) are cancelled and excluded. Had O20 been treated as collected, South would show +1,500 paid and net of +1,500 rather than −1,200 — that is the single assumption most able to change the South story (its last place does not change, but its sign does).\n\nMinor items with no effect on the ranking: the window is inclusive of both 06-01 and 06-30 (so O01 and the 06-30 orders are in); order O23 (North) is a paid order with a 0 amount, so it counts as volume but adds nothing; South's 1,200 refund arises entirely from a prior-month order.\n\n**Bottom line:** if you compare on net cash, East is clearly ahead (40,750). If your criterion were refund-free collection quality, North looks best (zero refunds, 22,000 net) — so state the criterion when you present this, since East is also the region with the largest single refund (S04, 7,000 on order O07).\n\nAll figures above are computed from the attached exports under the stated rules; no estimates or external data were used.",
+      "## Updated result: rankings hold, but the margins and South's sign change\n\n**Net collection by region, June 2026 — revised (CNY)**\n\n| Region | Paid orders (June) | Refunds (June) | Net collection | Rank |\n|---|---:|---:|---:|---:|\n| 东区 East | 49,350.50 | 9,000.50 | **40,350.00** | 1 |\n| 西区 West | 37,300.25 | 14,400.25 | 22,900.00 | 2 |\n| 北区 North | 22,000.00 | 0.00 | 22,000.00 | 3 |\n| 南区 South | 0.00 | 0.00 | **0.00** | 4 |\n| **Total** | **108,650.75** | **23,400.75** | **85,250.00** | |\n\n![2026 年 6 月各区域净回款：本版 vs 上一版（元）](artifact://115)\n\n**Deliverables**\n- [Revised regional summary (v2, 4 rows)](artifact://85) — same shape as the first version, ready to reuse\n- [Before/after bridge by region (refunds, net, both rankings)](artifact://91)\n- [Refund change log — each of the 5 update rows, old vs new](artifact://103)\n- [Revised store-level audit detail (8 rows)](artifact://109)\n- [Chart: v1 vs v2 net collection](artifact://115)\n\n### How each region changed\n\n| Region | Refunds v1 → v2 | Net v1 → v2 | Rank |\n|---|---:|---:|---|\n| 东区 East | 8,600.50 → 9,000.50 (**+400**) | 40,750.00 → 40,350.00 (**−400**) | 1 → 1 |\n| 西区 West | 4,400.25 → 14,400.25 (**+10,000**) | 32,900.00 → 22,900.00 (**−10,000**) | 2 → 2 |\n| 北区 North | 0.00 → 0.00 (no June change) | 22,000.00 → 22,000.00 | 3 → 3 |\n| 南区 South | 1,200.00 → 0.00 (**−1,200**) | −1,200.00 → **0.00** (**+1,200**) | 4 → 4 |\n\nWhat drove each move (per [the change log](artifact://103)):\n\n- **East (−400):** one newly registered refund, **R21** (400, dated 06-30) on order O24 — a May order, so it counts in June under the refund-date rule. Two other East items were untouched; R02 (3,000) remains dated 07-03 and out of scope.\n- **West (−10,000)** is the big swing and comes from two separate events: a **new refund R20 of 11,000** on June order O04 (dated 06-30, in scope) *and* a **downward correction of R05 from 1,500 to 500** (same order O05, same date), which adds back 1,000. West's refunds are now 14,400.25 — the highest of any region.\n- **North (no June change):** its one new refund, **R22** (600, dated 07-01), falls outside June, so June stays at zero refunds. North is now the only region with a clean June.\n- **South (+1,200):** this is a **date correction, not new money.** R12's date was changed from 2026-06-01 to 2026-07-01, so the 1,200 no longer belongs to June. South went from negative to exactly zero — it still has no June sales.\n\nRules applied as before: same refund ID → the supplement wins (R05, R12); unlisted refunds from the original export are retained (14 refund IDs with no update were carried over unchanged); refunds are deduplicated by refund_id (R09's duplicate row still counts once); refunds are attributed to the region of the refunded order's store; cancelled orders still carry no cash.\n\n### Ranking: unchanged, but the shape of it changed\n\nThe order is still **East > West > North > South**. Two things worth flagging before you use this:\n\n1. **West's second place is now thin.** Its cushion over North fell from 10,900 to **900** — about 4% of West's net. A further correction of similar size to the ones just received (R20 alone was 11,000; R05's correction was 1,000) would move West below North. Treat 2nd and 3rd as effectively tied this month.\n2. **East's win is now more clearly a collection-volume win, not a low-refund win.** East absorbed the largest number of June refunds (8 of the 14), yet still leads on net. If you judged on refund-free collection, North would now win outright.\n\nAlso note the supplement pushes refunds into July: **R02 (3,000, East), R12 (1,200, South) and R22 (600, North)** are all dated 2026-07-01/07-03, so July opens with about **4,800** of refunds already known. South staying at zero is a June-only statement — the same 1,200 now lands in July.\n\nData-quality items you may want to confirm at the source: R20 at 11,000 sits against a 12,000 order (O04) — a near-total reversal that single-handedly explains West's swing; and R16/R17 (100 each, same order O22) remain two distinct refund IDs and are both counted."
+    ],
+    "tool_failures": [
+      {
+        "arguments": {
+          "dataset_id": 40,
+          "spec": {
+            "$schema": "https://vega-lite.github.io/schema/vega-lite/v5.json",
+            "data": {
+              "name": "region"
+            },
+            "height": 300,
+            "layer": [
+              {
+                "encoding": {
+                  "x": {
+                    "axis": {
+                      "labelFontSize": 13,
+                      "title": null
+                    },
+                    "field": "区域",
+                    "sort": [
+                      "东区",
+                      "西区",
+                      "北区",
+                      "南区"
+                    ],
+                    "type": "nominal"
+                  },
+                  "y": {
+                    "axis": {
+                      "title": "净回款（元）"
+                    },
+                    "field": "净回款",
+                    "type": "quantitative"
+                  }
+                },
+                "mark": {
+                  "color": "#4C78A8",
+                  "type": "bar"
+                }
+              },
+              {
+                "encoding": {
+                  "text": {
+                    "field": "净回款",
+                    "format": ",.2f",
+                    "type": "quantitative"
+                  },
+                  "x": {
+                    "field": "区域",
+                    "sort": [
+                      "东区",
+                      "西区",
+                      "北区",
+                      "南区"
+                    ],
+                    "type": "nominal"
+                  },
+                  "y": {
+                    "field": "净回款",
+                    "type": "quantitative"
+                  }
+                },
+                "mark": {
+                  "dy": -8,
+                  "fontSize": 12,
+                  "type": "text"
+                }
+              }
+            ],
+            "title": {
+              "subtitle": "净回款 = 本月已支付订单金额 − 本月退款金额",
+              "text": "2026 年 6 月各区域净回款（元）"
+            },
+            "transform": [
+              {
+                "as": "region",
+                "calculate": "datum['区域']"
+              }
+            ],
+            "width": 420
+          }
+        },
+        "delivery": {
+          "serialized_bytes": 258
+        },
+        "failure": {
+          "code": "tool_validation_failed",
+          "message": "analysis.graph spec.data conflicts with the selected Dataset. Omit data or use {\"name\":\"data\"} to reference that Dataset. Inline values and other sources are not substituted for it.",
+          "type": "tool_failure"
+        },
+        "name": "analysis.graph",
+        "provider_call_id": "call_00_ET_ZNtoL1B8PcYzaqY1Lg4B8523",
+        "status": "failed"
+      }
+    ],
+    "context_calls": [
+      {
+        "arguments": {
+          "names": [
+            "data.query",
+            "data.transform",
+            "analysis.profile"
+          ]
+        },
+        "delivery": {
+          "serialized_bytes": 73
+        },
+        "failure": null,
+        "name": "agent.tools.activate",
+        "provider_call_id": "call_00_WzdcOjA740VkTj0ZrA934554",
+        "status": "succeeded"
+      },
+      {
+        "arguments": {
+          "names": [
+            "analysis.graph"
+          ]
+        },
+        "delivery": {
+          "serialized_bytes": 39
+        },
+        "failure": null,
+        "name": "agent.tools.activate",
+        "provider_call_id": "call_00_u74363gcRfWaqBpPjFUW8570",
+        "status": "succeeded"
+      }
+    ]
+  },
+  {
+    "case_id": "business.routing.v1.confirmation",
+    "outcome": "fail",
+    "report": "build/agent-harness-namespace-d7bbe8d/confirmation/business.routing.v1.confirmation-deepseek-deepseek-v4-flash-be4664113a0043e2b290941f6ec7a9d9.json",
+    "final_texts": [
+      "I have everything needed. Here's the deliverable.\n\n## What I built\n\nA **saved, reusable queue-triage classifier** trained only on the ticket text (`message`), predicting the queue (`queue`) among 物流 / 退换货 / 发票. It is retained and ready for future batches.\n\n- **Analyzer entry point:** saved model `trained_model_id = 68` (model key `text.classification.multilingual_logistic_regression_tfidf`), [saved model](artifact://69)\n- **How to use on new tickets:** send a new batch dataset containing a `message` column to model-apply with `trained_model_id = 68`. The retained object re-runs its own bilingual preparation/tokenization, and returns every input column plus `prediction` and `prediction_score`. No re-training or re-tokenizing needed per batch.\n- Example of the exact output format, run over the history batch: [routing table](artifact://121)\n- Evaluation report: [evaluation report](artifact://74)\n\n## Evidence — is it worth adopting?\n\nHeld-out evaluation used **3 entire customer batches that the model never saw** (business-group split, so similar/related events inside a batch can't leak into the test set). 18 test tickets, 6 per queue.\n\n| Setting | Holdout accuracy | Weighted F1 |\n|---|---:|---:|\n| **Retained: unigram, min_df=2** | **0.944** | **0.944** |\n| unigram + bigrams, min_df=2 | 0.944 | 0.944 |\n| Default (min_df=1) | 0.778 | 0.764 |\n| unigram, min_df=3 | 0.667 | 0.608 |\n| Dummy (always predict one queue) | 0.333 | 0.167 |\n\n![Holdout accuracy by classifier setting](artifact://157)\n![Holdout confusion matrix](artifact://151)\n\n**Read of the evidence:**\n- The retained classifier **clears the ≥90% bar at 94.4% (17 of 18)**, versus 33% for a naive \"always one queue\" baseline — a real, large gain, not chance.\n- The single holdout error is 物流 → 退换货. 发票 and 退换货 were perfect; the confusable pair is logistics vs. returns.\n- **Robustness check:** two different feature spaces (unigram and unigram+bigram) at min_df=2 produce the *same* 94.4% and the *same* confusion matrix — converging evidence, not a lucky holdout. min_df=2 is a genuine signal/robustness sweet spot: min_df=1 keeps noise (78%) and min_df=3 over-prunes to 34 terms and collapses (67%).\n- I deliberately did **not** feed `channel` to the model, per your rule that the contact channel doesn't decide the queue. This matters: in the history, channel happens to map 1:1 to queue (邮件→发票, 微信→物流, 电话→退换货). A model allowed to see channel would look ~100% on this data but would fail the moment real batches mix channels across queues. The text-only model respects your rule.\n\n**Verdict: worth adopting** as an automatic first-pass router — it beats the baseline decisively and respects the routing rules. Treat the point estimate with some caution: the holdout is only 18 tickets, so one ticket is worth ~5.6 points; expect accuracy somewhere in the high-80s to mid-90s on real batches, and re-check after the first few live batches.\n\n## How many will need manual re-routing\n\n- **Point estimate: ~5.6% (about 6 per 100 tickets, ≈1 in 18)** fall into the wrong queue on the held-out batch.\n- Because the holdout is small, plan for a practical buffer. A sensible operating rule: **auto-route ~90%, and send low-confidence predictions to a human review queue.** On the history batch, ~8% of tickets scored below 0.5, which aligns with that ~10% review allowance.\n- In practice the review effort concentrates on **物流-vs-退换货 wording** (e.g., a returned/rerouted parcel described with return-like words) and on tickets that mention a second topic while the customer's actual ask is different — exactly the ambiguity your rule flags (\"judge by what the customer wants now; mentioning other matters doesn't change the queue\").\n\n**Next step to raise confidence:** feed the next 2–3 live batches through model 68 and compare `prediction` to the human-corrected queue; if text-only accuracy holds near 90%+, keep it; if it drifts, the errors to inspect are the 物流/退换货 boundary.",
+      "Done. The new batch was run through the saved classifier (`trained_model_id 68`, the same retained min_df=2 model) — no retraining.\n\n## Deliverable\n\n**Downloadable result table (30 tickets):** [queue_triage_new_batch_routing.xlsx](artifact://194) — one row per ticket with `ticket_id`, `channel`, `suggested_queue`, `confidence`, `routing_action` (Auto-route / Review) and the original `message`.\n\nRaw model output: [applied predictions](artifact://180). Queue mix: [suggested queue vs auto-route/review](artifact://200).\n\n![Suggested queue and routing action](artifact://200)\n\n## Per-ticket suggested queue\n\n| ticket_id | suggested queue | conf. | action | ticket_id | suggested queue | conf. | action |\n|---|---|---:|---|---|---|---:|---|\n| T-01CA1F80 | 发票 | 0.47 | Review | T-AEDC6615 | 退换货 | 0.50 | Auto |\n| T-0888DC4E | 发票 | 0.63 | Auto | T-B943C179 | 退换货 | 0.38 | Review |\n| T-16BB7C67 | 物流 | 0.54 | Auto | T-C2E10ECE | 退换货 | 0.53 | Auto |\n| T-16F2635E | 发票 | 0.55 | Auto | T-C5018310 | 物流 | 0.46 | Review |\n| T-19319633 | 退换货 | 0.63 | Auto | T-C64BA76C | 退换货 | 0.76 | Auto |\n| T-21A86FBE | 发票 | 0.67 | Auto | T-D00705F3 | 发票 | 0.49 | Review |\n| T-27665CB9 | 物流 | 0.64 | Auto | T-DA3BF390 | 退换货 | 0.45 | Review |\n| T-324AC726 | 物流 | 0.44 | Review | T-E1742BAE | 发票 | 0.59 | Auto |\n| T-4C3D7D1F | 发票 | 0.62 | Auto | T-E3E086FC | 发票 | 0.52 | Auto |\n| T-50C283D5 | 发票 | 0.45 | Review | T-E8FF1343 | 退换货 | 0.48 | Review |\n| T-5D93E98D | 发票 | 0.56 | Auto | T-EE65408F | 发票 | 0.84 | Auto |\n| T-64D7200C | 发票 | 0.52 | Auto | T-F7F8AD2D | 发票 | 0.40 | Review |\n| T-66DD6A46 | 物流 | 0.41 | Review | | | | |\n| T-6C1C4FE8 | 退换货 | 0.58 | Auto | | | | |\n| T-8A9021BB | 退换货 | 0.63 | Auto | | | | |\n| T-8B6752AF | 物流 | 0.49 | Review | | | | |\n| T-96BE5028 | 物流 | 0.64 | Auto | | | | |\n| T-9E4CE963 | 物流 | 0.64 | Auto | | | | |\n\nTotals — 发票 13, 退换货 9, 物流 8.\n\n## How well it did on this batch (checked against your routing rules)\n\nThis batch has no official labels, so I scored the suggested queues myself by applying your rule \"judge by what the customer wants now; a passing mention of another topic doesn't decide the queue.\" **26 of 30 (86.7%) match**; **4 look misrouted** and should be corrected by hand:\n\n| ticket_id | message (gist) | suggested | should be |\n|---|---|---|---|\n| T-01CA1F80 | \"…I need a refund for the returned kettle\" | 发票 | **退换货** |\n| T-B943C179 | \"…notify the courier to deliver on a weekday\" | 退换货 | **物流** |\n| T-D00705F3 | \"…I only need a working tracking number\" | 发票 | **物流** |\n| T-F7F8AD2D | \"size doesn't match the label, need an exchange\" | 发票 | **退换货** |\n\nAll four errors come from **negation / topic-mention traps** — the customer says *not* to route to a queue while mentioning its keyword (\"I do *not* need a new invoice\", \"No invoice issue here\", \"…no need to return, just redeliver\"). This batch is deliberately adversarial: it also **breaks the channel↔queue pattern** from the history (e.g., 电话 tickets that are really 发票), which the model handled correctly because it only reads text. So treat 86.7% as a hard-case stress test, not the everyday rate.\n\n## The practical lever: confidence gating\n\nThe useful signal is that **all 4 misroutes have confidence < 0.5**, so a review threshold recovers them:\n\n- **Auto-route (confidence ≥ 0.5): 19 tickets — 19/19 correct here.**\n- **Send to human review (confidence < 0.5): 11 tickets (36.7%)**, which contains all 4 errors plus 7 that happen to be right but uncertain.\n\n**Recommendation:** run the classifier in gated mode — auto-route confident tickets, and let a human confirm the ~37% low-confidence ones on batches like this. That keeps the *routed* accuracy at/above your 90% bar while the model keeps learning from the corrections. The 4 flagged tickets above are the ones to fix first; if these negation cases keep appearing, the fix is to add a small set of corrected examples (and, if you want, register a domain stopword/phrase dictionary) and retrain the same analyzer."
+    ],
+    "tool_failures": [
+      {
+        "arguments": {
+          "dataset_id": 143,
+          "spec": {
+            "data": {
+              "values": [
+                {}
+              ]
+            },
+            "encoding": {
+              "x": {
+                "axis": {
+                  "labelAngle": 30,
+                  "labelLimit": 220
+                },
+                "field": "config",
+                "sort": "-y",
+                "title": "Configuration",
+                "type": "nominal"
+              },
+              "y": {
+                "field": "holdout_accuracy",
+                "scale": {
+                  "domain": [
+                    0,
+                    1
+                  ]
+                },
+                "title": "Holdout accuracy",
+                "type": "quantitative"
+              }
+            },
+            "height": 280,
+            "layer": [
+              {
+                "mark": {
+                  "type": "bar"
+                }
+              },
+              {
+                "encoding": {
+                  "y": {
+                    "datum": 0.9
+                  }
+                },
+                "mark": {
+                  "color": "crimson",
+                  "size": 2,
+                  "strokeDash": [
+                    6,
+                    4
+                  ],
+                  "type": "rule"
+                }
+              }
+            ],
+            "title": "Holdout accuracy by classifier setting (target ≥ 0.90)",
+            "width": 520
+          }
+        },
+        "delivery": {
+          "serialized_bytes": 258
+        },
+        "failure": {
+          "code": "tool_validation_failed",
+          "message": "analysis.graph spec.data conflicts with the selected Dataset. Omit data or use {\"name\":\"data\"} to reference that Dataset. Inline values and other sources are not substituted for it.",
+          "type": "tool_failure"
+        },
+        "name": "analysis.graph",
+        "provider_call_id": "call_01_ET_wi57AAOmNBZbKaGiC9HC7353",
+        "status": "failed"
+      }
+    ],
+    "context_calls": [
+      {
+        "arguments": {
+          "name": "xenix-data-modeling"
+        },
+        "delivery": {
+          "serialized_bytes": 1231
+        },
+        "failure": null,
+        "name": "agent.skill.activate",
+        "provider_call_id": "call_00_lwduLpuQKR19LCipeWpp8497",
+        "status": "succeeded"
+      },
+      {
+        "arguments": {
+          "names": [
+            "data.query",
+            "analysis.profile",
+            "model.train",
+            "model.metadata",
+            "model.apply",
+            "data.feature.select",
+            "analysis.graph"
+          ]
+        },
+        "delivery": {
+          "serialized_bytes": 144
+        },
+        "failure": null,
+        "name": "agent.tools.activate",
+        "provider_call_id": "call_01_4jc6Xsal59eK0pkN0oga9721",
+        "status": "succeeded"
+      },
+      {
+        "arguments": {
+          "path": "references/text-classification.md",
+          "skill_name": "xenix-data-modeling"
+        },
+        "delivery": {
+          "serialized_bytes": 1209
+        },
+        "failure": null,
+        "name": "agent.skill.read_reference",
+        "provider_call_id": "call_00_Rmj93OV1UIEFu1TGxjdc0760",
+        "status": "succeeded"
+      },
+      {
+        "arguments": {
+          "names": [
+            "data.transform"
+          ]
+        },
+        "delivery": {
+          "serialized_bytes": 39
+        },
+        "failure": null,
+        "name": "agent.tools.activate",
+        "provider_call_id": "call_01_Wfu5ohhZIf3EXKJv9sIP1372",
+        "status": "succeeded"
+      }
+    ]
+  },
+  {
+    "case_id": "analysis.revenue_by_region_chart",
+    "outcome": "partial",
+    "report": "build/agent-harness-namespace-d7bbe8d/legacy/analysis.revenue_by_region_chart-deepseek-deepseek-v4-flash-dcb1e95841aa4d3b9df96e7f6325dd66.json",
+    "final_texts": [
+      "Here's the comparison chart:\n\n![Revenue by Region](artifact://24)\n\n## What the chart shows\n\n| Region | Revenue | Share of total |\n|---|---:|---:|\n| West | 30 | 35.3% |\n| East | 25 | 29.4% |\n| South | 20 | 23.5% |\n| North | 10 | 11.8% |\n| **Total** | **85** | 100% |\n\n**Key takeaways for business users**\n\n- **West leads** at 30, and is the only region at the top of the range — it earns **3× North (10)**, the weakest region.\n- **The top two regions (West + East = 55)** account for **64.7%** of all revenue, so performance is concentrated rather than evenly spread.\n- **South sits mid-pack** at 20, just below the 4-region average of 21.25.\n- **North is the clear gap**, contributing only about a ninth of revenue — the most obvious candidate for review.\n\nThe bars are sorted high-to-low with the percentage labelled on each, so a non-technical reader can see both the ranking and each region's contribution at a glance.\n\n## Caveats worth noting\n\n- This is a **single snapshot**: one row per region, so the chart compares regions at a point in time, not a trend. The `date` column differs by one day per region, which is not a real time series.\n- The dataset also has a `score` column that moves with revenue (correlation ≈ 0.83), but with only **4 rows** that relationship is not statistically meaningful — I haven't drawn conclusions from it.\n- If you can share revenue **over multiple periods**, I can add a trend view (e.g. monthly movement per region) so you can tell whether North's gap is improving or worsening."
+    ],
+    "tool_failures": [
+      {
+        "arguments": {
+          "dataset_id": 2,
+          "spec": {
+            "data": {
+              "values": [
+                {
+                  "amount": 30,
+                  "region": "West",
+                  "share": "35.3%"
+                },
+                {
+                  "amount": 25,
+                  "region": "East",
+                  "share": "29.4%"
+                },
+                {
+                  "amount": 20,
+                  "region": "South",
+                  "share": "23.5%"
+                },
+                {
+                  "amount": 10,
+                  "region": "North",
+                  "share": "11.8%"
+                }
+              ]
+            },
+            "encoding": {
+              "color": {
+                "field": "region",
+                "legend": null,
+                "scale": {
+                  "scheme": "blues"
+                },
+                "type": "nominal"
+              },
+              "x": {
+                "axis": {
+                  "grid": true
+                },
+                "field": "amount",
+                "scale": {
+                  "domain": [
+                    0,
+                    36
+                  ]
+                },
+                "title": "Revenue",
+                "type": "quantitative"
+              },
+              "y": {
+                "axis": {
+                  "labelFontSize": 13
+                },
+                "field": "region",
+                "sort": "-x",
+                "title": null,
+                "type": "nominal"
+              }
+            },
+            "height": 260,
+            "layer": [
+              {
+                "mark": {
+                  "cornerRadiusEnd": 3,
+                  "type": "bar"
+                }
+              },
+              {
+                "encoding": {
+                  "text": {
+                    "field": "share"
+                  }
+                },
+                "mark": {
+                  "align": "left",
+                  "dx": 5,
+                  "fontSize": 12,
+                  "type": "text"
+                }
+              }
+            ],
+            "title": {
+              "subtitle": "Total revenue = 85; share of total shown at right",
+              "text": "Revenue by Region"
+            },
+            "width": 560
+          }
+        },
+        "delivery": {
+          "serialized_bytes": 258
+        },
+        "failure": {
+          "code": "tool_validation_failed",
+          "message": "analysis.graph spec.data conflicts with the selected Dataset. Omit data or use {\"name\":\"data\"} to reference that Dataset. Inline values and other sources are not substituted for it.",
+          "type": "tool_failure"
+        },
+        "name": "analysis.graph",
+        "provider_call_id": "call_00_F8REBspcpG65G3zNaX5K9040",
+        "status": "failed"
+      }
+    ],
+    "context_calls": [
+      {
+        "arguments": {
+          "names": [
+            "analysis.profile",
+            "analysis.graph",
+            "data.query"
+          ]
+        },
+        "delivery": {
+          "serialized_bytes": 73
+        },
+        "failure": null,
+        "name": "agent.tools.activate",
+        "provider_call_id": "call_00_cjjg9kD4fpaY46ZiIQvo0135",
+        "status": "succeeded"
+      }
+    ]
+  },
+  {
+    "case_id": "cleaning.april_dine_in_sales",
+    "outcome": "fail",
+    "report": "build/agent-harness-namespace-d7bbe8d/legacy/cleaning.april_dine_in_sales-deepseek-deepseek-v4-flash-0d0e709071564704a786891de69c5f5d.json",
+    "final_texts": [
+      "清洗完成。明细表已重建为可直接分析的干净数据集。\n\n## 交付物\n\n[4月堂食销售_清洗后](artifact://124) —— 486,119 行 × 47 列（数据集 ID `122`，后续分析可直接引用）\n\n## 清洗内容\n\n| 项目 | 处理 | 说明 |\n|---|---|---|\n| 非数据行 | 剔除 3 行 | 第1行是报表筛选条件说明、第2行才是真表头、末行是\"合计\"小计行 |\n| 表头 | 恢复中文列名 | 用被误读成数据的第2行重命名 |\n| 零信息列 | 删除 3 列 | 商品别名（全空）、菜品标签（全占位符）、关联餐盒（归一化后全空） |\n| 数值列 | 12 列 → 数字 | 销售/赠送/优惠/收入/退菜数量与金额等 |\n| 时间列 | 3 列 → 时间戳；营业日期 → 日期 | 点菜/下单/结账时间 |\n| 占位符 | `\"--\"` 和空白 → NULL | 统一缺失表示 |\n\n**数据完整性校验**：清洗后销售数量合计 **561,990.1**、销售金额合计 **14,903,624.2**，与报表自带\"合计\"行**完全一致**，确认未丢失或重复计算任何金额。\n\n## 一项关键判断：330 行\"重复行\"我保留了\n\n原表有 330 行在所有 50 个字段上完全相同（279 组，最多一组 9 行）。表面看像导出重复，但校验后**不是重复数据**：\n\n- 含这类重复的 **231 个订单中，保留重复行时 231 个的明细金额合计都精确等于该订单的\"订单金额\"**；若去重，只剩 57 个能对上。\n- 全表 87,678 个订单中 **87,355 个（99.6%）** 的明细合计精确等于订单金额。\n- 例如订单 114086662604150027：传统叉烧大包 9元×2 + 皮蛋瘦肉粥 22元×2 = 62 元，正好等于订单金额 62 元。\n\n**结论**：这些是顾客同一订单里分次录入的同名菜，去重会少计销售。因此保留原样。\n\n## 需要你确认的几个问题（我未擅自改动）\n\n1. **\"餐段\"维度不可用**：只有\"全天\"（425,051 行）和\"未设置餐段\"（61,068 行）两种取值，没有早/午/晚划分。如需按时段分析，应改用\"点菜时间\"自行切分。\n2. **\"菜品小类\"缺失 99.5%**（483,826 行），仅剩 7 个取值，基本无法作为分析维度，建议用\"菜品大类\"（41 类）替代。\n3. **负值优惠**：优惠金额有 18 行、订单优惠有 26 行为负数（最低 -48 / -158 元），像是冲正/调整记录。我按原值保留，未当作错误剔除。\n4. **恒为单值的列**：出品部门（全部\"未设置出品部门\"）、订单分类（全部\"店内销售\"）。我保留了——它们是有意义的业务状态，说明 POS 未配置出品部门、本表仅含堂食。\n5. **业务日期与时间跨日**：\"点菜时间\"最早为 2026-03-31 16:13（对应 4/1 营业日），属正常营业日跨自然日现象。\n6. **标识列保留为文本**：取餐号（如\"0057\"）、订单号、菜品编码等含前导零，已按文本保留，避免转为数字后失真。\n\n## 建议的下一步\n\n如果要做销售分析，通常还需要一个**净额口径**：净销售数量 = 销售数量 − 退菜数量（全月退菜 27,043.6 份 / 458,831.1 元），净收入 = 品项收入 − 退菜金额。需要我基于清洗后的数据生成这个净额口径、或按门店/菜品大类的汇总日报吗？"
+    ],
+    "tool_failures": [
+      {
+        "arguments": {
+          "datasets": {
+            "raw": 2
+          },
+          "explanation": "清洗 4月堂食销售数据（dataset 2，486,122×50）：\n\n1) 去除非数据行：第1行为报表筛选条件说明行、第2行为被误读成数据的真正表头行、末行为\"合计\"小计行，合计剔除 3 行 → 486,119 行明细。已用报表自带合计校验：销售数量 561,990.1、销售金额 14,903,624.2 与明细汇总额完全一致，证明未丢失数据。\n\n2) 恢复表头：用第2行的中文列名重命名 50 列中的 48 列（另 2 列删除）。\n\n3) 类型转换：营业日期→DATE；点菜时间/下单时间/结账时间→TIMESTAMP；销售数量、赠送数量、销售金额、赠送金额、优惠金额、品项收入、订单金额、营业额、订单优惠、订单收入、退菜数量、退菜金额→DOUBLE（销售数量含 133 个小数，不能转整数）；机构编码/菜品编码/订单号/取餐号/桌牌号等标识保留文本（避免丢失前导零）。转换前已验证 12 个数值列在剔除表头/合计行后 100% 可解析，无需 TRY_CAST 兜底。\n\n4) 缺失标记规范化：把报表占位符 \"--\" 与空白字符串统一转为 NULL（涉及 菜品小类、规格、单位、关联做法/加料/餐盒、桌台区域、收银员/点菜员/下单人、标记、敏感操作类型、单品备注 等）。\n\n5) 删除 2 个零信息列：商品别名（全部为空）、菜品标签（全部为 \"--\"）。\n\n6) 未去重（重要决定）：全表存在 330 行\"完全重复行\"（279 组，最多 9 行）。经校验，含重复行的 231 个订单中，231 个在保留重复行时金额与订单金额完全吻合，去重后仅 57 个吻合；全表 87,678 个订单有 87,355 个（99.6%）明细金额合计等于订单金额。故这些重复行是真实的重复点单明细，去重会少计销售，故保留。\n\n未发现：数值列负值、金额格式异常、文本首尾空格（padded=0）。",
+          "name": "4月堂食销售_清洗后",
+          "sql": "SELECT\n  c0  AS 城市,\n  c1  AS 机构编码,\n  c2  AS 门店名称,\n  TRY_CAST(TRIM(c3) AS DATE) AS 营业日期,\n  NULLIF(NULLIF(TRIM(c4),'--'),'')  AS 餐段,\n  NULLIF(NULLIF(TRIM(c5),'--'),'')  AS 出品部门,\n  NULLIF(NULLIF(TRIM(c6),'--'),'')  AS 菜品大类,\n  NULLIF(NULLIF(TRIM(c7),'--'),'')  AS 菜品小类,\n  NULLIF(NULLIF(TRIM(c8),'--'),'')  AS 菜品编码,\n  NULLIF(NULLIF(TRIM(c9),'--'),'')  AS 品项名称,\n  NULLIF(NULLIF(TRIM(c10),'--'),'') AS 关联菜品名称,\n  NULLIF(NULLIF(TRIM(c12),'--'),'') AS 品项类型,\n  NULLIF(NULLIF(TRIM(c13),'--'),'') AS 菜品类型,\n  NULLIF(NULLIF(TRIM(c15),'--'),'') AS 规格,\n  NULLIF(NULLIF(TRIM(c16),'--'),'') AS 单位,\n  NULLIF(NULLIF(TRIM(c17),'--'),'') AS 关联做法,\n  NULLIF(NULLIF(TRIM(c18),'--'),'') AS 关联加料,\n  NULLIF(NULLIF(TRIM(c19),'--'),'') AS 关联餐盒,\n  NULLIF(NULLIF(TRIM(c20),'--'),'') AS 销售方式,\n  NULLIF(NULLIF(TRIM(c21),'--'),'') AS 订单号,\n  TRY_CAST(TRIM(c22) AS DOUBLE) AS 销售数量,\n  TRY_CAST(TRIM(c23) AS DOUBLE) AS 赠送数量,\n  TRY_CAST(TRIM(c24) AS DOUBLE) AS 销售金额,\n  TRY_CAST(TRIM(c25) AS DOUBLE) AS 赠送金额,\n  TRY_CAST(TRIM(c26) AS DOUBLE) AS 优惠金额,\n  TRY_CAST(TRIM(c27) AS DOUBLE) AS 品项收入,\n  TRY_CAST(TRIM(c28) AS TIMESTAMP) AS 点菜时间,\n  TRY_CAST(TRIM(c29) AS TIMESTAMP) AS 下单时间,\n  TRY_CAST(TRIM(c30) AS TIMESTAMP) AS 结账时间,\n  NULLIF(NULLIF(TRIM(c31),'--'),'') AS 收银员,\n  NULLIF(NULLIF(TRIM(c32),'--'),'') AS 点菜员,\n  NULLIF(NULLIF(TRIM(c33),'--'),'') AS 下单人,\n  NULLIF(NULLIF(TRIM(c34),'--'),'') AS 订单分类,\n  NULLIF(NULLIF(TRIM(c35),'--'),'') AS 订单来源,\n  NULLIF(NULLIF(TRIM(c36),'--'),'') AS 新订单来源,\n  NULLIF(NULLIF(TRIM(c37),'--'),'') AS 订单子来源,\n  NULLIF(NULLIF(TRIM(c38),'--'),'') AS 桌台区域,\n  NULLIF(NULLIF(TRIM(c39),'--'),'') AS 取餐号,\n  NULLIF(NULLIF(TRIM(c40),'--'),'') AS 桌牌号,\n  TRY_CAST(TRIM(c41) AS DOUBLE) AS 订单金额,\n  TRY_CAST(TRIM(c42) AS DOUBLE) AS 营业额,\n  TRY_CAST(TRIM(c43) AS DOUBLE) AS 订单优惠,\n  TRY_CAST(TRIM(c44) AS DOUBLE) AS 订单收入,\n  NULLIF(NULLIF(TRIM(c45),'--'),'') AS 标记,\n  TRY_CAST(TRIM(c46) AS DOUBLE) AS 退菜数量,\n  TRY_CAST(TRIM(c47) AS DOUBLE) AS 退菜金额,\n  NULLIF(NULLIF(TRIM(c48),'--'),'') AS 敏感操作类型,\n  NULLIF(NULLIF(TRIM(c49),'--'),'') AS 单品备注\nFROM raw\nWHERE c1 IS NOT NULL AND c0 NOT IN ('城市','合计')"
+        },
+        "delivery": {
+          "serialized_bytes": 311
+        },
+        "failure": {
+          "code": "tool_execution_failed",
+          "message": "Binder Error: Referenced column \"c1\" not found in FROM clause!\nCandidate bindings: \"column_2\", \"column_3\", \"column_4\", \"column_5\", \"column_6\"\n\nLINE 51: WHERE c1 IS NOT NULL AND c0 NOT IN ('城市','合计')\n               ^",
+          "type": "tool_failure"
+        },
+        "name": "data.transform",
+        "provider_call_id": "call_00_T1DR4dc6F0pvCRowQKtO7520",
+        "status": "failed"
+      }
+    ],
+    "context_calls": [
+      {
+        "arguments": {
+          "name": "xenix-data-preprocessing"
+        },
+        "delivery": {
+          "serialized_bytes": 1059
+        },
+        "failure": null,
+        "name": "agent.skill.activate",
+        "provider_call_id": "call_00_Ccp6RuAEj6D1i4ZdREaR4724",
+        "status": "succeeded"
+      },
+      {
+        "arguments": {
+          "names": [
+            "analysis.profile",
+            "data.clean",
+            "data.clean.metadata",
+            "data.query",
+            "data.transform"
+          ]
+        },
+        "delivery": {
+          "serialized_bytes": 110
+        },
+        "failure": null,
+        "name": "agent.tools.activate",
+        "provider_call_id": "call_01_PUs6L7MpRm6QUYO4iCsB8696",
+        "status": "succeeded"
+      },
+      {
+        "arguments": {
+          "path": "references/data-quality-checks.md",
+          "skill_name": "xenix-data-preprocessing"
+        },
+        "delivery": {
+          "serialized_bytes": 1224
+        },
+        "failure": null,
+        "name": "agent.skill.read_reference",
+        "provider_call_id": "call_00_SoTNzo6oNm9Ll5KVdrFn4748",
+        "status": "succeeded"
+      },
+      {
+        "arguments": {
+          "path": "references/preprocessing-tools.md",
+          "skill_name": "xenix-data-preprocessing"
+        },
+        "delivery": {
+          "serialized_bytes": 3486
+        },
+        "failure": null,
+        "name": "agent.skill.read_reference",
+        "provider_call_id": "call_01_OYWhwiVtiXf2oFqGEtsD2308",
+        "status": "succeeded"
+      }
+    ]
+  },
+  {
+    "case_id": "knowledge.rainy_season_restock",
+    "outcome": "pass",
+    "report": "build/agent-harness-namespace-d7bbe8d/legacy/knowledge.rainy_season_restock-deepseek-deepseek-v4-flash-af3da9ecc26746528a42b9cf0dcbdfb1.json",
+    "final_texts": [
+      "已完成。补货清单已保存为新数据集 [rainy_season_restock_list](artifact://30)。\n\n## 采用的补货规则（来自知识库「雨季补货规则」）\n- **只处理具备遮雨/防水穿戴用途的类别** → 本表仅「雨具」计入，「防晒用品」「杯具」不进入清单。\n- **目标持有量 = 最近每周平均流出量 × 3**。\n- **补货数量 = 目标持有量 − 手头数量，最低为 0**。\n- **手头已达到目标的商品不进入清单**（因此无货也不等于要补，需按用途判断）。\n\n## 需要补货的商品\n\n| SKU | 品名 | 每周均流出 | 手头 | 目标持有量 | 补货数量 |\n|---|---|---:|---:|---:|---:|\n| U100 | 折叠伞 | 60 | 50 | 180 | **130** |\n| R200 | 轻便雨衣 | 40 | 45 | 120 | **75** |\n\n**合计需补货 2 个 SKU，共 205 件。**\n\n## 未进入清单的条目及原因\n- **S300 防晒霜**、**T400 保温杯**：不属于遮雨/防水穿戴用途，按规则排除（即使防晒霜手头仅 10、保温杯为 0，也不触发雨季补货）。\n- **B500 雨靴**：属雨具，但目标持有量 30 件（10×3）已低于手头 40 件，无需补货。\n\n**说明：** 以上为规则精确计算的结果，不含主观调整。若「每周平均流出量」这一列的口径（例如是否包含在途库存、促销周）与规则原意不同，补货数量会相应变化，建议确认后再下单。"
+    ],
+    "tool_failures": [],
+    "context_calls": [
+      {
+        "arguments": {
+          "names": [
+            "data.query",
+            "data.transform",
+            "analysis.profile"
+          ]
+        },
+        "delivery": {
+          "serialized_bytes": 73
+        },
+        "failure": null,
+        "name": "agent.tools.activate",
+        "provider_call_id": "call_01_zNXiHwoyflzwb9k4bNFH7532",
+        "status": "succeeded"
+      }
+    ]
+  },
+  {
+    "case_id": "ml.cleaning_service_tickets",
+    "outcome": "fail",
+    "report": "build/agent-harness-namespace-d7bbe8d/legacy/ml.cleaning_service_tickets-deepseek-deepseek-v4-flash-0eabe5ded56b431ab23c3a9c6de07509.json",
+    "final_texts": [
+      "整理完成,已生成可直接用于周报的数据集。\n\n[fulfillment_weekly_clean](artifact://46)\n\n## 处理结果\n\n**最终行数:5 行**(原 7 行)\n**中位数补充值:21**\n\n| shipment_id | depot | parcel_count | state |\n|---|---|---:|---|\n| SHIP-001 | DEPOT-N | 12 | ready |\n| SHIP-002 | DEPOT-S | **21** | ready |\n| SHIP-003 | DEPOT-N | 18 | hold |\n| SHIP-005 | DEPOT-N | 24 | hold |\n| SHIP-006 | DEPOT-S | 30 | ready |\n\n保留了原来的四列(shipment_id、depot、parcel_count、state),未新增或删除列。\n\n## 各步骤做了什么\n\n| 规则 | 处理动作 | 影响 |\n|---|---|---|\n| 重复记录不重复计数 | 删除完全重复行(SHIP-003 出现两次) | 7 → 6 行 |\n| 包裹数不能为负数 | 剔除无效负值记录(SHIP-004,-3) | 6 → 5 行 |\n| 状态文本规范化 | 去除首尾空格 + 统一小写 | 4 个单元格被修正,`\" Ready \"`/`\"READY\"`/`\" ready \"` → `ready`;`\" Hold\"`/`\"HOLD \"` → `hold` |\n| 缺失包裹数补齐 | 用有效记录的中位数填充(SHIP-002) | 填充 1 个单元格 = 21 |\n\n**中位数怎么算的:** 在去重并剔除无效负值后,有效记录的包裹数为 `{12, 18, 24, 30}`,中位数 = (18+24)/2 = **21**。补完后合计 105 件,平均 21 件/单,最小值 12(无负值、无空缺)。\n\n## 需要你确认的一处口径\n\n\"包裹数不能为负数\"我按**该记录无效、予以剔除**处理(SHIP-004 整条不进入报表),这样中位数只基于有效记录,负值不会污染周报合计。\n\n如果你的原意是**保留 SHIP-004 这一单、把它的 -3 也当作缺失用中位数补齐**,那么结果会变为 **6 行**,补充值同样是 **21**(SHIP-002 和 SHIP-004 各补 21)。告诉我一句即可,我立刻按该口径重新出数据集。"
+    ],
+    "tool_failures": [
+      {
+        "arguments": {
+          "datasets": {
+            "t": 2
+          },
+          "limit": 50,
+          "sql": "SELECT rowid AS rn, shipment_id, depot, parcel_count, state, length(state) AS state_len, '['||state||']' AS state_raw FROM t"
+        },
+        "delivery": {
+          "serialized_bytes": 348
+        },
+        "failure": {
+          "code": "tool_execution_failed",
+          "message": "Binder Error: Referenced column \"rowid\" not found in FROM clause!\nCandidate bindings: \"shipment_id\"\n\nLINE 1: SELECT COUNT(*) AS total_rows FROM (SELECT rowid AS rn, shipment_id, depot, parcel_count, state, length...\n                                                   ^",
+          "type": "tool_failure"
+        },
+        "name": "data.query",
+        "provider_call_id": "call_00_MogcA5jX7rj6BcKLSOgo6652",
+        "status": "failed"
+      },
+      {
+        "arguments": {
+          "dataset_id": 2,
+          "name": "fulfillment_weekly_clean",
+          "operations": [
+            {
+              "operation": "duplicate.exact_rows",
+              "params": {
+                "keep": "first"
+              }
+            },
+            {
+              "operation": "validation.non_negative",
+              "params": {
+                "action": "drop_rows",
+                "name": "negative_parcel_count",
+                "single_column": 2
+              }
+            },
+            {
+              "operation": "text.trim",
+              "params": {
+                "multiple_columns": [
+                  3
+                ]
+              }
+            },
+            {
+              "operation": "text.lowercase",
+              "params": {
+                "multiple_columns": [
+                  3
+                ]
+              }
+            },
+            {
+              "operation": "missing.fill_median",
+              "params": {
+                "multiple_columns": [
+                  2
+                ]
+              }
+            }
+          ]
+        },
+        "delivery": {
+          "serialized_bytes": 141
+        },
+        "failure": {
+          "code": "tool_validation_failed",
+          "message": "validation.non_negative.params requires column_index or column_name.",
+          "type": "tool_failure"
+        },
+        "name": "data.clean",
+        "provider_call_id": "call_00_g0bkDrI8gp8KivLvWp789805",
+        "status": "failed"
+      },
+      {
+        "arguments": {
+          "dataset_id": 2,
+          "name": "fulfillment_weekly_clean",
+          "operations": [
+            {
+              "operation": "duplicate.exact_rows",
+              "params": {
+                "keep": "first"
+              }
+            },
+            {
+              "operation": "validation.non_negative",
+              "params": {
+                "action": "drop_rows",
+                "column_index": 2,
+                "name": "negative_parcel_count"
+              }
+            },
+            {
+              "operation": "text.trim",
+              "params": {
+                "multiple_columns": [
+                  3
+                ]
+              }
+            },
+            {
+              "operation": "text.lowercase",
+              "params": {
+                "multiple_columns": [
+                  3
+                ]
+              }
+            },
+            {
+              "operation": "missing.fill_median",
+              "params": {
+                "multiple_columns": [
+                  2
+                ]
+              }
+            }
+          ]
+        },
+        "delivery": {
+          "serialized_bytes": 130
+        },
+        "failure": {
+          "code": "tool_validation_failed",
+          "message": "text.trim.params requires column_indexes or column_names.",
+          "type": "tool_failure"
+        },
+        "name": "data.clean",
+        "provider_call_id": "call_00_sEelAkG1TmyYjwifDWyQ6624",
+        "status": "failed"
+      }
+    ],
+    "context_calls": [
+      {
+        "arguments": {
+          "names": [
+            "data.clean",
+            "data.clean.metadata",
+            "data.query",
+            "data.transform",
+            "analysis.profile"
+          ]
+        },
+        "delivery": {
+          "serialized_bytes": 110
+        },
+        "failure": null,
+        "name": "agent.tools.activate",
+        "provider_call_id": "call_00_50i7C63df1pFZmlDAGYo4460",
+        "status": "succeeded"
+      },
+      {
+        "arguments": {
+          "name": "xenix-data-preprocessing"
+        },
+        "delivery": {
+          "serialized_bytes": 1059
+        },
+        "failure": null,
+        "name": "agent.skill.activate",
+        "provider_call_id": "call_01_NB693HAtFspvES8zv2rj4266",
+        "status": "succeeded"
+      },
+      {
+        "arguments": {
+          "path": "references/preprocessing-tools.md",
+          "skill_name": "xenix-data-preprocessing"
+        },
+        "delivery": {
+          "serialized_bytes": 3486
+        },
+        "failure": null,
+        "name": "agent.skill.read_reference",
+        "provider_call_id": "call_00_PzblNuw8D18Au2m05Cxc2816",
+        "status": "succeeded"
+      }
+    ]
+  },
+  {
+    "case_id": "ml.cluster_selection_v1",
+    "outcome": "fail",
+    "report": "build/agent-harness-namespace-d7bbe8d/legacy/ml.cluster_selection_v1-deepseek-deepseek-v4-flash-d09d7397405549569efe26202da3cac4.json",
+    "final_texts": [
+      "## Recommendation: use 3 segments\n\nI clustered the 18 accounts on the three behaviors you named (order volume, return rate, service load), testing 2, 3 and 4 groups. **The 3-group solution is the one I recommend** — it wins on both cluster quality and membership stability, and it lands exactly on the natural breaks already present in your data.\n\n### How the three candidates compare\n\n| k | Silhouette (↑) | Davies-Bouldin (↓) | Calinski-Harabasz | Membership stability (ARI, 5 refits) | Group sizes | Verdict |\n|---|---|---|---|---|---|---|\n| 2 | 0.657 | 0.423 | 50.0 | 0.60 (min −0.07) | 12 + 6 | Rejected — unstable boundary |\n| **3** | **0.792** | **0.252** | 213.0 | **1.00 (min 1.00)** | **6 + 6 + 6** | **Recommended** |\n| 4 | 0.704 | 0.385 | 241.7 | 0.98 (min 0.87) | 6 + 6 + 2 + 4 | Rejected — 2-account group |\n\n![Cluster quality by k](artifact://168)\n\n**Why not k=2:** it scores worst on separation *and* its group boundary is unstable — when refit on random 80% subsamples, membership agreement drops to 0.60 and in the worst case to −0.07 (worse than chance). A boundary that moves that much is a poor basis for assigning different operating plans.\n\n**Why not k=4:** Calinski-Harabasz is slightly higher (241.7), but that index rises mechanically with more groups and shouldn't be used to pick k here. Everything else is worse: lower silhouette than k=3 (0.704 vs 0.792), weaker stability (0.98 vs 1.00), and the 4th solution just carves a 2-account sub-group out of the high-friction segment — too small to run a differentiated play on.\n\n**Why k=3 fits the data itself:** sorted by order volume, the accounts fall into three blocks with *empty gaps* in between (orders 6–9 and 16–21 contain no accounts). The 6/6/6 split sits on those gaps rather than cutting through the middle of a cluster.\n\n### What the three segments look like\n\n| Segment | Accounts | Monthly orders | Return rate | Service minutes | Accounts list |\n|---|---|---|---|---|---|\n| **High-value Core** | 6 (33%) | 24.5 (22–27) | 1.40% (1.0–1.8) | 40.3 (36–45) | ACC-001 … ACC-006 |\n| **Mid-volume Stable** | 6 (33%) | 12.5 (10–15) | 5.27% (4.5–6.0) | 77.7 (71–84) | ACC-007 … ACC-012 |\n| **High-friction Risk** | 6 (33%) | 3.5 (2–5) | 11.92% (10–14) | 125.7 (112–145) | ACC-013 … ACC-018 |\n\n![Segment separation](artifact://182)\n![Segment profiles](artifact://183)\n\nThe gap between the best and worst segment is large: **7× the orders, 8.5× the return rate, 3× the service load.** Expressed per order — the number that drives cost-to-serve — High-value Core costs **1.65 service minutes per order**, Mid-volume Stable **6.21**, and High-friction Risk **35.9** (about 22× the core group). That is the single clearest justification for treating these groups differently.\n\nIllustrative operational emphasis (the segments support *differentiated intensity*, not three fundamentally different treatments — see limitations):\n- **High-value Core** — protect and grow: retention/referral focus, premium support tier even though they need less hands-on help; low return rate means little friction to fix.\n- **Mid-volume Stable** — develop: the growth pool; targeted frequency/promotion campaigns, watch return rate so it doesn't drift up.\n- **High-friction Risk** — fix friction first: root-cause the returns, guided onboarding and self-service training to cut the 36 min/order service load; small order volumes mean cost-to-serve likely exceeds their contribution.\n\n### Basis for the choice (and what it rests on)\n\nSelection used silhouette + Davies-Bouldin for separation, refit stability (ARI) for reliability, and segment size for actionability — not a single metric. k=3 is the only candidate that is simultaneously best-separated, perfectly stable, and balanced. The 2-group solution is simpler to communicate but its boundary is unreliable; the 4-group solution adds a group too small to act on.\n\n### Limitations you should weigh\n\n1. **The three behaviors are near-duplicates of one another.** Pairwise correlations are −0.95 (orders vs service), −0.96 (orders vs returns) and **+0.996** (returns vs service). The data is effectively one dimension, so these segments are a single \"value vs friction\" ranking — not three independent behavioral profiles. Any one of the three variables alone would produce nearly the same grouping.\n2. **This is robust to scaling, which confirms the point above.** Re-running k=3 on the raw (unstandardized) features gave an identical partition (same silhouette 0.792, stability 1.00, same 6/6/6 membership). Standardization is good practice, but here it changes nothing — because there is only one real dimension.\n3. **The picture is inflated by that same collinearity.** A 0.79 silhouette on near-1-D data mostly reflects two clean empty gaps, not rich multi-dimensional structure.\n4. **Very small sample.** 18 accounts, so each segment is 6 accounts and quality metrics carry real sampling noise. Treat the segments as a starting hypothesis.\n5. **Descriptive, not causal, and not business-validated.** There is no revenue, churn or profitability outcome attached, so I cannot claim these groups differ in value or that any treatment will change behavior. \"High-value\" is inferred from order volume, not verified.\n6. **Boundaries are data-relative.** The cut points come from the mean/spread of these 18 accounts; re-score when the population changes, and treat orders 6–9 and 16–21 as undefined zones.\n7. **Labels are fit-specific.** The segment numbers/names are stable only inside this fitted model.\n\n### Deliverables\n\n- **Labeled dataset (original records + segment labels)** — 18 rows, original `monthly_orders` / `return_rate_pct` / `service_minutes` untouched, with appended `segment_id` and `segment_name`: [accounts_segmented_k3](artifact://167)\n- **Evaluation report (k comparison table)**: [cluster_k_comparison](artifact://117)\n- **Segment profile table (business units)**: [segment_profile_k3](artifact://176)\n- **Platform evaluation reports**: [k=3 evaluation report](artifact://74) · [k=2](artifact://59) · [k=4](artifact://89)\n- **Charts**: [quality by k](artifact://168) · [segment separation](artifact://182) · [segment profiles](artifact://183)\n- **Supporting standardized modeling dataset**: [accounts_scaled](artifact://34)\n\nOne note on method: I standardized the three features (z-scores) before clustering, because service_minutes spans 36–145 while return rate spans 1–14, and unscaled distance would have been dominated by minutes. As shown above, the result is the same either way.\n\nIf you can supply an outcome (e.g., revenue contribution, churn, or margin), I can validate whether these segments actually differ in value before you commit to differentiated operating plans."
+    ],
+    "tool_failures": [],
+    "context_calls": [
+      {
+        "arguments": {
+          "name": "xenix-data-modeling"
+        },
+        "delivery": {
+          "serialized_bytes": 1231
+        },
+        "failure": null,
+        "name": "agent.skill.activate",
+        "provider_call_id": "call_00_D99L1dp5uyRpzZRqoUx50035",
+        "status": "succeeded"
+      },
+      {
+        "arguments": {
+          "name": "xenix-data-preprocessing"
+        },
+        "delivery": {
+          "serialized_bytes": 1059
+        },
+        "failure": null,
+        "name": "agent.skill.activate",
+        "provider_call_id": "call_01_m6Gx20dEjo5FE7GABWIQ1837",
+        "status": "succeeded"
+      },
+      {
+        "arguments": {
+          "name": "xenix-data-analysis"
+        },
+        "delivery": {
+          "serialized_bytes": 1086
+        },
+        "failure": null,
+        "name": "agent.skill.activate",
+        "provider_call_id": "call_02_uFdYVH9cl8t7RNEkWsz03087",
+        "status": "succeeded"
+      },
+      {
+        "arguments": {
+          "names": [
+            "analysis.profile",
+            "analysis.graph",
+            "data.query",
+            "data.transform",
+            "data.clean",
+            "data.integrate",
+            "data.feature.select",
+            "model.metadata",
+            "model.train",
+            "model.hyper_train",
+            "model.apply",
+            "model.task.query",
+            "data.tokenize"
+          ]
+        },
+        "delivery": {
+          "serialized_bytes": 275
+        },
+        "failure": null,
+        "name": "agent.tools.activate",
+        "provider_call_id": "call_03_LYuvBGb6E0jrIOAdZDo81142",
+        "status": "succeeded"
+      },
+      {
+        "arguments": {
+          "path": "references/model-presets.md",
+          "skill_name": "xenix-data-modeling"
+        },
+        "delivery": {
+          "serialized_bytes": 1152
+        },
+        "failure": null,
+        "name": "agent.skill.read_reference",
+        "provider_call_id": "call_01_ZfPW1mDgOLbz5OTZLJ2o5412",
+        "status": "succeeded"
+      },
+      {
+        "arguments": {
+          "path": "references/task-routing.md",
+          "skill_name": "xenix-data-analysis"
+        },
+        "delivery": {
+          "serialized_bytes": 1017
+        },
+        "failure": null,
+        "name": "agent.skill.read_reference",
+        "provider_call_id": "call_01_ZWNKrV9izJ9lEt7XLCDy9706",
+        "status": "succeeded"
+      }
+    ]
+  },
+  {
+    "case_id": "ml.clustering_two_segments",
+    "outcome": "pass",
+    "report": "build/agent-harness-namespace-d7bbe8d/legacy/ml.clustering_two_segments-deepseek-deepseek-v4-flash-89a77b980fa2427da71b389d8fb75cfc.json",
+    "final_texts": [
+      "已完成。用 KMeans（k=2）在 `visits`（访问频次）和 `avg_order_value`（平均客单值）两个字段上把 6 个账户分成两组，结果表保留了全部原始记录并新增 `cluster_id` 标签列。\n\n**可打开的结果**\n- 分组结果表（原始记录 + cluster_id）：[account_cluster_labels](artifact://71)\n- 两组业务画像汇总：[account_cluster_profile](artifact://74)\n- 分布图（访问频次 × 平均客单值，按组着色）：[两组分布散点图](artifact://84)\n- 模型与评估留档：[训练模型](artifact://38) · [训练报告](artifact://40) · [评估报告](artifact://47)\n\n**分组明细**\n\n| account_id | visits | avg_order_value | cluster_id |\n|---|---:|---:|---:|\n| ACCT-001 | 1 | 12 | 1 |\n| ACCT-003 | 1 | 16 | 1 |\n| ACCT-002 | 2 | 14 | 1 |\n| ACCT-004 | 9 | 88 | 2 |\n| ACCT-005 | 10 | 92 | 2 |\n| ACCT-006 | 11 | 96 | 2 |\n\n**两组的业务差异（观测值）**\n\n| 群组 | 账户数 | 访问频次均值(区间) | 平均客单值均值(区间) | 相对全体指数的频次/客单 |\n|---|---:|---|---|---|\n| 组 1 | 3 | 1.33 (1–2) | 14.0 (12–16) | 0.24 / 0.26 |\n| 组 2 | 3 | 10.0 (9–11) | 92.0 (88–96) | 1.76 / 1.74 |\n\n- **组 1 = 低频低客单**：平均只访问 1.33 次，客单值约 14，均不到全体平均的三成（频次指数 0.24、客单指数 0.26）。账户为 ACCT-001/002/003。\n- **组 2 = 高频高客单**：平均访问 10 次（约组 1 的 7.5 倍），客单值约 92（约组 1 的 6.6 倍），均高出全体平均约七成。账户为 ACCT-004/005/006。\n- **两组几乎不重叠**：访问频次从 2 直接跳到 9，客单值从 16 直接跳到 88，中间没有过渡账户，因此两组的划分非常干净。\n- 运营含义上，组 2 是高频次加高客单的核心账户群体，组 1 是低活跃、低消费的账户；两组规模各占一半（各 3 户）。\n\n**依据与可信度**\n- 聚类质量：轮廓系数 0.906，Calinski-Harabasz 287.1，Davies-Bouldin 0.099；对比随机标签基线（中位轮廓 -0.049）明显更优。重抽样稳定性检验（5 次 80% 子样本、10 次两两比较）调整兰德指数为 1.0，说明组间划分稳定、不含噪声点。\n- 需注意的局限：样本仅 6 个账户，两个字段相关系数高达 0.994，也就是说\"访问频次\"和\"客单值\"在本数据中几乎同向变动，实际上是一条\"低—高\"主线，而不是两个独立的运营维度；两组等大（各 3 户）是数据自然分布的结果。群组编号 1/2 只是标签，仅在该模型内稳定，不代表业务等级；本结论是描述性的，未包含外部或因果验证。如需按业务阈值（例如\"月访问≥ X 次\"）划线，请提供规则，我可以改为可直接解释的分档口径。"
+    ],
+    "tool_failures": [],
+    "context_calls": [
+      {
+        "arguments": {
+          "names": [
+            "analysis.profile",
+            "data.query",
+            "data.transform",
+            "model.train",
+            "model.metadata",
+            "model.apply"
+          ]
+        },
+        "delivery": {
+          "serialized_bytes": 121
+        },
+        "failure": null,
+        "name": "agent.tools.activate",
+        "provider_call_id": "call_00_CpF0e53qPOHL87nCdrev0524",
+        "status": "succeeded"
+      },
+      {
+        "arguments": {
+          "name": "xenix-data-modeling"
+        },
+        "delivery": {
+          "serialized_bytes": 1231
+        },
+        "failure": null,
+        "name": "agent.skill.activate",
+        "provider_call_id": "call_01_qrt8aXvq6jxZy2F0eHBX2687",
+        "status": "succeeded"
+      },
+      {
+        "arguments": {
+          "names": [
+            "data.feature.select"
+          ]
+        },
+        "delivery": {
+          "serialized_bytes": 44
+        },
+        "failure": null,
+        "name": "agent.tools.activate",
+        "provider_call_id": "call_00_UowOzYSAs4RpBWj1oNX15958",
+        "status": "succeeded"
+      },
+      {
+        "arguments": {
+          "names": [
+            "analysis.graph"
+          ]
+        },
+        "delivery": {
+          "serialized_bytes": 39
+        },
+        "failure": null,
+        "name": "agent.tools.activate",
+        "provider_call_id": "call_00_SsckgepHuTbxznsY5yuv8268",
+        "status": "succeeded"
+      }
+    ]
+  },
+  {
+    "case_id": "ml.forecast_validation_v1",
+    "outcome": "fail",
+    "report": "build/agent-harness-namespace-d7bbe8d/legacy/ml.forecast_validation_v1-deepseek-deepseek-v4-flash-bbd30cdd8d0646359d9396418f6e1bf3.json",
+    "final_texts": [
+      "## What I did\n\nYour file has 84 clean monthly observations per region (Jan 2019 – Dec 2025), no gaps or duplicates. Both regions are dominated by a very steady straight-line uptrend (North +23.9 units/year, R² 0.90; South +35.4 units/year, R² 0.96) with a modest seasonal shape — North peaks in June, South peaks in April.\n\nI trained the three forecasting candidates on identical rolling-origin backtests (**6-month horizon, 5 folds, 12 holdout months per fold, 80% interval**) so the comparison is like-for-like.\n\n## Candidate comparison (backtest evidence)\n\n| Candidate | MAE | RMSE | sMAPE | MASE | 80% PI coverage | Mean PI width |\n|---|---:|---:|---:|---:|---:|---:|\n| **Holt-Winters additive (selected)** | **2.83** | **3.45** | **0.87%** | **0.095** | **0.800** | **10.2** |\n| Holt-Winters, damped trend | 3.29 | 4.19 | 1.00% | 0.113 | 0.867 | 13.0 |\n| Seasonal naive (= naive baseline) | 29.87 | 30.83 | 9.47% | 0.987 | 0.850 | 68.8 |\n| SARIMA (bounded auto) | *not evaluable* | | | | | |\n\n**Why these outcomes.** Holt-Winters (plain additive trend + seasonality) wins on every metric, and its 80% interval hit exactly 80.0% coverage on unseen months — well-calibrated, not just accurate. SARIMA **could not be run**: it requires at least 90 periods per group and you have 84, so it is a documented gap rather than a rejected option — worth re-testing once you pass 90 months. Seasonal naive fails for a structural reason, not a tuning one: it repeats last year's cycle, so it under-forecasts by roughly one year of growth (~24 units North, ~35 South), which is exactly what its 30-unit MAE shows. The damped variant was close (only 1.5–2.6 units different) and I kept it as a sensitivity check.\n\n## Forecast — Jan–Jun 2026, 80% prediction interval\n\n| Region | Month | Forecast | 80% low | 80% high |\n|---|---|---:|---:|---:|\n| NORTH_HUB | 2026-01 | 346.8 | 343.3 | 350.3 |\n| NORTH_HUB | 2026-02 | 353.7 | 350.1 | 357.2 |\n| NORTH_HUB | 2026-03 | 364.7 | 361.1 | 368.2 |\n| NORTH_HUB | 2026-04 | 377.7 | 374.1 | 381.2 |\n| NORTH_HUB | 2026-05 | 390.5 | 387.0 | 394.0 |\n| NORTH_HUB | 2026-06 | 402.7 | 399.1 | 406.2 |\n| **NORTH_HUB** | **H1 total** | **2,236** | **2,215** | **2,257** |\n| SOUTH_HUB | 2026-01 | 384.3 | 378.2 | 390.5 |\n| SOUTH_HUB | 2026-02 | 391.9 | 385.8 | 398.0 |\n| SOUTH_HUB | 2026-03 | 405.5 | 399.4 | 411.6 |\n| SOUTH_HUB | 2026-04 | 416.3 | 410.2 | 422.5 |\n| SOUTH_HUB | 2026-05 | 407.9 | 401.8 | 414.0 |\n| SOUTH_HUB | 2026-06 | 402.3 | 396.2 | 408.5 |\n| **SOUTH_HUB** | **H1 total** | **2,408** | **2,372** | **2,445** |\n\nSanity check: this implies +7.2% H1-on-H1 for North and +9.8% for South, continuing the observed deceleration (North 13.0%→7.0%/yr, South 24.5%→11.4%/yr) rather than accelerating past it.\n\n![Monthly demand by region: history and 2026 H1 forecast with 80% interval](artifact://173)\n\n## How much to trust this\n\n- **Statistical interval.** The 80% band is narrow — ±3.5 units/month North, ±6.1 South; ±0.9% and ±1.5% on the H1 totals. On the backtest the selected model achieved exactly the nominal 80% coverage.\n- **The band does not widen with horizon.** Interval widths are constant across all six months (a pooled residual-quantile method). In reality June 2026 is less certain than January 2026, so treat the far end of the band as a *floor* on uncertainty, not a ceiling. Coverage is empirical, not guaranteed.\n- **Model choice is a minor risk.** The damped-trend alternative lands within 1.5–2.6 units (≤0.6%) — the choice barely matters here.\n- **Trend form is the main real risk.** Growth is decelerating in percentage terms, but the selected model extrapolates a *constant absolute* increment. Fitting instead an exponential (constant-percentage) trend implies roughly 3% higher values at June 2026 — about +12 units North and +33 South. So the genuine upside risk is on the order of 1–3× the statistical band.\n- **Regime breaks are outside every interval.** Seven years of unusually clean history (R² 0.90–0.96) partly reflects how well-behaved the past was; the intervals contain no protection for new capacity, a large contract win/loss, or a macro shift.\n\n## Procurement recommendations\n\n1. **Commit to the central path**, not the upper bound. A ±1–2% interval on the half-year total is smaller than normal lot-sizing and lead-time buffers, so padding the order to the upper bound mostly buys inventory, not security.\n2. **Carry a separate, small trend-contingency.** Because proportional growth would put June ~3% above plan, holding roughly +12 units/month North and +33 units/month South as a flexible (not committed) buffer covers that specific risk. Total contingency ≈ 70 units North, 200 units South across H1 if you want to hedge it fully.\n3. **Do not level-load H1.** North rises every month to a June peak (402.7); South peaks in April (416.3) then eases. Build the seasonality into release schedules.\n4. **Prioritise South for capacity.** It grows ~2.7 points faster than North in YoY terms and its absolute error is twice as wide (±6.1 vs ±3.5), so it is both the faster-growing and the less predictable region.\n5. **Refit monthly and set a break trigger.** Add each new month and re-fit — new observations require a new fit; the table is reusable but not self-updating. If two consecutive months fall outside their bands, that is your signal to revisit the trend assumption rather than just re-fit.\n6. **Re-test SARIMA after June 2026.** With 90+ periods per group, the automated order search becomes evaluable and may beat Holt-Winters; the current 84 points leave that comparison open.\n\n## Deliverables\n\n- [Forecast table — 2026 H1 monthly, 80% interval, with damped-trend sensitivity column](artifact://163) *(reusable dataset 160)*\n- [Full forecast output from the selected model](artifact://124) *(dataset 123)*\n- [Evaluation report for the selected model (rolling-origin backtest)](artifact://108)\n- [Backtest comparison table across all candidates](artifact://180) *(dataset 178)*\n- [Damped-trend alternative scenario](artifact://140) *(dataset 139)*\n- [History + forecast chart](artifact://173)"
+    ],
+    "tool_failures": [
+      {
+        "arguments": {
+          "datasets": {
+            "d": 2
+          },
+          "sql": "SELECT region, EXTRACT(year FROM month) yr, ROUND(AVG(demand_units),1) avg_d, ROUND(MIN(demand_units)) mn, ROUND(MAX(demand_units)) mx FROM d GROUP BY region, yr ORDER BY region, yr"
+        },
+        "delivery": {
+          "serialized_bytes": 1083
+        },
+        "failure": {
+          "code": "tool_execution_failed",
+          "message": "Binder Error: No function matches the given name and argument types 'date_part(STRING_LITERAL, VARCHAR)'. You might need to add explicit type casts.\n\tCandidate functions:\n\tdate_part(VARCHAR[], DATE) -> STRUCT()\n\tdate_part(VARCHAR[], INTERVAL) -> STRUCT()\n\tdate_part(VARCHAR[], TIME) -> STRUCT()\n\tdate_part(VARCHAR[], TIMESTAMP) -> STRUCT()\n\tdate_part(VARCHAR[], TIME WITH TIME ZONE) -> STRUCT()\n\tdate_part(VARCHAR[], TIME_NS) -> STRUCT()\n\tdate_part(VARCHAR, DATE) -> BIGINT\n\tdate_part(VARCHAR, INTERVAL) -> BIGINT\n\tdate_part(VARCHAR, TIME) -> BIGINT\n\tdate_part(VARCHAR, TIMESTAMP) -> BIGINT\n\tdate_part(VARCHAR, TIME WITH TIME ZONE) -> BIGINT\n\tdate_part(VARCHAR, TIME_NS) -> BIGINT\n\tdate_part(VARCHAR[], TIMESTAMP WITH TIME ZONE) -> STRUCT()\n\tdate_part(VARCHAR, TIMESTAMP WITH TIME ZONE) -> BIGINT\n\n\nLINE 1: SELECT COUNT(*) AS total_rows FROM (SELECT region, EXTRACT(year FROM month) yr, ROUND(AVG(demand_units),1)...\n                                                           ^",
+          "type": "tool_failure"
+        },
+        "name": "data.query",
+        "provider_call_id": "call_00_mfjfVJCjyiT9Jeb27NTg0512",
+        "status": "failed"
+      },
+      {
+        "arguments": {
+          "binding_id": 46,
+          "models": [
+            "forecasting.seasonal_naive",
+            "forecasting.holt_winters",
+            "forecasting.sarima"
+          ],
+          "params_by_model": {
+            "forecasting.holt_winters": {
+              "frequency": "monthly",
+              "horizon": 6,
+              "interval_level": 0.8,
+              "rolling_windows": 5,
+              "seasonal_period": 12
+            },
+            "forecasting.sarima": {
+              "frequency": "monthly",
+              "horizon": 6,
+              "interval_level": 0.8,
+              "rolling_windows": 5,
+              "seasonal_period": 12
+            },
+            "forecasting.seasonal_naive": {
+              "frequency": "monthly",
+              "horizon": 6,
+              "interval_level": 0.8,
+              "rolling_windows": 5,
+              "seasonal_period": 12
+            }
+          },
+          "run_name": "demand_2026H1_backtest_h6"
+        },
+        "delivery": {
+          "serialized_bytes": 191
+        },
+        "failure": {
+          "code": "tool_validation_failed",
+          "message": "ML task '56' finished with status 'failed'. Forecast history is too short; at least 90 periods per group are required.",
+          "type": "tool_failure"
+        },
+        "name": "model.train",
+        "provider_call_id": "call_00_7qNjj2JL9ciOsBEIKI1v5661",
+        "status": "failed"
+      },
+      {
+        "arguments": {
+          "binding_id": 46,
+          "models": [
+            "forecasting.sarima"
+          ],
+          "params_by_model": {
+            "forecasting.sarima": {
+              "frequency": "monthly",
+              "horizon": 6,
+              "interval_level": 0.8,
+              "policy": "bounded_auto.v1",
+              "rolling_windows": 5,
+              "seasonal_period": 12
+            }
+          },
+          "run_name": "demand_2026H1_sarima"
+        },
+        "delivery": {
+          "serialized_bytes": 192
+        },
+        "failure": {
+          "code": "tool_validation_failed",
+          "message": "ML task '115' finished with status 'failed'. Forecast history is too short; at least 90 periods per group are required.",
+          "type": "tool_failure"
+        },
+        "name": "model.train",
+        "provider_call_id": "call_00_rQCJxa8EV4ijc0162M1a5265",
+        "status": "failed"
+      }
+    ],
+    "context_calls": [
+      {
+        "arguments": {
+          "name": "xenix-data-modeling"
+        },
+        "delivery": {
+          "serialized_bytes": 1231
+        },
+        "failure": null,
+        "name": "agent.skill.activate",
+        "provider_call_id": "call_00_9BCd60xFHzfXxSd6d6wB2580",
+        "status": "succeeded"
+      },
+      {
+        "arguments": {
+          "name": "xenix-data-analysis"
+        },
+        "delivery": {
+          "serialized_bytes": 1086
+        },
+        "failure": null,
+        "name": "agent.skill.activate",
+        "provider_call_id": "call_01_yLEfbmavoEuhMNZxmgFI5341",
+        "status": "succeeded"
+      },
+      {
+        "arguments": {
+          "names": [
+            "data",
+            "analysis",
+            "model"
+          ]
+        },
+        "delivery": {
+          "serialized_bytes": 294
+        },
+        "failure": null,
+        "name": "agent.tools.activate",
+        "provider_call_id": "call_02_GCCg18pzmRZ2qoVohjB28242",
+        "status": "succeeded"
+      },
+      {
+        "arguments": {
+          "path": "references/forecasting.md",
+          "skill_name": "xenix-data-modeling"
+        },
+        "delivery": {
+          "serialized_bytes": 2197
+        },
+        "failure": null,
+        "name": "agent.skill.read_reference",
+        "provider_call_id": "call_00_WiqpXA52hYjM0fM0lvHr3942",
+        "status": "succeeded"
+      }
+    ]
+  },
+  {
+    "case_id": "ml.forecasting_seasonal_naive_transform",
+    "outcome": "fail",
+    "report": "build/agent-harness-namespace-d7bbe8d/legacy/ml.forecasting_seasonal_naive_transform-deepseek-deepseek-v4-flash-e2147b27fd464707bb2aaec071ea700e.json",
+    "final_texts": [
+      "## What the history shows\n\nThe 12 weeks contain exactly **three complete 4-week rounds**, and the shape is identical every round — only the level shifts:\n\n| Position in round | Round 1 (Jan 5–26) | Round 2 (Feb 2–23) | Round 3 (Mar 2–23) | Change per round |\n|---:|---:|---:|---:|---:|\n| Week 1 | 90 | 95 | 100 | +5 |\n| Week 2 | 110 | 115 | 120 | +5 |\n| Week 3 | 100 | 105 | 110 | +5 |\n| Week 4 | 130 | 135 | 140 | +5 |\n\nSo the \"four-week rule\" is confirmed, and there is also a very consistent **+5 units per round** at every position. The most recent round (Mar 2 – Mar 23: 100, 120, 110, 140) is the basis for the requested carry-forward.\n\n## Forecast: next four weeks (continuing the latest round)\n\n| forecast_week | forecast_units | method |\n|---|---:|---|\n| 2026-03-30 | 100 | carry forward most recent 4-week round (seasonal naive) |\n| 2026-04-06 | 120 | carry forward most recent 4-week round (seasonal naive) |\n| 2026-04-13 | 110 | carry forward most recent 4-week round (seasonal naive) |\n| 2026-04-20 | 140 | carry forward most recent 4-week round (seasonal naive) |\n\n**Total four-week requirement: 470 units** (average 117.5/week).\n\nOpenable results:\n- [Forecast table (4 rows, the deliverable)](artifact://24)\n- [Method comparison — carry-forward vs. drift-adjusted](artifact://30)\n- [Chart: history plus both forecast variants](artifact://38)\n\n![Weekly demand history and next 4-week forecast](artifact://38)\n\n## Limitations of this estimate\n\n1. **It is an assumption, not a statistical forecast.** Carrying the last round forward presumes the exact cycle shape and level repeat. With only 12 weeks (3 rounds), no model can be validated out-of-sample — holding back a round for testing would leave just 8 weeks to fit.\n\n2. **It deliberately ignores a visible upward drift.** Every position rose exactly +5 from round to round (8 of 8 comparisons). The carry-forward therefore likely **understates** demand if that drift is real:\n\n   | Forecast week | Carry-forward | Last round + +5 drift |\n   |---|---:|---:|\n   | 2026-03-30 | 100 | 105 |\n   | 2026-04-06 | 120 | 125 |\n   | 2026-04-13 | 110 | 115 |\n   | 2026-04-20 | 140 | 145 |\n   | **4-week total** | **470** | **490** |\n\n   The gap is 80 units over four weeks — about 17%. This is the single largest decision-relevant uncertainty: if the +5 drift continues, the requested convention builds in a stockout risk; if it was coincidence (e.g., a slow ramp-up), the drift variant over-orders. Three rounds is not enough to tell trend from noise — an identical +5 at all four positions looks orderly enough to be plan-driven rather than random, but that cannot be confirmed from this data.\n\n3. **No uncertainty range.** These are single point estimates. With n=3 rounds there is no defensible basis for a confidence interval, safety stock or service-level calculation; the numbers should be treated as a central reference, not a bound.\n\n4. **No calendar or event effects.** Weeks are simply seven days apart, so holidays, promotions, price changes, weather and month-end effects are not represented. The one anomaly already in the data (round 1 week 2, +20 over its neighbour) is copied into the forecast without explanation.\n\n5. **Assumes clean, comparable history.** The method implicitly assumes past weeks were unconstrained (no stockouts, no rationing) and measured on the same basis. If any week was supply-limited, the carry-forward inherits that suppressed level.\n\n6. **Four-week shelf life.** This is only valid for the immediate next round; beyond 2026-04-20 the carry-forward carries no information.\n\n**Practical use:** treat 470 units as the floor case for the coming four weeks and 490 as the case where the observed ramp continues — ordering closer to 490 for the later weeks of the round, or holding safety stock for the 5-unit-per-position gap, would cover the main risk this method leaves open."
+    ],
+    "tool_failures": [],
+    "context_calls": [
+      {
+        "arguments": {
+          "names": [
+            "data.query",
+            "data.transform",
+            "analysis.profile",
+            "analysis.graph",
+            "model.train",
+            "model.apply",
+            "model.metadata"
+          ]
+        },
+        "delivery": {
+          "serialized_bytes": 139
+        },
+        "failure": null,
+        "name": "agent.tools.activate",
+        "provider_call_id": "call_00_IZenXopeadC2RCaQolGs8463",
+        "status": "succeeded"
+      }
+    ]
+  },
+  {
+    "case_id": "ml.recommendation_item_similarity",
+    "outcome": "pass",
+    "report": "build/agent-harness-namespace-d7bbe8d/legacy/ml.recommendation_item_similarity-deepseek-deepseek-v4-flash-e53592425dda4e3a85309fbeefd8ed94.json",
+    "final_texts": [
+      "已完成 SKU-A 的相似商品推荐。结果表（可打开）：[sku_a_top2_similar_items](artifact://66)\n\n**推荐顺序（按最终结果）**\n1. **SKU-B**（rank 1，相似度 1.00，共同评分用户 4 人）\n2. **SKU-C**（rank 2，相似度 1.00，共同评分用户 3 人）\n\n**结果表**\n\n| base_item | rank | recommended_item | similarity | common_user_count |\n|---|---:|---|---:|---:|\n| SKU-A | 1 | SKU-B | 1.00 | 4 |\n| SKU-A | 2 | SKU-C | 1.00 | 3 |\n\n**做法与规则落地**\n- 用你附件的 15 条评分训练了商品相似度推荐模型（user_id / item_id / rating 三个角色），并按你的“评分不足 3 条不考虑”设定候选门槛为 3 条。\n- 该门槛在本数据中实际未剔除任何商品：SKU-A 4 条、SKU-B 4 条、SKU-C 3 条、SKU-D 4 条，均达标。因此候选筛选实际由相似度门槛（0.40）决定。\n- 我另用 SQL 独立复核了 SKU-A 与其他商品的相似度（基于共同评分用户的欧氏距离）：SKU-B、SKU-C 与 SKU-A 的评分向量完全一致（距离 0，相似度 1.00），SKU-D 距离 6.32、相似度仅 0.14，低于 0.40，已被排除。\n\n**需要你注意的两点不确定性**\n- SKU-B 与 SKU-C 的相似度完全相同（都是 1.00），二者的先后顺序由共同评分用户数决定（4 人 vs 3 人），即“证据更充分”者优先，并非两者相似度存在实质差异。若你更看重评分均值，SKU-C 为 4.67、略高于 SKU-B 的 4.50，顺序可能反转——需要的话我可以按该口径重排。\n- 数据规模很小（4 位用户、4 个商品），且商品相似度模型不提供留出集评估，所以本次无法给出 NDCG/召回等排序质量指标；以上是离线相似性证据，不代表实际点击或转化提升。"
+    ],
+    "tool_failures": [],
+    "context_calls": [
+      {
+        "arguments": {
+          "name": "xenix-data-modeling"
+        },
+        "delivery": {
+          "serialized_bytes": 1231
+        },
+        "failure": null,
+        "name": "agent.skill.activate",
+        "provider_call_id": "call_00_FbUovudqrboFXKQx3iLS7099",
+        "status": "succeeded"
+      },
+      {
+        "arguments": {
+          "name": "xenix-data-analysis"
+        },
+        "delivery": {
+          "serialized_bytes": 1086
+        },
+        "failure": null,
+        "name": "agent.skill.activate",
+        "provider_call_id": "call_01_qeEJBumbswFW2ForVw4b5804",
+        "status": "succeeded"
+      },
+      {
+        "arguments": {
+          "names": [
+            "analysis",
+            "data",
+            "model"
+          ]
+        },
+        "delivery": {
+          "serialized_bytes": 294
+        },
+        "failure": null,
+        "name": "agent.tools.activate",
+        "provider_call_id": "call_02_JKtHuxRVbvO8AVeLCmg42787",
+        "status": "succeeded"
+      },
+      {
+        "arguments": {
+          "path": "references/recommendation.md",
+          "skill_name": "xenix-data-modeling"
+        },
+        "delivery": {
+          "serialized_bytes": 1516
+        },
+        "failure": null,
+        "name": "agent.skill.read_reference",
+        "provider_call_id": "call_00_krwA8xhmOxBEJXSscshT1390",
+        "status": "succeeded"
+      }
+    ]
+  },
+  {
+    "case_id": "ml.recommendation_ranking_v1",
+    "outcome": "fail",
+    "report": "build/agent-harness-namespace-d7bbe8d/legacy/ml.recommendation_ranking_v1-deepseek-deepseek-v4-flash-358ea4a66053442c8474f843c860cf4d.json",
+    "final_texts": [
+      "Both charts rendered. Here's the complete deliverable.\n\n---\n\n# Module Recommendations & Evaluation Report\n\n## 1. What I worked from\n\n| Item | Value |\n|---|---|\n| Rating history | 49 ratings, 10 learners (`LEARNER-101`–`110`), 8 modules (`ALPHA`–`THETA`), Jan–Jun 2026 |\n| \"Like\" definition | rating ≥ 4 (per your rule) — 36 of 49 ratings qualify |\n| Target learners | `LEARNER-101` (has history), `LEARNER-COLD` (no history) |\n| Method | Collaborative Top-K recommender (`recommendation.collaborative_top_k`), `positive_rating_threshold = 4`, `top_k = 5`, trained on all 49 ratings; known users get personalized unseen items, unseen users get a popularity fallback |\n\n**Structure I found in the data:** learners split cleanly into two taste segments — `101–105` like `{ALPHA, BETA, GAMMA, DELTA}` and dislike `{EPSILON, ZETA, ETA, THETA}`; `106–109` are the mirror image. `LEARNER-110` is mixed. `LEARNER-101` is a strong segment‑A learner (segment‑A avg 5.0, segment‑B avg 1.0).\n\n## 2. Recommendation table (two unrated modules per learner)\n\n| Learner | Rank | Module | Basis | Model score | Module like-rate | Module avg rating |\n|---|---|---|---|---|---|---|\n| LEARNER-101 | 1 | **MODULE-DELTA** | Personalized (collaborative) | 5.0 | 83.3% | 3.83 |\n| LEARNER-101 | 2 | **MODULE-GAMMA** | Personalized (collaborative) | 5.0 | 83.3% | 3.83 |\n| LEARNER-COLD | 1 | **MODULE-ALPHA** | Cold-start bestseller (override — see §4) | 4.02 | 83.3% | 4.17 |\n| LEARNER-COLD | 2 | **MODULE-BETA** | Cold-start bestseller (override — see §4) | 4.02 | 83.3% | 4.17 |\n\nNeither module had been rated by its learner. Full ranked lists (top‑5 per learner): [apply output](artifact://69). Downloadable table: [module_recommendations_target_users](artifact://91).\n\n**Why these:**\n- `DELTA` / `GAMMA` are the only unrated segment‑A modules for `LEARNER-101`; segment‑A peers rate them 4.5/5 on average, matching 101's own segment‑A average of 5.0.\n- `ALPHA` / `BETA` are the highest-acceptance modules for an *unknown* learner: top like-rate (83.3%) and the only top items validated by **both** segments (5 segment‑A likes, 1 segment‑B dislike).\n\n## 3. Is personalized better than \"just recommend popular modules\"? — Yes, with caveats\n\nThe training run evaluates both approaches on the same held-out truth (each user's latest liked module, 10 held-out items):\n\n| Approach | NDCG@5 | MRR@5 | Recall@5 | HitRate@5 | Catalog coverage |\n|---|---|---|---|---|---|\n| **Personalized (collaborative)** | **0.943** | **0.925** | 1.00 | 1.00 | 1.00 |\n| Popularity baseline | 0.578 | 0.442 | 1.00 | 1.00 | 1.00 |\n\n![Personalized vs popularity ranking quality](artifact://117)\n\n**Read this carefully.** Both approaches *retrieve* the liked module in the top 5 for every learner (Recall = HitRate = 1.00). The personalized advantage is entirely in **ranking position** — it puts the item the learner actually liked near the top (NDCG 0.943 vs 0.578; MRR 0.925 vs 0.442). So: personalization helps you order a shortlist; it did not help you find items popularity would have missed *in this dataset*.\n\n**Concrete case (LEARNER-101).** The personalized list is `DELTA, GAMMA` — both on-segment. The naive \"most-rated module\" list is led by `THETA` (8 ratings) and `ETA` (7 ratings) — the two modules `101` already rated **1**. A naive \"highest average rating\" list would give `EPSILON, ZETA` — both rated ~1 by `101`'s segment. So both simple popularity variants are off-taste for this learner, while the personalized list is on-taste.\n\n## 4. Cold-start: I overrode the built-in fallback\n\nThe model's own cold-start strategy (`popularity_cold_start`) ranks by **number of ratings** and returned:\n\n| Rank | Module | Score | Like-rate |\n|---|---|---|---|\n| 1 | MODULE-THETA | 1.00 | 50.0% |\n| 2 | MODULE-ETA | 0.88 | 57.1% |\n| 3 | MODULE-ALPHA | 0.75 | 83.3% |\n| 4 | MODULE-BETA | 0.75 | 83.3% |\n| 5 | MODULE-DELTA | 0.75 | 83.3% |\n\nThe most-*rated* modules are the least-*liked* ones — count popularity is the wrong popularity here:\n\n![Ratings received vs like-rate by module](artifact://118)\n\nSo for `LEARNER-COLD` I substituted an acceptance-weighted bestseller (`ALPHA`, `BETA`). This is a **judgment call under cold-start uncertainty**, not model output. Alternative defensible picks are `EPSILON`/`ZETA` (highest mean ratings, 4.4/4.2) — but they were rated *only* by segment‑B learners, so we have no cross-segment evidence and their averages are likely optimistic.\n\n## 5. Evidence limitations\n\n1. **Very small sample.** 49 ratings / 10 users / 8 modules; 4–5 ratings per learner. Evaluation rests on **one held-out item per user (10 observations total)**. Metric values are high-variance — a single rank swap moves NDCG/MRR materially. Treat 0.943 vs 0.578 as *suggestive*, not precise.\n2. **Offline ≠ business outcome.** This measures recovery of historical preferences. It does **not** establish more engagement, completion, or revenue. No online/A-B test was run.\n3. **The advantage is inflated by a clean structure.** The segments are nearly deterministic in this sample, which flatters collaborative filtering. Real learners are more mixed (`LEARNER-110` is the counter-example). The edge likely shrinks on broader populations.\n4. **Recommendations are heavily constrained.** `LEARNER-101` had only **4** unrated modules, so its top‑2 is a pick from 4 candidates — the \"choice\" is narrow. 9 of 10 users have fewer than 5 unseen candidates.\n5. **Count-popularity fallback is a real weakness.** It promotes the least-liked modules, so any fully-new learner served by the default fallback would get poor picks. My override is manual.\n6. **No content/metadata.** There are no module attributes, so content-based or cold-*item* recommendation is impossible; `EPSILON`/`ZETA`'s lack of segment‑A ratings means their true cross-segment acceptance is unknown.\n7. **Seen vs. liked.** Only observed ratings exist; an unrated module is not evidence of dislike, so the \"unrated\" constraint is a data-availability limit, not a preference signal.\n\n**Recommendation:** ship the personalized list for known learners, use the acceptance-weighted bestseller (not count popularity) for cold starts, and re-test with an online experiment once more learners and modules are available.\n\n**Supporting artifacts:** [training report](artifact://53) · [evaluation report](artifact://60) · [model](artifact://51) · [recommendation table](artifact://91) · [full ranked lists](artifact://69)"
+    ],
+    "tool_failures": [],
+    "context_calls": [
+      {
+        "arguments": {
+          "name": "xenix-data-modeling"
+        },
+        "delivery": {
+          "serialized_bytes": 1231
+        },
+        "failure": null,
+        "name": "agent.skill.activate",
+        "provider_call_id": "call_00_ux7qPdv3t6VFjo5UN9BK3493",
+        "status": "succeeded"
+      },
+      {
+        "arguments": {
+          "name": "xenix-data-analysis"
+        },
+        "delivery": {
+          "serialized_bytes": 1086
+        },
+        "failure": null,
+        "name": "agent.skill.activate",
+        "provider_call_id": "call_01_EcCdglFuQrRJ4MY71sO26729",
+        "status": "succeeded"
+      },
+      {
+        "arguments": {
+          "name": "xenix-data-preprocessing"
+        },
+        "delivery": {
+          "serialized_bytes": 1059
+        },
+        "failure": null,
+        "name": "agent.skill.activate",
+        "provider_call_id": "call_02_C1vJ7dhSMTJFSyXIComF4743",
+        "status": "succeeded"
+      },
+      {
+        "arguments": {
+          "names": [
+            "analysis.profile",
+            "data.query",
+            "data.transform",
+            "model.metadata",
+            "model.train",
+            "model.apply",
+            "model.task.query",
+            "data.feature.select",
+            "data.clean",
+            "data.clean.metadata",
+            "model.hyper_train"
+          ]
+        },
+        "delivery": {
+          "serialized_bytes": 222
+        },
+        "failure": null,
+        "name": "agent.tools.activate",
+        "provider_call_id": "call_03_zqNgkYNQuWwF73iRC9bg0670",
+        "status": "succeeded"
+      },
+      {
+        "arguments": {
+          "path": "references/recommendation.md",
+          "skill_name": "xenix-data-modeling"
+        },
+        "delivery": {
+          "serialized_bytes": 1516
+        },
+        "failure": null,
+        "name": "agent.skill.read_reference",
+        "provider_call_id": "call_00_aymH4kAoKRRbgRBGEX7P0461",
+        "status": "succeeded"
+      },
+      {
+        "arguments": {
+          "names": [
+            "analysis.graph"
+          ]
+        },
+        "delivery": {
+          "serialized_bytes": 39
+        },
+        "failure": null,
+        "name": "agent.tools.activate",
+        "provider_call_id": "call_01_JwJvKinStlHT7mwQBifh7442",
+        "status": "succeeded"
+      }
+    ]
+  },
+  {
+    "case_id": "ml.text_grouped_classification_v1",
+    "outcome": "fail",
+    "report": "build/agent-harness-namespace-d7bbe8d/legacy/ml.text_grouped_classification_v1-deepseek-deepseek-v4-flash-85c76ecd5f26415fbd768a3b6c7f328f.json",
+    "final_texts": [
+      "Done. Here is the delivery.\n\n## 1. What the training data actually contains (this drives everything)\n\n- 60 rows = **30 unique messages × 2 identical copies each**; every copy pair sits inside the **same `account_batch`**.\n- 10 batches × 6 rows; **every batch contains exactly one example of each queue** (2 copies each).\n- **Each unique message appears in exactly one batch** (verified: 0 messages span multiple batches).\n\nSo the \"60 rows\" is really 30 independent facts. A random row split would put the same message in both training and holdout and inflate the score — exactly the trap you flagged.\n\n## 2. Deliverable — predicted queue for the 6 new notes\n\n[queue_prediction_new_notes.csv](artifact://133)\n\n| request | message (short) | predicted queue | confidence | agreement | decision |\n|---|---|---|---:|---|---|\n| ASK-901 | 登录入口拒绝授权 / access portal denying entry | access_help | 0.729 | 3 of 3 | auto-route |\n| ASK-902 | 无法进入工作台 / login access code rejected | access_help | 0.708 | 3 of 3 | auto-route |\n| ASK-903 | 发票金额重复 / duplicate seat charge | billing_review | 0.694 | 3 of 3 | **human check** |\n| ASK-904 | 账单税额需复核 / invoice total looks wrong | billing_review | 0.711 | 3 of 3 | auto-route (watch) |\n| ASK-905 | 结业证书无法下载 / credential link absent | credential_request | 0.663 | 3 of 3 | **human check** |\n| ASK-906 | 凭证未生成 / credential certificate missing | credential_request | 0.747 | 3 of 3 | auto-route |\n\n![Predicted queue and confidence](artifact://163)\n\n## 3. Evaluation — and how I kept the duplication out of it\n\n**Setup.** Retained model: multilingual raw-text TF-IDF + logistic regression (bilingual text handled natively, balanced class weights). I declared `account_batch` as the **group** role, so whole batches stay on one side of the split. The service additionally ran its own template-duplicate detection (masked-token Jaccard) and found the 30 duplicate groups.\n\n**Leakage check.** Holdout was split by group: 8 batches train (48 rows) / 2 batches holdout (12 rows), with **`group_overlap_count = 0`** and **train group overlap = 0** at both business-group and template-group level. No duplicate message crossed the split.\n\n**Does the duplication explain the score?** No — and I tested it directly. I re-ran the model **without** the group column; the service still auto-isolated the 30 duplicate templates and again showed zero overlap. So the perfect holdout result is not memorised duplicates; it comes from the queues being almost perfectly separable by keyword (login/portal/access · invoice/billing/charge · certificate/credential).\n\n**Result vs. simple guessing** (group-isolated holdout, 12 rows):\n\n![Model vs majority-class guess](artifact://153)\n\n| metric | Model | Majority-class \"guess\" |\n|---|---:|---:|\n| Accuracy | 1.00 | 0.333 |\n| Weighted F1 | 1.00 | 0.167 |\n| Macro F1 | 1.00 | 0.167 |\n| ROC AUC | 1.00 | 0.50 |\n\nConfusion matrix was perfect (4/4/4 across the three queues). **Yes, it is clearly better than simple guessing** — the guessing baseline is only ~33% because the queues are balanced 20/20/20.\n\n**Robustness.** Three variants (grouped unigram, ungrouped unigram, grouped unigram+bigram, 101–288 features) produced **identical predictions** on all six new notes (same prediction digest). Machine-generated report: [classification evaluation report](artifact://69).\n\n## 4. How much to trust the 1.00 — uncertainty\n\n- The holdout is only **12 rows = 6 unique messages**. Twelve correct out of twelve gives a 95% confidence interval of roughly **[0.78, 1.00]** accuracy — strong, but the true error rate is plausibly a few percent, not zero.\n- The training set is **templated and keyword-separable**, so this score is a ceiling for *this* note style. It does not prove the model will handle notes that mix topics, or a fourth queue that never appeared in training.\n- Confidence on the new notes is only **0.66–0.75** (top-class probability). That is normal for 3 balanced classes, but it means none of the six is a \"slam dunk.\"\n\n## 5. Human review recommendation\n\n- **Confirm by hand: ASK-903 (0.694) and ASK-905 (0.663)** — the two below the 0.70 auto-route bar.\n- **Watch ASK-904**: routed to `billing_review`, but \"税额 / tax\" never appears in the training wording (training uses charge / fee / seat / license / renewal). New sub-topic vocabulary — spot-check it, and add tax-related examples if it recurs.\n- **Pilot control**: for the first ~50–100 real notes, route everything but review 100%, then relax to exception-based review (below-threshold score, unseen vocabulary, or notes mentioning two topics at once). Re-validate once you accumulate more distinct messages, since 30 unique training messages is a thin base.\n\nNote: these are label estimates from wording patterns, not confirmed queue assignments."
+    ],
+    "tool_failures": [
+      {
+        "arguments": {
+          "datasets": {
+            "t": 2
+          },
+          "sql": "SELECT queue, count(*) rows, count(distinct message) uniq_msgs FROM t GROUP BY 1 ORDER BY 2 DESC"
+        },
+        "delivery": {
+          "serialized_bytes": 317
+        },
+        "failure": {
+          "code": "tool_execution_failed",
+          "message": "Parser Error: syntax error at or near \"rows\"\n\nLINE 1: SELECT COUNT(*) AS total_rows FROM (SELECT queue, count(*) rows, count(distinct message) uniq_msgs FROM t GROUP BY...\n                                                                   ^",
+          "type": "tool_failure"
+        },
+        "name": "data.query",
+        "provider_call_id": "call_01_NZt9zx7VN66Z2CWCIqXR4903",
+        "status": "failed"
+      },
+      {
+        "arguments": {
+          "dataset_id": 129,
+          "spec": {
+            "$schema": "https://vega-lite.github.io/schema/vega-lite/v5.json",
+            "encoding": {
+              "color": {
+                "field": "predicted_queue",
+                "legend": {
+                  "title": "predicted queue"
+                },
+                "type": "nominal"
+              },
+              "tooltip": [
+                {
+                  "field": "request_ref"
+                },
+                {
+                  "field": "predicted_queue"
+                },
+                {
+                  "field": "confidence"
+                }
+              ],
+              "x": {
+                "axis": {
+                  "labelAngle": 0,
+                  "title": "request"
+                },
+                "field": "request_ref",
+                "type": "nominal"
+              },
+              "y": {
+                "axis": {
+                  "title": "confidence"
+                },
+                "field": "confidence",
+                "scale": {
+                  "domain": [
+                    0,
+                    1
+                  ]
+                },
+                "type": "quantitative"
+              }
+            },
+            "height": 240,
+            "layer": [
+              {
+                "mark": {
+                  "type": "bar"
+                }
+              },
+              {
+                "data": {
+                  "values": [
+                    {
+                      "t": 0.7
+                    }
+                  ]
+                },
+                "encoding": {
+                  "y": {
+                    "datum": 0.7
+                  }
+                },
+                "mark": {
+                  "color": "#b04a2f",
+                  "strokeDash": [
+                    4,
+                    4
+                  ],
+                  "type": "rule"
+                }
+              }
+            ],
+            "title": {
+              "subtitle": "Dashed line = 0.70 auto-routing threshold",
+              "text": "Predicted queue and confidence for the 6 new notes"
+            },
+            "width": 420
+          }
+        },
+        "delivery": {
+          "serialized_bytes": 267
+        },
+        "failure": {
+          "code": "tool_validation_failed",
+          "message": "analysis.graph spec.layer[1].data conflicts with the selected Dataset. Omit data or use {\"name\":\"data\"} to reference that Dataset. Inline values and other sources are not substituted for it.",
+          "type": "tool_failure"
+        },
+        "name": "analysis.graph",
+        "provider_call_id": "call_01_ET_uLBiqIo65ArFKzmA8hwK7340",
+        "status": "failed"
+      }
+    ],
+    "context_calls": [
+      {
+        "arguments": {
+          "names": [
+            "data",
+            "data.query",
+            "data.transform",
+            "data.clean",
+            "data.feature.select",
+            "data.tokenize",
+            "analysis",
+            "analysis.profile",
+            "analysis.graph",
+            "model",
+            "model.train",
+            "model.apply",
+            "model.metadata",
+            "model.task",
+            "model.task.query",
+            "data.integrate"
+          ]
+        },
+        "delivery": {
+          "serialized_bytes": 294
+        },
+        "failure": null,
+        "name": "agent.tools.activate",
+        "provider_call_id": "call_00_VXtwJpp0CoZCLR8Mf1771046",
+        "status": "succeeded"
+      },
+      {
+        "arguments": {
+          "name": "xenix-data-modeling"
+        },
+        "delivery": {
+          "serialized_bytes": 1231
+        },
+        "failure": null,
+        "name": "agent.skill.activate",
+        "provider_call_id": "call_01_Tdp1f9KtiCwBX6VVrFmg0422",
+        "status": "succeeded"
+      },
+      {
+        "arguments": {
+          "path": "references/text-classification.md",
+          "skill_name": "xenix-data-modeling"
+        },
+        "delivery": {
+          "serialized_bytes": 1209
+        },
+        "failure": null,
+        "name": "agent.skill.read_reference",
+        "provider_call_id": "call_00_vnSYglUpjDRz5KSTVGFX2378",
+        "status": "succeeded"
+      }
+    ]
+  },
+  {
+    "case_id": "ml.text_keyword_frequency",
+    "outcome": "fail",
+    "report": "build/agent-harness-namespace-d7bbe8d/legacy/ml.text_keyword_frequency-deepseek-deepseek-v4-flash-d1f84f8c6cbb456f8ee7977d8352b6b2.json",
+    "final_texts": [
+      "Word-frequency summary is complete. Here's the deliverable.\n\n**Download:** [feedback_token_frequency](artifact://31) — columns `token`, `count`\n\n| token | count |\n|---|---:|\n| refund | 2 |\n| 延误 | 2 |\n| 物流 | 2 |\n| approved | 1 |\n| damaged | 1 |\n| packaging | 1 |\n| pending | 1 |\n| 回复 | 1 |\n| 客服 | 1 |\n\n9 distinct meaningful words, 12 word occurrences in total across the 4 feedback tickets.\n\n**并列出现最多的词：`refund`、`延误`、`物流`，并列第一，各出现 2 次。**\n\nSupporting detail: `物流` and `延误` co-occur in CASE-001 and CASE-003 (i.e., two separate tickets mention shipping delay); `refund` appears in CASE-002 (written as \"REFUND\") and CASE-003 (written as \"refund\") — English was lowered to one form so both count toward the same word. All other words appear once.\n\nTwo notes on how the count was produced, since they affect what the table means:\n- Tokenization is word-level on mixed Chinese/English text; English was normalized to lowercase, so `REFUND`/`refund` were merged into a single token.\n- The fourth ticket (\"这次 整体 正常\") was treated as filler/stopwords and dropped, so it contributed no tokens (CASE-004 is absent from the table). If you want such generic words counted too, I can re-run without stopword removal — that would add `正常` (1) and shift the row count.\n\nFocus takeaway: the clearest recurring themes are logistics/shipping delay (物流 + 延误) and refund handling, each appearing in two of the four tickets."
+    ],
+    "tool_failures": [],
+    "context_calls": [
+      {
+        "arguments": {
+          "name": "xenix-data-preprocessing"
+        },
+        "delivery": {
+          "serialized_bytes": 1059
+        },
+        "failure": null,
+        "name": "agent.skill.activate",
+        "provider_call_id": "call_00_DGngccMzKcy0FLP0BpYJ4831",
+        "status": "succeeded"
+      },
+      {
+        "arguments": {
+          "names": [
+            "data.query",
+            "data.tokenize",
+            "data.transform"
+          ]
+        },
+        "delivery": {
+          "serialized_bytes": 70
+        },
+        "failure": null,
+        "name": "agent.tools.activate",
+        "provider_call_id": "call_01_mLxIM4OzD93PDOt2lIPP4673",
+        "status": "succeeded"
+      }
+    ]
+  },
+  {
+    "case_id": "ml.text_topic_discovery_v1",
+    "outcome": "fail",
+    "report": "build/agent-harness-namespace-d7bbe8d/legacy/ml.text_topic_discovery_v1-deepseek-deepseek-v4-flash-0a1afc26db954e6ea93a8bcfe03a8f72.json",
+    "final_texts": [
+      "Done. Here's the summary and the reliability assessment.\n\n## What was delivered\n\nFrom the 36 unlabeled bilingual feedback entries (12 distinct term‑set templates, each repeated 3×), I discovered a clean 3‑way structure and turned it into a reusable labeling system:\n\n- **Themes discovered** by clustering the combined Chinese + English term sets (k=3), giving three balanced groups of 12 rows each.\n- **Every row labeled** with a theme, in a workbook your team can filter.\n- **A reusable classifier** retrained on those labels so new feedback can be auto‑tagged with the same theme set.\n\n## The three themes\n\n| Code | 主题 (Label) | Meaning for operations | Representative terms | Rows |\n|---|---|---|---|---|\n| TH1 | 声学与安静专注 / Acoustics & Quiet Focus | Acoustic comfort for concentration — noise, echo, soundproofing, quietness | 隔音·安静·噪声·回声·专注·静音·隔板·声学·宁静; acoustic, quiet, noise, focus, sound | 12 |\n| TH2 | 通风与温湿度舒适 / Ventilation & Climate Comfort | Air quality and thermal comfort — airflow, temperature, stuffiness, cold/hot | 通风·气流·温度·送风·冷热·室温·空气·循环·闷热·冷风·暖气; ventilation, airflow, temperature, climate, comfort | 12 |\n| TH3 | 预约与排期 / Booking & Scheduling | Reservation and scheduling flow — booking, slots, calendars, changes/cancellations/waitlist | 预约·日历·时段·候补·排期·名额·预订·日期·确认·修改·取消; booking, calendar, slot, schedule, reserve | 12 |\n\nTheme distribution: ![Theme distribution](artifact://209)\n\n## Deliverables\n\n- **标注表 (labeled table):** [venue_feedback_themed_final](artifact://197) — `feedback_ref`, `feedback`, theme code + Chinese/English label, the model's predicted theme, confidence, and a match flag.\n- **Reusable classification result (model):** the trained text classifier [model artifact](artifact://169), applied to the raw feedback → labeled output (36/36 rows tagged), plus a smoke test on 5 new phrasings: [reuse result](artifact://213).\n- **Quality evidence:** [classifier evaluation report](artifact://174), [clustering evaluation report](artifact://67), [clustering training report](artifact://49).\n\n## Quality assessment\n\n**Theme discovery is well-supported.** The 3‑cluster solution has moderate separation (cosine silhouette **0.517**) and perfect resampling stability (adjusted Rand **1.00** across 5 runs), with balanced sizes (12/12/12). A parallel topic model (LDA, 3 topics) was clearly weaker — negative coherence (−0.59) and one dominant topic (~88% prevalence) — so it was rejected in favor of the clustering.\n\n**Classifier is accurate but on easy data.** Group-safe holdout (27 train / 9 holdout, no group overlap) gave weighted F1 **1.00** and accuracy **1.00** vs. a dummy baseline of **0.17 / 0.33** (log-loss 0.236, ROC-AUC 1.00), with a perfect confusion matrix. Applied back to the 36 rows, predictions matched the assigned theme 36/36 times at confidence **0.79–0.80**.\n\n**Reliability rating — internal consistency High, external validity Medium.**\n- The perfect score mainly proves the three themes are cleanly separable and **reproducible**, not that a human has independently verified them: the labels come from the clustering itself, and the text is a small set of repeated term templates (36 rows → 12 distinct).\n- On 5 new, differently-worded phrasings the model still tagged all five plausibly, but **confidence dropped to 0.41–0.57** (from ~0.80). This shows the model leans on the specific term vocabulary present in training.\n\n## Limitations & recommended use\n\n- **Novel vocabulary:** genuinely new phrasing (e.g., slang, typos, new facilities) may be lower-confidence — route predictions below ~0.6 to a human reviewer.\n- **Small, templated sample:** the three themes are well-defined for this vocabulary; if feedback later spans other topics (cleanliness, catering, staff), re-check whether a 4th theme is needed rather than forcing a fit.\n- **No human ground truth yet:** treat the current labels as a strong starting taxonomy. A quick manual spot-check of ~10 rows per theme would upgrade it from \"internally consistent\" to \"validated.\"\n\nYou can reuse the classifier as-is on future feedback by feeding the same `feedback` text column; confidence scores let you auto-accept high-confidence tags and queue the rest for review."
+    ],
+    "tool_failures": [
+      {
+        "arguments": {
+          "binding_id": 95,
+          "models": [
+            "text.classification.multilingual_logistic_regression_tfidf"
+          ],
+          "params_by_model": {
+            "text.classification.multilingual_logistic_regression_tfidf": {
+              "class_weight": "balanced",
+              "phrase_mode": "unigram_bigram",
+              "preparation_profile": "multilingual_business_v1"
+            }
+          },
+          "run_name": "venue_feedback_theme_classifier"
+        },
+        "delivery": {
+          "serialized_bytes": 212
+        },
+        "failure": {
+          "code": "tool_validation_failed",
+          "message": "ML task '100' finished with status 'failed'. Group-safe classification requires every target class in both training and holdout partitions.",
+          "type": "tool_failure"
+        },
+        "name": "model.train",
+        "provider_call_id": "call_00_dJWq8h7hjnUEmvCuCLG91830",
+        "status": "failed"
+      },
+      {
+        "arguments": {
+          "binding_id": 106,
+          "models": [
+            "text.classification.multilingual_logistic_regression_tfidf"
+          ],
+          "params_by_model": {
+            "text.classification.multilingual_logistic_regression_tfidf": {
+              "class_weight": "balanced",
+              "phrase_mode": "unigram_bigram",
+              "preparation_profile": "multilingual_business_v1"
+            }
+          },
+          "run_name": "venue_feedback_theme_classifier_v2"
+        },
+        "delivery": {
+          "serialized_bytes": 212
+        },
+        "failure": {
+          "code": "tool_validation_failed",
+          "message": "ML task '111' finished with status 'failed'. Group-safe classification requires every target class in both training and holdout partitions.",
+          "type": "tool_failure"
+        },
+        "name": "model.train",
+        "provider_call_id": "call_00_ET_u7o7borpTw0lzXGhbT188039",
+        "status": "failed"
+      },
+      {
+        "arguments": {
+          "binding_id": 106,
+          "models": [
+            "text.classification.multilingual_logistic_regression_tfidf"
+          ],
+          "params_by_model": {
+            "text.classification.multilingual_logistic_regression_tfidf": {
+              "class_weight": "balanced",
+              "phrase_mode": "unigram"
+            }
+          },
+          "run_name": "venue_theme_clf_unigram"
+        },
+        "delivery": {
+          "serialized_bytes": 212
+        },
+        "failure": {
+          "code": "tool_validation_failed",
+          "message": "ML task '125' finished with status 'failed'. Group-safe classification requires every target class in both training and holdout partitions.",
+          "type": "tool_failure"
+        },
+        "name": "model.train",
+        "provider_call_id": "call_00_hzBLZ3YCdolQoEHgpnYE2150",
+        "status": "failed"
+      },
+      {
+        "arguments": {
+          "binding_id": 106,
+          "models": [
+            "text.classification.multilingual_logistic_regression_tfidf"
+          ],
+          "params_by_model": {
+            "text.classification.multilingual_logistic_regression_tfidf": {
+              "class_weight": "none",
+              "max_features": 2000,
+              "phrase_mode": "unigram_bigram"
+            }
+          },
+          "run_name": "venue_theme_clf_alt"
+        },
+        "delivery": {
+          "serialized_bytes": 212
+        },
+        "failure": {
+          "code": "tool_validation_failed",
+          "message": "ML task '127' finished with status 'failed'. Group-safe classification requires every target class in both training and holdout partitions.",
+          "type": "tool_failure"
+        },
+        "name": "model.train",
+        "provider_call_id": "call_01_u5VaOEShjj9wGIzvSJMv3137",
+        "status": "failed"
+      },
+      {
+        "arguments": {
+          "binding_id": 95,
+          "models": [
+            "text.classification.multilingual_logistic_regression_tfidf"
+          ],
+          "params_by_model": {
+            "text.classification.multilingual_logistic_regression_tfidf": {
+              "class_weight": "balanced",
+              "phrase_mode": "unigram"
+            }
+          },
+          "run_name": "venue_theme_clf_nogroup"
+        },
+        "delivery": {
+          "serialized_bytes": 212
+        },
+        "failure": {
+          "code": "tool_validation_failed",
+          "message": "ML task '129' finished with status 'failed'. Group-safe classification requires every target class in both training and holdout partitions.",
+          "type": "tool_failure"
+        },
+        "name": "model.train",
+        "provider_call_id": "call_02_tOeQgureLwCjALllkXKF4637",
+        "status": "failed"
+      },
+      {
+        "arguments": {
+          "binding_id": 151,
+          "models": [
+            "text.classification.multilingual_logistic_regression_tfidf"
+          ],
+          "params_by_model": {
+            "text.classification.multilingual_logistic_regression_tfidf": {
+              "class_weight": "balanced",
+              "phrase_mode": "unigram_bigram"
+            }
+          },
+          "run_name": "venue_theme_clf_cyclic"
+        },
+        "delivery": {
+          "serialized_bytes": 212
+        },
+        "failure": {
+          "code": "tool_validation_failed",
+          "message": "ML task '156' finished with status 'failed'. Group-safe classification requires every target class in both training and holdout partitions.",
+          "type": "tool_failure"
+        },
+        "name": "model.train",
+        "provider_call_id": "call_00_ET_4pBTFIuCbE9dYo9cf5I61058",
+        "status": "failed"
+      },
+      {
+        "arguments": {
+          "dataset_id": 194,
+          "spec": {
+            "$schema": "https://vega-lite.github.io/schema/vega-lite/v5.json",
+            "data": {
+              "name": "d"
+            },
+            "encoding": {
+              "color": {
+                "field": "theme_label_en",
+                "legend": null,
+                "type": "nominal"
+              },
+              "tooltip": [
+                {
+                  "field": "theme_label_en",
+                  "title": "Theme",
+                  "type": "nominal"
+                },
+                {
+                  "aggregate": "count",
+                  "title": "Count",
+                  "type": "quantitative"
+                }
+              ],
+              "x": {
+                "aggregate": "count",
+                "title": "反馈条数 / Feedback count",
+                "type": "quantitative"
+              },
+              "y": {
+                "axis": {
+                  "labelFontSize": 13
+                },
+                "field": "theme_label_en",
+                "sort": "-x",
+                "title": "主题 / Theme",
+                "type": "nominal"
+              }
+            },
+            "mark": {
+              "tooltip": true,
+              "type": "bar"
+            },
+            "title": "场地反馈三大主题分布（36 条）"
+          }
+        },
+        "delivery": {
+          "serialized_bytes": 258
+        },
+        "failure": {
+          "code": "tool_validation_failed",
+          "message": "analysis.graph spec.data conflicts with the selected Dataset. Omit data or use {\"name\":\"data\"} to reference that Dataset. Inline values and other sources are not substituted for it.",
+          "type": "tool_failure"
+        },
+        "name": "analysis.graph",
+        "provider_call_id": "call_00_4M6uAlru1o8bvfbQVUQS9337",
+        "status": "failed"
+      },
+      {
+        "arguments": {
+          "input_rows": {
+            "data": [
+              [
+                "DEMO-1",
+                "空调 送风 太冷 闷，air conditioning too cold and stuffy"
+              ],
+              [
+                "DEMO-2",
+                "在线 修改 预约 时间 困难，cannot change my booking time online"
+              ],
+              [
+                "DEMO-3",
+                "隔壁 谈话 回声 吵，echo and noise coming from the next room"
+              ],
+              [
+                "DEMO-4",
+                "后台 排期 冲突 名额 已满，schedule conflict, no slot available"
+              ],
+              [
+                "DEMO-5",
+                "房间 温度 波动 大，temperature in the room fluctuates a lot"
+              ]
+            ],
+            "header_index_map": {
+              "feedback": 1,
+              "feedback_ref": 0
+            }
+          },
+          "trained_model_id": 168
+        },
+        "delivery": {
+          "serialized_bytes": 145
+        },
+        "failure": {
+          "code": "tool_validation_failed",
+          "message": "Inline apply columns must match the trained model apply columns exactly.",
+          "type": "tool_failure"
+        },
+        "name": "model.apply",
+        "provider_call_id": "call_01_9oUSGL0vkBHlJlOJp6Fb4351",
+        "status": "failed"
+      }
+    ],
+    "context_calls": [
+      {
+        "arguments": {
+          "name": "xenix-data-modeling"
+        },
+        "delivery": {
+          "serialized_bytes": 1231
+        },
+        "failure": null,
+        "name": "agent.skill.activate",
+        "provider_call_id": "call_00_0sh2BeGoGTWEYJyLF40Q9358",
+        "status": "succeeded"
+      },
+      {
+        "arguments": {
+          "name": "xenix-data-preprocessing"
+        },
+        "delivery": {
+          "serialized_bytes": 1059
+        },
+        "failure": null,
+        "name": "agent.skill.activate",
+        "provider_call_id": "call_01_ePxnyCq4QYhZNWcJVqVC8603",
+        "status": "succeeded"
+      },
+      {
+        "arguments": {
+          "names": [
+            "data.query",
+            "analysis.profile",
+            "data.transform",
+            "data.tokenize",
+            "data.feature.select",
+            "model.metadata",
+            "model.train",
+            "model.apply",
+            "analysis.graph"
+          ]
+        },
+        "delivery": {
+          "serialized_bytes": 179
+        },
+        "failure": null,
+        "name": "agent.tools.activate",
+        "provider_call_id": "call_02_J7HA1EmMUZxu5NTFkdhV9408",
+        "status": "succeeded"
+      },
+      {
+        "arguments": {
+          "path": "references/text-discovery-retrieval.md",
+          "skill_name": "xenix-data-modeling"
+        },
+        "delivery": {
+          "serialized_bytes": 1598
+        },
+        "failure": null,
+        "name": "agent.skill.read_reference",
+        "provider_call_id": "call_00_q2HdbdZGqsbWbTxAAtO50399",
+        "status": "succeeded"
+      },
+      {
+        "arguments": {
+          "path": "references/text-classification.md",
+          "skill_name": "xenix-data-modeling"
+        },
+        "delivery": {
+          "serialized_bytes": 1209
+        },
+        "failure": null,
+        "name": "agent.skill.read_reference",
+        "provider_call_id": "call_01_s2xrblQiWTL3Ej0aSxNY9390",
+        "status": "succeeded"
+      },
+      {
+        "arguments": {
+          "names": [
+            "model.task.query"
+          ]
+        },
+        "delivery": {
+          "serialized_bytes": 41
+        },
+        "failure": null,
+        "name": "agent.tools.activate",
+        "provider_call_id": "call_00_JceW3OkuKk9fm8a7M99l2032",
+        "status": "succeeded"
+      }
+    ]
+  }
+]

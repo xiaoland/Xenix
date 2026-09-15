@@ -7,7 +7,10 @@ from ..knowledge_service import (
     KnowledgeService,
 )
 from ..llm import ToolFailure, ToolSuccess
-from ..llm.tooling import AgentTool, ToolExecutionContext
+from ..llm.tool_protocol import (
+    AgentTool,
+    ToolExecutionContext,
+)
 from .tool_inputs import KnowledgeLookupInput
 
 KNOWLEDGE_LOOKUP_TOOL_NAME = "knowledge.lookup"

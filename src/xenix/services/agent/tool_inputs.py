@@ -104,21 +104,6 @@ class AnalysisGraphInput(AgentToolInput):
         return self
 
 
-class AnalysisLambdaInput(AgentToolInput):
-    code: RequiredString
-    datasets: Annotated[dict[str, PositiveInt], Field(min_length=1)] = Field(
-        description="Mapping from dataset alias to registered dataset_id."
-    )
-    params: dict[str, Any] = Field(default_factory=dict)
-    manifest: dict[str, Any] = Field(default_factory=dict)
-
-    @model_validator(mode="after")
-    def _non_empty_dataset_aliases(self) -> AnalysisLambdaInput:
-        if any(not alias.strip() for alias in self.datasets):
-            raise ValueError("analysis.lambda datasets must map non-empty aliases to dataset ids.")
-        return self
-
-
 class AnalysisProfileInput(AgentToolInput):
     dataset_id: PositiveInt
     field_limit: Annotated[int, Field(ge=1, le=MAX_PROFILE_FIELD_LIMIT)] = Field(

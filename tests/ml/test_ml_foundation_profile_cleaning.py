@@ -9,12 +9,13 @@ from unittest.mock import Mock
 import polars as pl
 
 from xenix.config import ensure_app_dirs, get_app_paths
-from xenix.services.agent.tools import AgentToolRegistry
+from xenix.services.agent.tools import build_agent_tools
+from xenix.services.llm.tool_registry import AgentToolRegistry
 from xenix.services.analysis_profile import AnalysisProfileService, ProfileDatasetInput
 from xenix.services.artifact_service import ArtifactService, build_artifact_uri
 from xenix.services.data_cleaning import DataCleaningService
 from xenix.services.dataset_service import DatasetService, RegisterDatasetInput
-from xenix.services.llm.tooling import ToolExecutionContext
+from xenix.services.llm.tool_protocol import ToolExecutionContext
 from xenix.services.preprocessing_worker import InlinePreprocessingWorkerRunner
 from xenix.services.storage import StorageBootstrapService
 from xenix.services.storage.models import ArtifactKind
@@ -80,7 +81,7 @@ def test_clean_room_profile_and_whole_dataset_cleaning_workflow(
     ).maximum == 5000
 
     inline_worker = InlinePreprocessingWorkerRunner()
-    tools = AgentToolRegistry(
+    registrations = build_agent_tools(
         paths=paths,
         dataset_service=datasets,
         data_cleaning_service=DataCleaningService(paths, worker_runner=inline_worker),
@@ -89,9 +90,10 @@ def test_clean_room_profile_and_whole_dataset_cleaning_workflow(
         artifact_service=artifacts,
         preprocessing_worker_runner=inline_worker,
     )
-    clean_outcome = tools.execute(
-        "data.clean",
-        {
+    tools = AgentToolRegistry(registrations)
+    clean_outcome = tools.invoke(
+        tool_name="data.clean",
+        arguments={
             "dataset_id": source_dataset.id,
             "name": "Support quality cleaned",
             "operations": [
@@ -119,7 +121,7 @@ def test_clean_room_profile_and_whole_dataset_cleaning_workflow(
                 },
             ],
         },
-        ToolExecutionContext(
+        context=ToolExecutionContext(
             thread_id=101,
             dataset_ids=(source_dataset.id,),
         ),

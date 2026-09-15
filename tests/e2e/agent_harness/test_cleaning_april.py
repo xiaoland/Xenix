@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import json
 import re
 from typing import Any
 
@@ -17,7 +18,7 @@ from ._infra.case_support import (
     attached_source_unchanged,
     canonical_completion,
     capture_attached_source_state,
-    enum_value,
+    linked_tables,
     sha256_file,
 )
 from ._infra.contracts import (
@@ -25,6 +26,8 @@ from ._infra.contracts import (
     BenchmarkCaseContext,
     BenchmarkCaseServices,
     BenchmarkInputError,
+    JudgeInput,
+    JudgeRubric,
     OutcomeCheck,
 )
 
@@ -32,8 +35,12 @@ from ._infra.contracts import (
 CASE_ID = "cleaning.april_dine_in_sales"
 EXPECTED_FILE_SIZE = 116_459_191
 EXPECTED_SHA256 = "6B902DE50277E727FE936FFC4FE072B4D8B1C3D60A7D85413E114B72C4140E31"
-EXPECTED_SHAPE = (485_789, 50)
-_DATASET_ID_LINE = re.compile(r"^dataset_id:\s*([A-Za-z0-9_-]+)\s*$", re.MULTILINE)
+DELIVERY_RUBRIC = JudgeRubric(
+    rubric_id="cleaning.april.primary_delivery.v1",
+    score_dimensions=("primary_delivery_correctness", "delivery_explanation_consistency"),
+    allowed_reason_codes=("primary_delivery_preserved", "primary_delivery_loses_business_rows", "primary_delivery_ambiguous"),
+    scoring_guidance=("以用户被告知应使用的主要清洗结果为准。正确的核对文件或中间产物不能补救主要交付物的数据损失。",),
+)
 
 
 pytestmark = pytest.mark.agent_harness_live
@@ -77,157 +84,86 @@ class AprilDineInSalesCleaningCase:
             services=services,
         )
 
-    def assess(
-        self,
-        *,
-        context: BenchmarkCaseContext,
-    ) -> BenchmarkCaseAssessment:
-        snapshot = context.snapshot
-        source_state = context.source_state
-        dataset_service = context.services.datasets
-        if snapshot is None or source_state is None or not source_state.source_dataset_ids:
-            semantic_checks = (
-                OutcomeCheck("terminal_output_resolved", False, "no_canonical_snapshot"),
-                OutcomeCheck("header_promoted", False, "no_terminal_dataset"),
-                OutcomeCheck("report_row_removed", False, "no_terminal_dataset"),
-                OutcomeCheck("header_row_removed", False, "no_terminal_dataset"),
-                OutcomeCheck("exact_duplicates_removed", False, "no_terminal_dataset"),
-                OutcomeCheck("expected_shape", False, "no_terminal_dataset"),
-                OutcomeCheck("business_rows_preserved", False, "no_terminal_dataset"),
-            )
-            integrity_checks = (
-                OutcomeCheck("canonical_completion", False, "no_canonical_snapshot"),
-                OutcomeCheck("source_unchanged", False, "source_state_unavailable"),
-            )
+    def assess(self, *, context: BenchmarkCaseContext) -> BenchmarkCaseAssessment:
+        state = context.source_state
+        completed = canonical_completion(context.snapshot)
+        available = isinstance(state, AttachedSourceState) and bool(state.source_dataset_ids)
+        unchanged = available and attached_source_unchanged(
+            source_path=self.source_path, source_state=state, services=context.services,
+        )
+        integrity = (
+            OutcomeCheck("canonical_completion", completed, _completion_summary(completed)),
+            OutcomeCheck("source_unchanged", unchanged, _source_summary(unchanged)),
+        )
+        tables = linked_tables(context) if available else {}
+        if not tables:
             return BenchmarkCaseAssessment(
-                semantic_checks=semantic_checks,
-                integrity_checks=integrity_checks,
+                semantic_checks=(OutcomeCheck("public_cleaned_table", False, "linked_table_missing"),),
+                integrity_checks=integrity,
             )
-
-        terminal = self._resolve_terminal_dataset(
-            snapshot=snapshot,
-            dataset_service=dataset_service,
-            source_dataset_ids=set(source_state.source_dataset_ids),
-            run_dataset_ids=context.run_dataset_ids,
-        )
-        canonical_complete = canonical_completion(snapshot)
-        source_unchanged = attached_source_unchanged(
-            source_path=self.source_path,
-            source_state=source_state,
-            services=context.services,
-        )
-        if terminal is None:
-            semantic_checks = (
-                OutcomeCheck("terminal_output_resolved", False, "no_readable_run_output_reference"),
-                OutcomeCheck("header_promoted", False, "no_terminal_dataset"),
-                OutcomeCheck("report_row_removed", False, "no_terminal_dataset"),
-                OutcomeCheck("header_row_removed", False, "no_terminal_dataset"),
-                OutcomeCheck("exact_duplicates_removed", False, "no_terminal_dataset"),
-                OutcomeCheck("expected_shape", False, "no_terminal_dataset"),
-                OutcomeCheck("business_rows_preserved", False, "no_terminal_dataset"),
+        source = _load_dataset_frame(context.services.datasets.get_dataset(state.source_dataset_ids[0]))
+        # A response may link several exports; inspect the delivered values, not
+        # whichever intermediate Dataset happened to be created last.
+        candidates = [(uri, frame, _cleaning_checks(source_frame=source, output_frame=frame)) for uri, frame in tables.items()]
+        _, frame, checks = max(candidates, key=lambda candidate: sum(check.passed for check in candidate[2]))
+        judge = None
+        if all(check.passed for check in (*checks, *integrity)):
+            evidence = [{"uri": uri, "shape": candidate.shape, "checks": [check.to_payload() for check in candidate_checks]} for uri, candidate, candidate_checks in candidates]
+            judge = JudgeInput(
+                rubric=DELIVERY_RUBRIC,
+                task_intent="清洗上传的 4 月堂食销售表。",
+                facts=(
+                    "业务真值为 486119 条销售明细；报告行、表头行和合计行应剔除，全空列可省略。",
+                    "这些相同外观的销售行参与订单金额对账，不能以行值相等为依据删去；business_rows_preserved 已独立核验全部业务值及重复次数。",
+                    "根据最终说明识别主要交付表，要求其 business_rows_preserved=true。主要推荐损失业务行的表，即使同时链接正确中间表或承认假设，也应判失败。",
+                ),
+                artifact_evidence=(
+                    f"final_answer: {getattr(context.snapshot.messages[-1], 'text', '')}",
+                    json.dumps(evidence, ensure_ascii=False),
+                ),
             )
-            integrity_checks = (
-                OutcomeCheck("canonical_completion", canonical_complete, _completion_summary(canonical_complete)),
-                OutcomeCheck("source_unchanged", source_unchanged, _source_summary(source_unchanged)),
-            )
-            return BenchmarkCaseAssessment(
-                semantic_checks=semantic_checks,
-                integrity_checks=integrity_checks,
-            )
-
-        terminal_dataset, output_frame = terminal
-        source_dataset = dataset_service.get_dataset(source_state.source_dataset_ids[0])
-        source_frame = _load_dataset_frame(source_dataset)
-        shape = (int(output_frame.height), int(output_frame.width))
-        table_checks = _cleaning_checks(source_frame=source_frame, output_frame=output_frame)
-        semantic_checks = (
-            OutcomeCheck("terminal_output_resolved", True, "readable_run_output_reference"),
-            *table_checks,
-        )
-        integrity_checks = (
-            OutcomeCheck("canonical_completion", canonical_complete, _completion_summary(canonical_complete)),
-            OutcomeCheck("source_unchanged", source_unchanged, _source_summary(source_unchanged)),
-        )
-        del terminal_dataset
         return BenchmarkCaseAssessment(
-            semantic_checks=semantic_checks,
-            integrity_checks=integrity_checks,
-            terminal_shape=shape,
+            semantic_checks=(OutcomeCheck("public_cleaned_table", True, "linked_table_readable"), *checks),
+            integrity_checks=integrity,
+            judge_input=judge,
+            judge_required=True,
+            terminal_shape=frame.shape,
         )
-
-    @staticmethod
-    def _resolve_terminal_dataset(
-        *,
-        snapshot: Any,
-        dataset_service: Any,
-        source_dataset_ids: set[str],
-        run_dataset_ids: frozenset[int],
-    ) -> tuple[Any, pl.DataFrame] | None:
-        for message in reversed(list(getattr(snapshot, "messages", []))):
-            if enum_value(getattr(message, "kind", None)) != "tool_result":
-                continue
-            if enum_value(getattr(message, "result_status", None)) != "succeeded":
-                continue
-            for dataset_id in _result_dataset_ids(getattr(message, "value_payload", None)):
-                if dataset_id in source_dataset_ids or dataset_id not in run_dataset_ids:
-                    continue
-                try:
-                    dataset = dataset_service.get_dataset(dataset_id)
-                    frame = _load_dataset_frame(dataset)
-                except Exception:
-                    continue
-                return dataset, frame
-        return None
 
 
 def _cleaning_checks(*, source_frame: pl.DataFrame, output_frame: pl.DataFrame) -> tuple[OutcomeCheck, ...]:
-    if source_frame.height < 2 or source_frame.width != output_frame.width:
-        return (
-            OutcomeCheck("header_promoted", False, "incompatible_source_or_output_schema"),
-            OutcomeCheck("report_row_removed", False, "incompatible_source_or_output_schema"),
-            OutcomeCheck("header_row_removed", False, "incompatible_source_or_output_schema"),
-            OutcomeCheck("exact_duplicates_removed", False, "incompatible_source_or_output_schema"),
-            OutcomeCheck("expected_shape", False, "unexpected_terminal_shape"),
-            OutcomeCheck("business_rows_preserved", False, "incompatible_source_or_output_schema"),
-        )
-
     expected_headers = tuple(_cell_text(value) for value in source_frame.row(1))
+    first = source_frame.columns[0]
+    business = source_frame.slice(2).filter((pl.col(first) != "合计").fill_null(True))
+    business.columns = list(expected_headers)
+    nonempty = business.select([_cell_text_expression(name).is_not_null().any().alias(name) for name in expected_headers]).row(0)
+    required = [name for name, populated in zip(expected_headers, nonempty, strict=True) if populated]
     normalized_name = lambda name: re.sub(r"[\W_]+", "", name).removesuffix("元")
     output_names = {normalized_name(name): name for name in output_frame.columns}
-    header_promoted = (
-        len(output_names) == len(expected_headers)
-        and set(output_names) == {normalized_name(name) for name in expected_headers}
-    )
-    if header_promoted:
-        output_frame = output_frame.select([
-            pl.col(output_names[normalized_name(name)]).alias(name) for name in expected_headers
-        ])
-    # The final 合计 is a report aggregate, not an additional sale. Compare
-    # business values after lossless type normalization, not their export text.
-    first = source_frame.columns[0]
-    business_frame = source_frame.slice(2).filter((pl.col(first) != "合计").fill_null(True))
-    business_frame.columns = list(expected_headers)
-    output_hashes = _row_hashes(output_frame)
-    business_rows_preserved = bool(
-        header_promoted
-        and _normalization_preserves_values(business_frame)
-        and _normalization_preserves_values(output_frame)
-        and _row_hashes(business_frame).unique().sort().equals(output_hashes.unique().sort())
-    )
-    first_values = output_frame.get_column(output_frame.columns[0]).cast(pl.String)
-    report_removed = not first_values.eq(_cell_text(source_frame.row(0)[0])).any()
-    header_removed = not first_values.eq(expected_headers[0]).any()
-    total_removed = not first_values.eq("合计").any()
-    duplicates_removed = output_hashes.n_unique() == output_frame.height
-    expected_shape = output_frame.shape == EXPECTED_SHAPE
+    names_unique = len(output_names) == output_frame.width
+    missing = [name for name in required if normalized_name(name) not in output_names]
+    unassigned = [name for name in output_frame.columns if normalized_name(name) not in {normalized_name(header) for header in expected_headers}]
+    if len(missing) == len(unassigned) == 1:
+        # Infer a lone renamed column from the remaining slot. Full row-value
+        # comparison below still proves whether that interpretation is correct.
+        output_names[normalized_name(missing[0])] = unassigned[0]
+    headers_match = names_unique and all(normalized_name(name) in output_names for name in required)
+    preserved = False
+    if headers_match:
+        selected = [name for name in expected_headers if normalized_name(name) in output_names]
+        output = output_frame.select([pl.col(output_names[normalized_name(name)]).alias(name) for name in selected])
+        business = business.select(selected)
+        # Equal-looking sale lines can be real repeated purchases. Compare the
+        # multiset, including multiplicity; unique() would silently lose sales.
+        preserved = (
+            output.height == business.height
+            and _normalization_preserves_values(business)
+            and _normalization_preserves_values(output)
+            and _row_hashes(business).sort().equals(_row_hashes(output).sort())
+        )
     return (
-        OutcomeCheck("header_promoted", header_promoted, "equivalent_headers" if header_promoted else "headers_not_promoted"),
-        OutcomeCheck("report_row_removed", report_removed, "report_row_absent" if report_removed else "report_row_retained"),
-        OutcomeCheck("header_row_removed", header_removed, "header_row_absent" if header_removed else "header_row_retained"),
-        OutcomeCheck("total_row_removed", total_removed, "total_row_absent" if total_removed else "total_row_retained"),
-        OutcomeCheck("exact_duplicates_removed", duplicates_removed, "no_exact_duplicates" if duplicates_removed else "exact_duplicates_retained"),
-        OutcomeCheck("expected_shape", expected_shape, "expected_terminal_shape" if expected_shape else "unexpected_terminal_shape"),
-        OutcomeCheck("business_rows_preserved", business_rows_preserved, "business_rows_match" if business_rows_preserved else "business_rows_differ"),
+        OutcomeCheck("header_promoted", headers_match, "business_headers_present" if headers_match else "business_columns_missing_or_ambiguous"),
+        OutcomeCheck("business_rows_preserved", preserved, "business_multiset_matches" if preserved else "business_rows_or_values_differ"),
     )
 
 
@@ -266,19 +202,6 @@ def _normalization_preserves_values(frame: pl.DataFrame) -> bool:
     return not any(lost.row(0))
 
 
-def _result_dataset_ids(value: Any) -> tuple[str, ...]:
-    candidates: list[str] = []
-    if isinstance(value, dict):
-        direct = value.get("dataset_id")
-        if isinstance(direct, str) and direct.strip():
-            candidates.append(direct.strip())
-        multiple = value.get("dataset_ids")
-        if isinstance(multiple, list):
-            candidates.extend(item.strip() for item in multiple if isinstance(item, str) and item.strip())
-    elif isinstance(value, str):
-        metadata = value.split("\n\n", 1)[0]
-        candidates.extend(match.group(1) for match in _DATASET_ID_LINE.finditer(metadata))
-    return tuple(dict.fromkeys(candidates))
 
 
 def _load_dataset_frame(dataset: Any) -> pl.DataFrame:

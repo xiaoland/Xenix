@@ -1,0 +1,196 @@
+{
+  "heatmap_template_valid_json": true,
+  "results": [
+    {
+      "stream": false,
+      "variant": "valid",
+      "error": null,
+      "executed": [
+        "ping",
+        "graph"
+      ],
+      "usage_observations": 2,
+      "persisted_kinds": [
+        "user",
+        "assistant",
+        "tool_call",
+        "tool_call",
+        "tool_result",
+        "tool_result",
+        "assistant"
+      ],
+      "tool_statuses": [
+        "succeeded",
+        "succeeded"
+      ],
+      "rounds": 2
+    },
+    {
+      "stream": false,
+      "variant": "unquoted_key",
+      "error": {
+        "type": "ValidationError",
+        "message": "Tool call 'analysis_graph' arguments are not valid JSON.",
+        "code": "llm_tool_arguments_invalid_json"
+      },
+      "executed": [],
+      "usage_observations": 0,
+      "persisted_kinds": [
+        "user"
+      ],
+      "tool_statuses": [],
+      "rounds": 1
+    },
+    {
+      "stream": false,
+      "variant": "trailing_comma",
+      "error": {
+        "type": "ValidationError",
+        "message": "Tool call 'analysis_graph' arguments are not valid JSON.",
+        "code": "llm_tool_arguments_invalid_json"
+      },
+      "executed": [],
+      "usage_observations": 0,
+      "persisted_kinds": [
+        "user"
+      ],
+      "tool_statuses": [],
+      "rounds": 1
+    },
+    {
+      "stream": false,
+      "variant": "non_object_json",
+      "error": {
+        "type": "ValidationError",
+        "message": "Tool call 'analysis_graph' arguments must be a JSON object.",
+        "code": null
+      },
+      "executed": [],
+      "usage_observations": 0,
+      "persisted_kinds": [
+        "user"
+      ],
+      "tool_statuses": [],
+      "rounds": 1
+    },
+    {
+      "stream": false,
+      "variant": "decoded_wrong_field_type",
+      "error": null,
+      "executed": [
+        "ping"
+      ],
+      "usage_observations": 2,
+      "persisted_kinds": [
+        "user",
+        "assistant",
+        "tool_call",
+        "tool_call",
+        "tool_result",
+        "tool_result",
+        "assistant"
+      ],
+      "tool_statuses": [
+        "succeeded",
+        "failed"
+      ],
+      "rounds": 2
+    },
+    {
+      "stream": true,
+      "variant": "valid",
+      "error": null,
+      "executed": [
+        "ping",
+        "graph"
+      ],
+      "usage_observations": 2,
+      "persisted_kinds": [
+        "user",
+        "assistant",
+        "tool_call",
+        "tool_call",
+        "tool_result",
+        "tool_result",
+        "assistant"
+      ],
+      "tool_statuses": [
+        "succeeded",
+        "succeeded"
+      ],
+      "rounds": 2
+    },
+    {
+      "stream": true,
+      "variant": "unquoted_key",
+      "error": {
+        "type": "ValidationError",
+        "message": "Tool call 'analysis_graph' arguments are not valid JSON.",
+        "code": "llm_tool_arguments_invalid_json"
+      },
+      "executed": [],
+      "usage_observations": 0,
+      "persisted_kinds": [
+        "user"
+      ],
+      "tool_statuses": [],
+      "rounds": 1
+    },
+    {
+      "stream": true,
+      "variant": "trailing_comma",
+      "error": {
+        "type": "ValidationError",
+        "message": "Tool call 'analysis_graph' arguments are not valid JSON.",
+        "code": "llm_tool_arguments_invalid_json"
+      },
+      "executed": [],
+      "usage_observations": 0,
+      "persisted_kinds": [
+        "user"
+      ],
+      "tool_statuses": [],
+      "rounds": 1
+    },
+    {
+      "stream": true,
+      "variant": "non_object_json",
+      "error": {
+        "type": "ValidationError",
+        "message": "Tool call 'analysis_graph' arguments must be a JSON object.",
+        "code": null
+      },
+      "executed": [],
+      "usage_observations": 0,
+      "persisted_kinds": [
+        "user"
+      ],
+      "tool_statuses": [],
+      "rounds": 1
+    },
+    {
+      "stream": true,
+      "variant": "decoded_wrong_field_type",
+      "error": null,
+      "executed": [
+        "ping"
+      ],
+      "usage_observations": 2,
+      "persisted_kinds": [
+        "user",
+        "assistant",
+        "tool_call",
+        "tool_call",
+        "tool_result",
+        "tool_result",
+        "assistant"
+      ],
+      "tool_statuses": [
+        "succeeded",
+        "failed"
+      ],
+      "rounds": 2
+    }
+  ],
+  "evidence_limit": "Synthetic inputs through real Provider parsing, Conversation, and Harness; one-character interleaved streams verify concatenation for these inputs. This does not reconstruct the original failed live arguments or exclude provider-side stream corruption."
+}

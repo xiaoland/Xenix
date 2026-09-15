@@ -2,26 +2,20 @@
 
 from __future__ import annotations
 
-from typing import Any
-
-
 from ..analysis_graph import GraphDatasetInput
-from ..analysis_lambda import AnalysisLambdaDataset, AnalysisLambdaInput
 from ..analysis_profile import ProfileDatasetInput
 from ..artifact_service import (
     RegisterArtifactInput,
-    build_artifact_uri,
 )
 from ..storage.models import (
     ArtifactKind,
 )
-from ..llm.tooling import (
+from ..llm.tool_protocol import (
     ToolExecutionContext,
     ToolSuccess,
 )
 from .tool_inputs import (
     AnalysisGraphInput,
-    AnalysisLambdaInput as AnalysisLambdaToolInput,
     AnalysisProfileInput,
 )
 from ._tool_common import _raise_if_cancelled
@@ -35,16 +29,13 @@ class AnalysisTools:
         artifact_service,
         analysis_profile_service,
         analysis_graph_service,
-        analysis_lambda_service,
         ml_service,
     ) -> None:
         self._dataset_service = dataset_service
         self._artifact_service = artifact_service
         self._analysis_profile_service = analysis_profile_service
         self._analysis_graph_service = analysis_graph_service
-        self._analysis_lambda_service = analysis_lambda_service
         self._ml_service = ml_service
-
 
     def _analysis_graph(
         self,
@@ -91,77 +82,6 @@ class AnalysisTools:
         }
         return ToolSuccess(value=payload)
 
-    def _analysis_lambda(
-        self,
-        input_data: AnalysisLambdaToolInput,
-        context: ToolExecutionContext,
-    ) -> ToolSuccess:
-        _raise_if_cancelled(self._ml_service, context)
-        datasets: list[AnalysisLambdaDataset] = []
-        for alias, dataset_id in input_data.datasets.items():
-            dataset = self._dataset_service.get_dataset(dataset_id)
-            datasets.append(
-                AnalysisLambdaDataset(
-                    alias=alias,
-                    dataset_id=dataset.id,
-                    dataset_name=dataset.name,
-                    source_path=dataset.source_path,
-                )
-            )
-
-        lambda_result = self._analysis_lambda_service.run_lambda(
-            AnalysisLambdaInput(
-                code=input_data.code,
-                datasets=datasets,
-                params=input_data.params,
-                manifest=input_data.manifest,
-            ),
-            cancel_requested=context.cancel_requested,
-        )
-        artifact_map: dict[str, str] = {}
-        artifact_payloads: list[dict[str, Any]] = []
-        for descriptor in lambda_result.artifacts:
-            kind = self._lambda_artifact_kind(descriptor.kind)
-            metadata_payload = {
-                "analysis_lambda": {
-                    "placeholder_id": descriptor.placeholder_id,
-                    "kind": descriptor.kind,
-                    "metadata": descriptor.metadata_payload,
-                }
-            }
-            artifact = self._artifact_service.register_artifact(
-                RegisterArtifactInput(
-                    kind=kind,
-                    title=descriptor.title,
-                    absolute_path=descriptor.absolute_path,
-                    mime_type=descriptor.mime_type,
-                    summary=descriptor.summary,
-                    metadata_payload=metadata_payload,
-                )
-            )
-            uri = build_artifact_uri(artifact.id)
-            artifact_map[descriptor.placeholder_id] = artifact.id
-            artifact_payloads.append(
-                {
-                    "artifact_id": artifact.id,
-                    "uri": uri,
-                    "title": artifact.title,
-                    "kind": artifact.kind.value,
-                    "mime_type": artifact.mime_type,
-                    "placeholder_id": descriptor.placeholder_id,
-                }
-            )
-
-        output = self._rewrite_lambda_artifact_uris(lambda_result.output, artifact_map)
-        payload = {
-            "result": {
-                "output": output,
-            },
-            "artifacts": artifact_payloads,
-            "dataset_ids": [dataset.dataset_id for dataset in datasets],
-        }
-        return ToolSuccess(value=payload)
-
     def _analysis_profile(
         self,
         input_data: AnalysisProfileInput,
@@ -177,32 +97,3 @@ class AnalysisTools:
             )
         )
         return ToolSuccess(value=result.model_dump(mode="json"))
-
-    def _lambda_artifact_kind(self, raw_kind: str) -> ArtifactKind:
-        value = str(raw_kind or "").strip()
-        if value == "image":
-            return ArtifactKind.IMAGE
-        if value == "report":
-            return ArtifactKind.REPORT
-        if value in {"dataset", "file", "table"}:
-            return ArtifactKind.FILE
-        try:
-            return ArtifactKind(value)
-        except ValueError:
-            return ArtifactKind.OTHER
-
-    def _rewrite_lambda_artifact_uris(self, value: Any, artifact_map: dict[str, str]) -> Any:
-        if isinstance(value, str):
-            rewritten = value
-            for placeholder_id, artifact_id in artifact_map.items():
-                rewritten = rewritten.replace(f"artifact://{placeholder_id}", build_artifact_uri(artifact_id))
-            return rewritten
-        if isinstance(value, list):
-            return [self._rewrite_lambda_artifact_uris(item, artifact_map) for item in value]
-        if isinstance(value, dict):
-            return {
-                key: self._rewrite_lambda_artifact_uris(item, artifact_map)
-                for key, item in value.items()
-            }
-        return value
-

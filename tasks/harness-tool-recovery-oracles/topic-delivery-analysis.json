@@ -1,0 +1,49 @@
+{
+  "case_id": "ml.text_topic_discovery_v1",
+  "observed_checks": [
+    {
+      "name": "topic_assignments",
+      "passed": false,
+      "summary": "linked_topic_assignments_missing_or_incorrect"
+    },
+    {
+      "name": "reusable_topic_model",
+      "passed": true,
+      "summary": "linked_model_available"
+    },
+    {
+      "name": "public_quality_evidence",
+      "passed": false,
+      "summary": "linked_quality_facts_missing"
+    }
+  ],
+  "linked_reusable_model": true,
+  "diagnosis": "Labeled delivery renames feedback_ref/feedback to Chinese headers; quality report is a linked 11-row table, not JSON. Neither name nor format is constrained by the business request.",
+  "transform_recipes": [
+    {
+      "datasets": {
+        "lab": 74
+      },
+      "explanation": "将聚类分配结果映射为运营可读的三个主题（通风与温控舒适度、隔音与专注环境、预约与排期流程），输出逐条反馈的标注表。",
+      "name": "场地反馈主题标注表",
+      "sql": "SELECT\n  lab.feedback_ref AS 反馈编号,\n  lab.feedback AS 原始反馈,\n  lab.cluster_label AS 主题编号,\n  CASE lab.cluster_label\n    WHEN 1 THEN '通风与温控舒适度'\n    WHEN 2 THEN '隔音与专注环境'\n    WHEN 3 THEN '预约与排期流程'\n  END AS 主题名称,\n  CASE lab.cluster_label\n    WHEN 1 THEN 'Ventilation & thermal comfort'\n    WHEN 2 THEN 'Acoustic & focus environment'\n    WHEN 3 THEN 'Booking & scheduling flow'\n  END AS 主题英文名,\n  CASE lab.cluster_label\n    WHEN 1 THEN '通风 气流 温度 / ventilation airflow temperature climate comfort'\n    WHEN 2 THEN '隔音 安静 噪声 / acoustic quiet noise focus sound'\n    WHEN 3 THEN '预约 日历 时段 / booking calendar slot schedule reserve'\n  END AS 主题代表词\nFROM lab\nORDER BY 主题编号, 反馈编号"
+    },
+    {
+      "datasets": {
+        "k": 2
+      },
+      "explanation": "汇总 k=2/3/4 三种聚类的轮廓系数、重抽样稳定度与簇规模，用于验证三个主题是否为数据支持的分组数。",
+      "name": "主题数选择对照",
+      "sql": "SELECT * FROM (VALUES\n  (2, 0.339, 0.632, 24, 12),\n  (3, 0.517, 1.000, 12, 12),\n  (4, 0.493, 0.827, 12, 3)\n) AS t(k_主题数, 轮廓系数, 重抽样稳定度, 最大组条数, 最小组条数)"
+    },
+    {
+      "datasets": {
+        "q": 2
+      },
+      "explanation": "汇总主题标注的质量证据：覆盖率、一致性、有效样本量、簇质量、稳定度、分组数验证、词项区分度、备选方法失败情况与复用试跑结果。",
+      "name": "主题标注质量评估明细",
+      "sql": "SELECT * FROM (VALUES\n  ('标注覆盖率', '已获主题的反馈条数/总条数', '36/36 = 100%', '高', '无缺失文本，无未分配行'),\n  ('同一文本标注一致性', '相同反馈文本是否得到不同主题', '12个不同文本，冲突0个 = 100%一致', '高', '同一文本重复出现3次，标注完全一致'),\n  ('有效样本量', '不同文本数 vs 总行数', '36行 = 12个不同文本，每个重复3次', '中', '独立证据为12条而非36条，指标可能被重复行抬高'),\n  ('主题均衡度', '各主题条数占比', '12/12/12 = 33.3% 各占三分之一', '高', '无空簇、无超大簇'),\n  ('簇内紧密程度', '余弦轮廓系数（k=3）', '0.517', '中高', '>0.5 表示分界清楚，但受模板化文本影响偏高'),\n  ('重抽样稳定度', '5次80%重抽样的平均调整兰德指数', '1.000（最低1.000）', '高', '按12个模板组重抽样，结果完全复现'),\n  ('分组数验证', 'k=2/3/4 的轮廓系数', 'k=2=0.339；k=3=0.517；k=4=0.493', '中高', 'k=4 会把声学主题拆成12条+3条，k=3最受支持'),\n  ('词项区分度', '仅出现在单一主题的词项比例', '50/50 = 100%', '需注意', '三主题之间零共享词，说明语料高度模板化'),\n  ('方法一致性（主题模型）', 'LDA 三主题的连贯性与占比', '连贯性-0.587；单一主题占比87.8%', '低（该法不可用）', 'LDA未复现三主题结构，本次不采用其标签'),\n  ('英文尾句依赖', '各主题英文固定短语', '每主题有专属5个英文词，命中率12/12', '需注意', '分类主要靠英文固定尾句，中文同义词未跨主题出现'),\n  ('未来反馈可复用性', '对新文本调用同一模型的试跑结果', '3条新反馈全部落到预期主题', '中', '复用同一分词与向量规格，属推断性结果，非人工核验')\n) AS t(检查项, 检查方式, 结果, 可靠程度, 说明)"
+    }
+  ],
+  "evidence_limit": "Retained transform recipes and final text; artifacts were removed by isolated-cell cleanup. A reconstructed delivery is not a retrospective live pass."
+}

@@ -1,0 +1,76 @@
+{
+  "scenario": "Activate a Skill and read its resource in one response; repeat the same read in the next response.",
+  "requests": 3,
+  "activation_snapshots_at_resource_read": [
+    [],
+    [
+      "probe"
+    ]
+  ],
+  "tool_outcomes": [
+    {
+      "tool": "agent.skill.activate",
+      "arguments": {
+        "name": "probe"
+      },
+      "status": "succeeded",
+      "value": {
+        "skill_name": "probe",
+        "instructions": "Optional guidance.",
+        "resources": {
+          "references": [
+            "references/example.md"
+          ]
+        }
+      }
+    },
+    {
+      "tool": "agent.skill.read_reference",
+      "arguments": {
+        "skill_name": "probe",
+        "path": "references/example.md"
+      },
+      "status": "failed",
+      "value": {
+        "type": "tool_failure",
+        "code": "agent_skill_not_activated",
+        "message": "Agent Skill 'probe' must be activated in this Thread before reading resources."
+      }
+    },
+    {
+      "tool": "agent.skill.read_reference",
+      "arguments": {
+        "skill_name": "probe",
+        "path": "references/example.md"
+      },
+      "status": "succeeded",
+      "value": {
+        "skill_name": "probe",
+        "kind": "references",
+        "path": "references/example.md",
+        "content": "Reference content.",
+        "size_bytes": 18
+      }
+    }
+  ],
+  "feedback_after_first_response": [
+    {
+      "skill_name": "probe",
+      "instructions": "Optional guidance.",
+      "resources": {
+        "references": [
+          "references/example.md"
+        ]
+      }
+    },
+    {
+      "type": "tool_failure",
+      "code": "agent_skill_not_activated",
+      "message": "Agent Skill 'probe' must be activated in this Thread before reading resources."
+    }
+  ],
+  "final_skill_names": [
+    "probe"
+  ],
+  "evidence_limit": "Synthetic catalog and scripted model through production Skill registration, registry, Conversation, Harness and isolated SQLite; no live LLM or benchmark claim."
+}

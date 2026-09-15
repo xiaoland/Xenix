@@ -11,7 +11,7 @@ from ..llm.providers import (
     extract_reasoning_content,
     request,
 )
-from ..llm.tooling import AgentToolSpec
+from ..llm.tool_protocol import AgentToolSpec
 
 __all__ = [
     "AgentProvider",

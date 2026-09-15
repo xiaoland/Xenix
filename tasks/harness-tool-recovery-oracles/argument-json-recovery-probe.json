@@ -1,0 +1,550 @@
+{
+  "heatmap_template_valid_json": true,
+  "results": [
+    {
+      "stream": false,
+      "variant": "valid",
+      "error": null,
+      "executed": [
+        "ping",
+        "graph"
+      ],
+      "usage_observations": 2,
+      "persisted_kinds": [
+        "user",
+        "assistant",
+        "tool_call",
+        "tool_call",
+        "tool_result",
+        "tool_result",
+        "assistant"
+      ],
+      "tool_statuses": [
+        "succeeded",
+        "succeeded"
+      ],
+      "rounds": 2,
+      "feedback": [],
+      "durable_raw_replay_verified": false
+    },
+    {
+      "stream": false,
+      "variant": "unquoted_key",
+      "error": null,
+      "executed": [
+        "ping",
+        "graph"
+      ],
+      "usage_observations": 3,
+      "persisted_kinds": [
+        "user",
+        "assistant",
+        "tool_call",
+        "tool_call",
+        "tool_result",
+        "tool_result",
+        "assistant",
+        "tool_call",
+        "tool_result",
+        "assistant"
+      ],
+      "tool_statuses": [
+        "succeeded",
+        "failed",
+        "succeeded"
+      ],
+      "rounds": 3,
+      "feedback": [
+        {
+          "type": "tool_failure",
+          "code": "llm_tool_arguments_invalid_json",
+          "message": "Tool call 'analysis_graph' arguments are not valid JSON: Expecting property name enclosed in double quotes (line 1, column 302).",
+          "details": {
+            "line": 1,
+            "column": 302,
+            "position": 301
+          }
+        }
+      ],
+      "durable_raw_replay_verified": true
+    },
+    {
+      "stream": false,
+      "variant": "trailing_comma",
+      "error": null,
+      "executed": [
+        "ping",
+        "graph"
+      ],
+      "usage_observations": 3,
+      "persisted_kinds": [
+        "user",
+        "assistant",
+        "tool_call",
+        "tool_call",
+        "tool_result",
+        "tool_result",
+        "assistant",
+        "tool_call",
+        "tool_result",
+        "assistant"
+      ],
+      "tool_statuses": [
+        "succeeded",
+        "failed",
+        "succeeded"
+      ],
+      "rounds": 3,
+      "feedback": [
+        {
+          "type": "tool_failure",
+          "code": "llm_tool_arguments_invalid_json",
+          "message": "Tool call 'analysis_graph' arguments are not valid JSON: Illegal trailing comma before end of object (line 1, column 1056).",
+          "details": {
+            "line": 1,
+            "column": 1056,
+            "position": 1055
+          }
+        }
+      ],
+      "durable_raw_replay_verified": true
+    },
+    {
+      "stream": false,
+      "variant": "non_object_json",
+      "error": null,
+      "executed": [
+        "ping",
+        "graph"
+      ],
+      "usage_observations": 3,
+      "persisted_kinds": [
+        "user",
+        "assistant",
+        "tool_call",
+        "tool_call",
+        "tool_result",
+        "tool_result",
+        "assistant",
+        "tool_call",
+        "tool_result",
+        "assistant"
+      ],
+      "tool_statuses": [
+        "succeeded",
+        "failed",
+        "succeeded"
+      ],
+      "rounds": 3,
+      "feedback": [
+        {
+          "type": "tool_failure",
+          "code": "tool_validation_failed",
+          "message": "Tool call 'analysis_graph' arguments must be a JSON object."
+        }
+      ],
+      "durable_raw_replay_verified": true
+    },
+    {
+      "stream": false,
+      "variant": "empty_text",
+      "error": null,
+      "executed": [
+        "ping",
+        "graph"
+      ],
+      "usage_observations": 3,
+      "persisted_kinds": [
+        "user",
+        "assistant",
+        "tool_call",
+        "tool_call",
+        "tool_result",
+        "tool_result",
+        "assistant",
+        "tool_call",
+        "tool_result",
+        "assistant"
+      ],
+      "tool_statuses": [
+        "succeeded",
+        "failed",
+        "succeeded"
+      ],
+      "rounds": 3,
+      "feedback": [
+        {
+          "type": "tool_failure",
+          "code": "llm_tool_arguments_invalid_json",
+          "message": "Tool call 'analysis_graph' arguments are not valid JSON: Expecting value (line 1, column 1).",
+          "details": {
+            "line": 1,
+            "column": 1,
+            "position": 0
+          }
+        }
+      ],
+      "durable_raw_replay_verified": true
+    },
+    {
+      "stream": false,
+      "variant": "truncated_json",
+      "error": null,
+      "executed": [
+        "ping",
+        "graph"
+      ],
+      "usage_observations": 3,
+      "persisted_kinds": [
+        "user",
+        "assistant",
+        "tool_call",
+        "tool_call",
+        "tool_result",
+        "tool_result",
+        "assistant",
+        "tool_call",
+        "tool_result",
+        "assistant"
+      ],
+      "tool_statuses": [
+        "succeeded",
+        "failed",
+        "succeeded"
+      ],
+      "rounds": 3,
+      "feedback": [
+        {
+          "type": "tool_failure",
+          "code": "llm_tool_arguments_invalid_json",
+          "message": "Tool call 'analysis_graph' arguments are not valid JSON: Unterminated string starting at (line 1, column 1024).",
+          "details": {
+            "line": 1,
+            "column": 1024,
+            "position": 1023
+          }
+        }
+      ],
+      "durable_raw_replay_verified": true
+    },
+    {
+      "stream": false,
+      "variant": "decoded_wrong_field_type",
+      "error": null,
+      "executed": [
+        "ping",
+        "graph"
+      ],
+      "usage_observations": 3,
+      "persisted_kinds": [
+        "user",
+        "assistant",
+        "tool_call",
+        "tool_call",
+        "tool_result",
+        "tool_result",
+        "assistant",
+        "tool_call",
+        "tool_result",
+        "assistant"
+      ],
+      "tool_statuses": [
+        "succeeded",
+        "failed",
+        "succeeded"
+      ],
+      "rounds": 3,
+      "feedback": [
+        {
+          "type": "tool_failure",
+          "code": "llm_tool_arguments_invalid",
+          "message": "Tool arguments do not match the registered input model.",
+          "details": {
+            "schema_keyword": "type",
+            "validation_errors": [
+              {
+                "field": "dataset_id",
+                "message": "Input should be a valid integer"
+              }
+            ]
+          },
+          "retryable": false
+        }
+      ],
+      "durable_raw_replay_verified": false
+    },
+    {
+      "stream": true,
+      "variant": "valid",
+      "error": null,
+      "executed": [
+        "ping",
+        "graph"
+      ],
+      "usage_observations": 2,
+      "persisted_kinds": [
+        "user",
+        "assistant",
+        "tool_call",
+        "tool_call",
+        "tool_result",
+        "tool_result",
+        "assistant"
+      ],
+      "tool_statuses": [
+        "succeeded",
+        "succeeded"
+      ],
+      "rounds": 2,
+      "feedback": [],
+      "durable_raw_replay_verified": false
+    },
+    {
+      "stream": true,
+      "variant": "unquoted_key",
+      "error": null,
+      "executed": [
+        "ping",
+        "graph"
+      ],
+      "usage_observations": 3,
+      "persisted_kinds": [
+        "user",
+        "assistant",
+        "tool_call",
+        "tool_call",
+        "tool_result",
+        "tool_result",
+        "assistant",
+        "tool_call",
+        "tool_result",
+        "assistant"
+      ],
+      "tool_statuses": [
+        "succeeded",
+        "failed",
+        "succeeded"
+      ],
+      "rounds": 3,
+      "feedback": [
+        {
+          "type": "tool_failure",
+          "code": "llm_tool_arguments_invalid_json",
+          "message": "Tool call 'analysis_graph' arguments are not valid JSON: Expecting property name enclosed in double quotes (line 1, column 302).",
+          "details": {
+            "line": 1,
+            "column": 302,
+            "position": 301
+          }
+        }
+      ],
+      "durable_raw_replay_verified": true
+    },
+    {
+      "stream": true,
+      "variant": "trailing_comma",
+      "error": null,
+      "executed": [
+        "ping",
+        "graph"
+      ],
+      "usage_observations": 3,
+      "persisted_kinds": [
+        "user",
+        "assistant",
+        "tool_call",
+        "tool_call",
+        "tool_result",
+        "tool_result",
+        "assistant",
+        "tool_call",
+        "tool_result",
+        "assistant"
+      ],
+      "tool_statuses": [
+        "succeeded",
+        "failed",
+        "succeeded"
+      ],
+      "rounds": 3,
+      "feedback": [
+        {
+          "type": "tool_failure",
+          "code": "llm_tool_arguments_invalid_json",
+          "message": "Tool call 'analysis_graph' arguments are not valid JSON: Illegal trailing comma before end of object (line 1, column 1056).",
+          "details": {
+            "line": 1,
+            "column": 1056,
+            "position": 1055
+          }
+        }
+      ],
+      "durable_raw_replay_verified": true
+    },
+    {
+      "stream": true,
+      "variant": "non_object_json",
+      "error": null,
+      "executed": [
+        "ping",
+        "graph"
+      ],
+      "usage_observations": 3,
+      "persisted_kinds": [
+        "user",
+        "assistant",
+        "tool_call",
+        "tool_call",
+        "tool_result",
+        "tool_result",
+        "assistant",
+        "tool_call",
+        "tool_result",
+        "assistant"
+      ],
+      "tool_statuses": [
+        "succeeded",
+        "failed",
+        "succeeded"
+      ],
+      "rounds": 3,
+      "feedback": [
+        {
+          "type": "tool_failure",
+          "code": "tool_validation_failed",
+          "message": "Tool call 'analysis_graph' arguments must be a JSON object."
+        }
+      ],
+      "durable_raw_replay_verified": true
+    },
+    {
+      "stream": true,
+      "variant": "empty_text",
+      "error": null,
+      "executed": [
+        "ping",
+        "graph"
+      ],
+      "usage_observations": 3,
+      "persisted_kinds": [
+        "user",
+        "assistant",
+        "tool_call",
+        "tool_call",
+        "tool_result",
+        "tool_result",
+        "assistant",
+        "tool_call",
+        "tool_result",
+        "assistant"
+      ],
+      "tool_statuses": [
+        "succeeded",
+        "failed",
+        "succeeded"
+      ],
+      "rounds": 3,
+      "feedback": [
+        {
+          "type": "tool_failure",
+          "code": "llm_tool_arguments_invalid_json",
+          "message": "Tool call 'analysis_graph' arguments are not valid JSON: Expecting value (line 1, column 1).",
+          "details": {
+            "line": 1,
+            "column": 1,
+            "position": 0
+          }
+        }
+      ],
+      "durable_raw_replay_verified": true
+    },
+    {
+      "stream": true,
+      "variant": "truncated_json",
+      "error": null,
+      "executed": [
+        "ping",
+        "graph"
+      ],
+      "usage_observations": 3,
+      "persisted_kinds": [
+        "user",
+        "assistant",
+        "tool_call",
+        "tool_call",
+        "tool_result",
+        "tool_result",
+        "assistant",
+        "tool_call",
+        "tool_result",
+        "assistant"
+      ],
+      "tool_statuses": [
+        "succeeded",
+        "failed",
+        "succeeded"
+      ],
+      "rounds": 3,
+      "feedback": [
+        {
+          "type": "tool_failure",
+          "code": "llm_tool_arguments_invalid_json",
+          "message": "Tool call 'analysis_graph' arguments are not valid JSON: Unterminated string starting at (line 1, column 1024).",
+          "details": {
+            "line": 1,
+            "column": 1024,
+            "position": 1023
+          }
+        }
+      ],
+      "durable_raw_replay_verified": true
+    },
+    {
+      "stream": true,
+      "variant": "decoded_wrong_field_type",
+      "error": null,
+      "executed": [
+        "ping",
+        "graph"
+      ],
+      "usage_observations": 3,
+      "persisted_kinds": [
+        "user",
+        "assistant",
+        "tool_call",
+        "tool_call",
+        "tool_result",
+        "tool_result",
+        "assistant",
+        "tool_call",
+        "tool_result",
+        "assistant"
+      ],
+      "tool_statuses": [
+        "succeeded",
+        "failed",
+        "succeeded"
+      ],
+      "rounds": 3,
+      "feedback": [
+        {
+          "type": "tool_failure",
+          "code": "llm_tool_arguments_invalid",
+          "message": "Tool arguments do not match the registered input model.",
+          "details": {
+            "schema_keyword": "type",
+            "validation_errors": [
+              {
+                "field": "dataset_id",
+                "message": "Input should be a valid integer"
+              }
+            ]
+          },
+          "retryable": false
+        }
+      ],
+      "durable_raw_replay_verified": false
+    }
+  ],
+  "evidence_limit": "Synthetic inputs through real Provider parsing, Conversation, Harness, and SQLite. The streaming branch uses the real LLMService.stream loop. Confirms sibling execution, failure feedback, repair, usage, UI detail and exact raw replay after reload; no original failed live arguments were reconstructed."
+}

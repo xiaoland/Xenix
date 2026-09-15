@@ -1,0 +1,32 @@
+{
+  "completed_reports": 28,
+  "expected_case_count": 28,
+  "missing_cases": [],
+  "extra_cases": [],
+  "duplicate_cases": 0,
+  "changed_runtime_or_case_inputs": [],
+  "launcher_changed_inputs": [],
+  "changed_settings": [],
+  "report_hash_mismatches": [],
+  "batches": [
+    {
+      "batch": "business",
+      "started_at": "2026-09-14T05:06:05.017685+00:00",
+      "completed_at": "2026-09-14T05:35:41.954701+00:00",
+      "exit_code": 1
+    },
+    {
+      "batch": "legacy",
+      "started_at": "2026-09-14T05:06:05.018359+00:00",
+      "completed_at": "2026-09-14T05:36:19.200057+00:00",
+      "exit_code": 0
+    },
+    {
+      "batch": "confirmation",
+      "started_at": "2026-09-14T05:35:41.955822+00:00",
+      "completed_at": "2026-09-14T06:01:04.970308+00:00",
+      "exit_code": 1
+    }
+  ],
+  "external_source_unchanged": true
+}

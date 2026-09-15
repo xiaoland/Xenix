@@ -18,6 +18,9 @@ from dataclasses import dataclass, field
 from typing import Any, Iterable, Literal, Mapping, TypeAlias
 
 from ...exceptions import ValidationError
+from .tool_protocol import (
+    InvalidToolArguments,
+)
 
 
 # These are deliberately modest.  They bound provider context and make a
@@ -373,12 +376,12 @@ class AssistantOutputItem:
 
 @dataclass(frozen=True)
 class ToolCallOutputItem:
-    """A provider tool call in canonical source order."""
+    """A requested tool call in source order, before registry identity resolution."""
 
     provider_call_id: str
     tool_name: str
     provider_name: str
-    arguments: dict[str, object]
+    arguments: dict[str, object] | InvalidToolArguments
     stream_index: int | None = None
 
 

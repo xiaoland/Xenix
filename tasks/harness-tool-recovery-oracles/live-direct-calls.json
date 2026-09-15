@@ -1,0 +1,30 @@
+[
+  {
+    "case_id": "ml.recommendation_ranking_v1",
+    "round": 1,
+    "tool": "data.query",
+    "status": "failed",
+    "provider_call_id": "call_01_ix2j2lXtxnnCYTsjgF9m2304"
+  },
+  {
+    "case_id": "ml.recommendation_ranking_v1",
+    "round": 1,
+    "tool": "data.query",
+    "status": "failed",
+    "provider_call_id": "call_02_jOQJLi8eJRXlMQLFq9hc5986"
+  },
+  {
+    "case_id": "ml.recommendation_ranking_v1",
+    "round": 2,
+    "tool": "data.query",
+    "status": "failed",
+    "provider_call_id": "call_01_Stzs9wXGIBeu8oGvaFwE0612"
+  },
+  {
+    "case_id": "ml.recommendation_ranking_v1",
+    "round": 2,
+    "tool": "data.query",
+    "status": "failed",
+    "provider_call_id": "call_02_UKdxdqr4KY7dhTZH0NYa0581"
+  }
+]

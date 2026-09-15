@@ -24,7 +24,11 @@ from .messages import (
     normalize_message_blocks,
 )
 from .providers import LLMRetryEvent
-from .tooling import StagedToolCall, TerminalToolResult, ToolScope
+from .tool_protocol import (
+    StagedToolCall,
+    TerminalToolResult,
+    ToolScope,
+)
 
 
 def _utc_now() -> datetime:

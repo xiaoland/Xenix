@@ -229,6 +229,8 @@ def _worker_exception(result: dict[str, Any]) -> Exception:
             retryable=result.get("retryable") if isinstance(result.get("retryable"), bool) else None,
         )
     details = result.get("traceback")
+    error = RuntimeError(message)
     if isinstance(details, str) and details.strip():
-        return RuntimeError(f"{message}\n{details}")
-    return RuntimeError(message)
+        # Preserve the child stack in diagnostics without repeating it in ToolResult text.
+        error.add_note(details)
+    return error

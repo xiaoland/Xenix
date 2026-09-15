@@ -4,7 +4,7 @@ import pytest
 
 from xenix.services.agent._model_tools import ModelTools
 from xenix.services.agent.tool_inputs import ModelApplyInput, ModelHyperTrainInput, ModelMetadataInput, ModelTrainInput
-from xenix.services.llm.tooling import ToolExecutionContext
+from xenix.services.llm.tool_protocol import ToolExecutionContext
 from xenix.services.storage.models import MLTaskArtifactKind
 
 

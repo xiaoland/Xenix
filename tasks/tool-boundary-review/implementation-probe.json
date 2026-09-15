@@ -1,0 +1,120 @@
+{
+  "tool_protocol_loaded_modules": [
+    "xenix.services.llm",
+    "xenix.services.llm.tool_protocol"
+  ],
+  "messages_loaded_modules": [
+    "xenix.services.llm",
+    "xenix.services.llm.messages",
+    "xenix.services.llm.tool_protocol"
+  ],
+  "unchanged_business_definitions": [
+    "analysis.graph",
+    "analysis.profile",
+    "data.clean",
+    "data.clean.metadata",
+    "data.feature.select",
+    "data.integrate",
+    "data.query",
+    "data.tokenize",
+    "data.transform",
+    "model.apply",
+    "model.hyper_train",
+    "model.metadata",
+    "model.task.query",
+    "model.task.stop",
+    "model.train"
+  ],
+  "invocation_without_schema_projection": {
+    "choice": {
+      "a": 3
+    }
+  },
+  "unsupported_advertised_union": "llm_tool_schema_invalid",
+  "skill_resource_results": [
+    {
+      "call": "1-direct-reference",
+      "status": "succeeded",
+      "value": {
+        "skill_name": "probe",
+        "kind": "references",
+        "path": "references/example.md",
+        "content": "Reference content.",
+        "size_bytes": 18
+      }
+    },
+    {
+      "call": "1-direct-asset",
+      "status": "succeeded",
+      "value": {
+        "skill_name": "probe",
+        "kind": "assets",
+        "path": "assets/example.json",
+        "content": "{\"ok\": true}",
+        "size_bytes": 12
+      }
+    },
+    {
+      "call": "1-guidance",
+      "status": "succeeded",
+      "value": {
+        "skill_name": "probe",
+        "instructions": "Optional guidance.",
+        "resources": {
+          "references": [
+            "references/example.md"
+          ],
+          "assets": [
+            "assets/example.json"
+          ]
+        }
+      }
+    },
+    {
+      "call": "1-same-response-reference",
+      "status": "succeeded",
+      "value": {
+        "skill_name": "probe",
+        "kind": "references",
+        "path": "references/example.md",
+        "content": "Reference content.",
+        "size_bytes": 18
+      }
+    },
+    {
+      "call": "1-same-response-asset",
+      "status": "succeeded",
+      "value": {
+        "skill_name": "probe",
+        "kind": "assets",
+        "path": "assets/example.json",
+        "content": "{\"ok\": true}",
+        "size_bytes": 12
+      }
+    },
+    {
+      "call": "1-missing",
+      "status": "failed",
+      "value": {
+        "type": "tool_failure",
+        "code": "tool_validation_failed",
+        "message": "Agent Skill resource 'references/missing.md' is not listed for skill 'probe'."
+      }
+    },
+    {
+      "call": "2-repair",
+      "status": "succeeded",
+      "value": {
+        "skill_name": "probe",
+        "kind": "references",
+        "path": "references/example.md",
+        "content": "Reference content.",
+        "size_bytes": 18
+      }
+    }
+  ],
+  "skill_guidance_history_reload": [
+    "probe"
+  ],
+  "evidence_limit": "Offline manual probes with isolated SQLite; no live LLM or benchmark pass claim. Business definitions compare saved pre-edit declarations/projector with current factory/input models."
+}

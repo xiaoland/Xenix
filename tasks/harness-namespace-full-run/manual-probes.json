@@ -1,0 +1,52 @@
+{
+  "april_integer_result_locator": [],
+  "april_xtt_locator": [
+    "122"
+  ],
+  "restock_without_budget": {
+    "cost": 3010.0,
+    "margin": 1865.0,
+    "boxes": 18,
+    "batches": {
+      "Q102": 1,
+      "Q203": 2,
+      "Q305": 1,
+      "Q509": 1,
+      "Q510": 1
+    }
+  },
+  "legacy_integer_lineage": {
+    "test_ml_cleaning": {
+      "integer_parent_chain_recognized": false,
+      "expected": true
+    },
+    "test_ml_cluster_selection": {
+      "integer_parent_chain_recognized": false,
+      "expected": true
+    },
+    "test_ml_forecast_validation": {
+      "integer_parent_chain_recognized": false,
+      "expected": true
+    },
+    "test_ml_forecasting": {
+      "integer_parent_chain_recognized": false,
+      "expected": true
+    },
+    "test_ml_text_insight": {
+      "integer_parent_chain_recognized": false,
+      "expected": true
+    },
+    "test_ml_text_grouped_classification": {
+      "integer_parent_chain_recognized": false,
+      "expected": true
+    },
+    "test_ml_text_topic_discovery": {
+      "integer_parent_chain_recognized": false,
+      "expected": true
+    },
+    "test_ml_recommendation_ranking": {
+      "integer_parent_chain_recognized": false,
+      "expected": true
+    }
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "model": "deepseek/deepseek-v4-flash",
+  "initial_probe_setup_rejection": "First synthetic history omitted reasoning_content required by this provider; HTTP 400. Added a synthetic reasoning field without changing production code.",
+  "original_arguments": "{\"dataset_id\":2,\"spec\":{\"mark\":\"bar\",}}",
+  "provider_accepted_history": true,
+  "corrected_call_observed": true,
+  "calls": [
+    {
+      "name": "analysis_graph",
+      "arguments": {
+        "dataset_id": 2,
+        "spec": {
+          "mark": "bar",
+          "encoding": {
+            "x": {
+              "field": "region",
+              "type": "nominal",
+              "title": "Region"
+            },
+            "y": {
+              "field": "sales",
+              "type": "quantitative",
+              "title": "Sales"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "usage": {
+    "input_tokens": 905,
+    "cached_input_tokens": 0,
+    "output_tokens": 114,
+    "total_tokens": 1019,
+    "provider_usage": {
+      "prompt_tokens": 905,
+      "completion_tokens": 114,
+      "total_tokens": 1019,
+      "prompt_tokens_details": {
+        "cached_tokens": 0
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 6
+      },
+      "prompt_cache_hit_tokens": 0,
+      "prompt_cache_miss_tokens": 905
+    }
+  },
+  "evidence_limit": "A synthetic malformed call and ToolFailure were supplied as conversation history. Real provider corrected the call; no chart was executed and this is not the recommendation benchmark score."
+}
