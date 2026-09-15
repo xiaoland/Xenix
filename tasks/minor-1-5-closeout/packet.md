@@ -19,3 +19,11 @@
 ## 清理未执行的原因
 
 自动审批拒绝对已列明的缓存及两个旧 review 目录执行批量 Remove-Item，只返回 blocked by policy。没有换用另一种删除方式，也没有声称释放了磁盘空间。build、dist、.runtime 的大部分空间包含有价值的制品或运行数据，不能以目录体积代替生命周期判断。
+
+## 发布尝试 — 2026-09-15
+
+收尾提交 58539a0 已推送，PR #125 的 Native CI 通过后合并至 main（adb0dbc）。v1.5.0 指向该合并结果，本地身份校验与远端 Linux preflight 通过。发布运行 34952724297 在 Windows 的 Re-verify exact release identity 阶段失败，尚未执行打包或发布步骤。
+
+根因是 scripts/verify_release_identity.py 的 subprocess 文本输出使用 Windows 默认 CP1252 解码 gh 的 UTF-8 中文 PR 信息，后台读取线程抛出 UnicodeDecodeError，随后 stdout 为 None 引发 AttributeError。修复为显式 encoding="utf-8"，不改变发布身份或推广校验。手工以 PYTHONUTF8=0 验证中文子进程输出及当前 tag 身份均通过，Ruff 与 diff 检查通过；未新增自动化测试。
+
+v1.5.0 已推送且不可移动。已向用户请求改发 1.5.1 或暂停发布的决定；确定前不创建新版本 tag，也不重试相同的确定性编码错误。原始失败日志保存在 build/release-1-5-failure.log。
