@@ -1,4 +1,4 @@
-# 1.5.0 Release Notes — Preparation
+# 1.5 Release Notes — 1.5.1 Preparation
 
 This is the candidate release summary for changes since v1.4.0, not a publication announcement. Publication follows [Windows Distribution](windows-distribution.md); local preparation and evidence are tracked in the [closeout packet](../../tasks/minor-1-5-closeout/packet.md).
 
@@ -25,3 +25,7 @@ Saved text analyzers retain their preparation and vocabulary. New classification
 The latest functional revision passed 303 offline tests, static checks, isolated startup, Windows packaging and packaged smoke. Targeted routing confirmation passed with 28/30 actual predictions correct (93.33%); this does not establish full live benchmark acceptance. The user closed benchmark improvement and failure investigation on 2026-09-15, with unresolved observations retained as historical evidence.
 
 The reviewed bundle predates the 1.5.0 declaration and embeds the preceding build identity; it is not a 1.5.0 release artifact. The final promoted commit requires its own CI, tag identity verification, release build and packaged smoke. Preparation does not create or push a release tag.
+
+## Initial publication recovery
+
+v1.5.0 passed promotion CI but its Windows release identity step failed while decoding UTF-8 GitHub CLI output with the default Windows code page, before packaging or publication. The tag remains unchanged. Version 1.5.1 includes explicit UTF-8 subprocess decoding and is the approved publication target for this minor release.
