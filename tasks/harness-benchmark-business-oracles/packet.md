@@ -1,3 +1,5 @@
+> 阶段归档（2026-09-15）：用户已结束 benchmark 优化及相关失败排查。以下为历史记录，旧 Next Step 不再代表待执行任务；当前工作见 [1.5.0 收尾](../minor-1-5-closeout/packet.md)。
+
 # Harness benchmark：任务设计与任务组织
 
 - **目标**：依据 Xenix 长期应完成的业务工作，设计有代表性、有区分力的任务组合；学习 FrontierHarness Eval 的任务与验收原则，按本产品取舍。

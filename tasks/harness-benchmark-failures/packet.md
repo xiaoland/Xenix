@@ -1,3 +1,5 @@
+> 阶段归档（2026-09-15）：用户已结束 benchmark 优化及相关失败排查。以下为历史记录，旧 Next Step 不再代表待执行任务；当前工作见 [1.5.0 收尾](../minor-1-5-closeout/packet.md)。
+
 # Harness benchmark 失败修复
 
 - **目标与授权**：第二批已提交 `3c378f7`，提交后工作区干净。用户授权判断是否有第三批高价值优化；若无则直接修复 benchmark 失败，包括 Harness 缺陷或误报。本 packet 记录已完成且获准提交的失败修复，以及用户追加要求的 benchmark 自测清理。

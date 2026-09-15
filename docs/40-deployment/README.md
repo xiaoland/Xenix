@@ -3,6 +3,8 @@
 Use this layer when runtime or release operations fail, or when an action can destroy local state. Route by trigger:
 
 - Build, packaged acceptance, distribution, packaged-only failure, or rollback: [Packaging](packaging.md)
+- Review 1.5.0 candidate changes and upgrade implications: [Release preparation](release-1.5.md)
+- Reconcile local tooling, caches, evidence and task archives: [Development closeout](development-closeout.md)
 - Build/publish an unsigned Velopack Setup or operate the Alibaba OSS feed: [Windows Distribution](windows-distribution.md)
 - Locate active state, inspect evidence, back up, reset, restore, or create a support bundle: [Runtime State](runtime-state.md)
 - Configure or diagnose logs, traces, metrics, or OTLP export: [Observability](observability.md)

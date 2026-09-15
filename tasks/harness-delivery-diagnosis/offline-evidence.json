@@ -1,0 +1,481 @@
+{
+  "scope": "One-off offline diagnosis: original SQL, native CSV import, query/transform, inspection and XTT formatting. No LLM calls or changed historical verdicts.",
+  "repository_commit": "a94aa280a6cd41ce312f19742a07f57ec1b3929f",
+  "experiment_sha256": "a511df9f5e860df81176db7a6ccf8951e4c687601218400f9fc9ef7ddc873dcc",
+  "revenue": [
+    {
+      "case_id": "business.revenue.v1.standard",
+      "source_report": "build/agent-harness-full-81fb9bb/business/business.revenue.v1.standard-deepseek-deepseek-v4-flash-f5c24ab1b83c4e3b8a16c71828887ddf.json",
+      "report_sha256": "beeaf5830cc4faf7e4f4758f1c17903b2f385671440def733ff5db7cb061377a",
+      "fixture_rows": {
+        "orders": {
+          "rows": 25,
+          "sha256": "f8773f79854efeff587f1ebb769b11817be0b491dad3ce35c6756804b8aea7e8"
+        },
+        "stores": {
+          "rows": 8,
+          "sha256": "edaf0aebdbc5e3eb9a186a95566c5045978a02518fb38100caba052fd06aba96"
+        },
+        "refunds": {
+          "rows": 17,
+          "sha256": "5a887d470e7fb8c68d40a412ef14998cb575287b9dd27fe7f96bc1e6b9b353fe"
+        },
+        "refund_updates": {
+          "rows": 5,
+          "sha256": "4b1c8a23f41b8a7278859e98164b58e9ea4f8a06ed4cdcccb28e77532c949d36"
+        }
+      },
+      "replays": [
+        {
+          "tool": "data.query",
+          "round": 3,
+          "sql_sha256": "b7ac93aa7c03e7dba931ae12e66140c73e3f3075b6754e6454fd832f0e45a3c5",
+          "original_serialized_bytes": 1542,
+          "returned_rows": 25,
+          "total_rows": 25,
+          "truncated": false,
+          "replayed_serialized_bytes": 1542,
+          "byte_count_matches_original": true,
+          "provider_wire_keeps_value": true,
+          "reconstructed_tool_text": "shape: 25 rows × 5 columns\nreturned_rows: 25\ntotal_rows: 25\ntruncated: false\nsample: head(25)\nnull: ∅\n\nschema:\n  order_id: str\n  paid_date: str\n  store_id: str\n  amount_yuan: float64\n  status: str\n\ndata:\n| # | order_id | paid_date | store_id | amount_yuan | status |\n|---:|---|---|---|---:|---|\n| 1 | O01 | 2026-06-01 | S01 | 10000.0 | paid |\n| 2 | O02 | 2026-06-30 | S01 | 20000.0 | paid |\n| 3 | O03 | 2026-06-10 | S02 | 8000.0 | paid |\n| 4 | O04 | 2026-06-20 | S02 | 12000.0 | paid |\n| 5 | O05 | 2026-06-12 | S03 | 9000.0 | paid |\n| 6 | O06 | 2026-06-18 | S03 | 7000.0 | paid |\n| 7 | O07 | 2026-06-15 | S04 | 15000.0 | paid |\n| 8 | O08 | 2026-05-31 | S02 | 5000.0 | paid |\n| 9 | O09 | 2026-07-01 | S04 | 11000.0 | paid |\n| 10 | O10 | 2026-06-24 | S01 | 3000.0 | cancelled |\n| 11 | O11 | 2026-06-29 | S04 | 1000.0 | paid |\n| 12 | O12 | 2026-06-25 | S01 | 2000.0 | paid |\n| 13 | O12 | 2026-06-25 | S01 | 2000.0 | paid |\n| 14 | O13 | 2026-06-09 | S05 | 11000.0 | paid |\n| 15 | O14 | 2026-06-09 | S05 | 11000.0 | paid |\n| 16 | O15 | 2026-04-30 | S06 | 1800.0 | paid |\n| 17 | O16 | 2026-06-21 | S07 | 950.25 | paid |\n| 18 | O17 | 2026-06-21 | S08 | 900.5 | paid |\n| 19 | O18 | 2026-05-20 | S05 | 6500.0 | paid |\n| 20 | O19 | 2026-07-02 | S03 | 4100.0 | paid |\n| 21 | O20 | 2026-06-30 | S06 | 2700.0 | cancelled |\n| 22 | O21 | 2026-06-02 | S07 | 350.0 | paid |\n| 23 | O22 | 2026-06-16 | S08 | 450.0 | paid |\n| 24 | O23 | 2026-06-26 | S05 | 0.0 | paid |\n| 25 | O24 | 2026-05-01 | S04 | 7800.0 | paid |"
+        },
+        {
+          "tool": "data.query",
+          "round": 3,
+          "sql_sha256": "b7ac93aa7c03e7dba931ae12e66140c73e3f3075b6754e6454fd832f0e45a3c5",
+          "original_serialized_bytes": 378,
+          "returned_rows": 8,
+          "total_rows": 8,
+          "truncated": false,
+          "replayed_serialized_bytes": 378,
+          "byte_count_matches_original": true,
+          "provider_wire_keeps_value": true,
+          "reconstructed_tool_text": "shape: 8 rows × 2 columns\nreturned_rows: 8\ntotal_rows: 8\ntruncated: false\nsample: head(8)\nnull: ∅\n\nschema:\n  store_id: str\n  region: str\n\ndata:\n| # | store_id | region |\n|---:|---|---|\n| 1 | S01 | 东区 |\n| 2 | S02 | 西区 |\n| 3 | S03 | 西区 |\n| 4 | S04 | 东区 |\n| 5 | S05 | 北区 |\n| 6 | S06 | 南区 |\n| 7 | S07 | 西区 |\n| 8 | S08 | 东区 |"
+        },
+        {
+          "tool": "data.query",
+          "round": 3,
+          "sql_sha256": "b7ac93aa7c03e7dba931ae12e66140c73e3f3075b6754e6454fd832f0e45a3c5",
+          "original_serialized_bytes": 987,
+          "returned_rows": 17,
+          "total_rows": 17,
+          "truncated": false,
+          "replayed_serialized_bytes": 987,
+          "byte_count_matches_original": true,
+          "provider_wire_keeps_value": true,
+          "reconstructed_tool_text": "shape: 17 rows × 4 columns\nreturned_rows: 17\ntotal_rows: 17\ntruncated: false\nsample: head(17)\nnull: ∅\n\nschema:\n  refund_id: str\n  order_id: str\n  refund_date: str\n  amount_yuan: float64\n\ndata:\n| # | refund_id | order_id | refund_date | amount_yuan |\n|---:|---|---|---|---:|\n| 1 | R01 | O01 | 2026-06-10 | 1000.0 |\n| 2 | R02 | O02 | 2026-07-03 | 3000.0 |\n| 3 | R03 | O08 | 2026-06-05 | 2000.0 |\n| 4 | R04 | O03 | 2026-06-15 | 500.0 |\n| 5 | R05 | O05 | 2026-06-23 | 1500.0 |\n| 6 | R06 | O12 | 2026-06-29 | 200.0 |\n| 7 | R07 | O07 | 2026-06-30 | 7000.0 |\n| 8 | R08 | O08 | 2026-05-31 | 500.0 |\n| 9 | R09 | O11 | 2026-06-30 | 100.0 |\n| 10 | R09 | O11 | 2026-06-30 | 100.0 |\n| 11 | R12 | O15 | 2026-06-01 | 1200.0 |\n| 12 | R13 | O16 | 2026-06-22 | 50.25 |\n| 13 | R14 | O17 | 2026-06-23 | 100.5 |\n| 14 | R15 | O21 | 2026-06-30 | 350.0 |\n| 15 | R16 | O22 | 2026-06-30 | 100.0 |\n| 16 | R17 | O22 | 2026-06-30 | 100.0 |\n| 17 | R18 | O18 | 2026-05-31 | 500.0 |"
+        },
+        {
+          "tool": "data.transform",
+          "round": 4,
+          "sql_sha256": "26cf03769594fd7935b06ab0c30c70e7104c9ed0dfd46adf0815fd1b7435b584",
+          "original_serialized_bytes": 984,
+          "returned_rows": 4,
+          "total_rows": 4,
+          "truncated": false,
+          "artifact_id_is_synthetic": true,
+          "replayed_serialized_bytes": 984,
+          "byte_count_matches_original": true,
+          "provider_wire_keeps_value": true,
+          "reconstructed_tool_text": "tool: data.transform\ndataset_id: 289e092fe53b4ad1a2f8dea4a2f96e44\nartifact_id: 00000000000000000000000000000000\nsummary: Transformed dataset created. Rows: 4.\ninput_dataset_ids: [dcef3fde2ffb4a0dadcf66c827c97f7c, a4f0996038b649b68ae64fc6e9d43e4d, d06e9c0d6064487cbada9d4cceb1d5a5]\nrow_count: 4\n\nshape: 4 rows × 4 columns\nreturned_rows: 4\ntotal_rows: 4\ntruncated: false\nsample: head(4)\nnull: ∅\n\nschema:\n  \"区域\": categorical\n  \"本月已支付订单金额\": numeric\n  \"本月退款金额\": numeric\n  \"净回款\": numeric\n\ndata:\n| # | 区域 | 本月已支付订单金额 | 本月退款金额 | 净回款 |\n|---:|---|---:|---:|---:|\n| 1 | 东区 | 49350.5 | 8600.5 | 40750.0 |\n| 2 | 西区 | 37300.25 | 4400.25 | 32900.0 |\n| 3 | 北区 | 22000.0 | 0.0 | 22000.0 |\n| 4 | 南区 | 0.0 | 1200.0 | -1200.0 |\n\nnotes:\n  - data is a preview of the generated dataset; use dataset_id for follow-up tools and artifact_id for the user-openable workbook."
+        },
+        {
+          "tool": "data.query",
+          "round": 5,
+          "sql_sha256": "8066428a1a1cb014fef4126fb696856b01fea58a107e9eefd7239f6c0317412e",
+          "original_serialized_bytes": 2061,
+          "returned_rows": 24,
+          "total_rows": 24,
+          "truncated": false,
+          "replayed_serialized_bytes": 2061,
+          "byte_count_matches_original": true,
+          "provider_wire_keeps_value": true,
+          "reconstructed_tool_text": "shape: 24 rows × 6 columns\nreturned_rows: 24\ntotal_rows: 24\ntruncated: false\nsample: head(24)\nnull: ∅\n\nschema:\n  order_id: str\n  paid_date: str\n  region: str\n  amount_yuan: float64\n  status: str\n  \"处理\": str\n\ndata:\n| # | order_id | paid_date | region | amount_yuan | status | 处理 |\n|---:|---|---|---|---:|---|---|\n| 1 | O10 | 2026-06-24 | 东区 | 3000.0 | cancelled | cancelled未收款 |\n| 2 | O20 | 2026-06-30 | 南区 | 2700.0 | cancelled | cancelled未收款 |\n| 3 | O01 | 2026-06-01 | 东区 | 10000.0 | paid | 计入本月 |\n| 4 | O02 | 2026-06-30 | 东区 | 20000.0 | paid | 计入本月 |\n| 5 | O03 | 2026-06-10 | 西区 | 8000.0 | paid | 计入本月 |\n| 6 | O04 | 2026-06-20 | 西区 | 12000.0 | paid | 计入本月 |\n| 7 | O05 | 2026-06-12 | 西区 | 9000.0 | paid | 计入本月 |\n| 8 | O06 | 2026-06-18 | 西区 | 7000.0 | paid | 计入本月 |\n| 9 | O07 | 2026-06-15 | 东区 | 15000.0 | paid | 计入本月 |\n| 10 | O11 | 2026-06-29 | 东区 | 1000.0 | paid | 计入本月 |\n| 11 | O12 | 2026-06-25 | 东区 | 2000.0 | paid | 计入本月 |\n| 12 | O13 | 2026-06-09 | 北区 | 11000.0 | paid | 计入本月 |\n| 13 | O14 | 2026-06-09 | 北区 | 11000.0 | paid | 计入本月 |\n| 14 | O16 | 2026-06-21 | 西区 | 950.25 | paid | 计入本月 |\n| 15 | O17 | 2026-06-21 | 东区 | 900.5 | paid | 计入本月 |\n| 16 | O21 | 2026-06-02 | 西区 | 350.0 | paid | 计入本月 |\n| 17 | O22 | 2026-06-16 | 东区 | 450.0 | paid | 计入本月 |\n| 18 | O23 | 2026-06-26 | 北区 | 0.0 | paid | 计入本月 |\n| 19 | O08 | 2026-05-31 | 西区 | 5000.0 | paid | 邻月/更早（非本月） |\n| 20 | O15 | 2026-04-30 | 南区 | 1800.0 | paid | 邻月/更早（非本月） |\n| 21 | O18 | 2026-05-20 | 北区 | 6500.0 | paid | 邻月/更早（非本月） |\n| 22 | O24 | 2026-05-01 | 东区 | 7800.0 | paid | 邻月/更早（非本月） |\n| 23 | O09 | 2026-07-01 | 东区 | 11000.0 | paid | 邻月/更晚（非本月） |\n| 24 | O19 | 2026-07-02 | 西区 | 4100.0 | paid | 邻月/更晚（非本月） |"
+        },
+        {
+          "tool": "data.query",
+          "round": 5,
+          "sql_sha256": "287e70fed389c414615f0bebe0b4bb62f667361642c48af4f81da6f6fdb5e13a",
+          "original_serialized_bytes": 1545,
+          "returned_rows": 16,
+          "total_rows": 16,
+          "truncated": false,
+          "replayed_serialized_bytes": 1545,
+          "byte_count_matches_original": true,
+          "provider_wire_keeps_value": true,
+          "reconstructed_tool_text": "shape: 16 rows × 7 columns\nreturned_rows: 16\ntotal_rows: 16\ntruncated: false\nsample: head(16)\nnull: ∅\n\nschema:\n  refund_id: str\n  order_id: str\n  store_id: str\n  region: str\n  refund_date: str\n  amount_yuan: float64\n  \"处理\": str\n\ndata:\n| # | refund_id | order_id | store_id | region | refund_date | amount_yuan | 处理 |\n|---:|---|---|---|---|---|---:|---|\n| 1 | R01 | O01 | S01 | 东区 | 2026-06-10 | 1000.0 | 计入本月 |\n| 2 | R03 | O08 | S02 | 西区 | 2026-06-05 | 2000.0 | 计入本月 |\n| 3 | R04 | O03 | S02 | 西区 | 2026-06-15 | 500.0 | 计入本月 |\n| 4 | R05 | O05 | S03 | 西区 | 2026-06-23 | 1500.0 | 计入本月 |\n| 5 | R06 | O12 | S01 | 东区 | 2026-06-29 | 200.0 | 计入本月 |\n| 6 | R07 | O07 | S04 | 东区 | 2026-06-30 | 7000.0 | 计入本月 |\n| 7 | R09 | O11 | S04 | 东区 | 2026-06-30 | 100.0 | 计入本月 |\n| 8 | R12 | O15 | S06 | 南区 | 2026-06-01 | 1200.0 | 计入本月 |\n| 9 | R13 | O16 | S07 | 西区 | 2026-06-22 | 50.25 | 计入本月 |\n| 10 | R14 | O17 | S08 | 东区 | 2026-06-23 | 100.5 | 计入本月 |\n| 11 | R15 | O21 | S07 | 西区 | 2026-06-30 | 350.0 | 计入本月 |\n| 12 | R16 | O22 | S08 | 东区 | 2026-06-30 | 100.0 | 计入本月 |\n| 13 | R17 | O22 | S08 | 东区 | 2026-06-30 | 100.0 | 计入本月 |\n| 14 | R08 | O08 | S02 | 西区 | 2026-05-31 | 500.0 | 非本月（更早） |\n| 15 | R18 | O18 | S05 | 北区 | 2026-05-31 | 500.0 | 非本月（更早） |\n| 16 | R02 | O02 | S01 | 东区 | 2026-07-03 | 3000.0 | 非本月（更晚） |"
+        },
+        {
+          "tool": "data.query",
+          "round": 8,
+          "sql_sha256": "b7ac93aa7c03e7dba931ae12e66140c73e3f3075b6754e6454fd832f0e45a3c5",
+          "original_serialized_bytes": 479,
+          "returned_rows": 5,
+          "total_rows": 5,
+          "truncated": false,
+          "replayed_serialized_bytes": 479,
+          "byte_count_matches_original": true,
+          "provider_wire_keeps_value": true,
+          "reconstructed_tool_text": "shape: 5 rows × 4 columns\nreturned_rows: 5\ntotal_rows: 5\ntruncated: false\nsample: head(5)\nnull: ∅\n\nschema:\n  refund_id: str\n  order_id: str\n  refund_date: str\n  amount_yuan: int64\n\ndata:\n| # | refund_id | order_id | refund_date | amount_yuan |\n|---:|---|---|---|---:|\n| 1 | R07 | O07 | 2026-06-30 | 9000 |\n| 2 | R10 | O02 | 2026-06-30 | 9000 |\n| 3 | R11 | O05 | 2026-07-01 | 500 |\n| 4 | R12 | O15 | 2026-06-01 | 900 |\n| 5 | R19 | O13 | 2026-07-02 | 500 |"
+        },
+        {
+          "tool": "data.transform",
+          "round": 9,
+          "sql_sha256": "123e4e265a7b2350e080d64603d270f8c1877e8f5a64f35c2a5fc20ef5f24d01",
+          "original_serialized_bytes": 1361,
+          "returned_rows": 4,
+          "total_rows": 4,
+          "truncated": false,
+          "artifact_id_is_synthetic": true,
+          "replayed_serialized_bytes": 1361,
+          "byte_count_matches_original": true,
+          "provider_wire_keeps_value": true,
+          "reconstructed_tool_text": "tool: data.transform\ndataset_id: 23bca9036dab42a3807b1403fe0f185a\nartifact_id: 00000000000000000000000000000000\nsummary: Transformed dataset created. Rows: 4.\ninput_dataset_ids: [dcef3fde2ffb4a0dadcf66c827c97f7c, a4f0996038b649b68ae64fc6e9d43e4d, d06e9c0d6064487cbada9d4cceb1d5a5, 628aab0c6b5f4a49aef57d92c5754136]\nrow_count: 4\n\nshape: 4 rows × 7 columns\nreturned_rows: 4\ntotal_rows: 4\ntruncated: false\nsample: head(4)\nnull: ∅\n\nschema:\n  \"区域\": categorical\n  \"本月已支付订单金额\": numeric\n  \"本月退款金额_上一版\": numeric\n  \"净回款_上一版\": numeric\n  \"本月退款金额_更新版\": numeric\n  \"净回款_更新版\": numeric\n  \"净回款变化\": numeric\n\ndata:\n| # | 区域 | 本月已支付订单金额 | 本月退款金额_上一版 | 净回款_上一版 | 本月退款金额_更新版 | 净回款_更新版 | 净回款变化 |\n|---:|---|---:|---:|---:|---:|---:|---:|\n| 1 | 西区 | 37300.25 | 4400.25 | 32900.0 | 4400.25 | 32900.0 | 0.0 |\n| 2 | 东区 | 49350.5 | 8600.5 | 40750.0 | 19600.5 | 29750.0 | -11000.0 |\n| 3 | 北区 | 22000.0 | 0.0 | 22000.0 | 0.0 | 22000.0 | 0.0 |\n| 4 | 南区 | 0.0 | 1200.0 | -1200.0 | 900.0 | -900.0 | 300.0 |\n\nnotes:\n  - data is a preview of the generated dataset; use dataset_id for follow-up tools and artifact_id for the user-openable workbook."
+        }
+      ],
+      "original_judge": {
+        "independence": "independent",
+        "metrics": {
+          "elapsed_seconds": 133.27965059998678,
+          "provider_retry_count": 0,
+          "token_usage": {
+            "cached_input_tokens": 384,
+            "input_tokens": 5299,
+            "output_tokens": 11556,
+            "total_tokens": 16855
+          }
+        },
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "reason_codes": [
+          "incorrect_business_claim"
+        ],
+        "required": true,
+        "rubric_id": "business.revenue_revision.explanation.v1",
+        "rubric_sha256": "73E55EF6575ABE0E1DDB2D780DE0F0C5E2DB301C5E0CAE1AD1650DE1F1FE17AB",
+        "scores": {
+          "month_close_grounding": 2,
+          "revision_explanation": 2
+        },
+        "status": "completed",
+        "summary": "judge_completed",
+        "verdict": "fail"
+      },
+      "original_failed_calls": [
+        {
+          "name": "data.query",
+          "round": 2,
+          "arguments": {
+            "dataset_id": "dcef3fde2ffb4a0dadcf66c827c97f7c",
+            "limit": 50,
+            "sql": "SELECT * FROM orders"
+          },
+          "failure": {
+            "code": "tool_execution_failed",
+            "message": "Catalog Error: Table with name orders does not exist!\nDid you mean \"pg_prepared_statements\"?\n\nLINE 1: SELECT COUNT(*) AS total_rows FROM (SELECT * FROM orders) AS xenix_query_result_count\n                                                          ^",
+            "type": "tool_failure"
+          }
+        },
+        {
+          "name": "data.query",
+          "round": 2,
+          "arguments": {
+            "dataset_id": "a4f0996038b649b68ae64fc6e9d43e4d",
+            "limit": 50,
+            "sql": "SELECT * FROM stores"
+          },
+          "failure": {
+            "code": "tool_execution_failed",
+            "message": "Catalog Error: Table with name stores does not exist!\nDid you mean \"sqlite_master\"?\n\nLINE 1: SELECT COUNT(*) AS total_rows FROM (SELECT * FROM stores) AS xenix_query_result_count\n                                                          ^",
+            "type": "tool_failure"
+          }
+        },
+        {
+          "name": "data.query",
+          "round": 2,
+          "arguments": {
+            "dataset_id": "d06e9c0d6064487cbada9d4cceb1d5a5",
+            "limit": 50,
+            "sql": "SELECT * FROM refunds"
+          },
+          "failure": {
+            "code": "tool_execution_failed",
+            "message": "Catalog Error: Table with name refunds does not exist!\nDid you mean \"pg_prepared_statements\"?\n\nLINE 1: SELECT COUNT(*) AS total_rows FROM (SELECT * FROM refunds) AS xenix_query_result_count\n                                                          ^",
+            "type": "tool_failure"
+          }
+        }
+      ],
+      "answer_characters": [
+        1684,
+        1722
+      ],
+      "independent_claim_facts": {
+        "method": "Independent Decimal aggregation of deduplicated source CSV records, joined through stores; not parsed from Subject prose or Judge output.",
+        "regional_cash": [
+          {
+            "region": "东区",
+            "paid_yuan": "49350.50",
+            "refund_yuan": "8600.50",
+            "net_yuan": "40750.00",
+            "refund_paid_ratio": "0.1742738168812879302134730145"
+          },
+          {
+            "region": "西区",
+            "paid_yuan": "37300.25",
+            "refund_yuan": "4400.25",
+            "net_yuan": "32900.00",
+            "refund_paid_ratio": "0.1179683782280279622790731966"
+          },
+          {
+            "region": "北区",
+            "paid_yuan": "22000",
+            "refund_yuan": "0",
+            "net_yuan": "22000",
+            "refund_paid_ratio": "0"
+          },
+          {
+            "region": "南区",
+            "paid_yuan": "0",
+            "refund_yuan": "1200",
+            "net_yuan": "-1200",
+            "refund_paid_ratio": null
+          }
+        ],
+        "cancelled_orders": [
+          {
+            "order_id": "O10",
+            "region": "东区",
+            "amount_yuan": "3000"
+          },
+          {
+            "order_id": "O20",
+            "region": "南区",
+            "amount_yuan": "2700"
+          }
+        ],
+        "east_west_net_gap_yuan": "7850.00"
+      }
+    },
+    {
+      "case_id": "business.revenue.v1.confirmation",
+      "source_report": "build/agent-harness-full-81fb9bb/confirmation/business.revenue.v1.confirmation-deepseek-deepseek-v4-flash-12cb3d355e3e4299898a28b90e516917.json",
+      "report_sha256": "38e73a3db7f18f5517fbf3aae8bc8f20e05368fc98c2a20bb9b24f9a079db1f7",
+      "fixture_rows": {
+        "orders": {
+          "rows": 25,
+          "sha256": "f8773f79854efeff587f1ebb769b11817be0b491dad3ce35c6756804b8aea7e8"
+        },
+        "stores": {
+          "rows": 8,
+          "sha256": "edaf0aebdbc5e3eb9a186a95566c5045978a02518fb38100caba052fd06aba96"
+        },
+        "refunds": {
+          "rows": 17,
+          "sha256": "5a887d470e7fb8c68d40a412ef14998cb575287b9dd27fe7f96bc1e6b9b353fe"
+        },
+        "refund_updates": {
+          "rows": 5,
+          "sha256": "f393d19c6fdca2b1268b87e22692c6f244af79c40bc2e7089435f08cdd0442dd"
+        }
+      },
+      "replays": [
+        {
+          "tool": "data.query",
+          "round": 2,
+          "sql_sha256": "b7ac93aa7c03e7dba931ae12e66140c73e3f3075b6754e6454fd832f0e45a3c5",
+          "original_serialized_bytes": 1542,
+          "returned_rows": 25,
+          "total_rows": 25,
+          "truncated": false,
+          "replayed_serialized_bytes": 1542,
+          "byte_count_matches_original": true,
+          "provider_wire_keeps_value": true,
+          "reconstructed_tool_text": "shape: 25 rows × 5 columns\nreturned_rows: 25\ntotal_rows: 25\ntruncated: false\nsample: head(25)\nnull: ∅\n\nschema:\n  order_id: str\n  paid_date: str\n  store_id: str\n  amount_yuan: float64\n  status: str\n\ndata:\n| # | order_id | paid_date | store_id | amount_yuan | status |\n|---:|---|---|---|---:|---|\n| 1 | O01 | 2026-06-01 | S01 | 10000.0 | paid |\n| 2 | O02 | 2026-06-30 | S01 | 20000.0 | paid |\n| 3 | O03 | 2026-06-10 | S02 | 8000.0 | paid |\n| 4 | O04 | 2026-06-20 | S02 | 12000.0 | paid |\n| 5 | O05 | 2026-06-12 | S03 | 9000.0 | paid |\n| 6 | O06 | 2026-06-18 | S03 | 7000.0 | paid |\n| 7 | O07 | 2026-06-15 | S04 | 15000.0 | paid |\n| 8 | O08 | 2026-05-31 | S02 | 5000.0 | paid |\n| 9 | O09 | 2026-07-01 | S04 | 11000.0 | paid |\n| 10 | O10 | 2026-06-24 | S01 | 3000.0 | cancelled |\n| 11 | O11 | 2026-06-29 | S04 | 1000.0 | paid |\n| 12 | O12 | 2026-06-25 | S01 | 2000.0 | paid |\n| 13 | O12 | 2026-06-25 | S01 | 2000.0 | paid |\n| 14 | O13 | 2026-06-09 | S05 | 11000.0 | paid |\n| 15 | O14 | 2026-06-09 | S05 | 11000.0 | paid |\n| 16 | O15 | 2026-04-30 | S06 | 1800.0 | paid |\n| 17 | O16 | 2026-06-21 | S07 | 950.25 | paid |\n| 18 | O17 | 2026-06-21 | S08 | 900.5 | paid |\n| 19 | O18 | 2026-05-20 | S05 | 6500.0 | paid |\n| 20 | O19 | 2026-07-02 | S03 | 4100.0 | paid |\n| 21 | O20 | 2026-06-30 | S06 | 2700.0 | cancelled |\n| 22 | O21 | 2026-06-02 | S07 | 350.0 | paid |\n| 23 | O22 | 2026-06-16 | S08 | 450.0 | paid |\n| 24 | O23 | 2026-06-26 | S05 | 0.0 | paid |\n| 25 | O24 | 2026-05-01 | S04 | 7800.0 | paid |"
+        },
+        {
+          "tool": "data.query",
+          "round": 2,
+          "sql_sha256": "b7ac93aa7c03e7dba931ae12e66140c73e3f3075b6754e6454fd832f0e45a3c5",
+          "original_serialized_bytes": 378,
+          "returned_rows": 8,
+          "total_rows": 8,
+          "truncated": false,
+          "replayed_serialized_bytes": 378,
+          "byte_count_matches_original": true,
+          "provider_wire_keeps_value": true,
+          "reconstructed_tool_text": "shape: 8 rows × 2 columns\nreturned_rows: 8\ntotal_rows: 8\ntruncated: false\nsample: head(8)\nnull: ∅\n\nschema:\n  store_id: str\n  region: str\n\ndata:\n| # | store_id | region |\n|---:|---|---|\n| 1 | S01 | 东区 |\n| 2 | S02 | 西区 |\n| 3 | S03 | 西区 |\n| 4 | S04 | 东区 |\n| 5 | S05 | 北区 |\n| 6 | S06 | 南区 |\n| 7 | S07 | 西区 |\n| 8 | S08 | 东区 |"
+        },
+        {
+          "tool": "data.query",
+          "round": 2,
+          "sql_sha256": "b7ac93aa7c03e7dba931ae12e66140c73e3f3075b6754e6454fd832f0e45a3c5",
+          "original_serialized_bytes": 987,
+          "returned_rows": 17,
+          "total_rows": 17,
+          "truncated": false,
+          "replayed_serialized_bytes": 987,
+          "byte_count_matches_original": true,
+          "provider_wire_keeps_value": true,
+          "reconstructed_tool_text": "shape: 17 rows × 4 columns\nreturned_rows: 17\ntotal_rows: 17\ntruncated: false\nsample: head(17)\nnull: ∅\n\nschema:\n  refund_id: str\n  order_id: str\n  refund_date: str\n  amount_yuan: float64\n\ndata:\n| # | refund_id | order_id | refund_date | amount_yuan |\n|---:|---|---|---|---:|\n| 1 | R01 | O01 | 2026-06-10 | 1000.0 |\n| 2 | R02 | O02 | 2026-07-03 | 3000.0 |\n| 3 | R03 | O08 | 2026-06-05 | 2000.0 |\n| 4 | R04 | O03 | 2026-06-15 | 500.0 |\n| 5 | R05 | O05 | 2026-06-23 | 1500.0 |\n| 6 | R06 | O12 | 2026-06-29 | 200.0 |\n| 7 | R07 | O07 | 2026-06-30 | 7000.0 |\n| 8 | R08 | O08 | 2026-05-31 | 500.0 |\n| 9 | R09 | O11 | 2026-06-30 | 100.0 |\n| 10 | R09 | O11 | 2026-06-30 | 100.0 |\n| 11 | R12 | O15 | 2026-06-01 | 1200.0 |\n| 12 | R13 | O16 | 2026-06-22 | 50.25 |\n| 13 | R14 | O17 | 2026-06-23 | 100.5 |\n| 14 | R15 | O21 | 2026-06-30 | 350.0 |\n| 15 | R16 | O22 | 2026-06-30 | 100.0 |\n| 16 | R17 | O22 | 2026-06-30 | 100.0 |\n| 17 | R18 | O18 | 2026-05-31 | 500.0 |"
+        },
+        {
+          "tool": "data.transform",
+          "round": 3,
+          "sql_sha256": "06473b12e80895cf22ca922e0d504ea6867a394778f11921359c53f85984abce",
+          "original_serialized_bytes": 1150,
+          "returned_rows": 4,
+          "total_rows": 4,
+          "truncated": false,
+          "artifact_id_is_synthetic": true,
+          "replayed_serialized_bytes": 1150,
+          "byte_count_matches_original": true,
+          "provider_wire_keeps_value": true,
+          "reconstructed_tool_text": "tool: data.transform\ndataset_id: d04f4062cfa24117842ccff91fafeca7\nartifact_id: 00000000000000000000000000000000\nsummary: Transformed dataset created. Rows: 4.\ninput_dataset_ids: [10f688bdb7dd47fe837eb431d079d6ae, d6eb95c101e64448ab2632764fe9da74, cf8526eadde64a8a9ba1220883c9669b]\nrow_count: 4\n\nshape: 4 rows × 6 columns\nreturned_rows: 4\ntotal_rows: 4\ntruncated: false\nsample: head(4)\nnull: ∅\n\nschema:\n  \"区域\": categorical\n  \"本月已支付订单数\": numeric\n  \"本月已支付订单金额\": numeric\n  \"本月退款笔数\": numeric\n  \"本月退款金额\": numeric\n  \"净回款\": numeric\n\ndata:\n| # | 区域 | 本月已支付订单数 | 本月已支付订单金额 | 本月退款笔数 | 本月退款金额 | 净回款 |\n|---:|---|---:|---:|---:|---:|---:|\n| 1 | 东区 | 7 | 49350.5 | 7 | 8600.5 | 40750.0 |\n| 2 | 西区 | 6 | 37300.25 | 5 | 4400.25 | 32900.0 |\n| 3 | 北区 | 3 | 22000.0 | 0 | 0.0 | 22000.0 |\n| 4 | 南区 | 0 | 0.0 | 1 | 1200.0 | -1200.0 |\n\nnotes:\n  - data is a preview of the generated dataset; use dataset_id for follow-up tools and artifact_id for the user-openable workbook."
+        },
+        {
+          "tool": "data.query",
+          "round": 6,
+          "sql_sha256": "b7ac93aa7c03e7dba931ae12e66140c73e3f3075b6754e6454fd832f0e45a3c5",
+          "original_serialized_bytes": 480,
+          "returned_rows": 5,
+          "total_rows": 5,
+          "truncated": false,
+          "replayed_serialized_bytes": 480,
+          "byte_count_matches_original": true,
+          "provider_wire_keeps_value": true,
+          "reconstructed_tool_text": "shape: 5 rows × 4 columns\nreturned_rows: 5\ntotal_rows: 5\ntruncated: false\nsample: head(5)\nnull: ∅\n\nschema:\n  refund_id: str\n  order_id: str\n  refund_date: str\n  amount_yuan: int64\n\ndata:\n| # | refund_id | order_id | refund_date | amount_yuan |\n|---:|---|---|---|---:|\n| 1 | R05 | O05 | 2026-06-23 | 500 |\n| 2 | R20 | O04 | 2026-06-30 | 11000 |\n| 3 | R12 | O15 | 2026-07-01 | 1200 |\n| 4 | R21 | O24 | 2026-06-30 | 400 |\n| 5 | R22 | O14 | 2026-07-01 | 600 |"
+        },
+        {
+          "tool": "data.transform",
+          "round": 7,
+          "sql_sha256": "88832ed35759667117798f1d2e88de3eea161bb73c009671e393e8685713dffe",
+          "original_serialized_bytes": 1274,
+          "returned_rows": 4,
+          "total_rows": 4,
+          "truncated": false,
+          "artifact_id_is_synthetic": true,
+          "replayed_serialized_bytes": 1274,
+          "byte_count_matches_original": true,
+          "provider_wire_keeps_value": true,
+          "reconstructed_tool_text": "tool: data.transform\ndataset_id: a3f0322bd6cd4c2b9b3a6060b4b75436\nartifact_id: 00000000000000000000000000000000\nsummary: Transformed dataset created. Rows: 4.\ninput_dataset_ids: [10f688bdb7dd47fe837eb431d079d6ae, d6eb95c101e64448ab2632764fe9da74, cf8526eadde64a8a9ba1220883c9669b, d2911022dd3c427b841107ffb509ba4b]\nrow_count: 4\n\nshape: 4 rows × 7 columns\nreturned_rows: 4\ntotal_rows: 4\ntruncated: false\nsample: head(4)\nnull: ∅\n\nschema:\n  \"区域\": categorical\n  \"本月已支付订单金额\": numeric\n  \"本月退款笔数\": numeric\n  \"本月退款金额\": numeric\n  \"净回款\": numeric\n  \"上版净回款\": numeric\n  \"净回款变化\": numeric\n\ndata:\n| # | 区域 | 本月已支付订单金额 | 本月退款笔数 | 本月退款金额 | 净回款 | 上版净回款 | 净回款变化 |\n|---:|---|---:|---:|---:|---:|---:|---:|\n| 1 | 东区 | 49350.5 | 8 | 9000.5 | 40350.0 | 40750.0 | -400.0 |\n| 2 | 西区 | 37300.25 | 6 | 14400.25 | 22900.0 | 32900.0 | -10000.0 |\n| 3 | 北区 | 22000.0 | 0 | 0.0 | 22000.0 | 22000.0 | 0.0 |\n| 4 | 南区 | 0.0 | 0 | 0.0 | 0.0 | -1200.0 | 1200.0 |\n\nnotes:\n  - data is a preview of the generated dataset; use dataset_id for follow-up tools and artifact_id for the user-openable workbook."
+        }
+      ],
+      "original_judge": {
+        "independence": "independent",
+        "metrics": {
+          "elapsed_seconds": 110.58057509997161,
+          "provider_retry_count": 0,
+          "token_usage": {
+            "cached_input_tokens": 2048,
+            "input_tokens": 5279,
+            "output_tokens": 8513,
+            "total_tokens": 13792
+          }
+        },
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "reason_codes": [
+          "incorrect_business_claim"
+        ],
+        "required": true,
+        "rubric_id": "business.revenue_revision.explanation.v1",
+        "rubric_sha256": "73E55EF6575ABE0E1DDB2D780DE0F0C5E2DB301C5E0CAE1AD1650DE1F1FE17AB",
+        "scores": {
+          "month_close_grounding": 0,
+          "revision_explanation": 2
+        },
+        "status": "completed",
+        "summary": "judge_completed",
+        "verdict": "fail"
+      },
+      "original_failed_calls": [],
+      "answer_characters": [
+        1696,
+        1702
+      ],
+      "independent_claim_facts": {
+        "method": "Independent Decimal aggregation of deduplicated source CSV records, joined through stores; not parsed from Subject prose or Judge output.",
+        "regional_cash": [
+          {
+            "region": "东区",
+            "paid_yuan": "49350.50",
+            "refund_yuan": "8600.50",
+            "net_yuan": "40750.00",
+            "refund_paid_ratio": "0.1742738168812879302134730145"
+          },
+          {
+            "region": "西区",
+            "paid_yuan": "37300.25",
+            "refund_yuan": "4400.25",
+            "net_yuan": "32900.00",
+            "refund_paid_ratio": "0.1179683782280279622790731966"
+          },
+          {
+            "region": "北区",
+            "paid_yuan": "22000",
+            "refund_yuan": "0",
+            "net_yuan": "22000",
+            "refund_paid_ratio": "0"
+          },
+          {
+            "region": "南区",
+            "paid_yuan": "0",
+            "refund_yuan": "1200",
+            "net_yuan": "-1200",
+            "refund_paid_ratio": null
+          }
+        ],
+        "cancelled_orders": [
+          {
+            "order_id": "O10",
+            "region": "东区",
+            "amount_yuan": "3000"
+          },
+          {
+            "order_id": "O20",
+            "region": "南区",
+            "amount_yuan": "2700"
+          }
+        ],
+        "east_west_net_gap_yuan": "7850.00",
+        "R20": {
+          "refund_yuan": "11000",
+          "order_id": "O04",
+          "order_yuan": "12000",
+          "is_full_order_amount": false
+        }
+      }
+    }
+  ],
+  "forecast": {
+    "source_report": "build/agent-harness-full-81fb9bb/legacy/ml.forecast_validation_v1-deepseek-deepseek-v4-flash-af055598eeec4be09bd426ed20cbf823.json",
+    "report_sha256": "a2cc9b63968255760efbeed9fe4ffd33826d57601ec63f0f7e33b313cba75ae5",
+    "tool_uri": "artifact://59137ebae3ed4eb6ac3555e1a271187c",
+    "answer_uri": "artifact://59137ebae3ed4eb6ac5555e1a271187c",
+    "different_positions_zero_based": [
+      [
+        29,
+        "3",
+        "5"
+      ]
+    ],
+    "apply_round": 11,
+    "final_round": 16,
+    "offline_path_checks": [
+      {
+        "input_uri": "artifact://59137ebae3ed4eb6ac3555e1a271187c",
+        "provider_parse_preserved": true,
+        "canonical_row_preserved": true,
+        "chatbot_projection_preserved": true,
+        "rendered_href_preserved": true
+      },
+      {
+        "input_uri": "artifact://59137ebae3ed4eb6ac5555e1a271187c",
+        "provider_parse_preserved": true,
+        "canonical_row_preserved": true,
+        "chatbot_projection_preserved": true,
+        "rendered_href_preserved": true
+      }
+    ],
+    "alternative_combined_workbook_sql": "SELECT region,\n       CAST(strptime(month,'%Y-%m-%d') AS DATE) AS period,\n       CAST(demand_units AS DOUBLE) AS actual,\n       CAST(NULL AS DOUBLE) AS forecast,\n       CAST(NULL AS DOUBLE) AS lower_80,\n       CAST(NULL AS DOUBLE) AS upper_80\nFROM hist WHERE month >= '2024-01-01'\nUNION ALL\nSELECT region,\n       CAST(forecast_time AS DATE) AS period,\n       CAST(NULL AS DOUBLE) AS actual,\n       ROUND(forecast,1) AS forecast,\n       ROUND(lower_bound,1) AS lower_80,\n       ROUND(upper_bound,1) AS upper_80\nFROM fc\nORDER BY region, period",
+    "limitation": "Synthetic provider messages replay native parse, row construction, projection and renderer; not the original network stream or database persistence. Historical runtime was cleaned up; legacy case did not freeze linked workbook contents."
+  }
+}

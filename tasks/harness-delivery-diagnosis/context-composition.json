@@ -1,0 +1,231 @@
+{
+  "source_request": "build/harness-context-diagnosis/capture/20184-006-request.json",
+  "source_request_sha256": "b376c5490606b7c19dbdb3767bd4385c175b024eb84d10635f42334db6796c0e",
+  "unit": "Unicode characters, not token allocation; provider token totals include serialization/tokenizer effects.",
+  "categories": {
+    "system_content_chars": 5307,
+    "historical_reasoning_chars": 9867,
+    "historical_tool_call_chars": 7962,
+    "user_content_chars": 653,
+    "assistant_content_chars": 318,
+    "skill_activation_content_chars": 8406,
+    "other_tool_result_content_chars": 1122,
+    "tabular_result_content_chars": 10004,
+    "tool_schema_chars": 20293
+  },
+  "messages": [
+    {
+      "message_index": 0,
+      "role": "system",
+      "category": "system",
+      "content_chars": 1992,
+      "reasoning_chars": 0,
+      "tool_call_chars": 0
+    },
+    {
+      "message_index": 1,
+      "role": "system",
+      "category": "system",
+      "content_chars": 3315,
+      "reasoning_chars": 0,
+      "tool_call_chars": 0
+    },
+    {
+      "message_index": 2,
+      "role": "user",
+      "category": "user",
+      "content_chars": 653,
+      "reasoning_chars": 0,
+      "tool_call_chars": 0
+    },
+    {
+      "message_index": 3,
+      "role": "assistant",
+      "category": "assistant",
+      "content_chars": 87,
+      "reasoning_chars": 532,
+      "tool_call_chars": 487
+    },
+    {
+      "message_index": 4,
+      "role": "tool",
+      "category": "skill_activation",
+      "content_chars": 3809,
+      "reasoning_chars": 0,
+      "tool_call_chars": 0
+    },
+    {
+      "message_index": 5,
+      "role": "tool",
+      "category": "skill_activation",
+      "content_chars": 4597,
+      "reasoning_chars": 0,
+      "tool_call_chars": 0
+    },
+    {
+      "message_index": 6,
+      "role": "tool",
+      "category": "other_tool_result",
+      "content_chars": 31,
+      "reasoning_chars": 0,
+      "tool_call_chars": 0
+    },
+    {
+      "message_index": 7,
+      "role": "assistant",
+      "category": "assistant",
+      "content_chars": 0,
+      "reasoning_chars": 367,
+      "tool_call_chars": 648
+    },
+    {
+      "message_index": 8,
+      "role": "tool",
+      "category": "tabular_result",
+      "content_chars": 1496,
+      "reasoning_chars": 0,
+      "tool_call_chars": 0
+    },
+    {
+      "message_index": 9,
+      "role": "tool",
+      "category": "tabular_result",
+      "content_chars": 320,
+      "reasoning_chars": 0,
+      "tool_call_chars": 0
+    },
+    {
+      "message_index": 10,
+      "role": "tool",
+      "category": "tabular_result",
+      "content_chars": 950,
+      "reasoning_chars": 0,
+      "tool_call_chars": 0
+    },
+    {
+      "message_index": 11,
+      "role": "assistant",
+      "category": "assistant",
+      "content_chars": 129,
+      "reasoning_chars": 7737,
+      "tool_call_chars": 3213
+    },
+    {
+      "message_index": 12,
+      "role": "tool",
+      "category": "tabular_result",
+      "content_chars": 1074,
+      "reasoning_chars": 0,
+      "tool_call_chars": 0
+    },
+    {
+      "message_index": 13,
+      "role": "tool",
+      "category": "tabular_result",
+      "content_chars": 2215,
+      "reasoning_chars": 0,
+      "tool_call_chars": 0
+    },
+    {
+      "message_index": 14,
+      "role": "assistant",
+      "category": "assistant",
+      "content_chars": 102,
+      "reasoning_chars": 1051,
+      "tool_call_chars": 2507
+    },
+    {
+      "message_index": 15,
+      "role": "tool",
+      "category": "other_tool_result",
+      "content_chars": 567,
+      "reasoning_chars": 0,
+      "tool_call_chars": 0
+    },
+    {
+      "message_index": 16,
+      "role": "tool",
+      "category": "other_tool_result",
+      "content_chars": 524,
+      "reasoning_chars": 0,
+      "tool_call_chars": 0
+    },
+    {
+      "message_index": 17,
+      "role": "assistant",
+      "category": "assistant",
+      "content_chars": 0,
+      "reasoning_chars": 180,
+      "tool_call_chars": 1107
+    },
+    {
+      "message_index": 18,
+      "role": "tool",
+      "category": "tabular_result",
+      "content_chars": 3949,
+      "reasoning_chars": 0,
+      "tool_call_chars": 0
+    }
+  ],
+  "tool_schemas": [
+    {
+      "name": "result_page",
+      "chars": 653
+    },
+    {
+      "name": "data_integrate",
+      "chars": 384
+    },
+    {
+      "name": "analysis_profile",
+      "chars": 1195
+    },
+    {
+      "name": "analysis_graph",
+      "chars": 4452
+    },
+    {
+      "name": "data_clean",
+      "chars": 1869
+    },
+    {
+      "name": "data_clean_metadata",
+      "chars": 470
+    },
+    {
+      "name": "data_tokenize",
+      "chars": 2548
+    },
+    {
+      "name": "data_query",
+      "chars": 1963
+    },
+    {
+      "name": "data_transform",
+      "chars": 2302
+    },
+    {
+      "name": "data_feature_select",
+      "chars": 1408
+    },
+    {
+      "name": "knowledge_lookup",
+      "chars": 1112
+    },
+    {
+      "name": "agent_skill_activate",
+      "chars": 561
+    },
+    {
+      "name": "agent_skill_read_reference",
+      "chars": 694
+    },
+    {
+      "name": "agent_skill_read_asset",
+      "chars": 654
+    }
+  ],
+  "uuid_like_occurrences": 26,
+  "uuid_like_unique": 6,
+  "note": "IDs counted lexically, including IDs repeated in historical reasoning; count is not an object-domain inventory."
+}

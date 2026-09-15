@@ -1,0 +1,24 @@
+{
+  "status": "rejected_before_execution",
+  "reason": "Automatic approval returned blocked by policy; no more specific reason provided.",
+  "deleted_paths": [],
+  "proposed_paths": [
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".pytest-basetemp",
+    ".mkdtemp-probe",
+    ".agent-browser",
+    ".agent-browser-tmp",
+    "dist/refactor-review",
+    "dist/tool-boundary-review"
+  ],
+  "retained": [
+    "runtime data",
+    "mock datasets",
+    "benchmark reports and settings",
+    "latest review bundle",
+    "release manifests",
+    "virtual environment"
+  ]
+}

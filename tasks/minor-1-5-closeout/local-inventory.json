@@ -1,0 +1,67 @@
+[
+  {
+    "path": ".mypy_cache",
+    "files": 18,
+    "bytes": 75624677
+  },
+  {
+    "path": ".pytest_cache",
+    "files": 5,
+    "bytes": 49573
+  },
+  {
+    "path": ".ruff_cache",
+    "files": 77,
+    "bytes": 210098
+  },
+  {
+    "path": ".pytest-basetemp",
+    "files": 0,
+    "bytes": 0
+  },
+  {
+    "path": ".codex-test-tmp",
+    "files": 462,
+    "bytes": 97761189
+  },
+  {
+    "path": ".mkdtemp-probe",
+    "files": 0,
+    "bytes": 0
+  },
+  {
+    "path": ".agent-browser",
+    "files": 0,
+    "bytes": 0
+  },
+  {
+    "path": ".agent-browser-tmp",
+    "files": 0,
+    "bytes": 0
+  },
+  {
+    "path": "build",
+    "files": 3803,
+    "bytes": 7675611814
+  },
+  {
+    "path": "dist",
+    "files": 33030,
+    "bytes": 10442829245
+  },
+  {
+    "path": "temp",
+    "files": 66,
+    "bytes": 548592
+  },
+  {
+    "path": ".runtime",
+    "files": 1618,
+    "bytes": 8635133318
+  },
+  {
+    "path": "ui-artifacts",
+    "files": 21,
+    "bytes": 644560
+  }
+]

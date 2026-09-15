@@ -1,3 +1,5 @@
+> 阶段归档（2026-09-15）：用户已结束 benchmark 优化及相关失败排查。以下为历史记录，旧 Next Step 不再代表待执行任务；当前工作见 [1.5.0 收尾](../minor-1-5-closeout/packet.md)。
+
 # Harness benchmark 第三批：失败也能成为有效测量
 
 - **目标与授权**：基线 `6666b2f`。用户澄清第三批指整个 benchmark 对 FrontierHarness Eval 的学习，沿用“有高价值改进则实施”的授权。重新评估任务、oracle/Judge、执行、测量、比较与诊断，优先改善失败结果的解释和比较；不继续扩题。
