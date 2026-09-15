@@ -132,6 +132,7 @@ def get_default_policy(
     *,
     summary_metric_name: str | None = None,
     group_aware: bool = False,
+    model_key: str | None = None,
 ) -> EvaluationPolicySnapshot:
     if evaluation_kind is EvaluationKind.SUMMARY:
         metric_name = summary_metric_name or "result_count"
@@ -147,6 +148,11 @@ def get_default_policy(
             random_state=42,
         )
     policy = _POLICIES[evaluation_kind].model_copy(deep=True)
+    if model_key == "text.classification.multilingual_logistic_regression_tfidf":
+        return policy.model_copy(update={
+            "policy_key": "classification.group_cross_validation.v1",
+            "split_strategy": "group_kfold.v1", "test_size": 0.0,
+        })
     if not group_aware or evaluation_kind in {
         EvaluationKind.FORECASTING,
         EvaluationKind.RANKING,

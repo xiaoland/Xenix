@@ -45,6 +45,16 @@ Skill guidance and resource readers depend on the static catalog, not on a Conve
 
 Successful guidance reads remain useful as a history projection for the next prompt; they do not grant the right to read resources. Conversation commits a response's complete ToolCall/ToolResult set together, so making resource access depend on already committed guidance would falsely reject a same-response read even after the guidance handler succeeded. Removing that dependency resolves the defect without pending activation state or forced extra model rounds.
 
+## Agent Choice and Retained Execution
+
+The Agent owns task-dependent choices; domain services own executing those choices and retaining the state needed to reuse them. A Tool should expose coherent strategies rather than silently making business choices inside a fixed workflow. Defaults are conveniences whose meaning is discoverable, not substitutes for caller control. Optional strategy details belong in on-demand metadata, not every initial Tool definition.
+
+Reusable objects must carry their declared execution recipe. A text analyzer retains the selected segmentation/feature strategy, filtering options, explicit resources, learned vocabulary and classifier, so applying it to another batch does not depend on the Agent reconstructing earlier steps. The service fits learned transformations within each training partition. The Agent can still use `data.transform` for separate business cleaning; that SQL is not implicitly captured as part of a trained analyzer, and its output is an explicit model input.
+
+Feedback should explain the effective choice, outcome and limitations in terms the Agent can act on. A prediction with no recognized features should expose that fact alongside its output; it should not silently look like a supported prediction, disappear from the result, or terminate the tool call. Similarly, repeated validation on the same rows should be identifiable as reused evidence. Internal records, raw digests and mandatory inspection rituals are not substitutes for these decision facts.
+
+This separates choice, execution and evidence without requiring the Agent to manually assemble the service's implementation. When behavior depends on a hidden default or a remembered sequence, first ask whether the missing concept should be an explicit strategy, retained state or clear result feedback. Fix that owner before adding procedural Skill instructions or extra validation gates. Text classification applies this principle in [its unit design](text-classification.md).
+
 ## Maintenance Rationale
 
 Unnecessary architecture dependencies can become functional defects: a resource reader tied to transcript commit order gains an accidental workflow requirement, and duplicate dispatch paths gain different validation, error and paging behavior. When fixing such failures, remove the incorrect dependency or competing owner rather than encoding a workaround in prompts, another state store, or more caller-side checks.

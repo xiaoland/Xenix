@@ -1,0 +1,18 @@
+{
+  "original_run": "dab06b8186724e01b8f3135009c61aa0",
+  "original_failure_kind": "process_wall_time_exceeded",
+  "original_last_usage_seconds": 16.842059899994638,
+  "original_sampling_rounds": 5,
+  "original_database_retained": false,
+  "scripted_error_replay": "restock-error-replay.json",
+  "live_probe": {
+    "completed_seconds": 32.325250299996696,
+    "primary_gateway_entries": 7,
+    "tokens": 37054,
+    "original_error_reproduced": false,
+    "original_timeout_reproduced": false,
+    "score": "Not scored; subject-only diagnosis on current HEAD, not a replacement benchmark result."
+  },
+  "conclusion": "After failed SQL persistence and the next pending placeholder, before the next metered main LLM gateway entry; original blocking frame remains unproven.",
+  "next_evidence_needed": "Capture the active stack and canonical snapshot when pending sampling stops progressing before gateway entry; retain interrupted-cell evidence before cleanup."
+}

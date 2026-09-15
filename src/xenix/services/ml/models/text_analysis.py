@@ -11,6 +11,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 
 from ....exceptions import ValidationError
+from ...data_tokenization_contracts import TextProcessingOptions
 from ...storage.models import ProblemKind
 from ..contracts import (
     ApplySummary,
@@ -44,6 +45,7 @@ from ..text_discovery import (
     prepare_discovery_corpus,
 )
 from ..text_preparation import (
+    PreparedTextClassificationData,
     PreparedTextCorpus,
     TextClassificationApplyFacts,
     TextClassificationEvaluationFacts,
@@ -52,6 +54,7 @@ from ..text_preparation import (
     build_text_preparer,
     build_text_vectorization_facts,
 )
+from ..text_classification_evaluation import read_cross_validation, write_cross_validation
 from ..types import (
     ColumnRoleKind,
     EvaluationKind,
@@ -99,7 +102,9 @@ from ._text_helpers import (
 _TEXT_RANDOM_STATE = 42
 
 
-class MultilingualTextClassificationParams(BaseModel):
+class MultilingualTextClassificationParams(TextProcessingOptions):
+    stopword_policy: Literal["none", "business"] = Field(default="none", description="None retains meaning-bearing words; business enables the built-in stopword list.")
+    minimum_token_length: int = Field(default=1, ge=1, le=20, description="1 retains Chinese single-character words, including negation and actions.")
     preparation_profile: Literal["multilingual_business_v1"] = "multilingual_business_v1"
     phrase_mode: Literal["unigram", "unigram_bigram"] = "unigram"
     max_features: int = Field(default=5000, ge=200, le=50000)
@@ -137,15 +142,18 @@ class MultilingualTextClassifier:
         corpus = self.preparer.prepare_series(_as_text_series(texts))
         if corpus.prepared_texts.eq("").any():
             raise ValidationError("Text classifier training rows must remain non-empty after retained preparation.")
-        self.vectorizer = TfidfVectorizer(
-            tokenizer=str.split,
-            preprocessor=None,
-            token_pattern=None,
-            lowercase=False,
-            max_features=self.max_features,
-            min_df=self.minimum_document_frequency,
-            ngram_range=(1, self.preparer.ngram_max),
-        )
+        if getattr(self.preparer.specification, "text_strategy", "words") == "characters":
+            self.vectorizer = TfidfVectorizer(
+                analyzer="char", lowercase=False, max_features=self.max_features,
+                min_df=self.minimum_document_frequency,
+                ngram_range=(2, self.preparer.specification.character_ngram_max),
+            )
+        else:
+            self.vectorizer = TfidfVectorizer(
+                tokenizer=str.split, preprocessor=None, token_pattern=None, lowercase=False,
+                max_features=self.max_features, min_df=self.minimum_document_frequency,
+                ngram_range=(1, self.preparer.ngram_max),
+            )
         try:
             matrix = self.vectorizer.fit_transform(corpus.prepared_texts.tolist())
         except ValueError as exc:
@@ -174,6 +182,21 @@ class MultilingualTextClassifier:
     def predict_proba(self, texts: pd.Series) -> np.ndarray:
         corpus = self.prepare(texts)
         return np.asarray(self.model.predict_proba(self.vectorizer.transform(corpus.prepared_texts.tolist())))
+
+    def feature_coverage(self, texts: pd.Series) -> pd.DataFrame:
+        """Row-level evidence; an empty vector remains an observable prediction, not a rejected call."""
+        corpus = self.prepare(texts)
+        analyzer = self.vectorizer.build_analyzer()
+        counts = []
+        for text in corpus.prepared_texts:
+            features = analyzer(text)
+            known = sum(feature in self.vectorizer.vocabulary_ for feature in features)
+            counts.append({
+                "known_feature_count": known,
+                "feature_coverage": known / len(features) if features else 0.0,
+                "prediction_evidence": "no_known_features" if not known else "known_features",
+            })
+        return pd.DataFrame(counts)
 
     @property
     def classes_(self) -> np.ndarray:
@@ -294,6 +317,8 @@ class MultilingualTextClassificationService(ModelServiceBase):
         params = MultilingualTextClassificationParams.model_validate(request.manual_training.params)
         preparer = build_text_preparer(_text_preparation_input(request, params))
         prepared = _prepare_multilingual_request_data(request, preparer)
+        if request.evaluation_policy.split_strategy == "group_kfold.v1":
+            return cls._fit_cross_validation(request, task_dir, params, preparer, prepared)
         split = prepare_supervised_split(
             prepared.raw_texts,
             prepared.labels,
@@ -356,6 +381,36 @@ class MultilingualTextClassificationService(ModelServiceBase):
         return FitTaskResult.model_validate(payload)
 
     @classmethod
+    def _fit_cross_validation(
+        cls, request: FitTaskRequest, task_dir: Path,
+        params: MultilingualTextClassificationParams, preparer: TextPreparer,
+        prepared: PreparedTextClassificationData,
+    ) -> FitTaskResult:
+        model_path, final_path, evidence_path = _multilingual_artifact_paths(cls.key, task_dir)
+        write_cross_validation(
+            prepared, build_estimator=lambda: cls._build_estimator(preparer, params),
+            policy=request.evaluation_policy, source_sha256=request.dataset_snapshot.source_sha256,
+            path=evidence_path,
+        )
+        final = cls._build_estimator(preparer, params)
+        final.text_column = _single_role_column(request.train_role_bindings, "text")
+        final.fit(prepared.raw_texts, prepared.labels)
+        joblib.dump(final, model_path)
+        joblib.dump(final, final_path)
+        return FitTaskResult(
+            task_id=request.task_id, evaluation_kind=request.evaluation_kind, evaluation_policy=request.evaluation_policy,
+            model_key=cls.key, params=params.model_dump(mode="json"),
+            model_artifact_path=str(model_path), final_model_artifact_path=str(final_path),
+            holdout_artifact_path=str(evidence_path),
+            training_scopes=TrainingScopeFacts(evaluation_model="out_of_fold_partitions", apply_model="all_eligible_rows"),
+            text_preparation_specification=prepared.specification,
+            text_preparation_facts=prepared.preparation_facts,
+            text_vectorization_facts=final.fit_vectorization_facts,
+            result_summary={"class_count": int(prepared.labels.nunique()),
+                "apply_row_count": len(prepared.labels), "text_strategy": preparer.specification.text_strategy},
+        )
+
+    @classmethod
     def tune(cls, request: HyperparameterTuningTaskRequest, task_dir: Path) -> HyperparameterTuningTaskResult:
         del request, task_dir
         raise ValidationError(
@@ -365,6 +420,12 @@ class MultilingualTextClassificationService(ModelServiceBase):
     @classmethod
     def evaluate(cls, request: EvaluateTaskRequest, task_dir: Path) -> EvaluateTaskResult:
         del task_dir
+        if request.evaluation_policy.split_strategy == "group_kfold.v1":
+            return EvaluateTaskResult(
+                task_id=request.task_id, evaluation_kind=request.evaluation_kind, evaluation_policy=request.evaluation_policy,
+                trained_model_id=request.evaluate_model.trained_model_id, model_key=cls.key,
+                **read_cross_validation(Path(request.evaluate_model.holdout_artifact_path), request.evaluation_policy),
+            )
         estimator = joblib.load(request.evaluate_model.trained_model_artifact_path)
         if not isinstance(estimator, MultilingualTextClassifier):
             raise ValidationError("The evaluation artifact is not a retained multilingual text classifier.")
@@ -453,6 +514,7 @@ class MultilingualTextClassificationService(ModelServiceBase):
         text_column = _single_role_column_from_artifact(estimator, request.feature_columns)
         result_frames: list[pd.DataFrame] = []
         inspected_texts: list[pd.Series] = []
+        inspected_coverage: list[pd.DataFrame] = []
         all_predictions: list[Any] = []
         for input_file in request.input_files:
             dataframe = load_dataset(Path(input_file.absolute_path))
@@ -464,6 +526,10 @@ class MultilingualTextClassificationService(ModelServiceBase):
             result_frame = dataframe.copy()
             result_frame["prediction"] = predictions
             result_frame["prediction_score"] = probabilities.max(axis=1).astype(float)
+            coverage = estimator.feature_coverage(texts)
+            inspected_coverage.append(coverage)
+            for column in coverage:
+                result_frame[column] = coverage[column].to_numpy()
             if len(request.input_files) > 1:
                 result_frame["source_file"] = input_file.file_name
             result_frames.append(result_frame)
@@ -478,6 +544,12 @@ class MultilingualTextClassificationService(ModelServiceBase):
             fit_row_count=estimator.fit_vectorization_facts.fit_row_count,
         )
         apply_facts = TextClassificationApplyFacts(
+            feature_coverage={
+                "text_strategy": getattr(estimator.preparer.specification, "text_strategy", "words"),
+                "no_known_features_row_count": int(sum((frame.known_feature_count == 0).sum() for frame in inspected_coverage)),
+                "mean_feature_coverage": float(pd.concat(inspected_coverage).feature_coverage.mean()),
+                "interpretation": "Coverage counts recognized feature occurrences, not correctness. prediction_score is uncalibrated maximum class probability; zero-feature rows are bias-only predictions.",
+            },
             specification=estimator.preparer.specification,
             preparation=corpus.quality_facts,
             vectorization=vectorization,

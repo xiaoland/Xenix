@@ -1,0 +1,380 @@
+[
+  {
+    "strategy": "words",
+    "cv": {
+      "method": "group_cross_validation",
+      "evaluation_id": "862f3f046d78416d",
+      "fold_count": 5,
+      "group_count": 15,
+      "eligible_row_count": 90,
+      "evaluated_row_count": 90,
+      "status": "complete",
+      "folds": [
+        {
+          "fold": 1,
+          "train_rows": 72,
+          "validation_rows": 18,
+          "train_groups": 12,
+          "validation_groups": 3,
+          "group_overlap_count": 0,
+          "accuracy": 0.8888888888888888
+        },
+        {
+          "fold": 2,
+          "train_rows": 72,
+          "validation_rows": 18,
+          "train_groups": 12,
+          "validation_groups": 3,
+          "group_overlap_count": 0,
+          "accuracy": 0.7222222222222222
+        },
+        {
+          "fold": 3,
+          "train_rows": 72,
+          "validation_rows": 18,
+          "train_groups": 12,
+          "validation_groups": 3,
+          "group_overlap_count": 0,
+          "accuracy": 0.6111111111111112
+        },
+        {
+          "fold": 4,
+          "train_rows": 72,
+          "validation_rows": 18,
+          "train_groups": 12,
+          "validation_groups": 3,
+          "group_overlap_count": 0,
+          "accuracy": 0.8888888888888888
+        },
+        {
+          "fold": 5,
+          "train_rows": 72,
+          "validation_rows": 18,
+          "train_groups": 12,
+          "validation_groups": 3,
+          "group_overlap_count": 0,
+          "accuracy": 0.7777777777777778
+        }
+      ],
+      "accuracy_range": {
+        "min": 0.6111111111111112,
+        "max": 0.8888888888888888
+      },
+      "interpretation": "Out-of-fold selection evidence, not independent acceptance after tuning. Matching evaluation_id means reused validation data."
+    },
+    "metrics": {
+      "accuracy": 0.7777777777777778,
+      "balanced_accuracy": 0.7777777777777778,
+      "precision_macro": 0.7837810337810337,
+      "precision_weighted": 0.7837810337810337,
+      "recall_macro": 0.7777777777777778,
+      "recall_weighted": 0.7777777777777778,
+      "f1_macro": 0.7769940787182167,
+      "f1_weighted": 0.7769940787182167,
+      "log_loss": 0.8768927882037164,
+      "roc_auc": 0.9444444444444444,
+      "pr_auc": 0.8990788811091612
+    },
+    "apply_feedback": {
+      "text_strategy": "words",
+      "no_known_features_row_count": 1,
+      "mean_feature_coverage": 0.660136906104648,
+      "interpretation": "Coverage counts recognized feature occurrences, not correctness. prediction_score is uncalibrated maximum class probability; zero-feature rows are bias-only predictions."
+    },
+    "columns": [
+      "ticket_id",
+      "customer_batch",
+      "channel",
+      "message",
+      "prediction",
+      "prediction_score",
+      "known_feature_count",
+      "feature_coverage",
+      "prediction_evidence"
+    ],
+    "predictions": [
+      "退换货",
+      "发票",
+      "物流",
+      "发票",
+      "退换货",
+      "发票",
+      "物流",
+      "退换货",
+      "发票",
+      "发票",
+      "发票",
+      "发票",
+      "物流",
+      "退换货",
+      "退换货",
+      "退换货",
+      "物流",
+      "物流",
+      "退换货",
+      "物流",
+      "退换货",
+      "物流",
+      "退换货",
+      "发票",
+      "退换货",
+      "发票",
+      "发票",
+      "发票",
+      "发票",
+      "退换货"
+    ]
+  },
+  {
+    "strategy": "characters",
+    "cv": {
+      "method": "group_cross_validation",
+      "evaluation_id": "862f3f046d78416d",
+      "fold_count": 5,
+      "group_count": 15,
+      "eligible_row_count": 90,
+      "evaluated_row_count": 90,
+      "status": "complete",
+      "folds": [
+        {
+          "fold": 1,
+          "train_rows": 72,
+          "validation_rows": 18,
+          "train_groups": 12,
+          "validation_groups": 3,
+          "group_overlap_count": 0,
+          "accuracy": 0.7777777777777778
+        },
+        {
+          "fold": 2,
+          "train_rows": 72,
+          "validation_rows": 18,
+          "train_groups": 12,
+          "validation_groups": 3,
+          "group_overlap_count": 0,
+          "accuracy": 0.6666666666666666
+        },
+        {
+          "fold": 3,
+          "train_rows": 72,
+          "validation_rows": 18,
+          "train_groups": 12,
+          "validation_groups": 3,
+          "group_overlap_count": 0,
+          "accuracy": 0.7777777777777778
+        },
+        {
+          "fold": 4,
+          "train_rows": 72,
+          "validation_rows": 18,
+          "train_groups": 12,
+          "validation_groups": 3,
+          "group_overlap_count": 0,
+          "accuracy": 0.8888888888888888
+        },
+        {
+          "fold": 5,
+          "train_rows": 72,
+          "validation_rows": 18,
+          "train_groups": 12,
+          "validation_groups": 3,
+          "group_overlap_count": 0,
+          "accuracy": 0.7777777777777778
+        }
+      ],
+      "accuracy_range": {
+        "min": 0.6666666666666666,
+        "max": 0.8888888888888888
+      },
+      "interpretation": "Out-of-fold selection evidence, not independent acceptance after tuning. Matching evaluation_id means reused validation data."
+    },
+    "metrics": {
+      "accuracy": 0.7777777777777778,
+      "balanced_accuracy": 0.7777777777777778,
+      "precision_macro": 0.787878787878788,
+      "precision_weighted": 0.7878787878787878,
+      "recall_macro": 0.7777777777777778,
+      "recall_weighted": 0.7777777777777778,
+      "f1_macro": 0.7748397435897436,
+      "f1_weighted": 0.7748397435897435,
+      "log_loss": 0.9402944357681493,
+      "roc_auc": 0.9372222222222223,
+      "pr_auc": 0.8903975596932064
+    },
+    "apply_feedback": {
+      "text_strategy": "characters",
+      "no_known_features_row_count": 1,
+      "mean_feature_coverage": 0.48037840623906386,
+      "interpretation": "Coverage counts recognized feature occurrences, not correctness. prediction_score is uncalibrated maximum class probability; zero-feature rows are bias-only predictions."
+    },
+    "columns": [
+      "ticket_id",
+      "customer_batch",
+      "channel",
+      "message",
+      "prediction",
+      "prediction_score",
+      "known_feature_count",
+      "feature_coverage",
+      "prediction_evidence"
+    ],
+    "predictions": [
+      "退换货",
+      "发票",
+      "物流",
+      "发票",
+      "退换货",
+      "发票",
+      "物流",
+      "物流",
+      "发票",
+      "发票",
+      "退换货",
+      "发票",
+      "物流",
+      "退换货",
+      "退换货",
+      "物流",
+      "物流",
+      "物流",
+      "退换货",
+      "物流",
+      "退换货",
+      "物流",
+      "退换货",
+      "发票",
+      "退换货",
+      "发票",
+      "发票",
+      "退换货",
+      "发票",
+      "退换货"
+    ]
+  },
+  {
+    "strategy": "pretokenized",
+    "cv": {
+      "method": "group_cross_validation",
+      "evaluation_id": "17d66450a87b3115",
+      "fold_count": 5,
+      "group_count": 15,
+      "eligible_row_count": 90,
+      "evaluated_row_count": 90,
+      "status": "complete",
+      "folds": [
+        {
+          "fold": 1,
+          "train_rows": 72,
+          "validation_rows": 18,
+          "train_groups": 12,
+          "validation_groups": 3,
+          "group_overlap_count": 0,
+          "accuracy": 0.8333333333333334
+        },
+        {
+          "fold": 2,
+          "train_rows": 72,
+          "validation_rows": 18,
+          "train_groups": 12,
+          "validation_groups": 3,
+          "group_overlap_count": 0,
+          "accuracy": 0.7222222222222222
+        },
+        {
+          "fold": 3,
+          "train_rows": 72,
+          "validation_rows": 18,
+          "train_groups": 12,
+          "validation_groups": 3,
+          "group_overlap_count": 0,
+          "accuracy": 0.6111111111111112
+        },
+        {
+          "fold": 4,
+          "train_rows": 72,
+          "validation_rows": 18,
+          "train_groups": 12,
+          "validation_groups": 3,
+          "group_overlap_count": 0,
+          "accuracy": 0.8888888888888888
+        },
+        {
+          "fold": 5,
+          "train_rows": 72,
+          "validation_rows": 18,
+          "train_groups": 12,
+          "validation_groups": 3,
+          "group_overlap_count": 0,
+          "accuracy": 0.7222222222222222
+        }
+      ],
+      "accuracy_range": {
+        "min": 0.6111111111111112,
+        "max": 0.8888888888888888
+      },
+      "interpretation": "Out-of-fold selection evidence, not independent acceptance after tuning. Matching evaluation_id means reused validation data."
+    },
+    "metrics": {
+      "accuracy": 0.7555555555555555,
+      "balanced_accuracy": 0.7555555555555555,
+      "precision_macro": 0.7606516290726817,
+      "precision_weighted": 0.7606516290726816,
+      "recall_macro": 0.7555555555555555,
+      "recall_weighted": 0.7555555555555555,
+      "f1_macro": 0.7512959206671175,
+      "f1_weighted": 0.7512959206671174,
+      "log_loss": 0.897003628271561,
+      "roc_auc": 0.9185185185185186,
+      "pr_auc": 0.8554475932075393
+    },
+    "apply_feedback": {
+      "text_strategy": "pretokenized",
+      "no_known_features_row_count": 1,
+      "mean_feature_coverage": 0.7004534996944864,
+      "interpretation": "Coverage counts recognized feature occurrences, not correctness. prediction_score is uncalibrated maximum class probability; zero-feature rows are bias-only predictions."
+    },
+    "columns": [
+      "ticket_id",
+      "customer_batch",
+      "channel",
+      "message",
+      "prediction",
+      "prediction_score",
+      "known_feature_count",
+      "feature_coverage",
+      "prediction_evidence"
+    ],
+    "predictions": [
+      "退换货",
+      "发票",
+      "物流",
+      "发票",
+      "退换货",
+      "发票",
+      "物流",
+      "退换货",
+      "发票",
+      "发票",
+      "发票",
+      "发票",
+      "物流",
+      "退换货",
+      "退换货",
+      "退换货",
+      "物流",
+      "物流",
+      "退换货",
+      "物流",
+      "退换货",
+      "物流",
+      "退换货",
+      "发票",
+      "物流",
+      "发票",
+      "发票",
+      "退换货",
+      "发票",
+      "退换货"
+    ]
+  }
+]

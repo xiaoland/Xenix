@@ -2,8 +2,8 @@
 
 `text.classification.multilingual_logistic_regression_tfidf` accepts bilingual raw text. Roles are `text`, observed label `target`, and optional repeated business entity `group`. Missing labels are not negative labels.
 
-The retained analyzer owns normalization, tokenization, masking, stopwords, and TF-IDF preparation. Custom dictionary and stopword resources are registered one-column Dataset IDs. Standalone tokenization is unnecessary unless tokens themselves are requested.
+Choose `text_strategy` through model parameters: `words` segments text, `characters` uses character n-grams, and `pretokenized` consumes whitespace-separated tokens without another segmentation pass. Word/token filtering is configurable; custom dictionary and stopword resources are one-column Dataset IDs. The analyzer saves the choice and learned preparation for future batches. Separate business cleaning can use `data.transform`.
 
-The service handles train-side vocabulary fitting and business/template grouping. Returned evaluation includes candidate-versus-dummy metrics, split facts, and preparation facts. Use the evidence relevant to label quality and generalization; there is no additional digest or overlap inspection ritual.
+New training returns grouped cross-validation against a dummy baseline, fold variability and an `evaluation_id`; matching IDs mean reused validation data, not independent confirmation after tuning. Vocabulary is fitted inside each fold. A high score on a small sample does not guarantee future accuracy.
 
-Apply accepts the same raw-text column and produces prediction and prediction_score alongside input columns. Deliver the returned Dataset and Artifact. Explain material label-quality or unfamiliar-text limitations; predictions remain estimates of labels.
+Apply reuses the saved strategy and reports feature coverage alongside predictions. `no_known_features` means the label relies only on class bias; `prediction_score` is uncalibrated model probability. Accuracy among auto-routed rows is distinct from accuracy across the whole batch. Deliver the returned Dataset and Artifact, with material limitations.

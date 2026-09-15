@@ -1,0 +1,624 @@
+{
+  "materialized_history_parquet_sha256": "ff130b8be17c5706fee7d542f028bb24ea786fecc392b7de2d63e917f81d2c18",
+  "configurations": [
+    {
+      "name": "queue_triage_baseline",
+      "params": {
+        "class_weight": "balanced",
+        "custom_dictionary_dataset_ids": [],
+        "max_features": 5000,
+        "minimum_document_frequency": 1,
+        "phrase_mode": "unigram",
+        "preparation_profile": "multilingual_business_v1",
+        "stopword_dataset_ids": []
+      },
+      "saved_model_id": 39,
+      "replayed_holdout_accuracy": 0.7777777777777778,
+      "saved_holdout_accuracy": 0.7777777777777778,
+      "holdout_batches": [
+        "B01",
+        "B08",
+        "B14"
+      ],
+      "confirmation_correct": 28,
+      "count": 30,
+      "predictions": {
+        "T-01CA1F80": "发票",
+        "T-0888DC4E": "发票",
+        "T-16BB7C67": "物流",
+        "T-16F2635E": "发票",
+        "T-19319633": "退换货",
+        "T-21A86FBE": "发票",
+        "T-27665CB9": "物流",
+        "T-324AC726": "物流",
+        "T-4C3D7D1F": "发票",
+        "T-50C283D5": "发票",
+        "T-5D93E98D": "发票",
+        "T-64D7200C": "发票",
+        "T-66DD6A46": "物流",
+        "T-6C1C4FE8": "退换货",
+        "T-8A9021BB": "退换货",
+        "T-8B6752AF": "物流",
+        "T-96BE5028": "物流",
+        "T-9E4CE963": "物流",
+        "T-AEDC6615": "退换货",
+        "T-B943C179": "物流",
+        "T-C2E10ECE": "退换货",
+        "T-C5018310": "物流",
+        "T-C64BA76C": "退换货",
+        "T-D00705F3": "发票",
+        "T-DA3BF390": "退换货",
+        "T-E1742BAE": "发票",
+        "T-E3E086FC": "发票",
+        "T-E8FF1343": "退换货",
+        "T-EE65408F": "发票",
+        "T-F7F8AD2D": "退换货"
+      }
+    },
+    {
+      "name": "queue_triage_bigram",
+      "params": {
+        "class_weight": "balanced",
+        "custom_dictionary_dataset_ids": [],
+        "max_features": 20000,
+        "minimum_document_frequency": 1,
+        "phrase_mode": "unigram_bigram",
+        "preparation_profile": "multilingual_business_v1",
+        "stopword_dataset_ids": []
+      },
+      "saved_model_id": 53,
+      "replayed_holdout_accuracy": 0.7777777777777778,
+      "saved_holdout_accuracy": 0.7777777777777778,
+      "holdout_batches": [
+        "B01",
+        "B08",
+        "B14"
+      ],
+      "confirmation_correct": 27,
+      "count": 30,
+      "predictions": {
+        "T-01CA1F80": "发票",
+        "T-0888DC4E": "发票",
+        "T-16BB7C67": "物流",
+        "T-16F2635E": "发票",
+        "T-19319633": "退换货",
+        "T-21A86FBE": "发票",
+        "T-27665CB9": "物流",
+        "T-324AC726": "物流",
+        "T-4C3D7D1F": "发票",
+        "T-50C283D5": "发票",
+        "T-5D93E98D": "发票",
+        "T-64D7200C": "发票",
+        "T-66DD6A46": "物流",
+        "T-6C1C4FE8": "退换货",
+        "T-8A9021BB": "退换货",
+        "T-8B6752AF": "物流",
+        "T-96BE5028": "物流",
+        "T-9E4CE963": "物流",
+        "T-AEDC6615": "退换货",
+        "T-B943C179": "物流",
+        "T-C2E10ECE": "退换货",
+        "T-C5018310": "物流",
+        "T-C64BA76C": "退换货",
+        "T-D00705F3": "发票",
+        "T-DA3BF390": "物流",
+        "T-E1742BAE": "发票",
+        "T-E3E086FC": "发票",
+        "T-E8FF1343": "退换货",
+        "T-EE65408F": "发票",
+        "T-F7F8AD2D": "退换货"
+      }
+    },
+    {
+      "name": "queue_triage_mindf2",
+      "params": {
+        "class_weight": "balanced",
+        "custom_dictionary_dataset_ids": [],
+        "max_features": 5000,
+        "minimum_document_frequency": 2,
+        "phrase_mode": "unigram",
+        "preparation_profile": "multilingual_business_v1",
+        "stopword_dataset_ids": []
+      },
+      "saved_model_id": 68,
+      "replayed_holdout_accuracy": 0.9444444444444444,
+      "saved_holdout_accuracy": 0.9444444444444444,
+      "holdout_batches": [
+        "B01",
+        "B08",
+        "B14"
+      ],
+      "confirmation_correct": 26,
+      "count": 30,
+      "predictions": {
+        "T-01CA1F80": "发票",
+        "T-0888DC4E": "发票",
+        "T-16BB7C67": "物流",
+        "T-16F2635E": "发票",
+        "T-19319633": "退换货",
+        "T-21A86FBE": "发票",
+        "T-27665CB9": "物流",
+        "T-324AC726": "物流",
+        "T-4C3D7D1F": "发票",
+        "T-50C283D5": "发票",
+        "T-5D93E98D": "发票",
+        "T-64D7200C": "发票",
+        "T-66DD6A46": "物流",
+        "T-6C1C4FE8": "退换货",
+        "T-8A9021BB": "退换货",
+        "T-8B6752AF": "物流",
+        "T-96BE5028": "物流",
+        "T-9E4CE963": "物流",
+        "T-AEDC6615": "退换货",
+        "T-B943C179": "退换货",
+        "T-C2E10ECE": "退换货",
+        "T-C5018310": "物流",
+        "T-C64BA76C": "退换货",
+        "T-D00705F3": "发票",
+        "T-DA3BF390": "退换货",
+        "T-E1742BAE": "发票",
+        "T-E3E086FC": "发票",
+        "T-E8FF1343": "退换货",
+        "T-EE65408F": "发票",
+        "T-F7F8AD2D": "发票"
+      }
+    },
+    {
+      "name": "queue_triage_cwnone",
+      "params": {
+        "class_weight": "none",
+        "custom_dictionary_dataset_ids": [],
+        "max_features": 5000,
+        "minimum_document_frequency": 1,
+        "phrase_mode": "unigram",
+        "preparation_profile": "multilingual_business_v1",
+        "stopword_dataset_ids": []
+      },
+      "saved_model_id": 78,
+      "replayed_holdout_accuracy": 0.7777777777777778,
+      "saved_holdout_accuracy": 0.7777777777777778,
+      "holdout_batches": [
+        "B01",
+        "B08",
+        "B14"
+      ],
+      "confirmation_correct": 28,
+      "count": 30,
+      "predictions": {
+        "T-01CA1F80": "发票",
+        "T-0888DC4E": "发票",
+        "T-16BB7C67": "物流",
+        "T-16F2635E": "发票",
+        "T-19319633": "退换货",
+        "T-21A86FBE": "发票",
+        "T-27665CB9": "物流",
+        "T-324AC726": "物流",
+        "T-4C3D7D1F": "发票",
+        "T-50C283D5": "发票",
+        "T-5D93E98D": "发票",
+        "T-64D7200C": "发票",
+        "T-66DD6A46": "物流",
+        "T-6C1C4FE8": "退换货",
+        "T-8A9021BB": "退换货",
+        "T-8B6752AF": "物流",
+        "T-96BE5028": "物流",
+        "T-9E4CE963": "物流",
+        "T-AEDC6615": "退换货",
+        "T-B943C179": "物流",
+        "T-C2E10ECE": "退换货",
+        "T-C5018310": "物流",
+        "T-C64BA76C": "退换货",
+        "T-D00705F3": "发票",
+        "T-DA3BF390": "退换货",
+        "T-E1742BAE": "发票",
+        "T-E3E086FC": "发票",
+        "T-E8FF1343": "退换货",
+        "T-EE65408F": "发票",
+        "T-F7F8AD2D": "退换货"
+      }
+    },
+    {
+      "name": "queue_triage_mindf3",
+      "params": {
+        "class_weight": "balanced",
+        "custom_dictionary_dataset_ids": [],
+        "max_features": 5000,
+        "minimum_document_frequency": 3,
+        "phrase_mode": "unigram",
+        "preparation_profile": "multilingual_business_v1",
+        "stopword_dataset_ids": []
+      },
+      "saved_model_id": 94,
+      "replayed_holdout_accuracy": 0.6666666666666666,
+      "saved_holdout_accuracy": 0.6666666666666666,
+      "holdout_batches": [
+        "B01",
+        "B08",
+        "B14"
+      ],
+      "confirmation_correct": 26,
+      "count": 30,
+      "predictions": {
+        "T-01CA1F80": "发票",
+        "T-0888DC4E": "发票",
+        "T-16BB7C67": "物流",
+        "T-16F2635E": "发票",
+        "T-19319633": "退换货",
+        "T-21A86FBE": "发票",
+        "T-27665CB9": "物流",
+        "T-324AC726": "退换货",
+        "T-4C3D7D1F": "发票",
+        "T-50C283D5": "发票",
+        "T-5D93E98D": "发票",
+        "T-64D7200C": "发票",
+        "T-66DD6A46": "物流",
+        "T-6C1C4FE8": "退换货",
+        "T-8A9021BB": "退换货",
+        "T-8B6752AF": "物流",
+        "T-96BE5028": "物流",
+        "T-9E4CE963": "物流",
+        "T-AEDC6615": "退换货",
+        "T-B943C179": "退换货",
+        "T-C2E10ECE": "退换货",
+        "T-C5018310": "物流",
+        "T-C64BA76C": "退换货",
+        "T-D00705F3": "发票",
+        "T-DA3BF390": "退换货",
+        "T-E1742BAE": "发票",
+        "T-E3E086FC": "发票",
+        "T-E8FF1343": "退换货",
+        "T-EE65408F": "发票",
+        "T-F7F8AD2D": "退换货"
+      }
+    },
+    {
+      "name": "queue_triage_mindf2_bigram",
+      "params": {
+        "class_weight": "balanced",
+        "custom_dictionary_dataset_ids": [],
+        "max_features": 20000,
+        "minimum_document_frequency": 2,
+        "phrase_mode": "unigram_bigram",
+        "preparation_profile": "multilingual_business_v1",
+        "stopword_dataset_ids": []
+      },
+      "saved_model_id": 104,
+      "replayed_holdout_accuracy": 0.9444444444444444,
+      "saved_holdout_accuracy": 0.9444444444444444,
+      "holdout_batches": [
+        "B01",
+        "B08",
+        "B14"
+      ],
+      "confirmation_correct": 26,
+      "count": 30,
+      "predictions": {
+        "T-01CA1F80": "发票",
+        "T-0888DC4E": "发票",
+        "T-16BB7C67": "物流",
+        "T-16F2635E": "发票",
+        "T-19319633": "退换货",
+        "T-21A86FBE": "发票",
+        "T-27665CB9": "物流",
+        "T-324AC726": "物流",
+        "T-4C3D7D1F": "发票",
+        "T-50C283D5": "发票",
+        "T-5D93E98D": "发票",
+        "T-64D7200C": "发票",
+        "T-66DD6A46": "物流",
+        "T-6C1C4FE8": "退换货",
+        "T-8A9021BB": "退换货",
+        "T-8B6752AF": "物流",
+        "T-96BE5028": "物流",
+        "T-9E4CE963": "物流",
+        "T-AEDC6615": "退换货",
+        "T-B943C179": "退换货",
+        "T-C2E10ECE": "退换货",
+        "T-C5018310": "物流",
+        "T-C64BA76C": "退换货",
+        "T-D00705F3": "发票",
+        "T-DA3BF390": "退换货",
+        "T-E1742BAE": "发票",
+        "T-E3E086FC": "发票",
+        "T-E8FF1343": "退换货",
+        "T-EE65408F": "发票",
+        "T-F7F8AD2D": "发票"
+      }
+    }
+  ],
+  "retained_holdout_rows": [
+    {
+      "ticket_id": "T-B5D15442",
+      "customer_batch": "B01",
+      "channel": "微信",
+      "message": "包裹三天没更新物流，想知道现在到哪里了。",
+      "queue": "物流"
+    },
+    {
+      "ticket_id": "T-8F8906DE",
+      "customer_batch": "B01",
+      "channel": "微信",
+      "message": "收货地址门牌号写错了，请帮我改到 302 室。",
+      "queue": "物流"
+    },
+    {
+      "ticket_id": "T-60F02FDF",
+      "customer_batch": "B08",
+      "channel": "微信",
+      "message": "台风之后物流中断了，预计哪天恢复配送？",
+      "queue": "物流"
+    },
+    {
+      "ticket_id": "T-B57419AE",
+      "customer_batch": "B08",
+      "channel": "微信",
+      "message": "包裹被退回寄件仓，我还想收到这件货。",
+      "queue": "物流"
+    },
+    {
+      "ticket_id": "T-F3B9B147",
+      "customer_batch": "B14",
+      "channel": "微信",
+      "message": "My parcel was sent to the old postcode; please trace it.",
+      "queue": "物流"
+    },
+    {
+      "ticket_id": "T-3170E1A2",
+      "customer_batch": "B14",
+      "channel": "微信",
+      "message": "派送员将商品放进了错误的快递柜。",
+      "queue": "物流"
+    },
+    {
+      "ticket_id": "T-7D3FDC26",
+      "customer_batch": "B01",
+      "channel": "电话",
+      "message": "鞋子尺码太小，想换大一码。",
+      "queue": "退换货"
+    },
+    {
+      "ticket_id": "T-F3C53446",
+      "customer_batch": "B01",
+      "channel": "电话",
+      "message": "杯子到货有裂纹，申请退货退款。",
+      "queue": "退换货"
+    },
+    {
+      "ticket_id": "T-BCB8C9B8",
+      "customer_batch": "B08",
+      "channel": "电话",
+      "message": "退货申请填错了数量，需要改成两件。",
+      "queue": "退换货"
+    },
+    {
+      "ticket_id": "T-F4E2C34D",
+      "customer_batch": "B08",
+      "channel": "电话",
+      "message": "这个配件不兼容我的设备，想退掉。",
+      "queue": "退换货"
+    },
+    {
+      "ticket_id": "T-D845AB78",
+      "customer_batch": "B14",
+      "channel": "电话",
+      "message": "My return request was closed even though the item is faulty.",
+      "queue": "退换货"
+    },
+    {
+      "ticket_id": "T-8EE2CBC4",
+      "customer_batch": "B14",
+      "channel": "电话",
+      "message": "我不再需要这台机器，七天内能申请无理由退货吗？",
+      "queue": "退换货"
+    },
+    {
+      "ticket_id": "T-86DF07B9",
+      "customer_batch": "B01",
+      "channel": "邮件",
+      "message": "请把发票抬头改成公司的全称。",
+      "queue": "发票"
+    },
+    {
+      "ticket_id": "T-5894CED9",
+      "customer_batch": "B01",
+      "channel": "邮件",
+      "message": "订单已完成，需要补开电子发票。",
+      "queue": "发票"
+    },
+    {
+      "ticket_id": "T-5A5D89F5",
+      "customer_batch": "B08",
+      "channel": "邮件",
+      "message": "发票项目名称与实际购买商品不符。",
+      "queue": "发票"
+    },
+    {
+      "ticket_id": "T-643555D3",
+      "customer_batch": "B08",
+      "channel": "邮件",
+      "message": "退款后需要红字发票用于财务冲销。",
+      "queue": "发票"
+    },
+    {
+      "ticket_id": "T-6BD68E89",
+      "customer_batch": "B14",
+      "channel": "邮件",
+      "message": "The tax invoice lists a product we did not purchase.",
+      "queue": "发票"
+    },
+    {
+      "ticket_id": "T-BB117451",
+      "customer_batch": "B14",
+      "channel": "邮件",
+      "message": "两家分公司分别付款，需要分别开票。",
+      "queue": "发票"
+    }
+  ],
+  "retained_errors": [
+    {
+      "ticket_id": "T-01CA1F80",
+      "customer_batch": "NEW-06",
+      "channel": "微信",
+      "message": "I do not need a new invoice; I need a refund for the returned kettle.",
+      "prediction": "发票",
+      "expected": "退换货",
+      "confidence": 0.4679208418858702,
+      "prepared_tokens": [
+        "do",
+        "not",
+        "need",
+        "new",
+        "invoice",
+        "need",
+        "refund",
+        "returned",
+        "kettle"
+      ],
+      "unknown_tokens": [
+        "do",
+        "new",
+        "kettle"
+      ],
+      "feature_margin_wrong_minus_correct": [
+        {
+          "token": "invoice",
+          "margin": 0.6767537552666733
+        },
+        {
+          "token": "not",
+          "margin": 0.23601276368409663
+        },
+        {
+          "token": "need",
+          "margin": 0.2235221121986316
+        },
+        {
+          "token": "returned",
+          "margin": -0.2029596884108957
+        },
+        {
+          "token": "refund",
+          "margin": -0.25875697465703756
+        }
+      ]
+    },
+    {
+      "ticket_id": "T-B943C179",
+      "customer_batch": "NEW-02",
+      "channel": "邮件",
+      "message": "办公室周末无人值班，请通知派件员工作日送。",
+      "prediction": "退换货",
+      "expected": "物流",
+      "confidence": 0.382873596087078,
+      "prepared_tokens": [
+        "办公室",
+        "周末",
+        "无人",
+        "值班",
+        "通知",
+        "工作日"
+      ],
+      "unknown_tokens": [
+        "办公室",
+        "周末",
+        "无人",
+        "值班",
+        "通知",
+        "工作日"
+      ],
+      "feature_margin_wrong_minus_correct": []
+    },
+    {
+      "ticket_id": "T-D00705F3",
+      "customer_batch": "NEW-05",
+      "channel": "邮件",
+      "message": "No invoice issue here; I only need a working tracking number.",
+      "prediction": "发票",
+      "expected": "物流",
+      "confidence": 0.4896530729623898,
+      "prepared_tokens": [
+        "no",
+        "invoice",
+        "issue",
+        "here",
+        "only",
+        "need",
+        "working",
+        "tracking",
+        "number"
+      ],
+      "unknown_tokens": [
+        "no",
+        "issue",
+        "here",
+        "only",
+        "working"
+      ],
+      "feature_margin_wrong_minus_correct": [
+        {
+          "token": "invoice",
+          "margin": 1.0474298985607313
+        },
+        {
+          "token": "need",
+          "margin": 0.20955056725381446
+        },
+        {
+          "token": "number",
+          "margin": -0.08812567310537929
+        },
+        {
+          "token": "tracking",
+          "margin": -0.5318871257314751
+        }
+      ]
+    },
+    {
+      "ticket_id": "T-F7F8AD2D",
+      "customer_batch": "NEW-04",
+      "channel": "微信",
+      "message": "尺码与标签不一致，需要换一件合身的。",
+      "prediction": "发票",
+      "expected": "退换货",
+      "confidence": 0.403736677437203,
+      "prepared_tokens": [
+        "尺码",
+        "标签",
+        "一致",
+        "需要",
+        "一件",
+        "合身"
+      ],
+      "unknown_tokens": [
+        "尺码",
+        "标签",
+        "一致",
+        "一件",
+        "合身"
+      ],
+      "feature_margin_wrong_minus_correct": [
+        {
+          "token": "需要",
+          "margin": 0.47395960378829927
+        }
+      ]
+    }
+  ],
+  "negation_vocabulary": {
+    "no": false,
+    "not": true,
+    "only": false,
+    "but": false,
+    "没有": false,
+    "不": false,
+    "但是": false
+  },
+  "retained_evaluation_digest": "48dd0f788c515855da8546a0d5fa0af6aef507b5b4da392e6bc681be973015b5",
+  "validation": {
+    "holdout_membership_digest_matches": true,
+    "all_six_saved_holdout_scores_match": true,
+    "all_30_saved_predictions_match": true,
+    "max_error_confidence_delta": 0.0
+  },
+  "limitations": "Rebuilt materialized Parquet and production estimators; the original persisted model binary was deleted with its cell. Membership, scores and outputs were checked against saved evidence. The diagnostic snapshot fingerprint does not affect the v2 split, which uses real materialized content SHA."
+}

@@ -40,7 +40,7 @@ def training_result_summary(result: dict[str, Any]) -> dict[str, Any]:
         key: result[key]
         for key in (
             "model_key", "trained_model_id", "evaluation_kind", "params", "best_params",
-            "training_scopes", "tuning_summary", "comparison", "error_summary",
+            "training_scopes", "tuning_summary", "comparison", "error_summary", "cross_validation",
         )
         if result.get(key) is not None
     }

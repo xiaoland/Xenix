@@ -16,7 +16,7 @@ from sqlmodel import SQLModel
 
 from ..config import AppPaths
 from ..exceptions import DatasetSourceMissingError, ValidationError, report_exception
-from .data_tokenization_contracts import StagedTextResourceInput, TextPreparationInput
+from .data_tokenization_contracts import StagedTextResourceInput, TextPreparationInput, TextProcessingOptions
 from .dataset_inspection import InspectDatasetInput
 from .dataset_service import DatasetService, MaterializeManualApplyCsvInput
 from .ml.contracts import (
@@ -634,6 +634,7 @@ class MLService:
             ),
             evaluation_policy=get_default_policy(
                 catalog.evaluation_kind,
+                model_key=model_key,
                 summary_metric_name=catalog.summary_metric_name,
                 group_aware=get_model_service(model_key).uses_automatic_groups or any(
                     role_binding.role == "group" and role_binding.columns
@@ -685,6 +686,7 @@ class MLService:
             {
                 "tokenizer_profile": params.get("preparation_profile"),
                 "phrase_mode": params.get("phrase_mode"),
+                **{name: params[name] for name in TextProcessingOptions.model_fields if name in params},
                 "custom_dictionary_resources": [
                     self._stage_text_resource(context, dataset_id)
                     for dataset_id in custom_ids

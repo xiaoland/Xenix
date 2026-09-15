@@ -1,0 +1,430 @@
+{
+  "experiments": [
+    {
+      "representation": "current",
+      "min_df": 1,
+      "grouped_cv_correct": 79,
+      "grouped_cv_total": 90,
+      "folds": [
+        {
+          "correct": 16,
+          "total": 18,
+          "heldout_batches": [
+            "B01",
+            "B06",
+            "B11"
+          ]
+        },
+        {
+          "correct": 16,
+          "total": 18,
+          "heldout_batches": [
+            "B04",
+            "B08",
+            "B09"
+          ]
+        },
+        {
+          "correct": 14,
+          "total": 18,
+          "heldout_batches": [
+            "B03",
+            "B07",
+            "B15"
+          ]
+        },
+        {
+          "correct": 17,
+          "total": 18,
+          "heldout_batches": [
+            "B10",
+            "B13",
+            "B14"
+          ]
+        },
+        {
+          "correct": 16,
+          "total": 18,
+          "heldout_batches": [
+            "B02",
+            "B05",
+            "B12"
+          ]
+        }
+      ],
+      "deliveries": {
+        "standard": {
+          "correct": 28,
+          "total": 30,
+          "errors": [
+            "T-60CF1C49",
+            "T-ADB30E47"
+          ]
+        },
+        "confirmation": {
+          "correct": 28,
+          "total": 30,
+          "errors": [
+            "T-01CA1F80",
+            "T-D00705F3"
+          ]
+        }
+      }
+    },
+    {
+      "representation": "current",
+      "min_df": 2,
+      "grouped_cv_correct": 76,
+      "grouped_cv_total": 90,
+      "folds": [
+        {
+          "correct": 17,
+          "total": 18,
+          "heldout_batches": [
+            "B01",
+            "B06",
+            "B11"
+          ]
+        },
+        {
+          "correct": 15,
+          "total": 18,
+          "heldout_batches": [
+            "B04",
+            "B08",
+            "B09"
+          ]
+        },
+        {
+          "correct": 13,
+          "total": 18,
+          "heldout_batches": [
+            "B03",
+            "B07",
+            "B15"
+          ]
+        },
+        {
+          "correct": 16,
+          "total": 18,
+          "heldout_batches": [
+            "B10",
+            "B13",
+            "B14"
+          ]
+        },
+        {
+          "correct": 15,
+          "total": 18,
+          "heldout_batches": [
+            "B02",
+            "B05",
+            "B12"
+          ]
+        }
+      ],
+      "deliveries": {
+        "standard": {
+          "correct": 28,
+          "total": 30,
+          "errors": [
+            "T-60CF1C49",
+            "T-ADB30E47"
+          ]
+        },
+        "confirmation": {
+          "correct": 26,
+          "total": 30,
+          "errors": [
+            "T-01CA1F80",
+            "T-B943C179",
+            "T-D00705F3",
+            "T-F7F8AD2D"
+          ]
+        }
+      }
+    },
+    {
+      "representation": "keep_cjk_characters",
+      "min_df": 1,
+      "grouped_cv_correct": 77,
+      "grouped_cv_total": 90,
+      "folds": [
+        {
+          "correct": 17,
+          "total": 18,
+          "heldout_batches": [
+            "B01",
+            "B06",
+            "B11"
+          ]
+        },
+        {
+          "correct": 14,
+          "total": 18,
+          "heldout_batches": [
+            "B04",
+            "B08",
+            "B09"
+          ]
+        },
+        {
+          "correct": 14,
+          "total": 18,
+          "heldout_batches": [
+            "B03",
+            "B07",
+            "B15"
+          ]
+        },
+        {
+          "correct": 17,
+          "total": 18,
+          "heldout_batches": [
+            "B10",
+            "B13",
+            "B14"
+          ]
+        },
+        {
+          "correct": 15,
+          "total": 18,
+          "heldout_batches": [
+            "B02",
+            "B05",
+            "B12"
+          ]
+        }
+      ],
+      "deliveries": {
+        "standard": {
+          "correct": 30,
+          "total": 30,
+          "errors": []
+        },
+        "confirmation": {
+          "correct": 27,
+          "total": 30,
+          "errors": [
+            "T-01CA1F80",
+            "T-8B6752AF",
+            "T-D00705F3"
+          ]
+        }
+      }
+    },
+    {
+      "representation": "keep_cjk_characters",
+      "min_df": 2,
+      "grouped_cv_correct": 75,
+      "grouped_cv_total": 90,
+      "folds": [
+        {
+          "correct": 16,
+          "total": 18,
+          "heldout_batches": [
+            "B01",
+            "B06",
+            "B11"
+          ]
+        },
+        {
+          "correct": 15,
+          "total": 18,
+          "heldout_batches": [
+            "B04",
+            "B08",
+            "B09"
+          ]
+        },
+        {
+          "correct": 13,
+          "total": 18,
+          "heldout_batches": [
+            "B03",
+            "B07",
+            "B15"
+          ]
+        },
+        {
+          "correct": 16,
+          "total": 18,
+          "heldout_batches": [
+            "B10",
+            "B13",
+            "B14"
+          ]
+        },
+        {
+          "correct": 15,
+          "total": 18,
+          "heldout_batches": [
+            "B02",
+            "B05",
+            "B12"
+          ]
+        }
+      ],
+      "deliveries": {
+        "standard": {
+          "correct": 29,
+          "total": 30,
+          "errors": [
+            "T-ADB30E47"
+          ]
+        },
+        "confirmation": {
+          "correct": 27,
+          "total": 30,
+          "errors": [
+            "T-01CA1F80",
+            "T-66DD6A46",
+            "T-D00705F3"
+          ]
+        }
+      }
+    },
+    {
+      "representation": "character_ngrams",
+      "min_df": 1,
+      "grouped_cv_correct": 70,
+      "grouped_cv_total": 90,
+      "folds": [
+        {
+          "correct": 14,
+          "total": 18,
+          "heldout_batches": [
+            "B01",
+            "B06",
+            "B11"
+          ]
+        },
+        {
+          "correct": 12,
+          "total": 18,
+          "heldout_batches": [
+            "B04",
+            "B08",
+            "B09"
+          ]
+        },
+        {
+          "correct": 14,
+          "total": 18,
+          "heldout_batches": [
+            "B03",
+            "B07",
+            "B15"
+          ]
+        },
+        {
+          "correct": 16,
+          "total": 18,
+          "heldout_batches": [
+            "B10",
+            "B13",
+            "B14"
+          ]
+        },
+        {
+          "correct": 14,
+          "total": 18,
+          "heldout_batches": [
+            "B02",
+            "B05",
+            "B12"
+          ]
+        }
+      ],
+      "deliveries": {
+        "standard": {
+          "correct": 29,
+          "total": 30,
+          "errors": [
+            "T-60CF1C49"
+          ]
+        },
+        "confirmation": {
+          "correct": 28,
+          "total": 30,
+          "errors": [
+            "T-5D93E98D",
+            "T-D00705F3"
+          ]
+        }
+      }
+    },
+    {
+      "representation": "character_ngrams",
+      "min_df": 2,
+      "grouped_cv_correct": 73,
+      "grouped_cv_total": 90,
+      "folds": [
+        {
+          "correct": 15,
+          "total": 18,
+          "heldout_batches": [
+            "B01",
+            "B06",
+            "B11"
+          ]
+        },
+        {
+          "correct": 16,
+          "total": 18,
+          "heldout_batches": [
+            "B04",
+            "B08",
+            "B09"
+          ]
+        },
+        {
+          "correct": 13,
+          "total": 18,
+          "heldout_batches": [
+            "B03",
+            "B07",
+            "B15"
+          ]
+        },
+        {
+          "correct": 14,
+          "total": 18,
+          "heldout_batches": [
+            "B10",
+            "B13",
+            "B14"
+          ]
+        },
+        {
+          "correct": 15,
+          "total": 18,
+          "heldout_batches": [
+            "B02",
+            "B05",
+            "B12"
+          ]
+        }
+      ],
+      "deliveries": {
+        "standard": {
+          "correct": 28,
+          "total": 30,
+          "errors": [
+            "T-60CF1C49",
+            "T-ADB30E47"
+          ]
+        },
+        "confirmation": {
+          "correct": 28,
+          "total": 30,
+          "errors": [
+            "T-5D93E98D",
+            "T-D00705F3"
+          ]
+        }
+      }
+    }
+  ],
+  "evidence_limit": "Five fixed group folds use historical labels only. Representation alternatives are offline counterfactuals, not production fixes or a benchmark rerun; test truths score results after fitting."
+}

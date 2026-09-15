@@ -20,6 +20,7 @@ This contract governs persisted ML work, not task packets under `tasks/`.
   artifact. The canonical apply artifact may be refit on all eligible rows and must
   not inherit an unsupported holdout-performance claim.
 - New grouped supervised evaluation derives its partition seed from source content, not the transient Dataset id assigned on import. Retained task policies keep their original partition semantics when earlier analyzers are evaluated again.
+- New multilingual text classification uses grouped out-of-fold evidence for selection. Its evaluation artifact contains predictions from models fitted without the respective validation groups; the canonical apply model is refit on all eligible rows. Incomplete validation is reported explicitly and does not inherit a score from its successful subset. Agent-selected preparation is retained with the analyzer, independently of any preceding business Dataset transformation.
 
 Exact task fields, operation enums, model taxonomy, and persistence shapes are owned
 by source, schemas, and tests.

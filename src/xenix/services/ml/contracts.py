@@ -412,6 +412,7 @@ class HyperparameterTuningTaskResult(TaskResultBase):
 
 
 class EvaluateTaskResult(TaskResultBase):
+    cross_validation: dict[str, Any] | None = None
     trained_model_id: int
     model_key: str
     evaluation: CandidateMetrics | None = None
