@@ -12,6 +12,7 @@ from .budgets import (
     BenchmarkBudgetSnapshot,
     BenchmarkBudgetStatus,
 )
+from .telemetry import BenchmarkTraceEvent
 
 
 class BenchmarkRunStatus(StrEnum):
@@ -38,7 +39,7 @@ class SemanticVerdict(StrEnum):
 
 
 class JudgeStatus(StrEnum):
-    """Whether V2 was able to obtain a trustworthy judge response."""
+    """Whether the evaluator obtained a usable Judge response."""
 
     NOT_REQUESTED = "not_requested"
     NOT_CONFIGURED = "not_configured"
@@ -82,6 +83,7 @@ class JudgeRubric:
     rubric_id: str
     score_dimensions: tuple[str, ...]
     allowed_reason_codes: tuple[str, ...]
+    scoring_guidance: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -93,21 +95,6 @@ class JudgeInput:
     facts: tuple[str, ...]
     artifact_evidence: tuple[str, ...]
 
-    def __post_init__(self) -> None:
-        if not self.rubric.rubric_id.strip():
-            raise ValueError("judge_rubric_id_required")
-        if not self.rubric.score_dimensions:
-            raise ValueError("judge_score_dimensions_required")
-        if (
-            not isinstance(self.task_intent, str)
-            or not self.task_intent.strip()
-            or len(self.task_intent) > 512
-        ):
-            raise ValueError("judge_task_intent_required")
-        _validate_bounded_strings("judge_facts", self.facts, maximum_items=12)
-        _validate_bounded_strings("judge_artifact_evidence", self.artifact_evidence, maximum_items=48)
-
-
 @dataclass(frozen=True)
 class BenchmarkCaseAssessment:
     """Case-owned final-outcome facts after one subject cell settles."""
@@ -117,6 +104,7 @@ class BenchmarkCaseAssessment:
     judge_input: JudgeInput | None = None
     judge_required: bool = False
     terminal_shape: tuple[int, int] | None = None
+    turn_checks: tuple[tuple[OutcomeCheck, ...], ...] = ()
 
     @property
     def semantic_checks_passed(self) -> bool:
@@ -130,13 +118,21 @@ class BenchmarkCaseAssessment:
 
 
 class BenchmarkDatasetAccess(Protocol):
-    def get_dataset(self, dataset_id: str) -> Any: ...
+    def get_dataset(self, dataset_id: int) -> Any: ...
 
     def list_datasets(self) -> list[Any]: ...
+
+    def get_dataset_audit(self, dataset_id: int) -> Any: ...
 
 
 class BenchmarkArtifactAccess(Protocol):
     def resolve_uri(self, uri: str) -> Any: ...
+
+
+class BenchmarkModelAccess(Protocol):
+    def get_task_details(self, ml_task_id: int) -> Any: ...
+
+    def get_trained_model(self, trained_model_id: int) -> Any: ...
 
 
 class BenchmarkKnowledgeImportAccess(Protocol):
@@ -144,13 +140,13 @@ class BenchmarkKnowledgeImportAccess(Protocol):
 
 
 class BenchmarkKnowledgeDerivationAccess(Protocol):
-    def status_for_import(self, import_id: str) -> Any: ...
+    def status_for_import(self, import_id: int) -> Any: ...
 
 
 class BenchmarkKnowledgeIndexAccess(Protocol):
     def enqueue_rebuild(self, index_kinds: Any, *, trigger: str) -> str: ...
 
-    def rebuild_now(self, task_id: str) -> Any: ...
+    def rebuild_now(self, task_id: int) -> Any: ...
 
 
 @dataclass(frozen=True)
@@ -168,6 +164,7 @@ class BenchmarkCaseServices:
 
     datasets: BenchmarkDatasetAccess
     artifacts: BenchmarkArtifactAccess
+    models: BenchmarkModelAccess | None = None
 
 
 @dataclass(frozen=True)
@@ -177,23 +174,25 @@ class BenchmarkCaseContext:
     snapshot: Any | None
     services: BenchmarkCaseServices
     source_state: Any | None
-    run_dataset_ids: frozenset[str]
+    run_dataset_ids: frozenset[int]
     runtime_home: Path
-    settings_unchanged: bool
+    turns: tuple[BenchmarkTurnObservation, ...] = ()
 
 
 class BenchmarkCase(Protocol):
     """Small outcome-first contract; the runner never branches on case id.
 
-    A case may additionally define ``prepare(*, services)`` when its isolated
-    cell needs public product state before the measured subject turn.
+    Optional ``build_submissions`` returns sequential requests for one thread;
+    legacy cases keep ``build_submission``. ``capture_turn(*, context)`` freezes
+    delivered evidence before a later request can revise it. ``prepare`` may
+    establish public product state before subject timing.
     """
 
     case_id: str
 
     def validate_input(self) -> str: ...
 
-    def build_submission(self, *, thread_id: str, fq_model_key: str) -> Any: ...
+    def build_submission(self, *, thread_id: int, fq_model_key: str) -> Any: ...
 
     def capture_source_state(self, *, snapshot: Any, services: BenchmarkCaseServices) -> Any: ...
 
@@ -246,6 +245,41 @@ class BenchmarkMetrics:
             "derived_dataset_count": self.derived_dataset_count,
             "terminal_shape": list(self.terminal_shape) if self.terminal_shape is not None else None,
         }
+
+
+@dataclass(frozen=True)
+class BenchmarkTurnResult:
+    """One user submission, with incremental (not cumulative) usage."""
+
+    index: int
+    run_status: BenchmarkRunStatus
+    subject_metrics: BenchmarkMetrics
+    failure_kind: str | None = None
+    semantic_checks: tuple[OutcomeCheck, ...] = ()
+    delivery_evidence: tuple[str, ...] = ()
+    request_text: str | None = None
+    attachment_names: tuple[str, ...] = ()
+
+    def to_payload(self) -> dict[str, Any]:
+        return {
+            "index": self.index,
+            "run_status": self.run_status.value,
+            "failure_kind": self.failure_kind,
+            "subject_metrics": self.subject_metrics.to_payload(),
+            "semantic_checks": [check.to_payload() for check in self.semantic_checks],
+            "delivery_evidence": list(self.delivery_evidence),
+            "request_text": self.request_text,
+            "attachment_names": list(self.attachment_names),
+        }
+
+
+@dataclass(frozen=True)
+class BenchmarkTurnObservation:
+    """Runtime-only checkpoint; a case owns the frozen delivery evidence."""
+
+    snapshot: Any | None
+    evidence: Any
+    result: BenchmarkTurnResult
 
 
 @dataclass(frozen=True)
@@ -323,6 +357,20 @@ class BenchmarkIdentity:
 
 
 @dataclass(frozen=True)
+class BenchmarkTraceResult:
+    """Correlated lifecycle evidence for debugging one isolated cell."""
+
+    trace_id: str
+    events: tuple[BenchmarkTraceEvent, ...] = ()
+
+    def to_payload(self) -> dict[str, Any]:
+        return {
+            "trace_id": self.trace_id,
+            "events": [event.to_payload() for event in self.events],
+        }
+
+
+@dataclass(frozen=True)
 class AgentHarnessBenchmarkResult:
     case_id: str
     run_id: str
@@ -342,15 +390,17 @@ class AgentHarnessBenchmarkResult:
     judge: JudgeResult = field(default_factory=JudgeResult)
     identity: BenchmarkIdentity = field(default_factory=BenchmarkIdentity)
     failure_kind: str | None = None
-    schema_version: int = 5
+    trace: BenchmarkTraceResult | None = None
+    turns: tuple[BenchmarkTurnResult, ...] = ()
+    planned_turn_count: int | None = None
+    schema_version: int = 6
 
     @property
     def integrity_passed(self) -> bool:
-        """Whether the completed cell produced a trustworthy measurement."""
+        """Whether the observed integrity checks passed, independently of completion."""
 
         return (
-            self.run_status is BenchmarkRunStatus.COMPLETED
-            and bool(self.integrity_checks)
+            bool(self.integrity_checks)
             and all(check.passed for check in self.integrity_checks)
         )
 
@@ -383,12 +433,7 @@ class AgentHarnessBenchmarkResult:
             "budget": self.budget.to_payload(),
             "identity": self.identity.to_payload(),
             "failure_kind": self.failure_kind,
+            "planned_turn_count": self.planned_turn_count,
+            "turns": [turn.to_payload() for turn in self.turns],
+            "trace": self.trace.to_payload() if self.trace is not None else None,
         }
-
-
-def _validate_bounded_strings(label: str, values: tuple[str, ...], *, maximum_items: int) -> None:
-    if len(values) > maximum_items:
-        raise ValueError(f"{label}_too_many")
-    for value in values:
-        if not isinstance(value, str) or not value.strip() or len(value) > 512:
-            raise ValueError(f"{label}_invalid")

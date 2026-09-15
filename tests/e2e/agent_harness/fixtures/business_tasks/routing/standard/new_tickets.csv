@@ -1,0 +1,31 @@
+ticket_id,customer_batch,channel,message
+T-2201A4E7,NEW-00,邮件,快递签收照片不是我家门口，请查一下送到哪里了。
+T-293A8082,NEW-05,邮件,Could you trace a parcel that disappeared after customs clearance?
+T-2FD501F5,NEW-07,邮件,My tracking page has no movement after the depot scan.
+T-379D94A0,NEW-03,邮件,取件短信丢失，能查出包裹所在的自提柜吗？
+T-3ED3C02B,NEW-02,微信,已退货三件但只退了两件的钱。
+T-40126812,NEW-03,电话,退款已经到账，请补一张红字发票冲账。
+T-4F8DE4AE,NEW-01,电话,请把这两笔订单的开票金额分别列出。
+T-60CF1C49,NEW-02,邮件,收件人今天住院，可以延迟两天再派件吗？
+T-64C02E3F,NEW-08,邮件,We moved upstairs; please update the delivery floor before arrival.
+T-678C5432,NEW-04,电话,公司更名后开票抬头需要更新。
+T-708260C5,NEW-09,电话,We were charged correctly but the invoice description needs correction.
+T-774E62C7,NEW-08,电话,My accountant cannot open the electronic invoice attachment.
+T-8114249E,NEW-08,微信,I want to return the unused charger because it is incompatible.
+T-8906EAD4,NEW-09,邮件,The carrier returned my parcel because the house number was incomplete.
+T-A27415D8,NEW-03,微信,替换的零件还是不匹配，我想申请全额退款。
+T-A3614CE4,NEW-06,电话,The invoice tax rate is wrong for the items we purchased.
+T-A7B37B01,NEW-01,微信,收到两个左脚鞋，请售后换成正确的一双。
+T-ADB30E47,NEW-01,邮件,订单拆单后另一个箱子一直未揽收。
+T-AE626697,NEW-06,邮件,Please ask the courier to use the side entrance for delivery.
+T-B4AF95A7,NEW-02,电话,报销系统读不出发票文件，能重新下载原件吗？
+T-B5B5C2B8,NEW-04,微信,杯盖密封失效漏水，能办理换新吗？
+T-BA9E6A62,NEW-07,电话,Could you issue separate tax invoices for each branch office?
+T-C06BB35A,NEW-05,微信,I sent the item back and need confirmation of the refund amount.
+T-C375A2CF,NEW-07,微信,Please exchange the medium sweater for a large one.
+T-C3FB2D14,NEW-05,电话,Please regenerate the invoice PDF with the corrected legal entity.
+T-C95ADED5,NEW-00,电话,财务说电子发票购方税号不对，需要重开。
+T-DAD1F781,NEW-06,微信,The replacement arrived scratched; can I return it for a refund?
+T-DDD0DCFF,NEW-04,邮件,我只需要查物流，包裹绕到了隔壁省。
+T-E40B42EB,NEW-00,微信,开箱发现屏幕坏点，想退货而不是维修。
+T-FC12EE0A,NEW-09,微信,The stitching came apart on arrival; I need a return authorization.

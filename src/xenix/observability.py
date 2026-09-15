@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
-import hashlib
 import sys
 import threading
 from collections.abc import Collection
@@ -25,6 +25,7 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
 from .build_info import APP_VERSION, BUILD_COMMIT
 from .config import AppPaths
+from .exceptions import report_exception
 from .release_config import apply_frozen_otel_environment
 
 INSTALL_ID_FILE_NAME = "telemetry.json"
@@ -106,10 +107,10 @@ class LLMUsageObservation:
 
     operation: str
     usage: LLMTokenUsage
-    thread_id: str | None = None
-    root_user_message_id: str | None = None
-    frontier_message_id: str | None = None
-    pending_message_id: str | None = None
+    thread_id: int | None = None
+    root_user_message_id: int | None = None
+    frontier_message_id: int | None = None
+    pending_message_id: int | None = None
     fq_model_key: str | None = None
     observed_at: datetime | None = None
 
@@ -149,9 +150,9 @@ class LLMUsageObservability(Protocol):
     def query_primary_usage(
         self,
         *,
-        thread_id: str,
-        root_user_message_ids: Collection[str],
-    ) -> dict[str, LLMUsageAggregate]: ...
+        thread_id: int,
+        root_user_message_ids: Collection[int],
+    ) -> dict[int, LLMUsageAggregate]: ...
 
 
 class NullLLMUsageObservability:
@@ -163,9 +164,9 @@ class NullLLMUsageObservability:
     def query_primary_usage(
         self,
         *,
-        thread_id: str,
-        root_user_message_ids: Collection[str],
-    ) -> dict[str, LLMUsageAggregate]:
+        thread_id: int,
+        root_user_message_ids: Collection[int],
+    ) -> dict[int, LLMUsageAggregate]:
         del thread_id, root_user_message_ids
         return {}
 
@@ -200,32 +201,33 @@ class LocalLLMUsageObservability:
             with self._lock:
                 self._append_locked(encoded)
             self._record_usage_metrics(observation)
-        except Exception:
-            # Observability is intentionally best effort.  Do not log the
-            # observation itself: its safe journal fields are enough evidence
-            # when persistence succeeds, and a failed logger could recurse.
+        except Exception as exc:
+            report_exception(exc)
+            # Usage recording must not undo a completed exchange, but its
+            # failure must remain visible without logging the observation payload.
             return
 
     def query_primary_usage(
         self,
         *,
-        thread_id: str,
-        root_user_message_ids: Collection[str],
-    ) -> dict[str, LLMUsageAggregate]:
+        thread_id: int,
+        root_user_message_ids: Collection[int],
+    ) -> dict[int, LLMUsageAggregate]:
         requested = {
             stable_hash(message_id): message_id
             for message_id in root_user_message_ids
-            if isinstance(message_id, str) and message_id
+            if isinstance(message_id, int) and message_id
         }
         if not requested:
             return {}
         thread_key = stable_hash(thread_id)
-        aggregates: dict[str, LLMUsageAggregate] = {}
+        aggregates: dict[int, LLMUsageAggregate] = {}
         observed_sampling_keys: set[str] = set()
         try:
             with self._lock:
                 records = list(self._iter_records_locked())
-        except Exception:
+        except Exception as exc:
+            report_exception(exc)
             return {}
         for record in records:
             if record.get("kind") != "llm_token_usage" or record.get("operation") != "primary":
@@ -478,8 +480,8 @@ def error_type(exc: BaseException) -> str:
     return exc.__class__.__name__
 
 
-def stable_hash(value: str) -> str:
-    return hashlib.sha256(value.encode("utf-8")).hexdigest()[:16]
+def stable_hash(value: str | int) -> str:
+    return hashlib.sha256(str(value).encode("utf-8")).hexdigest()[:16]
 
 
 def inject_context(carrier: dict[str, str]) -> dict[str, str]:
@@ -618,8 +620,8 @@ def _is_valid_usage_observation(observation: Any) -> bool:
     )
 
 
-def _stable_key(value: str | None) -> str | None:
-    return stable_hash(value) if isinstance(value, str) and value else None
+def _stable_key(value: str | int | None) -> str | None:
+    return stable_hash(value) if isinstance(value, (str, int)) and value else None
 
 
 def _usage_from_record(record: dict[str, Any]) -> LLMTokenUsage | None:

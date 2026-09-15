@@ -1,0 +1,203 @@
+[
+  {
+    "case_id": "ml.clustering_two_segments",
+    "original_run_id": "665017a6be6449e0bd6acac0a555a34b",
+    "method": "Replay original SQL to an XLSX artifact, or exact native model/roles/parameters to an inline apply artifact, in isolated storage. New public artifact handles; no LLM calls.",
+    "columns": [
+      "account_id",
+      "visits",
+      "avg_order_value",
+      "cluster_id",
+      "assignment_changed",
+      "normalized_distance_to_centroid"
+    ],
+    "rows": [
+      {
+        "account_id": "ACCT-001",
+        "visits": 1,
+        "avg_order_value": 12,
+        "cluster_id": 0,
+        "assignment_changed": false,
+        "normalized_distance_to_centroid": 0.041
+      },
+      {
+        "account_id": "ACCT-002",
+        "visits": 2,
+        "avg_order_value": 14,
+        "cluster_id": 0,
+        "assignment_changed": false,
+        "normalized_distance_to_centroid": 0.0667
+      },
+      {
+        "account_id": "ACCT-003",
+        "visits": 1,
+        "avg_order_value": 16,
+        "cluster_id": 0,
+        "assignment_changed": false,
+        "normalized_distance_to_centroid": 0.041
+      },
+      {
+        "account_id": "ACCT-004",
+        "visits": 9,
+        "avg_order_value": 88,
+        "cluster_id": 1,
+        "assignment_changed": false,
+        "normalized_distance_to_centroid": 0.1108
+      },
+      {
+        "account_id": "ACCT-005",
+        "visits": 10,
+        "avg_order_value": 92,
+        "cluster_id": 1,
+        "assignment_changed": false,
+        "normalized_distance_to_centroid": 0.0
+      },
+      {
+        "account_id": "ACCT-006",
+        "visits": 11,
+        "avg_order_value": 96,
+        "cluster_id": 1,
+        "assignment_changed": false,
+        "normalized_distance_to_centroid": 0.1108
+      }
+    ],
+    "output_parent_dataset_id": null,
+    "linked": {
+      "semantic_checks": [
+        {
+          "name": "exact_two_segment_partition",
+          "passed": true,
+          "summary": "exact_two_segment_partition_observed"
+        },
+        {
+          "name": "public_artifact_linked",
+          "passed": true,
+          "summary": "public_table_link_observed"
+        }
+      ],
+      "integrity_passed": true,
+      "terminal_shape": [
+        6,
+        6
+      ]
+    },
+    "unlinked_existing_result": {
+      "semantic_checks": [
+        {
+          "name": "exact_two_segment_partition",
+          "passed": false,
+          "summary": "exact_two_segment_partition_missing"
+        },
+        {
+          "name": "public_artifact_linked",
+          "passed": false,
+          "summary": "public_table_link_missing"
+        }
+      ],
+      "integrity_passed": true,
+      "terminal_shape": null
+    },
+    "wrong_link": {
+      "semantic_checks": [
+        {
+          "name": "exact_two_segment_partition",
+          "passed": false,
+          "summary": "exact_two_segment_partition_missing"
+        },
+        {
+          "name": "public_artifact_linked",
+          "passed": false,
+          "summary": "public_table_link_missing"
+        }
+      ],
+      "integrity_passed": true,
+      "terminal_shape": null
+    }
+  },
+  {
+    "case_id": "ml.recommendation_item_similarity",
+    "original_run_id": "1b1865c5b9e2400396066ae98c47a6cc",
+    "method": "Replay original SQL to an XLSX artifact, or exact native model/roles/parameters to an inline apply artifact, in isolated storage. New public artifact handles; no LLM calls.",
+    "columns": [
+      "source_file",
+      "input_row_number",
+      "base_item",
+      "rank",
+      "recommended_item",
+      "similarity",
+      "common_user_count"
+    ],
+    "rows": [
+      {
+        "source_file": "80ca6b476d6a40fb9048f29ceaede2b7.csv",
+        "input_row_number": 1,
+        "base_item": "SKU-A",
+        "rank": 1,
+        "recommended_item": "SKU-B",
+        "similarity": 1.0,
+        "common_user_count": 4
+      },
+      {
+        "source_file": "80ca6b476d6a40fb9048f29ceaede2b7.csv",
+        "input_row_number": 1,
+        "base_item": "SKU-A",
+        "rank": 2,
+        "recommended_item": "SKU-C",
+        "similarity": 1.0,
+        "common_user_count": 3
+      }
+    ],
+    "output_parent_dataset_id": null,
+    "linked": {
+      "semantic_checks": [
+        {
+          "name": "exact_ranked_recommendations",
+          "passed": true,
+          "summary": "exact_ranked_recommendations_observed"
+        },
+        {
+          "name": "public_artifact_linked",
+          "passed": true,
+          "summary": "public_table_link_observed"
+        }
+      ],
+      "integrity_passed": true,
+      "terminal_shape": [
+        2,
+        7
+      ]
+    },
+    "unlinked_existing_result": {
+      "semantic_checks": [
+        {
+          "name": "exact_ranked_recommendations",
+          "passed": false,
+          "summary": "exact_ranked_recommendations_missing"
+        },
+        {
+          "name": "public_artifact_linked",
+          "passed": false,
+          "summary": "public_table_link_missing"
+        }
+      ],
+      "integrity_passed": true,
+      "terminal_shape": null
+    },
+    "wrong_link": {
+      "semantic_checks": [
+        {
+          "name": "exact_ranked_recommendations",
+          "passed": false,
+          "summary": "exact_ranked_recommendations_missing"
+        },
+        {
+          "name": "public_artifact_linked",
+          "passed": false,
+          "summary": "public_table_link_missing"
+        }
+      ],
+      "integrity_passed": true,
+      "terminal_shape": null
+    }
+  }
+]

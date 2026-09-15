@@ -1,0 +1,85 @@
+{
+  "standard": {
+    "revenue": {
+      "sql_reference_matches": true,
+      "equivalent_table_passes": true,
+      "aggregate_rows_allowed_duplicate_regions_rejected": true,
+      "stale_or_wrong_earlier_delivery_rejected": true,
+      "distinct_wrong_strategies": [
+        "append_corrections",
+        "lifetime_refunds",
+        "drop_old_order_refunds"
+      ]
+    },
+    "campaign": {
+      "sql_reference_matches": true,
+      "eligible": [
+        "C01",
+        "C03",
+        "C06",
+        "C08",
+        "C11",
+        "C15",
+        "C16",
+        "C19",
+        "C23",
+        "C27",
+        "C31"
+      ],
+      "distinct_wrong_policies": [
+        "expired_threshold",
+        "all_vip_exemptions"
+      ]
+    },
+    "routing": {
+      "reference_accuracy": 0.9666666666666667,
+      "channel_shortcut_accuracy": 0.0,
+      "same_model_required": true,
+      "equivalent_table_passes": true
+    }
+  },
+  "confirmation": {
+    "revenue": {
+      "sql_reference_matches": true,
+      "equivalent_table_passes": true,
+      "aggregate_rows_allowed_duplicate_regions_rejected": true,
+      "stale_or_wrong_earlier_delivery_rejected": true,
+      "distinct_wrong_strategies": [
+        "append_corrections",
+        "lifetime_refunds",
+        "drop_old_order_refunds"
+      ]
+    },
+    "campaign": {
+      "sql_reference_matches": true,
+      "eligible": [
+        "C03",
+        "C04",
+        "C06",
+        "C07",
+        "C08",
+        "C16",
+        "C17",
+        "C18",
+        "C20",
+        "C23",
+        "C28",
+        "C29"
+      ],
+      "distinct_wrong_policies": [
+        "expired_threshold",
+        "all_vip_exemptions"
+      ]
+    },
+    "routing": {
+      "reference_accuracy": 0.9666666666666667,
+      "channel_shortcut_accuracy": 0.0,
+      "same_model_required": true,
+      "equivalent_table_passes": true
+    }
+  },
+  "delivery_boundary": {
+    "orphan_ignored": true,
+    "earlier_content_frozen": true
+  }
+}

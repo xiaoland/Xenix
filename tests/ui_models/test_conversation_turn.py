@@ -24,19 +24,19 @@ def test_matching_append_acknowledges_once_and_final_unlocks_turn() -> None:
     assert controller.begin("generation-1", attachment_count=2)
     append = _event(
         kind="snapshot",
-        thread_id="thread-1",
+        thread_id=101,
         client_submission_id="generation-1",
-        pending_message_id="pending-1",
-        snapshot=_snapshot("thread-1"),
+        pending_message_id=102,
+        snapshot=_snapshot(101),
     )
     assert controller.route(append).acknowledge_composer is True
     assert controller.route(append).acknowledge_composer is False
     assert controller.busy is True
     final = _event(
         kind="snapshot",
-        thread_id="thread-1",
+        thread_id=101,
         client_submission_id="generation-1",
-        snapshot=_snapshot("thread-1"),
+        snapshot=_snapshot(101),
         is_final=True,
     )
     assert controller.route(final).action is TurnAction.FINAL_SNAPSHOT
@@ -64,25 +64,25 @@ def test_attachment_index_is_bounded_by_pending_submission() -> None:
 def test_old_generation_failure_and_event_cannot_disturb_new_turn() -> None:
     controller = ConversationTurnController()
     assert controller.begin("old", attachment_count=0)
-    controller.select_thread("thread-1")
+    controller.select_thread(101)
     assert controller.begin("new", attachment_count=0)
     assert controller.fail("old") is FailureRecovery.IGNORE
-    old_final = _event(kind="snapshot", client_submission_id="old", snapshot=_snapshot("thread-1"), is_final=True)
+    old_final = _event(kind="snapshot", client_submission_id="old", snapshot=_snapshot(101), is_final=True)
     assert controller.route(old_final).action is TurnAction.IGNORE
     assert controller.active_submission_id == "new"
 
 
 def test_pause_allows_only_matching_final_snapshot() -> None:
     controller = ConversationTurnController()
-    controller.select_thread("thread-1")
+    controller.select_thread(101)
     assert controller.begin("generation-1", attachment_count=0)
-    controller.mark_paused("thread-1")
-    live = _event(kind="thinking", thread_id="thread-1", client_submission_id="generation-1", chatbot_event=object())
+    controller.mark_paused(101)
+    live = _event(kind="thinking", thread_id=101, client_submission_id="generation-1", chatbot_event=object())
     final = _event(
         kind="snapshot",
-        thread_id="thread-1",
+        thread_id=101,
         client_submission_id="generation-1",
-        snapshot=_snapshot("thread-1"),
+        snapshot=_snapshot(101),
         is_final=True,
     )
     assert controller.route(live).action is TurnAction.IGNORE
@@ -92,17 +92,17 @@ def test_pause_allows_only_matching_final_snapshot() -> None:
 def test_failure_stop_and_shutdown_gates() -> None:
     controller = ConversationTurnController()
     assert controller.stop_disposition() is StopDisposition.NO_THREAD
-    controller.select_thread("thread-1")
+    controller.select_thread(101)
     assert controller.begin("generation-1", attachment_count=0)
     assert controller.stop_disposition() is StopDisposition.PREPARING
     assert controller.fail("generation-1") is FailureRecovery.PRESERVE_COMPOSER
     assert controller.begin("generation-2", attachment_count=0)
     acknowledged = _event(
         kind="snapshot",
-        thread_id="thread-1",
+        thread_id=101,
         client_submission_id="generation-2",
-        pending_message_id="pending-2",
-        snapshot=_snapshot("thread-1"),
+        pending_message_id=103,
+        snapshot=_snapshot(101),
     )
     controller.route(acknowledged)
     assert controller.stop_disposition() is StopDisposition.PAUSE

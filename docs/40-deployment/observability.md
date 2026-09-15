@@ -4,6 +4,13 @@
 
 Developers and support operators use this runbook to inspect local logs, enable or verify OTLP export, or keep a failing telemetry backend from affecting the desktop application. Observability failure must not make interactive startup depend on backend availability.
 
+Agent submissions emit an `agent.harness.submit_user_turn` span across the full
+stream lifetime. It carries the OpenTelemetry GenAI operation, requested model,
+conversation correlation, and attachment counts; exceptions are recorded by the
+shared span boundary. Agent Harness benchmark reports use the same operation and
+conversation attribute vocabulary, allowing a benchmark failure to be compared
+with production traces without coupling benchmark code to an exporter.
+
 ## Local Evidence
 
 Xenix writes JSON Lines to `logs/xenix.log` under the active runtime home. The file rotates at approximately 1 MB and retains three backups. Logs may contain local paths and diagnostic context; handle them as sensitive support evidence.
@@ -34,6 +41,8 @@ field values; it never takes a screenshot. The structured tree retains semantic
 identifiers and per-item references, and for file-attachment chips those
 references are resolved source paths, so the tree is not path-redacted.
 
+The bounded `qt.log` also preserves local paths and diagnostic text after credentials. Credential values following API-key, authorization, or Bearer markers are redacted individually rather than discarding the rest of a log line.
+
 Direct tests can explicitly register a synthetic root with the scoped
 `ui_artifacts` fixture. A call failure writes `manifest.json`, `tree.json`,
 `actual.png`, bounded/redacted `qt.log`, and `index.json` below
@@ -48,7 +57,7 @@ add line-edit values, combo text, file paths, credentials, or message bodies to
 the schema. Runtime/user screenshots require separate explicit authority and are
 not enabled by the layout-debug switch.
 
-Native CI captures the five admitted Widget Lab scenarios under
+Native CI captures every admitted Widget Lab scenario under
 `ui-artifacts/scenarios/` via `pdm run ui-capture-all`, runs the native-window
 smoke in a separate `windows` QPA pytest process, and rebuilds
 `ui-artifacts/index.json`. The index contains only manifest metadata, relative

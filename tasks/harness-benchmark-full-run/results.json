@@ -1,0 +1,4479 @@
+{
+  "planned_cells": 28,
+  "completed_reports": 28,
+  "rows": [
+    {
+      "case_id": "business.campaign.v1.contact_interval",
+      "batch": "business",
+      "report": "build/agent-harness-full-81fb9bb/business/business.campaign.v1.contact_interval-deepseek-deepseek-v4-flash-d2870d26ba2f4aafabf918323990d71e.json",
+      "report_sha256": "00aada521a298b25f271fd4de6624564195fea2c4c160f137ffc27572830f169",
+      "observation": {
+        "run_id": "d2870d26ba2f4aafabf918323990d71e",
+        "outcome": "pass",
+        "reason": "judge_verdict",
+        "run_status": "completed",
+        "failure_kind": null,
+        "judge_status": "completed",
+        "budget_reason": null,
+        "reported_subject_tokens": 63565,
+        "subject_tokens_complete": true,
+        "turn_seconds": 32.704334200010635,
+        "sampling_rounds": 6,
+        "provenance": {
+          "harness_variant": "baseline",
+          "repository_commit": "81fb9bbc682c92b68346a139f7e011f4b72a45ee",
+          "repository_dirty": true,
+          "case_definition_sha256": "91345DE7D5C5A698BE9E90F4755530A5ADCE172825668F508F092587B84B18B3",
+          "runtime_sha256": "9107D3A35FFD1A2306FF4A247807B2EEB4280911A9ACC38B63365BEF4B25989C"
+        }
+      },
+      "identity": {
+        "case_definition_sha256": "91345DE7D5C5A698BE9E90F4755530A5ADCE172825668F508F092587B84B18B3",
+        "effective_settings_sha256": "6973FC1DA2E20673BAAAE75940A37DE309FD0DC58E98CC9606C23B4EE0E547E8",
+        "embedding_settings_sha256": "84855E3EADB8F092BBE6E6E87D5ECAD071F1981359295FBA2826AEC4630F0397",
+        "fixture_sha256": "E2D14E879241A73BA01D6E9F0F30D4377EA8ECB36330946B3AD8A13E095455CA",
+        "harness_variant": "baseline",
+        "invocation_id": "fb1d58692cb747099d2d8e093ba45a22",
+        "judge_settings_sha256": "86A3403ECB36E19C283750DF3E07A5984AF12994769207E46981D0162835A507",
+        "repository_commit": "81fb9bbc682c92b68346a139f7e011f4b72a45ee",
+        "repository_dirty": true,
+        "runtime_sha256": "9107D3A35FFD1A2306FF4A247807B2EEB4280911A9ACC38B63365BEF4B25989C",
+        "settings_sha256": "9BD35670D0D0AD156B5F4B148A530992988DA094A0F68365D796ECA83C6149B6"
+      },
+      "integrity": {
+        "checks": [
+          {
+            "name": "source_inputs_preserved",
+            "passed": true,
+            "summary": "external_inputs_and_imported_datasets"
+          }
+        ],
+        "passed": true
+      },
+      "semantic": {
+        "checks": [
+          {
+            "name": "turn_1.answer_completed",
+            "passed": true,
+            "summary": "terminal_assistant_answer"
+          },
+          {
+            "name": "turn_1.deliveries_accessible",
+            "passed": true,
+            "summary": "linked_artifacts_readable"
+          },
+          {
+            "name": "turn_1.eligible_list_delivered",
+            "passed": true,
+            "summary": "expected_customer_ids=['C06', 'C08', 'C11', 'C15', 'C16', 'C19', 'C23', 'C31']"
+          }
+        ],
+        "passed": true,
+        "verdict": "pass"
+      },
+      "judge": {
+        "independence": "independent",
+        "metrics": {
+          "elapsed_seconds": 19.452570600027684,
+          "provider_retry_count": 0,
+          "token_usage": {
+            "cached_input_tokens": 640,
+            "input_tokens": 5633,
+            "output_tokens": 1326,
+            "total_tokens": 6959
+          }
+        },
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "reason_codes": [
+          "grounded_delivery"
+        ],
+        "required": true,
+        "rubric_id": "business.campaign_eligibility.explanation.v1",
+        "rubric_sha256": "8A6B83AD1C3AEC7C2EFAB2E62351A7A90BB3D9DDBA28C5BFD64517443B2F6FDA",
+        "scores": {
+          "effective_rule": 2,
+          "exceptions_explained": 2
+        },
+        "status": "completed",
+        "summary": "judge_completed",
+        "verdict": "pass"
+      },
+      "budget": {
+        "exhaustion_reason": null,
+        "invocation_reported_subject_tokens": 167916,
+        "policy": {
+          "execution_limits": "production_harness_and_llm_settings",
+          "max_reported_invocation_subject_tokens": 4000000,
+          "max_wall_seconds": 900.0,
+          "policy_id": "agent-harness-budget-v2",
+          "token_enforcement": "next_cell_admission"
+        },
+        "provider_attempts_dispatched": 6,
+        "reported_subject_tokens": 63565,
+        "sampling_rounds_admitted": 6,
+        "status": "within_limits"
+      },
+      "turn_metrics": [
+        {
+          "index": 1,
+          "metrics": {
+            "assessment_seconds": null,
+            "derived_dataset_count": 1,
+            "message_counts": {
+              "assistant": 6,
+              "tool_call": 8,
+              "tool_result": 8,
+              "user": 1
+            },
+            "provider_retry_count": 0,
+            "sampling_round_count": 6,
+            "terminal_shape": null,
+            "token_usage": {
+              "cached_input_tokens": 50432,
+              "input_tokens": 57038,
+              "output_tokens": 6527,
+              "total_tokens": 63565
+            },
+            "tool_call_counts_by_name": {
+              "agent.skill.activate": 1,
+              "analysis.profile": 1,
+              "data.query": 3,
+              "data.transform": 2,
+              "knowledge.lookup": 1
+            },
+            "tool_result_counts_by_status": {
+              "failed": 1,
+              "succeeded": 7
+            },
+            "turn_seconds": 32.704334200010635,
+            "usage_reported_primary_response_count": 6
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "business.campaign.v1.spending_threshold",
+      "batch": "business",
+      "report": "build/agent-harness-full-81fb9bb/business/business.campaign.v1.spending_threshold-deepseek-deepseek-v4-flash-ae86cf812d2b469eb18ba5311cfd5f24.json",
+      "report_sha256": "de17174725da39aed80f2a0034912658ad8a803596a6a4d3fb22bfeea913f953",
+      "observation": {
+        "run_id": "ae86cf812d2b469eb18ba5311cfd5f24",
+        "outcome": "pass",
+        "reason": "judge_verdict",
+        "run_status": "completed",
+        "failure_kind": null,
+        "judge_status": "completed",
+        "budget_reason": null,
+        "reported_subject_tokens": 48526,
+        "subject_tokens_complete": true,
+        "turn_seconds": 30.556123899994418,
+        "sampling_rounds": 5,
+        "provenance": {
+          "harness_variant": "baseline",
+          "repository_commit": "81fb9bbc682c92b68346a139f7e011f4b72a45ee",
+          "repository_dirty": true,
+          "case_definition_sha256": "91345DE7D5C5A698BE9E90F4755530A5ADCE172825668F508F092587B84B18B3",
+          "runtime_sha256": "9107D3A35FFD1A2306FF4A247807B2EEB4280911A9ACC38B63365BEF4B25989C"
+        }
+      },
+      "identity": {
+        "case_definition_sha256": "91345DE7D5C5A698BE9E90F4755530A5ADCE172825668F508F092587B84B18B3",
+        "effective_settings_sha256": "6973FC1DA2E20673BAAAE75940A37DE309FD0DC58E98CC9606C23B4EE0E547E8",
+        "embedding_settings_sha256": "84855E3EADB8F092BBE6E6E87D5ECAD071F1981359295FBA2826AEC4630F0397",
+        "fixture_sha256": "CFBABD87C13D0A911DF2903C0246A3CC34EEC03FC26F32B45F4795834154FDD4",
+        "harness_variant": "baseline",
+        "invocation_id": "fb1d58692cb747099d2d8e093ba45a22",
+        "judge_settings_sha256": "86A3403ECB36E19C283750DF3E07A5984AF12994769207E46981D0162835A507",
+        "repository_commit": "81fb9bbc682c92b68346a139f7e011f4b72a45ee",
+        "repository_dirty": true,
+        "runtime_sha256": "9107D3A35FFD1A2306FF4A247807B2EEB4280911A9ACC38B63365BEF4B25989C",
+        "settings_sha256": "9BD35670D0D0AD156B5F4B148A530992988DA094A0F68365D796ECA83C6149B6"
+      },
+      "integrity": {
+        "checks": [
+          {
+            "name": "source_inputs_preserved",
+            "passed": true,
+            "summary": "external_inputs_and_imported_datasets"
+          }
+        ],
+        "passed": true
+      },
+      "semantic": {
+        "checks": [
+          {
+            "name": "turn_1.answer_completed",
+            "passed": true,
+            "summary": "terminal_assistant_answer"
+          },
+          {
+            "name": "turn_1.deliveries_accessible",
+            "passed": true,
+            "summary": "linked_artifacts_readable"
+          },
+          {
+            "name": "turn_1.eligible_list_delivered",
+            "passed": true,
+            "summary": "expected_customer_ids=['C03', 'C06', 'C08', 'C16', 'C23']"
+          }
+        ],
+        "passed": true,
+        "verdict": "pass"
+      },
+      "judge": {
+        "independence": "independent",
+        "metrics": {
+          "elapsed_seconds": 22.65623040002538,
+          "provider_retry_count": 0,
+          "token_usage": {
+            "cached_input_tokens": 640,
+            "input_tokens": 5265,
+            "output_tokens": 1649,
+            "total_tokens": 6914
+          }
+        },
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "reason_codes": [
+          "grounded_delivery"
+        ],
+        "required": true,
+        "rubric_id": "business.campaign_eligibility.explanation.v1",
+        "rubric_sha256": "8A6B83AD1C3AEC7C2EFAB2E62351A7A90BB3D9DDBA28C5BFD64517443B2F6FDA",
+        "scores": {
+          "effective_rule": 2,
+          "exceptions_explained": 2
+        },
+        "status": "completed",
+        "summary": "judge_completed",
+        "verdict": "pass"
+      },
+      "budget": {
+        "exhaustion_reason": null,
+        "invocation_reported_subject_tokens": 104351,
+        "policy": {
+          "execution_limits": "production_harness_and_llm_settings",
+          "max_reported_invocation_subject_tokens": 4000000,
+          "max_wall_seconds": 900.0,
+          "policy_id": "agent-harness-budget-v2",
+          "token_enforcement": "next_cell_admission"
+        },
+        "provider_attempts_dispatched": 5,
+        "reported_subject_tokens": 48526,
+        "sampling_rounds_admitted": 5,
+        "status": "within_limits"
+      },
+      "turn_metrics": [
+        {
+          "index": 1,
+          "metrics": {
+            "assessment_seconds": null,
+            "derived_dataset_count": 1,
+            "message_counts": {
+              "assistant": 5,
+              "tool_call": 6,
+              "tool_result": 6,
+              "user": 1
+            },
+            "provider_retry_count": 0,
+            "sampling_round_count": 5,
+            "terminal_shape": null,
+            "token_usage": {
+              "cached_input_tokens": 38144,
+              "input_tokens": 42623,
+              "output_tokens": 5903,
+              "total_tokens": 48526
+            },
+            "tool_call_counts_by_name": {
+              "agent.skill.activate": 1,
+              "analysis.profile": 1,
+              "data.query": 2,
+              "data.transform": 1,
+              "knowledge.lookup": 1
+            },
+            "tool_result_counts_by_status": {
+              "succeeded": 6
+            },
+            "turn_seconds": 30.556123899994418,
+            "usage_reported_primary_response_count": 5
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "business.campaign.v1.standard",
+      "batch": "business",
+      "report": "build/agent-harness-full-81fb9bb/business/business.campaign.v1.standard-deepseek-deepseek-v4-flash-e14d2bf8b79a4f33abf2a0768e255eee.json",
+      "report_sha256": "0b2c43161ef8072d69963ed4ba5b4beeed5b378551576f1c2fd5f2e9fa1025ef",
+      "observation": {
+        "run_id": "e14d2bf8b79a4f33abf2a0768e255eee",
+        "outcome": "pass",
+        "reason": "judge_verdict",
+        "run_status": "completed",
+        "failure_kind": null,
+        "judge_status": "completed",
+        "budget_reason": null,
+        "reported_subject_tokens": 55825,
+        "subject_tokens_complete": true,
+        "turn_seconds": 28.753759999992326,
+        "sampling_rounds": 6,
+        "provenance": {
+          "harness_variant": "baseline",
+          "repository_commit": "81fb9bbc682c92b68346a139f7e011f4b72a45ee",
+          "repository_dirty": true,
+          "case_definition_sha256": "91345DE7D5C5A698BE9E90F4755530A5ADCE172825668F508F092587B84B18B3",
+          "runtime_sha256": "9107D3A35FFD1A2306FF4A247807B2EEB4280911A9ACC38B63365BEF4B25989C"
+        }
+      },
+      "identity": {
+        "case_definition_sha256": "91345DE7D5C5A698BE9E90F4755530A5ADCE172825668F508F092587B84B18B3",
+        "effective_settings_sha256": "6973FC1DA2E20673BAAAE75940A37DE309FD0DC58E98CC9606C23B4EE0E547E8",
+        "embedding_settings_sha256": "84855E3EADB8F092BBE6E6E87D5ECAD071F1981359295FBA2826AEC4630F0397",
+        "fixture_sha256": "DDF4B77B17E20F18327824EDA549E2DEEE5FF2DFEBA7005C3F446B7160124733",
+        "harness_variant": "baseline",
+        "invocation_id": "fb1d58692cb747099d2d8e093ba45a22",
+        "judge_settings_sha256": "86A3403ECB36E19C283750DF3E07A5984AF12994769207E46981D0162835A507",
+        "repository_commit": "81fb9bbc682c92b68346a139f7e011f4b72a45ee",
+        "repository_dirty": true,
+        "runtime_sha256": "9107D3A35FFD1A2306FF4A247807B2EEB4280911A9ACC38B63365BEF4B25989C",
+        "settings_sha256": "9BD35670D0D0AD156B5F4B148A530992988DA094A0F68365D796ECA83C6149B6"
+      },
+      "integrity": {
+        "checks": [
+          {
+            "name": "source_inputs_preserved",
+            "passed": true,
+            "summary": "external_inputs_and_imported_datasets"
+          }
+        ],
+        "passed": true
+      },
+      "semantic": {
+        "checks": [
+          {
+            "name": "turn_1.answer_completed",
+            "passed": true,
+            "summary": "terminal_assistant_answer"
+          },
+          {
+            "name": "turn_1.deliveries_accessible",
+            "passed": true,
+            "summary": "linked_artifacts_readable"
+          },
+          {
+            "name": "turn_1.eligible_list_delivered",
+            "passed": true,
+            "summary": "expected_customer_ids=['C01', 'C03', 'C06', 'C08', 'C11', 'C15', 'C16', 'C19', 'C23', 'C27', 'C31']"
+          }
+        ],
+        "passed": true,
+        "verdict": "pass"
+      },
+      "judge": {
+        "independence": "independent",
+        "metrics": {
+          "elapsed_seconds": 49.56729829998221,
+          "provider_retry_count": 0,
+          "token_usage": {
+            "cached_input_tokens": 640,
+            "input_tokens": 5285,
+            "output_tokens": 3852,
+            "total_tokens": 9137
+          }
+        },
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "reason_codes": [
+          "grounded_delivery"
+        ],
+        "required": true,
+        "rubric_id": "business.campaign_eligibility.explanation.v1",
+        "rubric_sha256": "8A6B83AD1C3AEC7C2EFAB2E62351A7A90BB3D9DDBA28C5BFD64517443B2F6FDA",
+        "scores": {
+          "effective_rule": 2,
+          "exceptions_explained": 2
+        },
+        "status": "completed",
+        "summary": "judge_completed",
+        "verdict": "pass"
+      },
+      "budget": {
+        "exhaustion_reason": null,
+        "invocation_reported_subject_tokens": 55825,
+        "policy": {
+          "execution_limits": "production_harness_and_llm_settings",
+          "max_reported_invocation_subject_tokens": 4000000,
+          "max_wall_seconds": 900.0,
+          "policy_id": "agent-harness-budget-v2",
+          "token_enforcement": "next_cell_admission"
+        },
+        "provider_attempts_dispatched": 6,
+        "reported_subject_tokens": 55825,
+        "sampling_rounds_admitted": 6,
+        "status": "within_limits"
+      },
+      "turn_metrics": [
+        {
+          "index": 1,
+          "metrics": {
+            "assessment_seconds": null,
+            "derived_dataset_count": 1,
+            "message_counts": {
+              "assistant": 6,
+              "tool_call": 7,
+              "tool_result": 7,
+              "user": 1
+            },
+            "provider_retry_count": 0,
+            "sampling_round_count": 6,
+            "terminal_shape": null,
+            "token_usage": {
+              "cached_input_tokens": 44032,
+              "input_tokens": 50676,
+              "output_tokens": 5149,
+              "total_tokens": 55825
+            },
+            "tool_call_counts_by_name": {
+              "agent.skill.activate": 1,
+              "analysis.profile": 1,
+              "data.query": 2,
+              "data.transform": 2,
+              "knowledge.lookup": 1
+            },
+            "tool_result_counts_by_status": {
+              "failed": 1,
+              "succeeded": 6
+            },
+            "turn_seconds": 28.753759999992326,
+            "usage_reported_primary_response_count": 6
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "business.restock.v1.arrival_earlier",
+      "batch": "business",
+      "report": "build/agent-harness-full-81fb9bb/business/business.restock.v1.arrival_earlier-deepseek-deepseek-v4-flash-eb88e22a350044feaa897108b5d86748.json",
+      "report_sha256": "8b66274c04b12608a665095241e1be1e2818251d257aa4ee26e5bf47d85d335d",
+      "observation": {
+        "run_id": "eb88e22a350044feaa897108b5d86748",
+        "outcome": "pass",
+        "reason": "judge_verdict",
+        "run_status": "completed",
+        "failure_kind": null,
+        "judge_status": "completed",
+        "budget_reason": null,
+        "reported_subject_tokens": 59843,
+        "subject_tokens_complete": true,
+        "turn_seconds": 38.51911430002656,
+        "sampling_rounds": 6,
+        "provenance": {
+          "harness_variant": "baseline",
+          "repository_commit": "81fb9bbc682c92b68346a139f7e011f4b72a45ee",
+          "repository_dirty": true,
+          "case_definition_sha256": "24CD6031DA1B7B9F9C70F2D77FD0A5DC29CEBC6947DE3E3FABA05D31F2697C2D",
+          "runtime_sha256": "9107D3A35FFD1A2306FF4A247807B2EEB4280911A9ACC38B63365BEF4B25989C"
+        }
+      },
+      "identity": {
+        "case_definition_sha256": "24CD6031DA1B7B9F9C70F2D77FD0A5DC29CEBC6947DE3E3FABA05D31F2697C2D",
+        "effective_settings_sha256": "6973FC1DA2E20673BAAAE75940A37DE309FD0DC58E98CC9606C23B4EE0E547E8",
+        "embedding_settings_sha256": "84855E3EADB8F092BBE6E6E87D5ECAD071F1981359295FBA2826AEC4630F0397",
+        "fixture_sha256": "68C747DC4CAB3AB623F8852770B7AC0F224EFB969219E240C1BAEE52D6396F16",
+        "harness_variant": "baseline",
+        "invocation_id": "fb1d58692cb747099d2d8e093ba45a22",
+        "judge_settings_sha256": "86A3403ECB36E19C283750DF3E07A5984AF12994769207E46981D0162835A507",
+        "repository_commit": "81fb9bbc682c92b68346a139f7e011f4b72a45ee",
+        "repository_dirty": true,
+        "runtime_sha256": "9107D3A35FFD1A2306FF4A247807B2EEB4280911A9ACC38B63365BEF4B25989C",
+        "settings_sha256": "9BD35670D0D0AD156B5F4B148A530992988DA094A0F68365D796ECA83C6149B6"
+      },
+      "integrity": {
+        "checks": [
+          {
+            "name": "source_inputs_preserved",
+            "passed": true,
+            "summary": "external_inputs_and_imported_datasets"
+          }
+        ],
+        "passed": true
+      },
+      "semantic": {
+        "checks": [
+          {
+            "name": "turn_1.answer_completed",
+            "passed": true,
+            "summary": "terminal_assistant_answer"
+          },
+          {
+            "name": "turn_1.deliveries_accessible",
+            "passed": true,
+            "summary": "linked_artifacts_readable"
+          },
+          {
+            "name": "turn_1.feasible_decision_available",
+            "passed": true,
+            "summary": "candidate_count=2"
+          },
+          {
+            "name": "turn_1.optimal_decision_available",
+            "passed": true,
+            "summary": "best_feasible_margin_cents=205000; optimum=205000"
+          }
+        ],
+        "passed": true,
+        "verdict": "pass"
+      },
+      "judge": {
+        "independence": "independent",
+        "metrics": {
+          "elapsed_seconds": 177.59495689999312,
+          "provider_retry_count": 0,
+          "token_usage": {
+            "cached_input_tokens": 1024,
+            "input_tokens": 4368,
+            "output_tokens": 11057,
+            "total_tokens": 15425
+          }
+        },
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "reason_codes": [
+          "grounded_decision"
+        ],
+        "required": true,
+        "rubric_id": "business.restock_decision.explanation.v1",
+        "rubric_sha256": "6A5FA84263DA0DF7657651A75DC069D2AEAE184B465574CB61D8308C8D47394F",
+        "scores": {
+          "business_explanation": 2,
+          "selected_plan": 2
+        },
+        "status": "completed",
+        "summary": "judge_completed",
+        "verdict": "pass"
+      },
+      "budget": {
+        "exhaustion_reason": null,
+        "invocation_reported_subject_tokens": 433066,
+        "policy": {
+          "execution_limits": "production_harness_and_llm_settings",
+          "max_reported_invocation_subject_tokens": 4000000,
+          "max_wall_seconds": 900.0,
+          "policy_id": "agent-harness-budget-v2",
+          "token_enforcement": "next_cell_admission"
+        },
+        "provider_attempts_dispatched": 6,
+        "reported_subject_tokens": 59843,
+        "sampling_rounds_admitted": 6,
+        "status": "within_limits"
+      },
+      "turn_metrics": [
+        {
+          "index": 1,
+          "metrics": {
+            "assessment_seconds": null,
+            "derived_dataset_count": 1,
+            "message_counts": {
+              "assistant": 6,
+              "tool_call": 8,
+              "tool_result": 8,
+              "user": 1
+            },
+            "provider_retry_count": 0,
+            "sampling_round_count": 6,
+            "terminal_shape": null,
+            "token_usage": {
+              "cached_input_tokens": 47744,
+              "input_tokens": 52498,
+              "output_tokens": 7345,
+              "total_tokens": 59843
+            },
+            "tool_call_counts_by_name": {
+              "agent.skill.activate": 1,
+              "data.query": 5,
+              "data.transform": 1,
+              "knowledge.lookup": 1
+            },
+            "tool_result_counts_by_status": {
+              "failed": 1,
+              "succeeded": 7
+            },
+            "turn_seconds": 38.51911430002656,
+            "usage_reported_primary_response_count": 6
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "business.restock.v1.budget_tight",
+      "batch": "business",
+      "report": "build/agent-harness-full-81fb9bb/business/business.restock.v1.budget_tight-deepseek-deepseek-v4-flash-d23bbcfffa3a4faf8ff404f6c9fb10c4.json",
+      "report_sha256": "601bab7b8ae46516639b5dd4df1eaf77338f91585a06d977ce11ce9d92044fbe",
+      "observation": {
+        "run_id": "d23bbcfffa3a4faf8ff404f6c9fb10c4",
+        "outcome": "pass",
+        "reason": "judge_verdict",
+        "run_status": "completed",
+        "failure_kind": null,
+        "judge_status": "completed",
+        "budget_reason": null,
+        "reported_subject_tokens": 96371,
+        "subject_tokens_complete": true,
+        "turn_seconds": 77.61031690001255,
+        "sampling_rounds": 7,
+        "provenance": {
+          "harness_variant": "baseline",
+          "repository_commit": "81fb9bbc682c92b68346a139f7e011f4b72a45ee",
+          "repository_dirty": true,
+          "case_definition_sha256": "24CD6031DA1B7B9F9C70F2D77FD0A5DC29CEBC6947DE3E3FABA05D31F2697C2D",
+          "runtime_sha256": "9107D3A35FFD1A2306FF4A247807B2EEB4280911A9ACC38B63365BEF4B25989C"
+        }
+      },
+      "identity": {
+        "case_definition_sha256": "24CD6031DA1B7B9F9C70F2D77FD0A5DC29CEBC6947DE3E3FABA05D31F2697C2D",
+        "effective_settings_sha256": "6973FC1DA2E20673BAAAE75940A37DE309FD0DC58E98CC9606C23B4EE0E547E8",
+        "embedding_settings_sha256": "84855E3EADB8F092BBE6E6E87D5ECAD071F1981359295FBA2826AEC4630F0397",
+        "fixture_sha256": "CBD198A51E8EB61A596F8FAC780A2612FFC9F151787636250698624EEEE53C49",
+        "harness_variant": "baseline",
+        "invocation_id": "fb1d58692cb747099d2d8e093ba45a22",
+        "judge_settings_sha256": "86A3403ECB36E19C283750DF3E07A5984AF12994769207E46981D0162835A507",
+        "repository_commit": "81fb9bbc682c92b68346a139f7e011f4b72a45ee",
+        "repository_dirty": true,
+        "runtime_sha256": "9107D3A35FFD1A2306FF4A247807B2EEB4280911A9ACC38B63365BEF4B25989C",
+        "settings_sha256": "9BD35670D0D0AD156B5F4B148A530992988DA094A0F68365D796ECA83C6149B6"
+      },
+      "integrity": {
+        "checks": [
+          {
+            "name": "source_inputs_preserved",
+            "passed": true,
+            "summary": "external_inputs_and_imported_datasets"
+          }
+        ],
+        "passed": true
+      },
+      "semantic": {
+        "checks": [
+          {
+            "name": "turn_1.answer_completed",
+            "passed": true,
+            "summary": "terminal_assistant_answer"
+          },
+          {
+            "name": "turn_1.deliveries_accessible",
+            "passed": true,
+            "summary": "linked_artifacts_readable"
+          },
+          {
+            "name": "turn_1.feasible_decision_available",
+            "passed": true,
+            "summary": "candidate_count=1"
+          },
+          {
+            "name": "turn_1.optimal_decision_available",
+            "passed": true,
+            "summary": "best_feasible_margin_cents=141500; optimum=141500"
+          }
+        ],
+        "passed": true,
+        "verdict": "pass"
+      },
+      "judge": {
+        "independence": "independent",
+        "metrics": {
+          "elapsed_seconds": 89.95829609996872,
+          "provider_retry_count": 0,
+          "token_usage": {
+            "cached_input_tokens": 1792,
+            "input_tokens": 4276,
+            "output_tokens": 6330,
+            "total_tokens": 10606
+          }
+        },
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "reason_codes": [
+          "grounded_decision"
+        ],
+        "required": true,
+        "rubric_id": "business.restock_decision.explanation.v1",
+        "rubric_sha256": "6A5FA84263DA0DF7657651A75DC069D2AEAE184B465574CB61D8308C8D47394F",
+        "scores": {
+          "business_explanation": 2,
+          "selected_plan": 2
+        },
+        "status": "completed",
+        "summary": "judge_completed",
+        "verdict": "pass"
+      },
+      "budget": {
+        "exhaustion_reason": null,
+        "invocation_reported_subject_tokens": 373223,
+        "policy": {
+          "execution_limits": "production_harness_and_llm_settings",
+          "max_reported_invocation_subject_tokens": 4000000,
+          "max_wall_seconds": 900.0,
+          "policy_id": "agent-harness-budget-v2",
+          "token_enforcement": "next_cell_admission"
+        },
+        "provider_attempts_dispatched": 7,
+        "reported_subject_tokens": 96371,
+        "sampling_rounds_admitted": 7,
+        "status": "within_limits"
+      },
+      "turn_metrics": [
+        {
+          "index": 1,
+          "metrics": {
+            "assessment_seconds": null,
+            "derived_dataset_count": 1,
+            "message_counts": {
+              "assistant": 7,
+              "tool_call": 8,
+              "tool_result": 8,
+              "user": 1
+            },
+            "provider_retry_count": 0,
+            "sampling_round_count": 7,
+            "terminal_shape": null,
+            "token_usage": {
+              "cached_input_tokens": 72832,
+              "input_tokens": 78851,
+              "output_tokens": 17520,
+              "total_tokens": 96371
+            },
+            "tool_call_counts_by_name": {
+              "agent.skill.activate": 1,
+              "data.query": 6,
+              "data.transform": 1
+            },
+            "tool_result_counts_by_status": {
+              "failed": 2,
+              "succeeded": 6
+            },
+            "turn_seconds": 77.61031690001255,
+            "usage_reported_primary_response_count": 7
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "business.restock.v1.margin_higher",
+      "batch": "business",
+      "report": "build/agent-harness-full-81fb9bb/business/business.restock.v1.margin_higher-deepseek-deepseek-v4-flash-3ec6f30ef2d148ea88c8f78ed5582814.json",
+      "report_sha256": "667563d0ae6bed73116f8450a3552144525128c12c2a9e8899a70e9438e39229",
+      "observation": {
+        "run_id": "3ec6f30ef2d148ea88c8f78ed5582814",
+        "outcome": "pass",
+        "reason": "judge_verdict",
+        "run_status": "completed",
+        "failure_kind": null,
+        "judge_status": "completed",
+        "budget_reason": null,
+        "reported_subject_tokens": 46527,
+        "subject_tokens_complete": true,
+        "turn_seconds": 37.429994600010104,
+        "sampling_rounds": 5,
+        "provenance": {
+          "harness_variant": "baseline",
+          "repository_commit": "81fb9bbc682c92b68346a139f7e011f4b72a45ee",
+          "repository_dirty": true,
+          "case_definition_sha256": "24CD6031DA1B7B9F9C70F2D77FD0A5DC29CEBC6947DE3E3FABA05D31F2697C2D",
+          "runtime_sha256": "9107D3A35FFD1A2306FF4A247807B2EEB4280911A9ACC38B63365BEF4B25989C"
+        }
+      },
+      "identity": {
+        "case_definition_sha256": "24CD6031DA1B7B9F9C70F2D77FD0A5DC29CEBC6947DE3E3FABA05D31F2697C2D",
+        "effective_settings_sha256": "6973FC1DA2E20673BAAAE75940A37DE309FD0DC58E98CC9606C23B4EE0E547E8",
+        "embedding_settings_sha256": "84855E3EADB8F092BBE6E6E87D5ECAD071F1981359295FBA2826AEC4630F0397",
+        "fixture_sha256": "1123043EAC418088F9D742FAEA065EE9F91F67C28D564AFC9F2E46892B8E90E0",
+        "harness_variant": "baseline",
+        "invocation_id": "fb1d58692cb747099d2d8e093ba45a22",
+        "judge_settings_sha256": "86A3403ECB36E19C283750DF3E07A5984AF12994769207E46981D0162835A507",
+        "repository_commit": "81fb9bbc682c92b68346a139f7e011f4b72a45ee",
+        "repository_dirty": true,
+        "runtime_sha256": "9107D3A35FFD1A2306FF4A247807B2EEB4280911A9ACC38B63365BEF4B25989C",
+        "settings_sha256": "9BD35670D0D0AD156B5F4B148A530992988DA094A0F68365D796ECA83C6149B6"
+      },
+      "integrity": {
+        "checks": [
+          {
+            "name": "source_inputs_preserved",
+            "passed": true,
+            "summary": "external_inputs_and_imported_datasets"
+          }
+        ],
+        "passed": true
+      },
+      "semantic": {
+        "checks": [
+          {
+            "name": "turn_1.answer_completed",
+            "passed": true,
+            "summary": "terminal_assistant_answer"
+          },
+          {
+            "name": "turn_1.deliveries_accessible",
+            "passed": true,
+            "summary": "linked_artifacts_readable"
+          },
+          {
+            "name": "turn_1.feasible_decision_available",
+            "passed": true,
+            "summary": "candidate_count=1"
+          },
+          {
+            "name": "turn_1.optimal_decision_available",
+            "passed": true,
+            "summary": "best_feasible_margin_cents=188500; optimum=188500"
+          }
+        ],
+        "passed": true,
+        "verdict": "pass"
+      },
+      "judge": {
+        "independence": "independent",
+        "metrics": {
+          "elapsed_seconds": 19.684125999978278,
+          "provider_retry_count": 0,
+          "token_usage": {
+            "cached_input_tokens": 1024,
+            "input_tokens": 4992,
+            "output_tokens": 1298,
+            "total_tokens": 6290
+          }
+        },
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "reason_codes": [
+          "grounded_decision"
+        ],
+        "required": true,
+        "rubric_id": "business.restock_decision.explanation.v1",
+        "rubric_sha256": "6A5FA84263DA0DF7657651A75DC069D2AEAE184B465574CB61D8308C8D47394F",
+        "scores": {
+          "business_explanation": 2,
+          "selected_plan": 2
+        },
+        "status": "completed",
+        "summary": "judge_completed",
+        "verdict": "pass"
+      },
+      "budget": {
+        "exhaustion_reason": null,
+        "invocation_reported_subject_tokens": 530473,
+        "policy": {
+          "execution_limits": "production_harness_and_llm_settings",
+          "max_reported_invocation_subject_tokens": 4000000,
+          "max_wall_seconds": 900.0,
+          "policy_id": "agent-harness-budget-v2",
+          "token_enforcement": "next_cell_admission"
+        },
+        "provider_attempts_dispatched": 5,
+        "reported_subject_tokens": 46527,
+        "sampling_rounds_admitted": 5,
+        "status": "within_limits"
+      },
+      "turn_metrics": [
+        {
+          "index": 1,
+          "metrics": {
+            "assessment_seconds": null,
+            "derived_dataset_count": 1,
+            "message_counts": {
+              "assistant": 5,
+              "tool_call": 4,
+              "tool_result": 4,
+              "user": 1
+            },
+            "provider_retry_count": 0,
+            "sampling_round_count": 5,
+            "terminal_shape": null,
+            "token_usage": {
+              "cached_input_tokens": 35584,
+              "input_tokens": 38802,
+              "output_tokens": 7725,
+              "total_tokens": 46527
+            },
+            "tool_call_counts_by_name": {
+              "agent.skill.activate": 1,
+              "data.query": 2,
+              "data.transform": 1
+            },
+            "tool_result_counts_by_status": {
+              "succeeded": 4
+            },
+            "turn_seconds": 37.429994600010104,
+            "usage_reported_primary_response_count": 5
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "business.restock.v1.margin_lower",
+      "batch": "business",
+      "report": "build/agent-harness-full-81fb9bb/business/business.restock.v1.margin_lower-deepseek-deepseek-v4-flash-ba8743e2c0f849c39153e40e99f639d2.json",
+      "report_sha256": "fe7a630d48d0e232285faae1caa4cb54b995ab66942e96fbb4671691425ad374",
+      "observation": {
+        "run_id": "ba8743e2c0f849c39153e40e99f639d2",
+        "outcome": "pass",
+        "reason": "judge_verdict",
+        "run_status": "completed",
+        "failure_kind": null,
+        "judge_status": "completed",
+        "budget_reason": null,
+        "reported_subject_tokens": 50880,
+        "subject_tokens_complete": true,
+        "turn_seconds": 40.510528399958275,
+        "sampling_rounds": 5,
+        "provenance": {
+          "harness_variant": "baseline",
+          "repository_commit": "81fb9bbc682c92b68346a139f7e011f4b72a45ee",
+          "repository_dirty": true,
+          "case_definition_sha256": "24CD6031DA1B7B9F9C70F2D77FD0A5DC29CEBC6947DE3E3FABA05D31F2697C2D",
+          "runtime_sha256": "9107D3A35FFD1A2306FF4A247807B2EEB4280911A9ACC38B63365BEF4B25989C"
+        }
+      },
+      "identity": {
+        "case_definition_sha256": "24CD6031DA1B7B9F9C70F2D77FD0A5DC29CEBC6947DE3E3FABA05D31F2697C2D",
+        "effective_settings_sha256": "6973FC1DA2E20673BAAAE75940A37DE309FD0DC58E98CC9606C23B4EE0E547E8",
+        "embedding_settings_sha256": "84855E3EADB8F092BBE6E6E87D5ECAD071F1981359295FBA2826AEC4630F0397",
+        "fixture_sha256": "3EDE05F05DC3D0F2AA286DED625752710D6EE2F37E091EB014A5D2EE25B0E8C1",
+        "harness_variant": "baseline",
+        "invocation_id": "fb1d58692cb747099d2d8e093ba45a22",
+        "judge_settings_sha256": "86A3403ECB36E19C283750DF3E07A5984AF12994769207E46981D0162835A507",
+        "repository_commit": "81fb9bbc682c92b68346a139f7e011f4b72a45ee",
+        "repository_dirty": true,
+        "runtime_sha256": "9107D3A35FFD1A2306FF4A247807B2EEB4280911A9ACC38B63365BEF4B25989C",
+        "settings_sha256": "9BD35670D0D0AD156B5F4B148A530992988DA094A0F68365D796ECA83C6149B6"
+      },
+      "integrity": {
+        "checks": [
+          {
+            "name": "source_inputs_preserved",
+            "passed": true,
+            "summary": "external_inputs_and_imported_datasets"
+          }
+        ],
+        "passed": true
+      },
+      "semantic": {
+        "checks": [
+          {
+            "name": "turn_1.answer_completed",
+            "passed": true,
+            "summary": "terminal_assistant_answer"
+          },
+          {
+            "name": "turn_1.deliveries_accessible",
+            "passed": true,
+            "summary": "linked_artifacts_readable"
+          },
+          {
+            "name": "turn_1.feasible_decision_available",
+            "passed": true,
+            "summary": "candidate_count=1"
+          },
+          {
+            "name": "turn_1.optimal_decision_available",
+            "passed": true,
+            "summary": "best_feasible_margin_cents=169000; optimum=169000"
+          }
+        ],
+        "passed": true,
+        "verdict": "pass"
+      },
+      "judge": {
+        "independence": "independent",
+        "metrics": {
+          "elapsed_seconds": 23.22909239999717,
+          "provider_retry_count": 0,
+          "token_usage": {
+            "cached_input_tokens": 1024,
+            "input_tokens": 3692,
+            "output_tokens": 1711,
+            "total_tokens": 5403
+          }
+        },
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "reason_codes": [
+          "grounded_decision"
+        ],
+        "required": true,
+        "rubric_id": "business.restock_decision.explanation.v1",
+        "rubric_sha256": "6A5FA84263DA0DF7657651A75DC069D2AEAE184B465574CB61D8308C8D47394F",
+        "scores": {
+          "business_explanation": 2,
+          "selected_plan": 2
+        },
+        "status": "completed",
+        "summary": "judge_completed",
+        "verdict": "pass"
+      },
+      "budget": {
+        "exhaustion_reason": null,
+        "invocation_reported_subject_tokens": 483946,
+        "policy": {
+          "execution_limits": "production_harness_and_llm_settings",
+          "max_reported_invocation_subject_tokens": 4000000,
+          "max_wall_seconds": 900.0,
+          "policy_id": "agent-harness-budget-v2",
+          "token_enforcement": "next_cell_admission"
+        },
+        "provider_attempts_dispatched": 5,
+        "reported_subject_tokens": 50880,
+        "sampling_rounds_admitted": 5,
+        "status": "within_limits"
+      },
+      "turn_metrics": [
+        {
+          "index": 1,
+          "metrics": {
+            "assessment_seconds": null,
+            "derived_dataset_count": 1,
+            "message_counts": {
+              "assistant": 5,
+              "tool_call": 7,
+              "tool_result": 7,
+              "user": 1
+            },
+            "provider_retry_count": 0,
+            "sampling_round_count": 5,
+            "terminal_shape": null,
+            "token_usage": {
+              "cached_input_tokens": 38528,
+              "input_tokens": 42885,
+              "output_tokens": 7995,
+              "total_tokens": 50880
+            },
+            "tool_call_counts_by_name": {
+              "agent.skill.activate": 1,
+              "analysis.profile": 1,
+              "data.query": 3,
+              "data.transform": 1,
+              "knowledge.lookup": 1
+            },
+            "tool_result_counts_by_status": {
+              "succeeded": 7
+            },
+            "turn_seconds": 40.510528399958275,
+            "usage_reported_primary_response_count": 5
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "business.restock.v1.no_purchase",
+      "batch": "business",
+      "report": "build/agent-harness-full-81fb9bb/business/business.restock.v1.no_purchase-deepseek-deepseek-v4-flash-d6e7cea0afd443de99ff84704e4c96e8.json",
+      "report_sha256": "598ad4caae56bb2cc1a9577948fd80ff4c43019b42de2ab8da33f37a73d21237",
+      "observation": {
+        "run_id": "d6e7cea0afd443de99ff84704e4c96e8",
+        "outcome": "pass",
+        "reason": "judge_verdict",
+        "run_status": "completed",
+        "failure_kind": null,
+        "judge_status": "completed",
+        "budget_reason": null,
+        "reported_subject_tokens": 27190,
+        "subject_tokens_complete": true,
+        "turn_seconds": 17.904481299978215,
+        "sampling_rounds": 4,
+        "provenance": {
+          "harness_variant": "baseline",
+          "repository_commit": "81fb9bbc682c92b68346a139f7e011f4b72a45ee",
+          "repository_dirty": true,
+          "case_definition_sha256": "24CD6031DA1B7B9F9C70F2D77FD0A5DC29CEBC6947DE3E3FABA05D31F2697C2D",
+          "runtime_sha256": "9107D3A35FFD1A2306FF4A247807B2EEB4280911A9ACC38B63365BEF4B25989C"
+        }
+      },
+      "identity": {
+        "case_definition_sha256": "24CD6031DA1B7B9F9C70F2D77FD0A5DC29CEBC6947DE3E3FABA05D31F2697C2D",
+        "effective_settings_sha256": "6973FC1DA2E20673BAAAE75940A37DE309FD0DC58E98CC9606C23B4EE0E547E8",
+        "embedding_settings_sha256": "84855E3EADB8F092BBE6E6E87D5ECAD071F1981359295FBA2826AEC4630F0397",
+        "fixture_sha256": "58A138C7D8626528E67398F8F3C9A37D7014F8F2AE3EAD8C6504702AB931F972",
+        "harness_variant": "baseline",
+        "invocation_id": "fb1d58692cb747099d2d8e093ba45a22",
+        "judge_settings_sha256": "86A3403ECB36E19C283750DF3E07A5984AF12994769207E46981D0162835A507",
+        "repository_commit": "81fb9bbc682c92b68346a139f7e011f4b72a45ee",
+        "repository_dirty": true,
+        "runtime_sha256": "9107D3A35FFD1A2306FF4A247807B2EEB4280911A9ACC38B63365BEF4B25989C",
+        "settings_sha256": "9BD35670D0D0AD156B5F4B148A530992988DA094A0F68365D796ECA83C6149B6"
+      },
+      "integrity": {
+        "checks": [
+          {
+            "name": "source_inputs_preserved",
+            "passed": true,
+            "summary": "external_inputs_and_imported_datasets"
+          }
+        ],
+        "passed": true
+      },
+      "semantic": {
+        "checks": [
+          {
+            "name": "turn_1.answer_completed",
+            "passed": true,
+            "summary": "terminal_assistant_answer"
+          },
+          {
+            "name": "turn_1.deliveries_accessible",
+            "passed": true,
+            "summary": "linked_artifacts_readable"
+          },
+          {
+            "name": "turn_1.feasible_decision_available",
+            "passed": true,
+            "summary": "candidate_count=1"
+          },
+          {
+            "name": "turn_1.optimal_decision_available",
+            "passed": true,
+            "summary": "best_feasible_margin_cents=0; optimum=0"
+          }
+        ],
+        "passed": true,
+        "verdict": "pass"
+      },
+      "judge": {
+        "independence": "independent",
+        "metrics": {
+          "elapsed_seconds": 13.25769160001073,
+          "provider_retry_count": 0,
+          "token_usage": {
+            "cached_input_tokens": 640,
+            "input_tokens": 3060,
+            "output_tokens": 1006,
+            "total_tokens": 4066
+          }
+        },
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "reason_codes": [
+          "grounded_decision"
+        ],
+        "required": true,
+        "rubric_id": "business.restock_decision.explanation.v1",
+        "rubric_sha256": "6A5FA84263DA0DF7657651A75DC069D2AEAE184B465574CB61D8308C8D47394F",
+        "scores": {
+          "business_explanation": 2,
+          "selected_plan": 2
+        },
+        "status": "completed",
+        "summary": "judge_completed",
+        "verdict": "pass"
+      },
+      "budget": {
+        "exhaustion_reason": null,
+        "invocation_reported_subject_tokens": 557663,
+        "policy": {
+          "execution_limits": "production_harness_and_llm_settings",
+          "max_reported_invocation_subject_tokens": 4000000,
+          "max_wall_seconds": 900.0,
+          "policy_id": "agent-harness-budget-v2",
+          "token_enforcement": "next_cell_admission"
+        },
+        "provider_attempts_dispatched": 4,
+        "reported_subject_tokens": 27190,
+        "sampling_rounds_admitted": 4,
+        "status": "within_limits"
+      },
+      "turn_metrics": [
+        {
+          "index": 1,
+          "metrics": {
+            "assessment_seconds": null,
+            "derived_dataset_count": 0,
+            "message_counts": {
+              "assistant": 4,
+              "tool_call": 4,
+              "tool_result": 4,
+              "user": 1
+            },
+            "provider_retry_count": 0,
+            "sampling_round_count": 4,
+            "terminal_shape": null,
+            "token_usage": {
+              "cached_input_tokens": 19840,
+              "input_tokens": 23949,
+              "output_tokens": 3241,
+              "total_tokens": 27190
+            },
+            "tool_call_counts_by_name": {
+              "agent.skill.activate": 1,
+              "data.query": 2,
+              "knowledge.lookup": 1
+            },
+            "tool_result_counts_by_status": {
+              "succeeded": 4
+            },
+            "turn_seconds": 17.904481299978215,
+            "usage_reported_primary_response_count": 4
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "business.restock.v1.standard",
+      "batch": "business",
+      "report": "build/agent-harness-full-81fb9bb/business/business.restock.v1.standard-deepseek-deepseek-v4-flash-7f14e3d313084024adf79f7dc055b715.json",
+      "report_sha256": "492f510a8ce826477d564c082af19578302d3cb7b9de9cf08ec296cc46781fd3",
+      "observation": {
+        "run_id": "7f14e3d313084024adf79f7dc055b715",
+        "outcome": "pass",
+        "reason": "judge_verdict",
+        "run_status": "completed",
+        "failure_kind": null,
+        "judge_status": "completed",
+        "budget_reason": null,
+        "reported_subject_tokens": 108936,
+        "subject_tokens_complete": true,
+        "turn_seconds": 57.08069199998863,
+        "sampling_rounds": 8,
+        "provenance": {
+          "harness_variant": "baseline",
+          "repository_commit": "81fb9bbc682c92b68346a139f7e011f4b72a45ee",
+          "repository_dirty": true,
+          "case_definition_sha256": "24CD6031DA1B7B9F9C70F2D77FD0A5DC29CEBC6947DE3E3FABA05D31F2697C2D",
+          "runtime_sha256": "9107D3A35FFD1A2306FF4A247807B2EEB4280911A9ACC38B63365BEF4B25989C"
+        }
+      },
+      "identity": {
+        "case_definition_sha256": "24CD6031DA1B7B9F9C70F2D77FD0A5DC29CEBC6947DE3E3FABA05D31F2697C2D",
+        "effective_settings_sha256": "6973FC1DA2E20673BAAAE75940A37DE309FD0DC58E98CC9606C23B4EE0E547E8",
+        "embedding_settings_sha256": "84855E3EADB8F092BBE6E6E87D5ECAD071F1981359295FBA2826AEC4630F0397",
+        "fixture_sha256": "0EEA8E8B1CA68DD617B60DD7BFF33794495981C932A686510B02581E8834267A",
+        "harness_variant": "baseline",
+        "invocation_id": "fb1d58692cb747099d2d8e093ba45a22",
+        "judge_settings_sha256": "86A3403ECB36E19C283750DF3E07A5984AF12994769207E46981D0162835A507",
+        "repository_commit": "81fb9bbc682c92b68346a139f7e011f4b72a45ee",
+        "repository_dirty": true,
+        "runtime_sha256": "9107D3A35FFD1A2306FF4A247807B2EEB4280911A9ACC38B63365BEF4B25989C",
+        "settings_sha256": "9BD35670D0D0AD156B5F4B148A530992988DA094A0F68365D796ECA83C6149B6"
+      },
+      "integrity": {
+        "checks": [
+          {
+            "name": "source_inputs_preserved",
+            "passed": true,
+            "summary": "external_inputs_and_imported_datasets"
+          }
+        ],
+        "passed": true
+      },
+      "semantic": {
+        "checks": [
+          {
+            "name": "turn_1.answer_completed",
+            "passed": true,
+            "summary": "terminal_assistant_answer"
+          },
+          {
+            "name": "turn_1.deliveries_accessible",
+            "passed": true,
+            "summary": "linked_artifacts_readable"
+          },
+          {
+            "name": "turn_1.feasible_decision_available",
+            "passed": true,
+            "summary": "candidate_count=1"
+          },
+          {
+            "name": "turn_1.optimal_decision_available",
+            "passed": true,
+            "summary": "best_feasible_margin_cents=184500; optimum=184500"
+          }
+        ],
+        "passed": true,
+        "verdict": "pass"
+      },
+      "judge": {
+        "independence": "independent",
+        "metrics": {
+          "elapsed_seconds": 117.94173730001785,
+          "provider_retry_count": 0,
+          "token_usage": {
+            "cached_input_tokens": 1792,
+            "input_tokens": 7166,
+            "output_tokens": 8474,
+            "total_tokens": 15640
+          }
+        },
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "reason_codes": [
+          "grounded_decision"
+        ],
+        "required": true,
+        "rubric_id": "business.restock_decision.explanation.v1",
+        "rubric_sha256": "6A5FA84263DA0DF7657651A75DC069D2AEAE184B465574CB61D8308C8D47394F",
+        "scores": {
+          "business_explanation": 2,
+          "selected_plan": 2
+        },
+        "status": "completed",
+        "summary": "judge_completed",
+        "verdict": "pass"
+      },
+      "budget": {
+        "exhaustion_reason": null,
+        "invocation_reported_subject_tokens": 276852,
+        "policy": {
+          "execution_limits": "production_harness_and_llm_settings",
+          "max_reported_invocation_subject_tokens": 4000000,
+          "max_wall_seconds": 900.0,
+          "policy_id": "agent-harness-budget-v2",
+          "token_enforcement": "next_cell_admission"
+        },
+        "provider_attempts_dispatched": 8,
+        "reported_subject_tokens": 108936,
+        "sampling_rounds_admitted": 8,
+        "status": "within_limits"
+      },
+      "turn_metrics": [
+        {
+          "index": 1,
+          "metrics": {
+            "assessment_seconds": null,
+            "derived_dataset_count": 2,
+            "message_counts": {
+              "assistant": 8,
+              "tool_call": 12,
+              "tool_result": 12,
+              "user": 1
+            },
+            "provider_retry_count": 0,
+            "sampling_round_count": 8,
+            "terminal_shape": null,
+            "token_usage": {
+              "cached_input_tokens": 89856,
+              "input_tokens": 98490,
+              "output_tokens": 10446,
+              "total_tokens": 108936
+            },
+            "tool_call_counts_by_name": {
+              "agent.skill.activate": 1,
+              "analysis.graph": 1,
+              "analysis.profile": 1,
+              "data.query": 6,
+              "data.transform": 2,
+              "knowledge.lookup": 1
+            },
+            "tool_result_counts_by_status": {
+              "failed": 2,
+              "succeeded": 10
+            },
+            "turn_seconds": 57.08069199998863,
+            "usage_reported_primary_response_count": 8
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "business.revenue.v1.standard",
+      "batch": "business",
+      "report": "build/agent-harness-full-81fb9bb/business/business.revenue.v1.standard-deepseek-deepseek-v4-flash-f5c24ab1b83c4e3b8a16c71828887ddf.json",
+      "report_sha256": "beeaf5830cc4faf7e4f4758f1c17903b2f385671440def733ff5db7cb061377a",
+      "observation": {
+        "run_id": "f5c24ab1b83c4e3b8a16c71828887ddf",
+        "outcome": "fail",
+        "reason": "judge_verdict",
+        "run_status": "completed",
+        "failure_kind": null,
+        "judge_status": "completed",
+        "budget_reason": null,
+        "reported_subject_tokens": 151497,
+        "subject_tokens_complete": true,
+        "turn_seconds": 58.39613999990979,
+        "sampling_rounds": 11,
+        "provenance": {
+          "harness_variant": "baseline",
+          "repository_commit": "81fb9bbc682c92b68346a139f7e011f4b72a45ee",
+          "repository_dirty": true,
+          "case_definition_sha256": "2D8D0F8633992A1BD0EE9FBEEF5B383572933997C3ADC97C78046156E2CFEFEC",
+          "runtime_sha256": "9107D3A35FFD1A2306FF4A247807B2EEB4280911A9ACC38B63365BEF4B25989C"
+        }
+      },
+      "identity": {
+        "case_definition_sha256": "2D8D0F8633992A1BD0EE9FBEEF5B383572933997C3ADC97C78046156E2CFEFEC",
+        "effective_settings_sha256": "6973FC1DA2E20673BAAAE75940A37DE309FD0DC58E98CC9606C23B4EE0E547E8",
+        "embedding_settings_sha256": "84855E3EADB8F092BBE6E6E87D5ECAD071F1981359295FBA2826AEC4630F0397",
+        "fixture_sha256": "E281B883A03A0DDABD96E1EBF908AECCDFBBAB5FE36C8C9EC212D6F669ADDA70",
+        "harness_variant": "baseline",
+        "invocation_id": "fb1d58692cb747099d2d8e093ba45a22",
+        "judge_settings_sha256": "86A3403ECB36E19C283750DF3E07A5984AF12994769207E46981D0162835A507",
+        "repository_commit": "81fb9bbc682c92b68346a139f7e011f4b72a45ee",
+        "repository_dirty": true,
+        "runtime_sha256": "9107D3A35FFD1A2306FF4A247807B2EEB4280911A9ACC38B63365BEF4B25989C",
+        "settings_sha256": "9BD35670D0D0AD156B5F4B148A530992988DA094A0F68365D796ECA83C6149B6"
+      },
+      "integrity": {
+        "checks": [
+          {
+            "name": "source_inputs_preserved",
+            "passed": true,
+            "summary": "external_inputs_and_imported_datasets"
+          }
+        ],
+        "passed": true
+      },
+      "semantic": {
+        "checks": [
+          {
+            "name": "turn_1.answer_completed",
+            "passed": true,
+            "summary": "terminal_assistant_answer"
+          },
+          {
+            "name": "turn_1.deliveries_accessible",
+            "passed": true,
+            "summary": "linked_artifacts_readable"
+          },
+          {
+            "name": "turn_1.net_receipts_delivered",
+            "passed": true,
+            "summary": "expected_yuan={'东区': 40750.0, '西区': 32900.0, '北区': 22000.0, '南区': -1200.0}"
+          },
+          {
+            "name": "turn_2.answer_completed",
+            "passed": true,
+            "summary": "terminal_assistant_answer"
+          },
+          {
+            "name": "turn_2.deliveries_accessible",
+            "passed": true,
+            "summary": "linked_artifacts_readable"
+          },
+          {
+            "name": "turn_2.net_receipts_delivered",
+            "passed": true,
+            "summary": "expected_yuan={'东区': 29750.0, '西区': 32900.0, '北区': 22000.0, '南区': -900.0}"
+          }
+        ],
+        "passed": true,
+        "verdict": "pass"
+      },
+      "judge": {
+        "independence": "independent",
+        "metrics": {
+          "elapsed_seconds": 133.27965059998678,
+          "provider_retry_count": 0,
+          "token_usage": {
+            "cached_input_tokens": 384,
+            "input_tokens": 5299,
+            "output_tokens": 11556,
+            "total_tokens": 16855
+          }
+        },
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "reason_codes": [
+          "incorrect_business_claim"
+        ],
+        "required": true,
+        "rubric_id": "business.revenue_revision.explanation.v1",
+        "rubric_sha256": "73E55EF6575ABE0E1DDB2D780DE0F0C5E2DB301C5E0CAE1AD1650DE1F1FE17AB",
+        "scores": {
+          "month_close_grounding": 2,
+          "revision_explanation": 2
+        },
+        "status": "completed",
+        "summary": "judge_completed",
+        "verdict": "fail"
+      },
+      "budget": {
+        "exhaustion_reason": null,
+        "invocation_reported_subject_tokens": 709160,
+        "policy": {
+          "execution_limits": "production_harness_and_llm_settings",
+          "max_reported_invocation_subject_tokens": 4000000,
+          "max_wall_seconds": 900.0,
+          "policy_id": "agent-harness-budget-v2",
+          "token_enforcement": "next_cell_admission"
+        },
+        "provider_attempts_dispatched": 11,
+        "reported_subject_tokens": 151497,
+        "sampling_rounds_admitted": 11,
+        "status": "within_limits"
+      },
+      "turn_metrics": [
+        {
+          "index": 1,
+          "metrics": {
+            "assessment_seconds": null,
+            "derived_dataset_count": 1,
+            "message_counts": {
+              "assistant": 7,
+              "tool_call": 12,
+              "tool_result": 12,
+              "user": 1
+            },
+            "provider_retry_count": 0,
+            "sampling_round_count": 7,
+            "terminal_shape": null,
+            "token_usage": {
+              "cached_input_tokens": 59264,
+              "input_tokens": 65118,
+              "output_tokens": 6676,
+              "total_tokens": 71794
+            },
+            "tool_call_counts_by_name": {
+              "agent.skill.activate": 1,
+              "analysis.graph": 1,
+              "data.query": 8,
+              "data.transform": 1,
+              "knowledge.lookup": 1
+            },
+            "tool_result_counts_by_status": {
+              "failed": 3,
+              "succeeded": 9
+            },
+            "turn_seconds": 33.254313899960835,
+            "usage_reported_primary_response_count": 7
+          }
+        },
+        {
+          "index": 2,
+          "metrics": {
+            "assessment_seconds": null,
+            "derived_dataset_count": 1,
+            "message_counts": {
+              "assistant": 4,
+              "tool_call": 3,
+              "tool_result": 3,
+              "user": 1
+            },
+            "provider_retry_count": 0,
+            "sampling_round_count": 4,
+            "terminal_shape": null,
+            "token_usage": {
+              "cached_input_tokens": 73088,
+              "input_tokens": 74602,
+              "output_tokens": 5101,
+              "total_tokens": 79703
+            },
+            "tool_call_counts_by_name": {
+              "analysis.graph": 1,
+              "data.query": 1,
+              "data.transform": 1
+            },
+            "tool_result_counts_by_status": {
+              "succeeded": 3
+            },
+            "turn_seconds": 25.141826099948958,
+            "usage_reported_primary_response_count": 4
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "business.routing.v1.standard",
+      "batch": "business",
+      "report": "build/agent-harness-full-81fb9bb/business/business.routing.v1.standard-deepseek-deepseek-v4-flash-fa174f6456c44e1095f950348290048b.json",
+      "report_sha256": "de51984cbd9992fb7d463157f3745ff4a606637a40890a524ef74dd404e03ecf",
+      "observation": {
+        "run_id": "fa174f6456c44e1095f950348290048b",
+        "outcome": "pass",
+        "reason": "judge_verdict",
+        "run_status": "completed",
+        "failure_kind": null,
+        "judge_status": "completed",
+        "budget_reason": null,
+        "reported_subject_tokens": 321108,
+        "subject_tokens_complete": true,
+        "turn_seconds": 139.97515720000956,
+        "sampling_rounds": 14,
+        "provenance": {
+          "harness_variant": "baseline",
+          "repository_commit": "81fb9bbc682c92b68346a139f7e011f4b72a45ee",
+          "repository_dirty": true,
+          "case_definition_sha256": "35744EC52709E4BF5D0B14C1BE957256E32C38D1113B494285E9427A16D066AE",
+          "runtime_sha256": "9107D3A35FFD1A2306FF4A247807B2EEB4280911A9ACC38B63365BEF4B25989C"
+        }
+      },
+      "identity": {
+        "case_definition_sha256": "35744EC52709E4BF5D0B14C1BE957256E32C38D1113B494285E9427A16D066AE",
+        "effective_settings_sha256": "6973FC1DA2E20673BAAAE75940A37DE309FD0DC58E98CC9606C23B4EE0E547E8",
+        "embedding_settings_sha256": "84855E3EADB8F092BBE6E6E87D5ECAD071F1981359295FBA2826AEC4630F0397",
+        "fixture_sha256": "52FFEC11EDA483EB18AB85C0A3C9812ECDBA8045AE85A54A157BAC86DB8B4B3A",
+        "harness_variant": "baseline",
+        "invocation_id": "fb1d58692cb747099d2d8e093ba45a22",
+        "judge_settings_sha256": "86A3403ECB36E19C283750DF3E07A5984AF12994769207E46981D0162835A507",
+        "repository_commit": "81fb9bbc682c92b68346a139f7e011f4b72a45ee",
+        "repository_dirty": true,
+        "runtime_sha256": "9107D3A35FFD1A2306FF4A247807B2EEB4280911A9ACC38B63365BEF4B25989C",
+        "settings_sha256": "9BD35670D0D0AD156B5F4B148A530992988DA094A0F68365D796ECA83C6149B6"
+      },
+      "integrity": {
+        "checks": [
+          {
+            "name": "source_inputs_preserved",
+            "passed": true,
+            "summary": "external_inputs_and_imported_datasets"
+          }
+        ],
+        "passed": true
+      },
+      "semantic": {
+        "checks": [
+          {
+            "name": "turn_1.answer_completed",
+            "passed": true,
+            "summary": "terminal_assistant_answer"
+          },
+          {
+            "name": "turn_1.deliveries_accessible",
+            "passed": true,
+            "summary": "linked_artifacts_readable"
+          },
+          {
+            "name": "turn_1.reusable_analyzer_saved",
+            "passed": true,
+            "summary": "saved_model_ids=['5c9e12ace51a4958bf5e0a54e15a1d26']"
+          },
+          {
+            "name": "turn_2.answer_completed",
+            "passed": true,
+            "summary": "terminal_assistant_answer"
+          },
+          {
+            "name": "turn_2.deliveries_accessible",
+            "passed": true,
+            "summary": "linked_artifacts_readable"
+          },
+          {
+            "name": "turn_2.complete_batch_quality",
+            "passed": true,
+            "summary": "accuracy=1.0; required=0.9"
+          },
+          {
+            "name": "turn_2.saved_analyzer_reused",
+            "passed": true,
+            "summary": "delivered_predictions_reference_same_persisted_model"
+          }
+        ],
+        "passed": true,
+        "verdict": "pass"
+      },
+      "judge": {
+        "independence": "independent",
+        "metrics": {
+          "elapsed_seconds": 88.07772519998252,
+          "provider_retry_count": 0,
+          "token_usage": {
+            "cached_input_tokens": 896,
+            "input_tokens": 8806,
+            "output_tokens": 7300,
+            "total_tokens": 16106
+          }
+        },
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "reason_codes": [
+          "grounded_reuse"
+        ],
+        "required": true,
+        "rubric_id": "business.routing_reuse.explanation.v1",
+        "rubric_sha256": "A813A96D29847CB305A36AB2EE5F3F67032B064D8322EFE11D5B58F609B02289",
+        "scores": {
+          "adoption_evidence": 2,
+          "manual_correction_estimate": 2,
+          "selected_analyzer_reused": 2,
+          "usable_queue_labels": 2
+        },
+        "status": "completed",
+        "summary": "judge_completed",
+        "verdict": "pass"
+      },
+      "budget": {
+        "exhaustion_reason": null,
+        "invocation_reported_subject_tokens": 1030268,
+        "policy": {
+          "execution_limits": "production_harness_and_llm_settings",
+          "max_reported_invocation_subject_tokens": 4000000,
+          "max_wall_seconds": 900.0,
+          "policy_id": "agent-harness-budget-v2",
+          "token_enforcement": "next_cell_admission"
+        },
+        "provider_attempts_dispatched": 14,
+        "reported_subject_tokens": 321108,
+        "sampling_rounds_admitted": 14,
+        "status": "within_limits"
+      },
+      "turn_metrics": [
+        {
+          "index": 1,
+          "metrics": {
+            "assessment_seconds": null,
+            "derived_dataset_count": 0,
+            "message_counts": {
+              "assistant": 8,
+              "tool_call": 14,
+              "tool_result": 14,
+              "user": 1
+            },
+            "provider_retry_count": 0,
+            "sampling_round_count": 8,
+            "terminal_shape": null,
+            "token_usage": {
+              "cached_input_tokens": 87296,
+              "input_tokens": 104782,
+              "output_tokens": 9050,
+              "total_tokens": 113832
+            },
+            "tool_call_counts_by_name": {
+              "agent.skill.activate": 1,
+              "agent.skill.read_reference": 1,
+              "analysis.profile": 1,
+              "data.feature.select": 1,
+              "data.query": 3,
+              "knowledge.lookup": 1,
+              "model.metadata": 1,
+              "model.train": 5
+            },
+            "tool_result_counts_by_status": {
+              "succeeded": 14
+            },
+            "turn_seconds": 109.44081210001605,
+            "usage_reported_primary_response_count": 8
+          }
+        },
+        {
+          "index": 2,
+          "metrics": {
+            "assessment_seconds": null,
+            "derived_dataset_count": 1,
+            "message_counts": {
+              "assistant": 6,
+              "tool_call": 6,
+              "tool_result": 6,
+              "user": 1
+            },
+            "provider_retry_count": 0,
+            "sampling_round_count": 6,
+            "terminal_shape": null,
+            "token_usage": {
+              "cached_input_tokens": 196736,
+              "input_tokens": 201975,
+              "output_tokens": 5301,
+              "total_tokens": 207276
+            },
+            "tool_call_counts_by_name": {
+              "data.feature.select": 1,
+              "data.query": 4,
+              "model.apply": 1
+            },
+            "tool_result_counts_by_status": {
+              "failed": 1,
+              "succeeded": 5
+            },
+            "turn_seconds": 30.534345099993516,
+            "usage_reported_primary_response_count": 6
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "business.campaign.v1.confirmation",
+      "batch": "confirmation",
+      "report": "build/agent-harness-full-81fb9bb/confirmation/business.campaign.v1.confirmation-deepseek-deepseek-v4-flash-69f8cd522863481691723d1b359e1357.json",
+      "report_sha256": "5ce5e691903af37795425c56dd34e05c2c783f0e4b7fc75ac95ee5a88909a6a5",
+      "observation": {
+        "run_id": "69f8cd522863481691723d1b359e1357",
+        "outcome": "pass",
+        "reason": "judge_verdict",
+        "run_status": "completed",
+        "failure_kind": null,
+        "judge_status": "completed",
+        "budget_reason": null,
+        "reported_subject_tokens": 53241,
+        "subject_tokens_complete": true,
+        "turn_seconds": 36.38303119997727,
+        "sampling_rounds": 5,
+        "provenance": {
+          "harness_variant": "baseline",
+          "repository_commit": "81fb9bbc682c92b68346a139f7e011f4b72a45ee",
+          "repository_dirty": true,
+          "case_definition_sha256": "91345DE7D5C5A698BE9E90F4755530A5ADCE172825668F508F092587B84B18B3",
+          "runtime_sha256": "9107D3A35FFD1A2306FF4A247807B2EEB4280911A9ACC38B63365BEF4B25989C"
+        }
+      },
+      "identity": {
+        "case_definition_sha256": "91345DE7D5C5A698BE9E90F4755530A5ADCE172825668F508F092587B84B18B3",
+        "effective_settings_sha256": "6973FC1DA2E20673BAAAE75940A37DE309FD0DC58E98CC9606C23B4EE0E547E8",
+        "embedding_settings_sha256": "84855E3EADB8F092BBE6E6E87D5ECAD071F1981359295FBA2826AEC4630F0397",
+        "fixture_sha256": "F8584F6E37AB935DE8892CB57F364DF61767D9FF28E9BC25D14CAAF7E1C2F489",
+        "harness_variant": "baseline",
+        "invocation_id": "5085b974332243958e9fb2540a97bba0",
+        "judge_settings_sha256": "86A3403ECB36E19C283750DF3E07A5984AF12994769207E46981D0162835A507",
+        "repository_commit": "81fb9bbc682c92b68346a139f7e011f4b72a45ee",
+        "repository_dirty": true,
+        "runtime_sha256": "9107D3A35FFD1A2306FF4A247807B2EEB4280911A9ACC38B63365BEF4B25989C",
+        "settings_sha256": "9BD35670D0D0AD156B5F4B148A530992988DA094A0F68365D796ECA83C6149B6"
+      },
+      "integrity": {
+        "checks": [
+          {
+            "name": "source_inputs_preserved",
+            "passed": true,
+            "summary": "external_inputs_and_imported_datasets"
+          }
+        ],
+        "passed": true
+      },
+      "semantic": {
+        "checks": [
+          {
+            "name": "turn_1.answer_completed",
+            "passed": true,
+            "summary": "terminal_assistant_answer"
+          },
+          {
+            "name": "turn_1.deliveries_accessible",
+            "passed": true,
+            "summary": "linked_artifacts_readable"
+          },
+          {
+            "name": "turn_1.eligible_list_delivered",
+            "passed": true,
+            "summary": "expected_customer_ids=['C03', 'C04', 'C06', 'C07', 'C08', 'C16', 'C17', 'C18', 'C20', 'C23', 'C28', 'C29']"
+          }
+        ],
+        "passed": true,
+        "verdict": "pass"
+      },
+      "judge": {
+        "independence": "independent",
+        "metrics": {
+          "elapsed_seconds": 28.27067509997869,
+          "provider_retry_count": 0,
+          "token_usage": {
+            "cached_input_tokens": 512,
+            "input_tokens": 5447,
+            "output_tokens": 2194,
+            "total_tokens": 7641
+          }
+        },
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "reason_codes": [
+          "grounded_delivery"
+        ],
+        "required": true,
+        "rubric_id": "business.campaign_eligibility.explanation.v1",
+        "rubric_sha256": "8A6B83AD1C3AEC7C2EFAB2E62351A7A90BB3D9DDBA28C5BFD64517443B2F6FDA",
+        "scores": {
+          "effective_rule": 2,
+          "exceptions_explained": 2
+        },
+        "status": "completed",
+        "summary": "judge_completed",
+        "verdict": "pass"
+      },
+      "budget": {
+        "exhaustion_reason": null,
+        "invocation_reported_subject_tokens": 53241,
+        "policy": {
+          "execution_limits": "production_harness_and_llm_settings",
+          "max_reported_invocation_subject_tokens": 4000000,
+          "max_wall_seconds": 900.0,
+          "policy_id": "agent-harness-budget-v2",
+          "token_enforcement": "next_cell_admission"
+        },
+        "provider_attempts_dispatched": 5,
+        "reported_subject_tokens": 53241,
+        "sampling_rounds_admitted": 5,
+        "status": "within_limits"
+      },
+      "turn_metrics": [
+        {
+          "index": 1,
+          "metrics": {
+            "assessment_seconds": null,
+            "derived_dataset_count": 1,
+            "message_counts": {
+              "assistant": 5,
+              "tool_call": 8,
+              "tool_result": 8,
+              "user": 1
+            },
+            "provider_retry_count": 0,
+            "sampling_round_count": 5,
+            "terminal_shape": null,
+            "token_usage": {
+              "cached_input_tokens": 38912,
+              "input_tokens": 45474,
+              "output_tokens": 7767,
+              "total_tokens": 53241
+            },
+            "tool_call_counts_by_name": {
+              "agent.skill.activate": 1,
+              "analysis.profile": 1,
+              "data.query": 4,
+              "data.transform": 1,
+              "knowledge.lookup": 1
+            },
+            "tool_result_counts_by_status": {
+              "succeeded": 8
+            },
+            "turn_seconds": 36.38303119997727,
+            "usage_reported_primary_response_count": 5
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "business.restock.v1.confirmation",
+      "batch": "confirmation",
+      "report": "build/agent-harness-full-81fb9bb/confirmation/business.restock.v1.confirmation-deepseek-deepseek-v4-flash-d2debd471c954b8f921f86e6386c052d.json",
+      "report_sha256": "f92d9ba3298ccb718d0c2e0415dc2c2d81a21adcc33e9ed823546490694b7167",
+      "observation": {
+        "run_id": "d2debd471c954b8f921f86e6386c052d",
+        "outcome": "pass",
+        "reason": "judge_verdict",
+        "run_status": "completed",
+        "failure_kind": null,
+        "judge_status": "completed",
+        "budget_reason": null,
+        "reported_subject_tokens": 63970,
+        "subject_tokens_complete": true,
+        "turn_seconds": 31.709552099986468,
+        "sampling_rounds": 6,
+        "provenance": {
+          "harness_variant": "baseline",
+          "repository_commit": "81fb9bbc682c92b68346a139f7e011f4b72a45ee",
+          "repository_dirty": true,
+          "case_definition_sha256": "24CD6031DA1B7B9F9C70F2D77FD0A5DC29CEBC6947DE3E3FABA05D31F2697C2D",
+          "runtime_sha256": "9107D3A35FFD1A2306FF4A247807B2EEB4280911A9ACC38B63365BEF4B25989C"
+        }
+      },
+      "identity": {
+        "case_definition_sha256": "24CD6031DA1B7B9F9C70F2D77FD0A5DC29CEBC6947DE3E3FABA05D31F2697C2D",
+        "effective_settings_sha256": "6973FC1DA2E20673BAAAE75940A37DE309FD0DC58E98CC9606C23B4EE0E547E8",
+        "embedding_settings_sha256": "84855E3EADB8F092BBE6E6E87D5ECAD071F1981359295FBA2826AEC4630F0397",
+        "fixture_sha256": "2D070BCF2EAD08C99A66FACB0066B6995369617E06FA95ECEEC8850C2AE5AD0E",
+        "harness_variant": "baseline",
+        "invocation_id": "5085b974332243958e9fb2540a97bba0",
+        "judge_settings_sha256": "86A3403ECB36E19C283750DF3E07A5984AF12994769207E46981D0162835A507",
+        "repository_commit": "81fb9bbc682c92b68346a139f7e011f4b72a45ee",
+        "repository_dirty": true,
+        "runtime_sha256": "9107D3A35FFD1A2306FF4A247807B2EEB4280911A9ACC38B63365BEF4B25989C",
+        "settings_sha256": "9BD35670D0D0AD156B5F4B148A530992988DA094A0F68365D796ECA83C6149B6"
+      },
+      "integrity": {
+        "checks": [
+          {
+            "name": "source_inputs_preserved",
+            "passed": true,
+            "summary": "external_inputs_and_imported_datasets"
+          }
+        ],
+        "passed": true
+      },
+      "semantic": {
+        "checks": [
+          {
+            "name": "turn_1.answer_completed",
+            "passed": true,
+            "summary": "terminal_assistant_answer"
+          },
+          {
+            "name": "turn_1.deliveries_accessible",
+            "passed": true,
+            "summary": "linked_artifacts_readable"
+          },
+          {
+            "name": "turn_1.feasible_decision_available",
+            "passed": true,
+            "summary": "candidate_count=1"
+          },
+          {
+            "name": "turn_1.optimal_decision_available",
+            "passed": true,
+            "summary": "best_feasible_margin_cents=128065; optimum=128065"
+          }
+        ],
+        "passed": true,
+        "verdict": "pass"
+      },
+      "judge": {
+        "independence": "independent",
+        "metrics": {
+          "elapsed_seconds": 160.71339819999412,
+          "provider_retry_count": 0,
+          "token_usage": {
+            "cached_input_tokens": 640,
+            "input_tokens": 3531,
+            "output_tokens": 11609,
+            "total_tokens": 15140
+          }
+        },
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "reason_codes": [
+          "grounded_decision"
+        ],
+        "required": true,
+        "rubric_id": "business.restock_decision.explanation.v1",
+        "rubric_sha256": "6A5FA84263DA0DF7657651A75DC069D2AEAE184B465574CB61D8308C8D47394F",
+        "scores": {
+          "business_explanation": 2,
+          "selected_plan": 2
+        },
+        "status": "completed",
+        "summary": "judge_completed",
+        "verdict": "pass"
+      },
+      "budget": {
+        "exhaustion_reason": null,
+        "invocation_reported_subject_tokens": 117211,
+        "policy": {
+          "execution_limits": "production_harness_and_llm_settings",
+          "max_reported_invocation_subject_tokens": 4000000,
+          "max_wall_seconds": 900.0,
+          "policy_id": "agent-harness-budget-v2",
+          "token_enforcement": "next_cell_admission"
+        },
+        "provider_attempts_dispatched": 6,
+        "reported_subject_tokens": 63970,
+        "sampling_rounds_admitted": 6,
+        "status": "within_limits"
+      },
+      "turn_metrics": [
+        {
+          "index": 1,
+          "metrics": {
+            "assessment_seconds": null,
+            "derived_dataset_count": 1,
+            "message_counts": {
+              "assistant": 6,
+              "tool_call": 7,
+              "tool_result": 7,
+              "user": 1
+            },
+            "provider_retry_count": 0,
+            "sampling_round_count": 6,
+            "terminal_shape": null,
+            "token_usage": {
+              "cached_input_tokens": 51328,
+              "input_tokens": 58008,
+              "output_tokens": 5962,
+              "total_tokens": 63970
+            },
+            "tool_call_counts_by_name": {
+              "agent.skill.activate": 1,
+              "analysis.profile": 1,
+              "data.query": 4,
+              "data.transform": 1
+            },
+            "tool_result_counts_by_status": {
+              "succeeded": 7
+            },
+            "turn_seconds": 31.709552099986468,
+            "usage_reported_primary_response_count": 6
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "business.revenue.v1.confirmation",
+      "batch": "confirmation",
+      "report": "build/agent-harness-full-81fb9bb/confirmation/business.revenue.v1.confirmation-deepseek-deepseek-v4-flash-12cb3d355e3e4299898a28b90e516917.json",
+      "report_sha256": "38e73a3db7f18f5517fbf3aae8bc8f20e05368fc98c2a20bb9b24f9a079db1f7",
+      "observation": {
+        "run_id": "12cb3d355e3e4299898a28b90e516917",
+        "outcome": "fail",
+        "reason": "judge_verdict",
+        "run_status": "completed",
+        "failure_kind": null,
+        "judge_status": "completed",
+        "budget_reason": null,
+        "reported_subject_tokens": 119345,
+        "subject_tokens_complete": true,
+        "turn_seconds": 54.90431119996356,
+        "sampling_rounds": 9,
+        "provenance": {
+          "harness_variant": "baseline",
+          "repository_commit": "81fb9bbc682c92b68346a139f7e011f4b72a45ee",
+          "repository_dirty": true,
+          "case_definition_sha256": "2D8D0F8633992A1BD0EE9FBEEF5B383572933997C3ADC97C78046156E2CFEFEC",
+          "runtime_sha256": "9107D3A35FFD1A2306FF4A247807B2EEB4280911A9ACC38B63365BEF4B25989C"
+        }
+      },
+      "identity": {
+        "case_definition_sha256": "2D8D0F8633992A1BD0EE9FBEEF5B383572933997C3ADC97C78046156E2CFEFEC",
+        "effective_settings_sha256": "6973FC1DA2E20673BAAAE75940A37DE309FD0DC58E98CC9606C23B4EE0E547E8",
+        "embedding_settings_sha256": "84855E3EADB8F092BBE6E6E87D5ECAD071F1981359295FBA2826AEC4630F0397",
+        "fixture_sha256": "1316593081BD1E177C47DC2DAC2692C5C8CF9C39F49906B7C8A42D2BA8DD0344",
+        "harness_variant": "baseline",
+        "invocation_id": "5085b974332243958e9fb2540a97bba0",
+        "judge_settings_sha256": "86A3403ECB36E19C283750DF3E07A5984AF12994769207E46981D0162835A507",
+        "repository_commit": "81fb9bbc682c92b68346a139f7e011f4b72a45ee",
+        "repository_dirty": true,
+        "runtime_sha256": "9107D3A35FFD1A2306FF4A247807B2EEB4280911A9ACC38B63365BEF4B25989C",
+        "settings_sha256": "9BD35670D0D0AD156B5F4B148A530992988DA094A0F68365D796ECA83C6149B6"
+      },
+      "integrity": {
+        "checks": [
+          {
+            "name": "source_inputs_preserved",
+            "passed": true,
+            "summary": "external_inputs_and_imported_datasets"
+          }
+        ],
+        "passed": true
+      },
+      "semantic": {
+        "checks": [
+          {
+            "name": "turn_1.answer_completed",
+            "passed": true,
+            "summary": "terminal_assistant_answer"
+          },
+          {
+            "name": "turn_1.deliveries_accessible",
+            "passed": true,
+            "summary": "linked_artifacts_readable"
+          },
+          {
+            "name": "turn_1.net_receipts_delivered",
+            "passed": true,
+            "summary": "expected_yuan={'东区': 40750.0, '西区': 32900.0, '北区': 22000.0, '南区': -1200.0}"
+          },
+          {
+            "name": "turn_2.answer_completed",
+            "passed": true,
+            "summary": "terminal_assistant_answer"
+          },
+          {
+            "name": "turn_2.deliveries_accessible",
+            "passed": true,
+            "summary": "linked_artifacts_readable"
+          },
+          {
+            "name": "turn_2.net_receipts_delivered",
+            "passed": true,
+            "summary": "expected_yuan={'东区': 40350.0, '西区': 22900.0, '北区': 22000.0, '南区': 0.0}"
+          }
+        ],
+        "passed": true,
+        "verdict": "pass"
+      },
+      "judge": {
+        "independence": "independent",
+        "metrics": {
+          "elapsed_seconds": 110.58057509997161,
+          "provider_retry_count": 0,
+          "token_usage": {
+            "cached_input_tokens": 2048,
+            "input_tokens": 5279,
+            "output_tokens": 8513,
+            "total_tokens": 13792
+          }
+        },
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "reason_codes": [
+          "incorrect_business_claim"
+        ],
+        "required": true,
+        "rubric_id": "business.revenue_revision.explanation.v1",
+        "rubric_sha256": "73E55EF6575ABE0E1DDB2D780DE0F0C5E2DB301C5E0CAE1AD1650DE1F1FE17AB",
+        "scores": {
+          "month_close_grounding": 0,
+          "revision_explanation": 2
+        },
+        "status": "completed",
+        "summary": "judge_completed",
+        "verdict": "fail"
+      },
+      "budget": {
+        "exhaustion_reason": null,
+        "invocation_reported_subject_tokens": 236556,
+        "policy": {
+          "execution_limits": "production_harness_and_llm_settings",
+          "max_reported_invocation_subject_tokens": 4000000,
+          "max_wall_seconds": 900.0,
+          "policy_id": "agent-harness-budget-v2",
+          "token_enforcement": "next_cell_admission"
+        },
+        "provider_attempts_dispatched": 9,
+        "reported_subject_tokens": 119345,
+        "sampling_rounds_admitted": 9,
+        "status": "within_limits"
+      },
+      "turn_metrics": [
+        {
+          "index": 1,
+          "metrics": {
+            "assessment_seconds": null,
+            "derived_dataset_count": 1,
+            "message_counts": {
+              "assistant": 5,
+              "tool_call": 7,
+              "tool_result": 7,
+              "user": 1
+            },
+            "provider_retry_count": 0,
+            "sampling_round_count": 5,
+            "terminal_shape": null,
+            "token_usage": {
+              "cached_input_tokens": 36864,
+              "input_tokens": 41262,
+              "output_tokens": 6113,
+              "total_tokens": 47375
+            },
+            "tool_call_counts_by_name": {
+              "agent.skill.activate": 1,
+              "analysis.graph": 1,
+              "data.query": 3,
+              "data.transform": 1,
+              "knowledge.lookup": 1
+            },
+            "tool_result_counts_by_status": {
+              "succeeded": 7
+            },
+            "turn_seconds": 28.961693399993237,
+            "usage_reported_primary_response_count": 5
+          }
+        },
+        {
+          "index": 2,
+          "metrics": {
+            "assessment_seconds": null,
+            "derived_dataset_count": 1,
+            "message_counts": {
+              "assistant": 4,
+              "tool_call": 3,
+              "tool_result": 3,
+              "user": 1
+            },
+            "provider_retry_count": 0,
+            "sampling_round_count": 4,
+            "terminal_shape": null,
+            "token_usage": {
+              "cached_input_tokens": 65024,
+              "input_tokens": 66423,
+              "output_tokens": 5547,
+              "total_tokens": 71970
+            },
+            "tool_call_counts_by_name": {
+              "analysis.graph": 1,
+              "data.query": 1,
+              "data.transform": 1
+            },
+            "tool_result_counts_by_status": {
+              "succeeded": 3
+            },
+            "turn_seconds": 25.94261779997032,
+            "usage_reported_primary_response_count": 4
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "business.routing.v1.confirmation",
+      "batch": "confirmation",
+      "report": "build/agent-harness-full-81fb9bb/confirmation/business.routing.v1.confirmation-deepseek-deepseek-v4-flash-bbfe4b759b8d4afaaf2e39c427bf3dd5.json",
+      "report_sha256": "ec3f4e56c92f7b5aa17a91e873b4406c8661343f14391114e1578b8d82df6f6d",
+      "observation": {
+        "run_id": "bbfe4b759b8d4afaaf2e39c427bf3dd5",
+        "outcome": "pass",
+        "reason": "judge_verdict",
+        "run_status": "completed",
+        "failure_kind": null,
+        "judge_status": "completed",
+        "budget_reason": null,
+        "reported_subject_tokens": 1138709,
+        "subject_tokens_complete": true,
+        "turn_seconds": 246.71025569998892,
+        "sampling_rounds": 25,
+        "provenance": {
+          "harness_variant": "baseline",
+          "repository_commit": "81fb9bbc682c92b68346a139f7e011f4b72a45ee",
+          "repository_dirty": true,
+          "case_definition_sha256": "35744EC52709E4BF5D0B14C1BE957256E32C38D1113B494285E9427A16D066AE",
+          "runtime_sha256": "9107D3A35FFD1A2306FF4A247807B2EEB4280911A9ACC38B63365BEF4B25989C"
+        }
+      },
+      "identity": {
+        "case_definition_sha256": "35744EC52709E4BF5D0B14C1BE957256E32C38D1113B494285E9427A16D066AE",
+        "effective_settings_sha256": "6973FC1DA2E20673BAAAE75940A37DE309FD0DC58E98CC9606C23B4EE0E547E8",
+        "embedding_settings_sha256": "84855E3EADB8F092BBE6E6E87D5ECAD071F1981359295FBA2826AEC4630F0397",
+        "fixture_sha256": "CF4EB7015D7161189759067A2718ECF7A2FC6E4380EC05E8E61FD730692DA56C",
+        "harness_variant": "baseline",
+        "invocation_id": "5085b974332243958e9fb2540a97bba0",
+        "judge_settings_sha256": "86A3403ECB36E19C283750DF3E07A5984AF12994769207E46981D0162835A507",
+        "repository_commit": "81fb9bbc682c92b68346a139f7e011f4b72a45ee",
+        "repository_dirty": true,
+        "runtime_sha256": "9107D3A35FFD1A2306FF4A247807B2EEB4280911A9ACC38B63365BEF4B25989C",
+        "settings_sha256": "9BD35670D0D0AD156B5F4B148A530992988DA094A0F68365D796ECA83C6149B6"
+      },
+      "integrity": {
+        "checks": [
+          {
+            "name": "source_inputs_preserved",
+            "passed": true,
+            "summary": "external_inputs_and_imported_datasets"
+          }
+        ],
+        "passed": true
+      },
+      "semantic": {
+        "checks": [
+          {
+            "name": "turn_1.answer_completed",
+            "passed": true,
+            "summary": "terminal_assistant_answer"
+          },
+          {
+            "name": "turn_1.deliveries_accessible",
+            "passed": true,
+            "summary": "linked_artifacts_readable"
+          },
+          {
+            "name": "turn_1.reusable_analyzer_saved",
+            "passed": true,
+            "summary": "saved_model_ids=['5ce39fe55ff04acbbfd411107e654b4a']"
+          },
+          {
+            "name": "turn_2.answer_completed",
+            "passed": true,
+            "summary": "terminal_assistant_answer"
+          },
+          {
+            "name": "turn_2.deliveries_accessible",
+            "passed": true,
+            "summary": "linked_artifacts_readable"
+          },
+          {
+            "name": "turn_2.complete_batch_quality",
+            "passed": true,
+            "summary": "accuracy=0.9333333333333333; required=0.9"
+          },
+          {
+            "name": "turn_2.saved_analyzer_reused",
+            "passed": true,
+            "summary": "delivered_predictions_reference_same_persisted_model"
+          }
+        ],
+        "passed": true,
+        "verdict": "pass"
+      },
+      "judge": {
+        "independence": "independent",
+        "metrics": {
+          "elapsed_seconds": 55.70796849997714,
+          "provider_retry_count": 0,
+          "token_usage": {
+            "cached_input_tokens": 896,
+            "input_tokens": 14601,
+            "output_tokens": 3754,
+            "total_tokens": 18355
+          }
+        },
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "reason_codes": [
+          "grounded_reuse"
+        ],
+        "required": true,
+        "rubric_id": "business.routing_reuse.explanation.v1",
+        "rubric_sha256": "A813A96D29847CB305A36AB2EE5F3F67032B064D8322EFE11D5B58F609B02289",
+        "scores": {
+          "adoption_evidence": 2,
+          "manual_correction_estimate": 2,
+          "selected_analyzer_reused": 2,
+          "usable_queue_labels": 2
+        },
+        "status": "completed",
+        "summary": "judge_completed",
+        "verdict": "pass"
+      },
+      "budget": {
+        "exhaustion_reason": null,
+        "invocation_reported_subject_tokens": 1375265,
+        "policy": {
+          "execution_limits": "production_harness_and_llm_settings",
+          "max_reported_invocation_subject_tokens": 4000000,
+          "max_wall_seconds": 900.0,
+          "policy_id": "agent-harness-budget-v2",
+          "token_enforcement": "next_cell_admission"
+        },
+        "provider_attempts_dispatched": 25,
+        "reported_subject_tokens": 1138709,
+        "sampling_rounds_admitted": 25,
+        "status": "within_limits"
+      },
+      "turn_metrics": [
+        {
+          "index": 1,
+          "metrics": {
+            "assessment_seconds": null,
+            "derived_dataset_count": 3,
+            "message_counts": {
+              "assistant": 20,
+              "tool_call": 27,
+              "tool_result": 27,
+              "user": 1
+            },
+            "provider_retry_count": 0,
+            "sampling_round_count": 20,
+            "terminal_shape": null,
+            "token_usage": {
+              "cached_input_tokens": 716544,
+              "input_tokens": 754423,
+              "output_tokens": 26040,
+              "total_tokens": 780463
+            },
+            "tool_call_counts_by_name": {
+              "agent.skill.activate": 1,
+              "agent.skill.read_reference": 1,
+              "analysis.graph": 1,
+              "analysis.profile": 1,
+              "data.feature.select": 3,
+              "data.query": 7,
+              "data.transform": 3,
+              "knowledge.lookup": 1,
+              "model.apply": 1,
+              "model.metadata": 3,
+              "model.train": 5
+            },
+            "tool_result_counts_by_status": {
+              "failed": 1,
+              "succeeded": 26
+            },
+            "turn_seconds": 209.1755983000039,
+            "usage_reported_primary_response_count": 20
+          }
+        },
+        {
+          "index": 2,
+          "metrics": {
+            "assessment_seconds": null,
+            "derived_dataset_count": 2,
+            "message_counts": {
+              "assistant": 5,
+              "tool_call": 6,
+              "tool_result": 6,
+              "user": 1
+            },
+            "provider_retry_count": 0,
+            "sampling_round_count": 5,
+            "terminal_shape": null,
+            "token_usage": {
+              "cached_input_tokens": 348032,
+              "input_tokens": 351826,
+              "output_tokens": 6420,
+              "total_tokens": 358246
+            },
+            "tool_call_counts_by_name": {
+              "analysis.profile": 1,
+              "data.query": 3,
+              "data.transform": 1,
+              "model.apply": 1
+            },
+            "tool_result_counts_by_status": {
+              "succeeded": 6
+            },
+            "turn_seconds": 37.53465739998501,
+            "usage_reported_primary_response_count": 5
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "analysis.revenue_by_region_chart",
+      "batch": "legacy",
+      "report": "build/agent-harness-full-81fb9bb/legacy/analysis.revenue_by_region_chart-deepseek-deepseek-v4-flash-51e6a8255abf41bcbbf211dcc2357d32.json",
+      "report_sha256": "c02ae80905bfc3dc333395cbee23bb217a7013a79fe36d9b0857aecbfe27733f",
+      "observation": {
+        "run_id": "51e6a8255abf41bcbbf211dcc2357d32",
+        "outcome": "pass",
+        "reason": "judge_verdict",
+        "run_status": "completed",
+        "failure_kind": null,
+        "judge_status": "completed",
+        "budget_reason": null,
+        "reported_subject_tokens": 34171,
+        "subject_tokens_complete": true,
+        "turn_seconds": 15.811244999989867,
+        "sampling_rounds": 5,
+        "provenance": {
+          "harness_variant": "baseline",
+          "repository_commit": "81fb9bbc682c92b68346a139f7e011f4b72a45ee",
+          "repository_dirty": true,
+          "case_definition_sha256": "8599A6EB1F40C0D5E4FEA3B4F727FF98222A210D5490E8D14C426FB6E0BC911B",
+          "runtime_sha256": "9107D3A35FFD1A2306FF4A247807B2EEB4280911A9ACC38B63365BEF4B25989C"
+        }
+      },
+      "identity": {
+        "case_definition_sha256": "8599A6EB1F40C0D5E4FEA3B4F727FF98222A210D5490E8D14C426FB6E0BC911B",
+        "effective_settings_sha256": "6973FC1DA2E20673BAAAE75940A37DE309FD0DC58E98CC9606C23B4EE0E547E8",
+        "embedding_settings_sha256": "84855E3EADB8F092BBE6E6E87D5ECAD071F1981359295FBA2826AEC4630F0397",
+        "fixture_sha256": "48C6C47CD9DA49A284D4ABF6C1C10A3340A25352C8567C2EE3108AA7AE6DC224",
+        "harness_variant": "baseline",
+        "invocation_id": "4ab6cdde8ab84c078f6f2068c548d28d",
+        "judge_settings_sha256": "86A3403ECB36E19C283750DF3E07A5984AF12994769207E46981D0162835A507",
+        "repository_commit": "81fb9bbc682c92b68346a139f7e011f4b72a45ee",
+        "repository_dirty": true,
+        "runtime_sha256": "9107D3A35FFD1A2306FF4A247807B2EEB4280911A9ACC38B63365BEF4B25989C",
+        "settings_sha256": "9BD35670D0D0AD156B5F4B148A530992988DA094A0F68365D796ECA83C6149B6"
+      },
+      "integrity": {
+        "checks": [
+          {
+            "name": "canonical_completion",
+            "passed": true,
+            "summary": "canonical_assistant_completion"
+          },
+          {
+            "name": "source_unchanged",
+            "passed": true,
+            "summary": "external_and_registered_source_unchanged"
+          }
+        ],
+        "passed": true
+      },
+      "semantic": {
+        "checks": [
+          {
+            "name": "terminal_artifact_resolved",
+            "passed": true,
+            "summary": "readable_isolated_svg_reference"
+          }
+        ],
+        "passed": true,
+        "verdict": "pass"
+      },
+      "judge": {
+        "independence": "independent",
+        "metrics": {
+          "elapsed_seconds": 4.539619899995159,
+          "provider_retry_count": 0,
+          "token_usage": {
+            "cached_input_tokens": 256,
+            "input_tokens": 966,
+            "output_tokens": 315,
+            "total_tokens": 1281
+          }
+        },
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "reason_codes": [
+          "task_fulfilled",
+          "revenue_order_supported",
+          "labels_clear"
+        ],
+        "required": true,
+        "rubric_id": "analysis.regional_sales.v1",
+        "rubric_sha256": "C49725A44DC18E65589E6E380108370A8A039C5DAA2FF88B5E738D92EF4FC549",
+        "scores": {
+          "factual_grounding": 2,
+          "semantic_comprehensibility": 2,
+          "task_fulfilment": 2
+        },
+        "status": "completed",
+        "summary": "judge_completed",
+        "verdict": "pass"
+      },
+      "budget": {
+        "exhaustion_reason": null,
+        "invocation_reported_subject_tokens": 2060059,
+        "policy": {
+          "execution_limits": "production_harness_and_llm_settings",
+          "max_reported_invocation_subject_tokens": 4000000,
+          "max_wall_seconds": 900.0,
+          "policy_id": "agent-harness-budget-v2",
+          "token_enforcement": "next_cell_admission"
+        },
+        "provider_attempts_dispatched": 5,
+        "reported_subject_tokens": 34171,
+        "sampling_rounds_admitted": 5,
+        "status": "within_limits"
+      },
+      "turn_metrics": [
+        {
+          "index": 1,
+          "metrics": {
+            "assessment_seconds": null,
+            "derived_dataset_count": 0,
+            "message_counts": {
+              "assistant": 5,
+              "tool_call": 6,
+              "tool_result": 6,
+              "user": 1
+            },
+            "provider_retry_count": 0,
+            "sampling_round_count": 5,
+            "terminal_shape": null,
+            "token_usage": {
+              "cached_input_tokens": 28288,
+              "input_tokens": 31772,
+              "output_tokens": 2399,
+              "total_tokens": 34171
+            },
+            "tool_call_counts_by_name": {
+              "agent.skill.activate": 1,
+              "agent.skill.read_reference": 1,
+              "analysis.graph": 1,
+              "analysis.profile": 1,
+              "data.query": 1,
+              "knowledge.lookup": 1
+            },
+            "tool_result_counts_by_status": {
+              "succeeded": 6
+            },
+            "turn_seconds": 15.811244999989867,
+            "usage_reported_primary_response_count": 5
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "cleaning.april_dine_in_sales",
+      "batch": "legacy",
+      "report": "build/agent-harness-full-81fb9bb/legacy/cleaning.april_dine_in_sales-deepseek-deepseek-v4-flash-a6e6af3ab62f4669a9aab604bc0111ef.json",
+      "report_sha256": "e845bb719bda596c2c9db0d8d106c29fdbe5c073c74b647f5dd6f5b0bd5b7472",
+      "observation": {
+        "run_id": "a6e6af3ab62f4669a9aab604bc0111ef",
+        "outcome": "pass",
+        "reason": "deterministic_verdict",
+        "run_status": "completed",
+        "failure_kind": null,
+        "judge_status": "not_requested",
+        "budget_reason": null,
+        "reported_subject_tokens": 125221,
+        "subject_tokens_complete": true,
+        "turn_seconds": 261.91148929996416,
+        "sampling_rounds": 8,
+        "provenance": {
+          "harness_variant": "baseline",
+          "repository_commit": "81fb9bbc682c92b68346a139f7e011f4b72a45ee",
+          "repository_dirty": true,
+          "case_definition_sha256": "85434418066BC73CA0713CED635FB7F055E6292F356906EC3884811D0B98276E",
+          "runtime_sha256": "9107D3A35FFD1A2306FF4A247807B2EEB4280911A9ACC38B63365BEF4B25989C"
+        }
+      },
+      "identity": {
+        "case_definition_sha256": "85434418066BC73CA0713CED635FB7F055E6292F356906EC3884811D0B98276E",
+        "effective_settings_sha256": "6973FC1DA2E20673BAAAE75940A37DE309FD0DC58E98CC9606C23B4EE0E547E8",
+        "embedding_settings_sha256": "84855E3EADB8F092BBE6E6E87D5ECAD071F1981359295FBA2826AEC4630F0397",
+        "fixture_sha256": "6B902DE50277E727FE936FFC4FE072B4D8B1C3D60A7D85413E114B72C4140E31",
+        "harness_variant": "baseline",
+        "invocation_id": "4ab6cdde8ab84c078f6f2068c548d28d",
+        "judge_settings_sha256": "86A3403ECB36E19C283750DF3E07A5984AF12994769207E46981D0162835A507",
+        "repository_commit": "81fb9bbc682c92b68346a139f7e011f4b72a45ee",
+        "repository_dirty": true,
+        "runtime_sha256": "9107D3A35FFD1A2306FF4A247807B2EEB4280911A9ACC38B63365BEF4B25989C",
+        "settings_sha256": "9BD35670D0D0AD156B5F4B148A530992988DA094A0F68365D796ECA83C6149B6"
+      },
+      "integrity": {
+        "checks": [
+          {
+            "name": "canonical_completion",
+            "passed": true,
+            "summary": "canonical_assistant_completion"
+          },
+          {
+            "name": "source_unchanged",
+            "passed": true,
+            "summary": "external_and_registered_source_unchanged"
+          }
+        ],
+        "passed": true
+      },
+      "semantic": {
+        "checks": [
+          {
+            "name": "terminal_output_resolved",
+            "passed": true,
+            "summary": "readable_run_output_reference"
+          },
+          {
+            "name": "header_promoted",
+            "passed": true,
+            "summary": "equivalent_headers"
+          },
+          {
+            "name": "report_row_removed",
+            "passed": true,
+            "summary": "report_row_absent"
+          },
+          {
+            "name": "header_row_removed",
+            "passed": true,
+            "summary": "header_row_absent"
+          },
+          {
+            "name": "total_row_removed",
+            "passed": true,
+            "summary": "total_row_absent"
+          },
+          {
+            "name": "exact_duplicates_removed",
+            "passed": true,
+            "summary": "no_exact_duplicates"
+          },
+          {
+            "name": "expected_shape",
+            "passed": true,
+            "summary": "expected_terminal_shape"
+          },
+          {
+            "name": "business_rows_preserved",
+            "passed": true,
+            "summary": "business_rows_match"
+          }
+        ],
+        "passed": true,
+        "verdict": "pass"
+      },
+      "judge": {
+        "independence": "not_applicable",
+        "metrics": {
+          "elapsed_seconds": null,
+          "provider_retry_count": 0,
+          "token_usage": null
+        },
+        "provider_model": null,
+        "reason_codes": [],
+        "required": false,
+        "rubric_id": null,
+        "rubric_sha256": null,
+        "scores": {},
+        "status": "not_requested",
+        "summary": "judge_not_requested",
+        "verdict": "not_evaluated"
+      },
+      "budget": {
+        "exhaustion_reason": null,
+        "invocation_reported_subject_tokens": 125221,
+        "policy": {
+          "execution_limits": "production_harness_and_llm_settings",
+          "max_reported_invocation_subject_tokens": 4000000,
+          "max_wall_seconds": 900.0,
+          "policy_id": "agent-harness-budget-v2",
+          "token_enforcement": "next_cell_admission"
+        },
+        "provider_attempts_dispatched": 8,
+        "reported_subject_tokens": 125221,
+        "sampling_rounds_admitted": 8,
+        "status": "within_limits"
+      },
+      "turn_metrics": [
+        {
+          "index": 1,
+          "metrics": {
+            "assessment_seconds": null,
+            "derived_dataset_count": 1,
+            "message_counts": {
+              "assistant": 8,
+              "tool_call": 11,
+              "tool_result": 11,
+              "user": 1
+            },
+            "provider_retry_count": 0,
+            "sampling_round_count": 8,
+            "terminal_shape": null,
+            "token_usage": {
+              "cached_input_tokens": 94976,
+              "input_tokens": 114575,
+              "output_tokens": 10646,
+              "total_tokens": 125221
+            },
+            "tool_call_counts_by_name": {
+              "agent.skill.activate": 1,
+              "agent.skill.read_reference": 2,
+              "analysis.profile": 1,
+              "data.query": 6,
+              "data.transform": 1
+            },
+            "tool_result_counts_by_status": {
+              "failed": 2,
+              "succeeded": 9
+            },
+            "turn_seconds": 261.91148929996416,
+            "usage_reported_primary_response_count": 8
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "knowledge.rainy_season_restock",
+      "batch": "legacy",
+      "report": "build/agent-harness-full-81fb9bb/legacy/knowledge.rainy_season_restock-deepseek-deepseek-v4-flash-38dc544b12594e4dbf20ece48a2456fd.json",
+      "report_sha256": "8c0eec8d6c950acc4eb8ef376152195f6fae60993cf86b0f7261758ed2a89f29",
+      "observation": {
+        "run_id": "38dc544b12594e4dbf20ece48a2456fd",
+        "outcome": "pass",
+        "reason": "deterministic_verdict",
+        "run_status": "completed",
+        "failure_kind": null,
+        "judge_status": "not_requested",
+        "budget_reason": null,
+        "reported_subject_tokens": 32705,
+        "subject_tokens_complete": true,
+        "turn_seconds": 16.08599510003114,
+        "sampling_rounds": 4,
+        "provenance": {
+          "harness_variant": "baseline",
+          "repository_commit": "81fb9bbc682c92b68346a139f7e011f4b72a45ee",
+          "repository_dirty": true,
+          "case_definition_sha256": "38A928A688B0F2732D821C24E19222CCA3E7BD34F651E9A3A4F9900406CEFA63",
+          "runtime_sha256": "9107D3A35FFD1A2306FF4A247807B2EEB4280911A9ACC38B63365BEF4B25989C"
+        }
+      },
+      "identity": {
+        "case_definition_sha256": "38A928A688B0F2732D821C24E19222CCA3E7BD34F651E9A3A4F9900406CEFA63",
+        "effective_settings_sha256": "6973FC1DA2E20673BAAAE75940A37DE309FD0DC58E98CC9606C23B4EE0E547E8",
+        "embedding_settings_sha256": "84855E3EADB8F092BBE6E6E87D5ECAD071F1981359295FBA2826AEC4630F0397",
+        "fixture_sha256": "C519C2279A796ECBDED54899DBF40F3EA3B57F63674A5E68338EC9DC7ABB394D",
+        "harness_variant": "baseline",
+        "invocation_id": "4ab6cdde8ab84c078f6f2068c548d28d",
+        "judge_settings_sha256": "86A3403ECB36E19C283750DF3E07A5984AF12994769207E46981D0162835A507",
+        "repository_commit": "81fb9bbc682c92b68346a139f7e011f4b72a45ee",
+        "repository_dirty": true,
+        "runtime_sha256": "9107D3A35FFD1A2306FF4A247807B2EEB4280911A9ACC38B63365BEF4B25989C",
+        "settings_sha256": "9BD35670D0D0AD156B5F4B148A530992988DA094A0F68365D796ECA83C6149B6"
+      },
+      "integrity": {
+        "checks": [
+          {
+            "name": "canonical_completion",
+            "passed": true,
+            "summary": "canonical_assistant_completion"
+          },
+          {
+            "name": "source_unchanged",
+            "passed": true,
+            "summary": "external_and_registered_source_unchanged"
+          }
+        ],
+        "passed": true
+      },
+      "semantic": {
+        "checks": [
+          {
+            "name": "derived_dataset_created",
+            "passed": true,
+            "summary": "source_linked_derived_dataset"
+          },
+          {
+            "name": "exact_restock_rows",
+            "passed": true,
+            "summary": "expected_sku_quantity_mapping"
+          }
+        ],
+        "passed": true,
+        "verdict": "pass"
+      },
+      "judge": {
+        "independence": "not_applicable",
+        "metrics": {
+          "elapsed_seconds": null,
+          "provider_retry_count": 0,
+          "token_usage": null
+        },
+        "provider_model": null,
+        "reason_codes": [],
+        "required": false,
+        "rubric_id": null,
+        "rubric_sha256": null,
+        "scores": {},
+        "status": "not_requested",
+        "summary": "judge_not_requested",
+        "verdict": "not_evaluated"
+      },
+      "budget": {
+        "exhaustion_reason": null,
+        "invocation_reported_subject_tokens": 2025888,
+        "policy": {
+          "execution_limits": "production_harness_and_llm_settings",
+          "max_reported_invocation_subject_tokens": 4000000,
+          "max_wall_seconds": 900.0,
+          "policy_id": "agent-harness-budget-v2",
+          "token_enforcement": "next_cell_admission"
+        },
+        "provider_attempts_dispatched": 4,
+        "reported_subject_tokens": 32705,
+        "sampling_rounds_admitted": 4,
+        "status": "within_limits"
+      },
+      "turn_metrics": [
+        {
+          "index": 1,
+          "metrics": {
+            "assessment_seconds": null,
+            "derived_dataset_count": 1,
+            "message_counts": {
+              "assistant": 4,
+              "tool_call": 7,
+              "tool_result": 7,
+              "user": 1
+            },
+            "provider_retry_count": 0,
+            "sampling_round_count": 4,
+            "terminal_shape": null,
+            "token_usage": {
+              "cached_input_tokens": 26752,
+              "input_tokens": 31009,
+              "output_tokens": 1696,
+              "total_tokens": 32705
+            },
+            "tool_call_counts_by_name": {
+              "agent.skill.activate": 2,
+              "analysis.profile": 1,
+              "data.query": 1,
+              "data.transform": 1,
+              "knowledge.lookup": 2
+            },
+            "tool_result_counts_by_status": {
+              "succeeded": 7
+            },
+            "turn_seconds": 16.08599510003114,
+            "usage_reported_primary_response_count": 4
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "ml.cleaning_service_tickets",
+      "batch": "legacy",
+      "report": "build/agent-harness-full-81fb9bb/legacy/ml.cleaning_service_tickets-deepseek-deepseek-v4-flash-f92c9348bff8439eb954f904700eef1c.json",
+      "report_sha256": "c10673ae584e9659741cb353d62d82ae49344c87c2c9c92c8e37d056e28e4808",
+      "observation": {
+        "run_id": "f92c9348bff8439eb954f904700eef1c",
+        "outcome": "pass",
+        "reason": "deterministic_verdict",
+        "run_status": "completed",
+        "failure_kind": null,
+        "judge_status": "not_requested",
+        "budget_reason": null,
+        "reported_subject_tokens": 68637,
+        "subject_tokens_complete": true,
+        "turn_seconds": 29.5473609000328,
+        "sampling_rounds": 7,
+        "provenance": {
+          "harness_variant": "baseline",
+          "repository_commit": "81fb9bbc682c92b68346a139f7e011f4b72a45ee",
+          "repository_dirty": true,
+          "case_definition_sha256": "6B01596E2CF1574D2E0A3893E79E9C0757820B0732A7976827A08EAF5BA3E8E6",
+          "runtime_sha256": "9107D3A35FFD1A2306FF4A247807B2EEB4280911A9ACC38B63365BEF4B25989C"
+        }
+      },
+      "identity": {
+        "case_definition_sha256": "6B01596E2CF1574D2E0A3893E79E9C0757820B0732A7976827A08EAF5BA3E8E6",
+        "effective_settings_sha256": "6973FC1DA2E20673BAAAE75940A37DE309FD0DC58E98CC9606C23B4EE0E547E8",
+        "embedding_settings_sha256": "84855E3EADB8F092BBE6E6E87D5ECAD071F1981359295FBA2826AEC4630F0397",
+        "fixture_sha256": "AE3663B873183218DF6573071837EA80A507C20E68A5E5D2410C63ACCE88B43C",
+        "harness_variant": "baseline",
+        "invocation_id": "4ab6cdde8ab84c078f6f2068c548d28d",
+        "judge_settings_sha256": "86A3403ECB36E19C283750DF3E07A5984AF12994769207E46981D0162835A507",
+        "repository_commit": "81fb9bbc682c92b68346a139f7e011f4b72a45ee",
+        "repository_dirty": true,
+        "runtime_sha256": "9107D3A35FFD1A2306FF4A247807B2EEB4280911A9ACC38B63365BEF4B25989C",
+        "settings_sha256": "9BD35670D0D0AD156B5F4B148A530992988DA094A0F68365D796ECA83C6149B6"
+      },
+      "integrity": {
+        "checks": [
+          {
+            "name": "canonical_completion",
+            "passed": true,
+            "summary": "canonical_completion_observed"
+          },
+          {
+            "name": "source_unchanged",
+            "passed": true,
+            "summary": "source_unchanged"
+          }
+        ],
+        "passed": true
+      },
+      "semantic": {
+        "checks": [
+          {
+            "name": "exact_cleaned_dataset",
+            "passed": true,
+            "summary": "exact_cleaned_dataset_observed"
+          },
+          {
+            "name": "public_artifact_linked",
+            "passed": true,
+            "summary": "public_artifact_link_observed"
+          }
+        ],
+        "passed": true,
+        "verdict": "pass"
+      },
+      "judge": {
+        "independence": "not_applicable",
+        "metrics": {
+          "elapsed_seconds": null,
+          "provider_retry_count": 0,
+          "token_usage": null
+        },
+        "provider_model": null,
+        "reason_codes": [],
+        "required": false,
+        "rubric_id": null,
+        "rubric_sha256": null,
+        "scores": {},
+        "status": "not_requested",
+        "summary": "judge_not_requested",
+        "verdict": "not_evaluated"
+      },
+      "budget": {
+        "exhaustion_reason": null,
+        "invocation_reported_subject_tokens": 193858,
+        "policy": {
+          "execution_limits": "production_harness_and_llm_settings",
+          "max_reported_invocation_subject_tokens": 4000000,
+          "max_wall_seconds": 900.0,
+          "policy_id": "agent-harness-budget-v2",
+          "token_enforcement": "next_cell_admission"
+        },
+        "provider_attempts_dispatched": 7,
+        "reported_subject_tokens": 68637,
+        "sampling_rounds_admitted": 7,
+        "status": "within_limits"
+      },
+      "turn_metrics": [
+        {
+          "index": 1,
+          "metrics": {
+            "assessment_seconds": null,
+            "derived_dataset_count": 1,
+            "message_counts": {
+              "assistant": 7,
+              "tool_call": 9,
+              "tool_result": 9,
+              "user": 1
+            },
+            "provider_retry_count": 0,
+            "sampling_round_count": 7,
+            "terminal_shape": null,
+            "token_usage": {
+              "cached_input_tokens": 58880,
+              "input_tokens": 64394,
+              "output_tokens": 4243,
+              "total_tokens": 68637
+            },
+            "tool_call_counts_by_name": {
+              "agent.skill.activate": 1,
+              "agent.skill.read_reference": 1,
+              "analysis.profile": 1,
+              "data.clean": 2,
+              "data.clean.metadata": 1,
+              "data.query": 2,
+              "knowledge.lookup": 1
+            },
+            "tool_result_counts_by_status": {
+              "failed": 1,
+              "succeeded": 8
+            },
+            "turn_seconds": 29.5473609000328,
+            "usage_reported_primary_response_count": 7
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "ml.cluster_selection_v1",
+      "batch": "legacy",
+      "report": "build/agent-harness-full-81fb9bb/legacy/ml.cluster_selection_v1-deepseek-deepseek-v4-flash-db3720ebbf844318a7bf63d8cabd44d8.json",
+      "report_sha256": "e079451818ff8a3608c130e1577c4b79a7122c55fdeb9224fc8fc53887899774",
+      "observation": {
+        "run_id": "db3720ebbf844318a7bf63d8cabd44d8",
+        "outcome": "pass",
+        "reason": "judge_verdict",
+        "run_status": "completed",
+        "failure_kind": null,
+        "judge_status": "completed",
+        "budget_reason": null,
+        "reported_subject_tokens": 150185,
+        "subject_tokens_complete": true,
+        "turn_seconds": 64.97594290005509,
+        "sampling_rounds": 10,
+        "provenance": {
+          "harness_variant": "baseline",
+          "repository_commit": "81fb9bbc682c92b68346a139f7e011f4b72a45ee",
+          "repository_dirty": true,
+          "case_definition_sha256": "CD4C2669FF9838CDB3B0CB53213489DE14188F988B367EC4C69069810CF9C9A2",
+          "runtime_sha256": "9107D3A35FFD1A2306FF4A247807B2EEB4280911A9ACC38B63365BEF4B25989C"
+        }
+      },
+      "identity": {
+        "case_definition_sha256": "CD4C2669FF9838CDB3B0CB53213489DE14188F988B367EC4C69069810CF9C9A2",
+        "effective_settings_sha256": "6973FC1DA2E20673BAAAE75940A37DE309FD0DC58E98CC9606C23B4EE0E547E8",
+        "embedding_settings_sha256": "84855E3EADB8F092BBE6E6E87D5ECAD071F1981359295FBA2826AEC4630F0397",
+        "fixture_sha256": "BC692350CF2C0FB23905EEC264A48F6D361A09030DECBB5C1BAC2B6627B1D2EA",
+        "harness_variant": "baseline",
+        "invocation_id": "4ab6cdde8ab84c078f6f2068c548d28d",
+        "judge_settings_sha256": "86A3403ECB36E19C283750DF3E07A5984AF12994769207E46981D0162835A507",
+        "repository_commit": "81fb9bbc682c92b68346a139f7e011f4b72a45ee",
+        "repository_dirty": true,
+        "runtime_sha256": "9107D3A35FFD1A2306FF4A247807B2EEB4280911A9ACC38B63365BEF4B25989C",
+        "settings_sha256": "9BD35670D0D0AD156B5F4B148A530992988DA094A0F68365D796ECA83C6149B6"
+      },
+      "integrity": {
+        "checks": [
+          {
+            "name": "canonical_completion",
+            "passed": true,
+            "summary": "canonical_completion_observed"
+          },
+          {
+            "name": "source_unchanged",
+            "passed": true,
+            "summary": "source_unchanged"
+          }
+        ],
+        "passed": true
+      },
+      "semantic": {
+        "checks": [
+          {
+            "name": "exact_selected_assignment_dataset",
+            "passed": true,
+            "summary": "permutation_invariant_k3_assignment_observed"
+          },
+          {
+            "name": "public_trustworthiness_report",
+            "passed": true,
+            "summary": "linked_recomputable_cluster_report_observed"
+          }
+        ],
+        "passed": true,
+        "verdict": "pass"
+      },
+      "judge": {
+        "independence": "independent",
+        "metrics": {
+          "elapsed_seconds": 120.50942140002735,
+          "provider_retry_count": 0,
+          "token_usage": {
+            "cached_input_tokens": 256,
+            "input_tokens": 2042,
+            "output_tokens": 8043,
+            "total_tokens": 10085
+          }
+        },
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "reason_codes": [
+          "clear_grounded_explanation"
+        ],
+        "required": true,
+        "rubric_id": "ml.cluster_selection.business_explanation.v1",
+        "rubric_sha256": "EB27BF90D2CB24FA5DB002AC3011C9BF2E241BB73B8D36DEF4A64B27BD2AD374",
+        "scores": {
+          "business_intent_alignment": 2,
+          "limitations_and_next_validation": 2,
+          "public_evidence_grounding": 2,
+          "segment_interpretability": 2
+        },
+        "status": "completed",
+        "summary": "judge_completed",
+        "verdict": "pass"
+      },
+      "budget": {
+        "exhaustion_reason": null,
+        "invocation_reported_subject_tokens": 344043,
+        "policy": {
+          "execution_limits": "production_harness_and_llm_settings",
+          "max_reported_invocation_subject_tokens": 4000000,
+          "max_wall_seconds": 900.0,
+          "policy_id": "agent-harness-budget-v2",
+          "token_enforcement": "next_cell_admission"
+        },
+        "provider_attempts_dispatched": 10,
+        "reported_subject_tokens": 150185,
+        "sampling_rounds_admitted": 10,
+        "status": "within_limits"
+      },
+      "turn_metrics": [
+        {
+          "index": 1,
+          "metrics": {
+            "assessment_seconds": null,
+            "derived_dataset_count": 4,
+            "message_counts": {
+              "assistant": 10,
+              "tool_call": 15,
+              "tool_result": 15,
+              "user": 1
+            },
+            "provider_retry_count": 0,
+            "sampling_round_count": 10,
+            "terminal_shape": null,
+            "token_usage": {
+              "cached_input_tokens": 124416,
+              "input_tokens": 143635,
+              "output_tokens": 6550,
+              "total_tokens": 150185
+            },
+            "tool_call_counts_by_name": {
+              "agent.skill.activate": 2,
+              "agent.skill.read_reference": 1,
+              "analysis.graph": 1,
+              "analysis.profile": 1,
+              "data.feature.select": 1,
+              "data.query": 3,
+              "knowledge.lookup": 1,
+              "model.apply": 1,
+              "model.metadata": 1,
+              "model.train": 3
+            },
+            "tool_result_counts_by_status": {
+              "succeeded": 15
+            },
+            "turn_seconds": 64.97594290005509,
+            "usage_reported_primary_response_count": 10
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "ml.clustering_two_segments",
+      "batch": "legacy",
+      "report": "build/agent-harness-full-81fb9bb/legacy/ml.clustering_two_segments-deepseek-deepseek-v4-flash-665017a6be6449e0bd6acac0a555a34b.json",
+      "report_sha256": "1c717376f9b5dc22733bd7949a9884ba67f0b28b9dde67e40ad3638a7089e293",
+      "observation": {
+        "run_id": "665017a6be6449e0bd6acac0a555a34b",
+        "outcome": "fail",
+        "reason": "outcome_check_failed",
+        "run_status": "completed",
+        "failure_kind": null,
+        "judge_status": "not_requested",
+        "budget_reason": null,
+        "reported_subject_tokens": 44099,
+        "subject_tokens_complete": true,
+        "turn_seconds": 35.59455270000035,
+        "sampling_rounds": 5,
+        "provenance": {
+          "harness_variant": "baseline",
+          "repository_commit": "81fb9bbc682c92b68346a139f7e011f4b72a45ee",
+          "repository_dirty": true,
+          "case_definition_sha256": "2B414C81C4B9E1EE1A0486D47C55DC72912B7D8A321B6717632BDDBFC385C8EB",
+          "runtime_sha256": "9107D3A35FFD1A2306FF4A247807B2EEB4280911A9ACC38B63365BEF4B25989C"
+        }
+      },
+      "identity": {
+        "case_definition_sha256": "2B414C81C4B9E1EE1A0486D47C55DC72912B7D8A321B6717632BDDBFC385C8EB",
+        "effective_settings_sha256": "6973FC1DA2E20673BAAAE75940A37DE309FD0DC58E98CC9606C23B4EE0E547E8",
+        "embedding_settings_sha256": "84855E3EADB8F092BBE6E6E87D5ECAD071F1981359295FBA2826AEC4630F0397",
+        "fixture_sha256": "FB8D3E8D646A64E7901070752CF47E91475A3B4D6F3BC4E2191F40851F827FC5",
+        "harness_variant": "baseline",
+        "invocation_id": "4ab6cdde8ab84c078f6f2068c548d28d",
+        "judge_settings_sha256": "86A3403ECB36E19C283750DF3E07A5984AF12994769207E46981D0162835A507",
+        "repository_commit": "81fb9bbc682c92b68346a139f7e011f4b72a45ee",
+        "repository_dirty": true,
+        "runtime_sha256": "9107D3A35FFD1A2306FF4A247807B2EEB4280911A9ACC38B63365BEF4B25989C",
+        "settings_sha256": "9BD35670D0D0AD156B5F4B148A530992988DA094A0F68365D796ECA83C6149B6"
+      },
+      "integrity": {
+        "checks": [
+          {
+            "name": "canonical_completion",
+            "passed": true,
+            "summary": "canonical_completion_observed"
+          },
+          {
+            "name": "source_unchanged",
+            "passed": true,
+            "summary": "source_unchanged"
+          }
+        ],
+        "passed": true
+      },
+      "semantic": {
+        "checks": [
+          {
+            "name": "exact_two_segment_partition",
+            "passed": false,
+            "summary": "exact_two_segment_partition_missing"
+          },
+          {
+            "name": "public_artifact_linked",
+            "passed": false,
+            "summary": "public_artifact_link_missing"
+          }
+        ],
+        "passed": false,
+        "verdict": "fail"
+      },
+      "judge": {
+        "independence": "not_applicable",
+        "metrics": {
+          "elapsed_seconds": null,
+          "provider_retry_count": 0,
+          "token_usage": null
+        },
+        "provider_model": null,
+        "reason_codes": [],
+        "required": false,
+        "rubric_id": null,
+        "rubric_sha256": null,
+        "scores": {},
+        "status": "not_requested",
+        "summary": "judge_not_requested",
+        "verdict": "not_evaluated"
+      },
+      "budget": {
+        "exhaustion_reason": null,
+        "invocation_reported_subject_tokens": 388142,
+        "policy": {
+          "execution_limits": "production_harness_and_llm_settings",
+          "max_reported_invocation_subject_tokens": 4000000,
+          "max_wall_seconds": 900.0,
+          "policy_id": "agent-harness-budget-v2",
+          "token_enforcement": "next_cell_admission"
+        },
+        "provider_attempts_dispatched": 5,
+        "reported_subject_tokens": 44099,
+        "sampling_rounds_admitted": 5,
+        "status": "within_limits"
+      },
+      "turn_metrics": [
+        {
+          "index": 1,
+          "metrics": {
+            "assessment_seconds": null,
+            "derived_dataset_count": 1,
+            "message_counts": {
+              "assistant": 5,
+              "tool_call": 7,
+              "tool_result": 7,
+              "user": 1
+            },
+            "provider_retry_count": 0,
+            "sampling_round_count": 5,
+            "terminal_shape": null,
+            "token_usage": {
+              "cached_input_tokens": 34432,
+              "input_tokens": 37708,
+              "output_tokens": 6391,
+              "total_tokens": 44099
+            },
+            "tool_call_counts_by_name": {
+              "agent.skill.activate": 1,
+              "analysis.graph": 1,
+              "analysis.profile": 1,
+              "data.query": 2,
+              "data.transform": 1,
+              "knowledge.lookup": 1
+            },
+            "tool_result_counts_by_status": {
+              "succeeded": 7
+            },
+            "turn_seconds": 35.59455270000035,
+            "usage_reported_primary_response_count": 5
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "ml.forecast_validation_v1",
+      "batch": "legacy",
+      "report": "build/agent-harness-full-81fb9bb/legacy/ml.forecast_validation_v1-deepseek-deepseek-v4-flash-af055598eeec4be09bd426ed20cbf823.json",
+      "report_sha256": "a2cc9b63968255760efbeed9fe4ffd33826d57601ec63f0f7e33b313cba75ae5",
+      "observation": {
+        "run_id": "af055598eeec4be09bd426ed20cbf823",
+        "outcome": "fail",
+        "reason": "outcome_check_failed",
+        "run_status": "completed",
+        "failure_kind": null,
+        "judge_status": "blocked",
+        "budget_reason": null,
+        "reported_subject_tokens": 315972,
+        "subject_tokens_complete": true,
+        "turn_seconds": 148.24022679997142,
+        "sampling_rounds": 16,
+        "provenance": {
+          "harness_variant": "baseline",
+          "repository_commit": "81fb9bbc682c92b68346a139f7e011f4b72a45ee",
+          "repository_dirty": true,
+          "case_definition_sha256": "7023955063953965220BF88E95E89CB93F1AD8929FA1257BAF32720D8ED11E86",
+          "runtime_sha256": "9107D3A35FFD1A2306FF4A247807B2EEB4280911A9ACC38B63365BEF4B25989C"
+        }
+      },
+      "identity": {
+        "case_definition_sha256": "7023955063953965220BF88E95E89CB93F1AD8929FA1257BAF32720D8ED11E86",
+        "effective_settings_sha256": "6973FC1DA2E20673BAAAE75940A37DE309FD0DC58E98CC9606C23B4EE0E547E8",
+        "embedding_settings_sha256": "84855E3EADB8F092BBE6E6E87D5ECAD071F1981359295FBA2826AEC4630F0397",
+        "fixture_sha256": "28F3BAD3A223D2CA18A17F5C673834E4CCB5A2EAE371C3F719EEFEF03EC53F68",
+        "harness_variant": "baseline",
+        "invocation_id": "4ab6cdde8ab84c078f6f2068c548d28d",
+        "judge_settings_sha256": "86A3403ECB36E19C283750DF3E07A5984AF12994769207E46981D0162835A507",
+        "repository_commit": "81fb9bbc682c92b68346a139f7e011f4b72a45ee",
+        "repository_dirty": true,
+        "runtime_sha256": "9107D3A35FFD1A2306FF4A247807B2EEB4280911A9ACC38B63365BEF4B25989C",
+        "settings_sha256": "9BD35670D0D0AD156B5F4B148A530992988DA094A0F68365D796ECA83C6149B6"
+      },
+      "integrity": {
+        "checks": [
+          {
+            "name": "canonical_completion",
+            "passed": true,
+            "summary": "canonical_completion_observed"
+          },
+          {
+            "name": "source_unchanged",
+            "passed": true,
+            "summary": "source_unchanged"
+          }
+        ],
+        "passed": true
+      },
+      "semantic": {
+        "checks": [
+          {
+            "name": "exact_future_forecast_dataset",
+            "passed": true,
+            "summary": "two_group_six_month_forecast_observed"
+          },
+          {
+            "name": "public_future_artifact",
+            "passed": false,
+            "summary": "linked_future_artifact_missing"
+          },
+          {
+            "name": "public_temporal_evaluation",
+            "passed": true,
+            "summary": "linked_same_fold_evaluation_observed"
+          }
+        ],
+        "passed": false,
+        "verdict": "fail"
+      },
+      "judge": {
+        "independence": "independent",
+        "metrics": {
+          "elapsed_seconds": null,
+          "provider_retry_count": 0,
+          "token_usage": null
+        },
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "reason_codes": [],
+        "required": true,
+        "rubric_id": null,
+        "rubric_sha256": null,
+        "scores": {},
+        "status": "blocked",
+        "summary": "semantic_prerequisite_failed",
+        "verdict": "not_evaluated"
+      },
+      "budget": {
+        "exhaustion_reason": null,
+        "invocation_reported_subject_tokens": 704114,
+        "policy": {
+          "execution_limits": "production_harness_and_llm_settings",
+          "max_reported_invocation_subject_tokens": 4000000,
+          "max_wall_seconds": 900.0,
+          "policy_id": "agent-harness-budget-v2",
+          "token_enforcement": "next_cell_admission"
+        },
+        "provider_attempts_dispatched": 16,
+        "reported_subject_tokens": 315972,
+        "sampling_rounds_admitted": 16,
+        "status": "within_limits"
+      },
+      "turn_metrics": [
+        {
+          "index": 1,
+          "metrics": {
+            "assessment_seconds": null,
+            "derived_dataset_count": 2,
+            "message_counts": {
+              "assistant": 15,
+              "tool_call": 24,
+              "tool_result": 24,
+              "user": 1
+            },
+            "provider_retry_count": 0,
+            "sampling_round_count": 16,
+            "terminal_shape": null,
+            "token_usage": {
+              "cached_input_tokens": 280704,
+              "input_tokens": 301374,
+              "output_tokens": 14598,
+              "total_tokens": 315972
+            },
+            "tool_call_counts_by_name": {
+              "agent.skill.activate": 1,
+              "agent.skill.read_reference": 1,
+              "analysis.graph": 1,
+              "data.feature.select": 1,
+              "data.query": 11,
+              "data.transform": 1,
+              "knowledge.lookup": 1,
+              "model.apply": 1,
+              "model.metadata": 1,
+              "model.train": 5
+            },
+            "tool_result_counts_by_status": {
+              "failed": 2,
+              "succeeded": 22
+            },
+            "turn_seconds": 148.24022679997142,
+            "usage_reported_primary_response_count": 16
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "ml.forecasting_seasonal_naive_transform",
+      "batch": "legacy",
+      "report": "build/agent-harness-full-81fb9bb/legacy/ml.forecasting_seasonal_naive_transform-deepseek-deepseek-v4-flash-05cdf64aae15433eae5bebb75f05767a.json",
+      "report_sha256": "a776e07e21aa5fe74e5d7d4ee7a0a0d2014dc77117a60bb7f0540282a545b64d",
+      "observation": {
+        "run_id": "05cdf64aae15433eae5bebb75f05767a",
+        "outcome": "pass",
+        "reason": "deterministic_verdict",
+        "run_status": "completed",
+        "failure_kind": null,
+        "judge_status": "not_requested",
+        "budget_reason": null,
+        "reported_subject_tokens": 113562,
+        "subject_tokens_complete": true,
+        "turn_seconds": 45.050282899988815,
+        "sampling_rounds": 9,
+        "provenance": {
+          "harness_variant": "baseline",
+          "repository_commit": "81fb9bbc682c92b68346a139f7e011f4b72a45ee",
+          "repository_dirty": true,
+          "case_definition_sha256": "539620A71BA16F90B44174AF4A6AC1AAC51C763BE470AF16782798F230009759",
+          "runtime_sha256": "9107D3A35FFD1A2306FF4A247807B2EEB4280911A9ACC38B63365BEF4B25989C"
+        }
+      },
+      "identity": {
+        "case_definition_sha256": "539620A71BA16F90B44174AF4A6AC1AAC51C763BE470AF16782798F230009759",
+        "effective_settings_sha256": "6973FC1DA2E20673BAAAE75940A37DE309FD0DC58E98CC9606C23B4EE0E547E8",
+        "embedding_settings_sha256": "84855E3EADB8F092BBE6E6E87D5ECAD071F1981359295FBA2826AEC4630F0397",
+        "fixture_sha256": "BA11796DD0ABB14FEC10BCFFB6D6A52FC758944CFBB77404C658D29CDC5CC889",
+        "harness_variant": "baseline",
+        "invocation_id": "4ab6cdde8ab84c078f6f2068c548d28d",
+        "judge_settings_sha256": "86A3403ECB36E19C283750DF3E07A5984AF12994769207E46981D0162835A507",
+        "repository_commit": "81fb9bbc682c92b68346a139f7e011f4b72a45ee",
+        "repository_dirty": true,
+        "runtime_sha256": "9107D3A35FFD1A2306FF4A247807B2EEB4280911A9ACC38B63365BEF4B25989C",
+        "settings_sha256": "9BD35670D0D0AD156B5F4B148A530992988DA094A0F68365D796ECA83C6149B6"
+      },
+      "integrity": {
+        "checks": [
+          {
+            "name": "canonical_completion",
+            "passed": true,
+            "summary": "canonical_completion_observed"
+          },
+          {
+            "name": "source_unchanged",
+            "passed": true,
+            "summary": "source_unchanged"
+          }
+        ],
+        "passed": true
+      },
+      "semantic": {
+        "checks": [
+          {
+            "name": "exact_seasonal_naive_dataset",
+            "passed": true,
+            "summary": "exact_seasonal_naive_dataset_observed"
+          },
+          {
+            "name": "public_artifact_linked",
+            "passed": true,
+            "summary": "public_artifact_link_observed"
+          }
+        ],
+        "passed": true,
+        "verdict": "pass"
+      },
+      "judge": {
+        "independence": "not_applicable",
+        "metrics": {
+          "elapsed_seconds": null,
+          "provider_retry_count": 0,
+          "token_usage": null
+        },
+        "provider_model": null,
+        "reason_codes": [],
+        "required": false,
+        "rubric_id": null,
+        "rubric_sha256": null,
+        "scores": {},
+        "status": "not_requested",
+        "summary": "judge_not_requested",
+        "verdict": "not_evaluated"
+      },
+      "budget": {
+        "exhaustion_reason": null,
+        "invocation_reported_subject_tokens": 817676,
+        "policy": {
+          "execution_limits": "production_harness_and_llm_settings",
+          "max_reported_invocation_subject_tokens": 4000000,
+          "max_wall_seconds": 900.0,
+          "policy_id": "agent-harness-budget-v2",
+          "token_enforcement": "next_cell_admission"
+        },
+        "provider_attempts_dispatched": 9,
+        "reported_subject_tokens": 113562,
+        "sampling_rounds_admitted": 9,
+        "status": "within_limits"
+      },
+      "turn_metrics": [
+        {
+          "index": 1,
+          "metrics": {
+            "assessment_seconds": null,
+            "derived_dataset_count": 2,
+            "message_counts": {
+              "assistant": 9,
+              "tool_call": 12,
+              "tool_result": 12,
+              "user": 1
+            },
+            "provider_retry_count": 0,
+            "sampling_round_count": 9,
+            "terminal_shape": null,
+            "token_usage": {
+              "cached_input_tokens": 99712,
+              "input_tokens": 107187,
+              "output_tokens": 6375,
+              "total_tokens": 113562
+            },
+            "tool_call_counts_by_name": {
+              "agent.skill.activate": 1,
+              "agent.skill.read_reference": 1,
+              "analysis.graph": 1,
+              "analysis.profile": 1,
+              "data.feature.select": 1,
+              "data.query": 1,
+              "data.transform": 2,
+              "knowledge.lookup": 1,
+              "model.metadata": 1,
+              "model.task.query": 1,
+              "model.train": 1
+            },
+            "tool_result_counts_by_status": {
+              "failed": 1,
+              "succeeded": 11
+            },
+            "turn_seconds": 45.050282899988815,
+            "usage_reported_primary_response_count": 9
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "ml.recommendation_item_similarity",
+      "batch": "legacy",
+      "report": "build/agent-harness-full-81fb9bb/legacy/ml.recommendation_item_similarity-deepseek-deepseek-v4-flash-1b1865c5b9e2400396066ae98c47a6cc.json",
+      "report_sha256": "b5b30b751ed5e8a7c3c0a7f17c8e4294568184e38c1ed22953a3c0d133573ef5",
+      "observation": {
+        "run_id": "1b1865c5b9e2400396066ae98c47a6cc",
+        "outcome": "fail",
+        "reason": "outcome_check_failed",
+        "run_status": "completed",
+        "failure_kind": null,
+        "judge_status": "not_requested",
+        "budget_reason": null,
+        "reported_subject_tokens": 79957,
+        "subject_tokens_complete": true,
+        "turn_seconds": 27.723945799982175,
+        "sampling_rounds": 8,
+        "provenance": {
+          "harness_variant": "baseline",
+          "repository_commit": "81fb9bbc682c92b68346a139f7e011f4b72a45ee",
+          "repository_dirty": true,
+          "case_definition_sha256": "02EC39CFBE246C20D931224647B8A91B7251CBC47B307C0E88E5C4E8AAE0A3B7",
+          "runtime_sha256": "9107D3A35FFD1A2306FF4A247807B2EEB4280911A9ACC38B63365BEF4B25989C"
+        }
+      },
+      "identity": {
+        "case_definition_sha256": "02EC39CFBE246C20D931224647B8A91B7251CBC47B307C0E88E5C4E8AAE0A3B7",
+        "effective_settings_sha256": "6973FC1DA2E20673BAAAE75940A37DE309FD0DC58E98CC9606C23B4EE0E547E8",
+        "embedding_settings_sha256": "84855E3EADB8F092BBE6E6E87D5ECAD071F1981359295FBA2826AEC4630F0397",
+        "fixture_sha256": "A45CC8B727D1BA85002552245EEB9F1C4C8020B061221906AC2CFD97D67DD9F1",
+        "harness_variant": "baseline",
+        "invocation_id": "4ab6cdde8ab84c078f6f2068c548d28d",
+        "judge_settings_sha256": "86A3403ECB36E19C283750DF3E07A5984AF12994769207E46981D0162835A507",
+        "repository_commit": "81fb9bbc682c92b68346a139f7e011f4b72a45ee",
+        "repository_dirty": true,
+        "runtime_sha256": "9107D3A35FFD1A2306FF4A247807B2EEB4280911A9ACC38B63365BEF4B25989C",
+        "settings_sha256": "9BD35670D0D0AD156B5F4B148A530992988DA094A0F68365D796ECA83C6149B6"
+      },
+      "integrity": {
+        "checks": [
+          {
+            "name": "canonical_completion",
+            "passed": true,
+            "summary": "canonical_completion_observed"
+          },
+          {
+            "name": "source_unchanged",
+            "passed": true,
+            "summary": "source_unchanged"
+          }
+        ],
+        "passed": true
+      },
+      "semantic": {
+        "checks": [
+          {
+            "name": "exact_ranked_recommendations",
+            "passed": false,
+            "summary": "exact_ranked_recommendations_missing"
+          },
+          {
+            "name": "public_artifact_linked",
+            "passed": false,
+            "summary": "public_artifact_link_missing"
+          }
+        ],
+        "passed": false,
+        "verdict": "fail"
+      },
+      "judge": {
+        "independence": "not_applicable",
+        "metrics": {
+          "elapsed_seconds": null,
+          "provider_retry_count": 0,
+          "token_usage": null
+        },
+        "provider_model": null,
+        "reason_codes": [],
+        "required": false,
+        "rubric_id": null,
+        "rubric_sha256": null,
+        "scores": {},
+        "status": "not_requested",
+        "summary": "judge_not_requested",
+        "verdict": "not_evaluated"
+      },
+      "budget": {
+        "exhaustion_reason": null,
+        "invocation_reported_subject_tokens": 897633,
+        "policy": {
+          "execution_limits": "production_harness_and_llm_settings",
+          "max_reported_invocation_subject_tokens": 4000000,
+          "max_wall_seconds": 900.0,
+          "policy_id": "agent-harness-budget-v2",
+          "token_enforcement": "next_cell_admission"
+        },
+        "provider_attempts_dispatched": 8,
+        "reported_subject_tokens": 79957,
+        "sampling_rounds_admitted": 8,
+        "status": "within_limits"
+      },
+      "turn_metrics": [
+        {
+          "index": 1,
+          "metrics": {
+            "assessment_seconds": null,
+            "derived_dataset_count": 2,
+            "message_counts": {
+              "assistant": 8,
+              "tool_call": 9,
+              "tool_result": 9,
+              "user": 1
+            },
+            "provider_retry_count": 0,
+            "sampling_round_count": 8,
+            "terminal_shape": null,
+            "token_usage": {
+              "cached_input_tokens": 70912,
+              "input_tokens": 76246,
+              "output_tokens": 3711,
+              "total_tokens": 79957
+            },
+            "tool_call_counts_by_name": {
+              "agent.skill.activate": 1,
+              "agent.skill.read_reference": 1,
+              "data.feature.select": 1,
+              "data.query": 2,
+              "knowledge.lookup": 1,
+              "model.apply": 1,
+              "model.metadata": 1,
+              "model.train": 1
+            },
+            "tool_result_counts_by_status": {
+              "succeeded": 9
+            },
+            "turn_seconds": 27.723945799982175,
+            "usage_reported_primary_response_count": 8
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "ml.recommendation_ranking_v1",
+      "batch": "legacy",
+      "report": "build/agent-harness-full-81fb9bb/legacy/ml.recommendation_ranking_v1-deepseek-deepseek-v4-flash-e6bea0f2f19b46dda474e20dca6a2594.json",
+      "report_sha256": "deb2bf298da12b95cbc584631c52e1f1d9a3aa671cdb6247beb18a12ea46e7de",
+      "observation": {
+        "run_id": "e6bea0f2f19b46dda474e20dca6a2594",
+        "outcome": "pass",
+        "reason": "judge_verdict",
+        "run_status": "completed",
+        "failure_kind": null,
+        "judge_status": "completed",
+        "budget_reason": null,
+        "reported_subject_tokens": 182092,
+        "subject_tokens_complete": true,
+        "turn_seconds": 73.07002099999227,
+        "sampling_rounds": 12,
+        "provenance": {
+          "harness_variant": "baseline",
+          "repository_commit": "81fb9bbc682c92b68346a139f7e011f4b72a45ee",
+          "repository_dirty": true,
+          "case_definition_sha256": "06897341C8974ACF17F748565A4EDF0C8F40B0CCA2ACD7737A8B0B62D48520F4",
+          "runtime_sha256": "9107D3A35FFD1A2306FF4A247807B2EEB4280911A9ACC38B63365BEF4B25989C"
+        }
+      },
+      "identity": {
+        "case_definition_sha256": "06897341C8974ACF17F748565A4EDF0C8F40B0CCA2ACD7737A8B0B62D48520F4",
+        "effective_settings_sha256": "6973FC1DA2E20673BAAAE75940A37DE309FD0DC58E98CC9606C23B4EE0E547E8",
+        "embedding_settings_sha256": "84855E3EADB8F092BBE6E6E87D5ECAD071F1981359295FBA2826AEC4630F0397",
+        "fixture_sha256": "65E48CA44FEEBDDD209BA1AFC702A0D2CB5CEA669B5946780F469BB48B860C53",
+        "harness_variant": "baseline",
+        "invocation_id": "4ab6cdde8ab84c078f6f2068c548d28d",
+        "judge_settings_sha256": "86A3403ECB36E19C283750DF3E07A5984AF12994769207E46981D0162835A507",
+        "repository_commit": "81fb9bbc682c92b68346a139f7e011f4b72a45ee",
+        "repository_dirty": true,
+        "runtime_sha256": "9107D3A35FFD1A2306FF4A247807B2EEB4280911A9ACC38B63365BEF4B25989C",
+        "settings_sha256": "9BD35670D0D0AD156B5F4B148A530992988DA094A0F68365D796ECA83C6149B6"
+      },
+      "integrity": {
+        "checks": [
+          {
+            "name": "canonical_completion",
+            "passed": true,
+            "summary": "canonical_completion_observed"
+          },
+          {
+            "name": "source_unchanged",
+            "passed": true,
+            "summary": "sources_unchanged"
+          }
+        ],
+        "passed": true
+      },
+      "semantic": {
+        "checks": [
+          {
+            "name": "exact_private_top_k",
+            "passed": true,
+            "summary": "known_and_cold_rankings_observed"
+          },
+          {
+            "name": "public_recommendation_artifact",
+            "passed": true,
+            "summary": "linked_recommendation_artifact_observed"
+          },
+          {
+            "name": "public_ranking_evaluation",
+            "passed": true,
+            "summary": "linked_candidate_baseline_evaluation_observed"
+          }
+        ],
+        "passed": true,
+        "verdict": "pass"
+      },
+      "judge": {
+        "independence": "independent",
+        "metrics": {
+          "elapsed_seconds": 23.049551700009033,
+          "provider_retry_count": 0,
+          "token_usage": {
+            "cached_input_tokens": 256,
+            "input_tokens": 2210,
+            "output_tokens": 1532,
+            "total_tokens": 3742
+          }
+        },
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "reason_codes": [
+          "complete_grounded_outcome"
+        ],
+        "required": true,
+        "rubric_id": "ml.recommendation_ranking_v1.business_outcome.v1",
+        "rubric_sha256": "F6328AA4100413E22263B59F72D414D84CDB77CE8D834A63984F6B7C3EA58796",
+        "scores": {
+          "cold_start_explanation": 2,
+          "decision_limits": 2,
+          "evaluation_grounding": 2,
+          "recommendation_delivery": 2
+        },
+        "status": "completed",
+        "summary": "judge_completed",
+        "verdict": "pass"
+      },
+      "budget": {
+        "exhaustion_reason": null,
+        "invocation_reported_subject_tokens": 1079725,
+        "policy": {
+          "execution_limits": "production_harness_and_llm_settings",
+          "max_reported_invocation_subject_tokens": 4000000,
+          "max_wall_seconds": 900.0,
+          "policy_id": "agent-harness-budget-v2",
+          "token_enforcement": "next_cell_admission"
+        },
+        "provider_attempts_dispatched": 12,
+        "reported_subject_tokens": 182092,
+        "sampling_rounds_admitted": 12,
+        "status": "within_limits"
+      },
+      "turn_metrics": [
+        {
+          "index": 1,
+          "metrics": {
+            "assessment_seconds": null,
+            "derived_dataset_count": 4,
+            "message_counts": {
+              "assistant": 12,
+              "tool_call": 18,
+              "tool_result": 18,
+              "user": 1
+            },
+            "provider_retry_count": 0,
+            "sampling_round_count": 12,
+            "terminal_shape": null,
+            "token_usage": {
+              "cached_input_tokens": 161408,
+              "input_tokens": 172705,
+              "output_tokens": 9387,
+              "total_tokens": 182092
+            },
+            "tool_call_counts_by_name": {
+              "agent.skill.activate": 1,
+              "agent.skill.read_reference": 1,
+              "analysis.graph": 1,
+              "data.feature.select": 1,
+              "data.query": 8,
+              "data.transform": 2,
+              "knowledge.lookup": 1,
+              "model.apply": 1,
+              "model.metadata": 1,
+              "model.train": 1
+            },
+            "tool_result_counts_by_status": {
+              "succeeded": 18
+            },
+            "turn_seconds": 73.07002099999227,
+            "usage_reported_primary_response_count": 12
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "ml.text_grouped_classification_v1",
+      "batch": "legacy",
+      "report": "build/agent-harness-full-81fb9bb/legacy/ml.text_grouped_classification_v1-deepseek-deepseek-v4-flash-de77c0c12a13496daf1f8c9714bbb0e6.json",
+      "report_sha256": "dcc82ca764bdd286908879e9efa0d085510d2914aed35241e644031dfc87df2a",
+      "observation": {
+        "run_id": "de77c0c12a13496daf1f8c9714bbb0e6",
+        "outcome": "pass",
+        "reason": "judge_verdict",
+        "run_status": "completed",
+        "failure_kind": null,
+        "judge_status": "completed",
+        "budget_reason": null,
+        "reported_subject_tokens": 231688,
+        "subject_tokens_complete": true,
+        "turn_seconds": 88.15966399997706,
+        "sampling_rounds": 13,
+        "provenance": {
+          "harness_variant": "baseline",
+          "repository_commit": "81fb9bbc682c92b68346a139f7e011f4b72a45ee",
+          "repository_dirty": true,
+          "case_definition_sha256": "274D7BA7FD702EA509E13564C8719AAA79BD1920EE3FC3BE8BF367DD8C70162F",
+          "runtime_sha256": "9107D3A35FFD1A2306FF4A247807B2EEB4280911A9ACC38B63365BEF4B25989C"
+        }
+      },
+      "identity": {
+        "case_definition_sha256": "274D7BA7FD702EA509E13564C8719AAA79BD1920EE3FC3BE8BF367DD8C70162F",
+        "effective_settings_sha256": "6973FC1DA2E20673BAAAE75940A37DE309FD0DC58E98CC9606C23B4EE0E547E8",
+        "embedding_settings_sha256": "84855E3EADB8F092BBE6E6E87D5ECAD071F1981359295FBA2826AEC4630F0397",
+        "fixture_sha256": "C1B734A25BDBD39D31809165B469F82461622D47EFB5E7FAE4AFC882AB2D98EA",
+        "harness_variant": "baseline",
+        "invocation_id": "4ab6cdde8ab84c078f6f2068c548d28d",
+        "judge_settings_sha256": "86A3403ECB36E19C283750DF3E07A5984AF12994769207E46981D0162835A507",
+        "repository_commit": "81fb9bbc682c92b68346a139f7e011f4b72a45ee",
+        "repository_dirty": true,
+        "runtime_sha256": "9107D3A35FFD1A2306FF4A247807B2EEB4280911A9ACC38B63365BEF4B25989C",
+        "settings_sha256": "9BD35670D0D0AD156B5F4B148A530992988DA094A0F68365D796ECA83C6149B6"
+      },
+      "integrity": {
+        "checks": [
+          {
+            "name": "canonical_completion",
+            "passed": true,
+            "summary": "canonical_completion_observed"
+          },
+          {
+            "name": "sources_unchanged",
+            "passed": true,
+            "summary": "sources_unchanged"
+          }
+        ],
+        "passed": true
+      },
+      "semantic": {
+        "checks": [
+          {
+            "name": "exact_raw_text_predictions",
+            "passed": true,
+            "summary": "exact_raw_text_predictions_observed"
+          },
+          {
+            "name": "public_prediction_artifact",
+            "passed": true,
+            "summary": "linked_prediction_artifact_observed"
+          },
+          {
+            "name": "public_group_safe_evaluation",
+            "passed": true,
+            "summary": "candidate_dummy_and_isolation_facts_observed"
+          }
+        ],
+        "passed": true,
+        "verdict": "pass"
+      },
+      "judge": {
+        "independence": "independent",
+        "metrics": {
+          "elapsed_seconds": 19.752502899966203,
+          "provider_retry_count": 0,
+          "token_usage": {
+            "cached_input_tokens": 256,
+            "input_tokens": 2214,
+            "output_tokens": 1553,
+            "total_tokens": 3767
+          }
+        },
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "reason_codes": [
+          "complete_grounded_outcome"
+        ],
+        "required": true,
+        "rubric_id": "ml.text_grouped_classification_v1.business_outcome.v1",
+        "rubric_sha256": "7D815EC065A811D6B8C95133617C62C676407C864A8679B1895C8B078283056A",
+        "scores": {
+          "decision_limits": 2,
+          "evaluation_grounding": 2,
+          "leakage_explanation": 2,
+          "prediction_delivery": 2
+        },
+        "status": "completed",
+        "summary": "judge_completed",
+        "verdict": "pass"
+      },
+      "budget": {
+        "exhaustion_reason": null,
+        "invocation_reported_subject_tokens": 1311413,
+        "policy": {
+          "execution_limits": "production_harness_and_llm_settings",
+          "max_reported_invocation_subject_tokens": 4000000,
+          "max_wall_seconds": 900.0,
+          "policy_id": "agent-harness-budget-v2",
+          "token_enforcement": "next_cell_admission"
+        },
+        "provider_attempts_dispatched": 13,
+        "reported_subject_tokens": 231688,
+        "sampling_rounds_admitted": 13,
+        "status": "within_limits"
+      },
+      "turn_metrics": [
+        {
+          "index": 1,
+          "metrics": {
+            "assessment_seconds": null,
+            "derived_dataset_count": 3,
+            "message_counts": {
+              "assistant": 13,
+              "tool_call": 19,
+              "tool_result": 19,
+              "user": 1
+            },
+            "provider_retry_count": 0,
+            "sampling_round_count": 13,
+            "terminal_shape": null,
+            "token_usage": {
+              "cached_input_tokens": 208256,
+              "input_tokens": 223063,
+              "output_tokens": 8625,
+              "total_tokens": 231688
+            },
+            "tool_call_counts_by_name": {
+              "agent.skill.activate": 1,
+              "agent.skill.read_reference": 1,
+              "analysis.graph": 1,
+              "analysis.profile": 2,
+              "data.feature.select": 1,
+              "data.query": 4,
+              "data.transform": 3,
+              "knowledge.lookup": 1,
+              "model.apply": 1,
+              "model.metadata": 2,
+              "model.train": 2
+            },
+            "tool_result_counts_by_status": {
+              "failed": 1,
+              "succeeded": 18
+            },
+            "turn_seconds": 88.15966399997706,
+            "usage_reported_primary_response_count": 13
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "ml.text_keyword_frequency",
+      "batch": "legacy",
+      "report": "build/agent-harness-full-81fb9bb/legacy/ml.text_keyword_frequency-deepseek-deepseek-v4-flash-8821e3fd139c410f8fbb05c3ebf57329.json",
+      "report_sha256": "a3d98c36c0c12eb8b5b8d517433b1da407991bf5879c078cf2f8d6930f3d6611",
+      "observation": {
+        "run_id": "8821e3fd139c410f8fbb05c3ebf57329",
+        "outcome": "pass",
+        "reason": "deterministic_verdict",
+        "run_status": "completed",
+        "failure_kind": null,
+        "judge_status": "not_requested",
+        "budget_reason": null,
+        "reported_subject_tokens": 63303,
+        "subject_tokens_complete": true,
+        "turn_seconds": 22.402302900038194,
+        "sampling_rounds": 7,
+        "provenance": {
+          "harness_variant": "baseline",
+          "repository_commit": "81fb9bbc682c92b68346a139f7e011f4b72a45ee",
+          "repository_dirty": true,
+          "case_definition_sha256": "9C45CDB721C942CB3B2DA18103A8ACCC889F1618896242DE17CF111967A84325",
+          "runtime_sha256": "9107D3A35FFD1A2306FF4A247807B2EEB4280911A9ACC38B63365BEF4B25989C"
+        }
+      },
+      "identity": {
+        "case_definition_sha256": "9C45CDB721C942CB3B2DA18103A8ACCC889F1618896242DE17CF111967A84325",
+        "effective_settings_sha256": "6973FC1DA2E20673BAAAE75940A37DE309FD0DC58E98CC9606C23B4EE0E547E8",
+        "embedding_settings_sha256": "84855E3EADB8F092BBE6E6E87D5ECAD071F1981359295FBA2826AEC4630F0397",
+        "fixture_sha256": "380229FA5B500CF99ED6B0B42207A03C2C8B0BA9ACE04599A3CA290FB5354C40",
+        "harness_variant": "baseline",
+        "invocation_id": "4ab6cdde8ab84c078f6f2068c548d28d",
+        "judge_settings_sha256": "86A3403ECB36E19C283750DF3E07A5984AF12994769207E46981D0162835A507",
+        "repository_commit": "81fb9bbc682c92b68346a139f7e011f4b72a45ee",
+        "repository_dirty": true,
+        "runtime_sha256": "9107D3A35FFD1A2306FF4A247807B2EEB4280911A9ACC38B63365BEF4B25989C",
+        "settings_sha256": "9BD35670D0D0AD156B5F4B148A530992988DA094A0F68365D796ECA83C6149B6"
+      },
+      "integrity": {
+        "checks": [
+          {
+            "name": "canonical_completion",
+            "passed": true,
+            "summary": "canonical_completion_observed"
+          },
+          {
+            "name": "source_unchanged",
+            "passed": true,
+            "summary": "source_unchanged"
+          }
+        ],
+        "passed": true
+      },
+      "semantic": {
+        "checks": [
+          {
+            "name": "exact_keyword_frequency_dataset",
+            "passed": true,
+            "summary": "exact_keyword_frequency_dataset_observed"
+          },
+          {
+            "name": "public_artifact_linked",
+            "passed": true,
+            "summary": "public_artifact_link_observed"
+          }
+        ],
+        "passed": true,
+        "verdict": "pass"
+      },
+      "judge": {
+        "independence": "not_applicable",
+        "metrics": {
+          "elapsed_seconds": null,
+          "provider_retry_count": 0,
+          "token_usage": null
+        },
+        "provider_model": null,
+        "reason_codes": [],
+        "required": false,
+        "rubric_id": null,
+        "rubric_sha256": null,
+        "scores": {},
+        "status": "not_requested",
+        "summary": "judge_not_requested",
+        "verdict": "not_evaluated"
+      },
+      "budget": {
+        "exhaustion_reason": null,
+        "invocation_reported_subject_tokens": 1374716,
+        "policy": {
+          "execution_limits": "production_harness_and_llm_settings",
+          "max_reported_invocation_subject_tokens": 4000000,
+          "max_wall_seconds": 900.0,
+          "policy_id": "agent-harness-budget-v2",
+          "token_enforcement": "next_cell_admission"
+        },
+        "provider_attempts_dispatched": 7,
+        "reported_subject_tokens": 63303,
+        "sampling_rounds_admitted": 7,
+        "status": "within_limits"
+      },
+      "turn_metrics": [
+        {
+          "index": 1,
+          "metrics": {
+            "assessment_seconds": null,
+            "derived_dataset_count": 2,
+            "message_counts": {
+              "assistant": 7,
+              "tool_call": 8,
+              "tool_result": 8,
+              "user": 1
+            },
+            "provider_retry_count": 0,
+            "sampling_round_count": 7,
+            "terminal_shape": null,
+            "token_usage": {
+              "cached_input_tokens": 54912,
+              "input_tokens": 61182,
+              "output_tokens": 2121,
+              "total_tokens": 63303
+            },
+            "tool_call_counts_by_name": {
+              "agent.skill.activate": 2,
+              "analysis.graph": 1,
+              "analysis.profile": 1,
+              "data.query": 2,
+              "data.tokenize": 1,
+              "data.transform": 1
+            },
+            "tool_result_counts_by_status": {
+              "succeeded": 8
+            },
+            "turn_seconds": 22.402302900038194,
+            "usage_reported_primary_response_count": 7
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "ml.text_topic_discovery_v1",
+      "batch": "legacy",
+      "report": "build/agent-harness-full-81fb9bb/legacy/ml.text_topic_discovery_v1-deepseek-deepseek-v4-flash-e1fd7cd8069641a0881c0ff606f64184.json",
+      "report_sha256": "4760043e6fa24f313aa178dd16fe25b568c9328315abb28b93073ac327610fb7",
+      "observation": {
+        "run_id": "e1fd7cd8069641a0881c0ff606f64184",
+        "outcome": "fail",
+        "reason": "outcome_check_failed",
+        "run_status": "completed",
+        "failure_kind": null,
+        "judge_status": "blocked",
+        "budget_reason": null,
+        "reported_subject_tokens": 618467,
+        "subject_tokens_complete": true,
+        "turn_seconds": 176.1003664000309,
+        "sampling_rounds": 19,
+        "provenance": {
+          "harness_variant": "baseline",
+          "repository_commit": "81fb9bbc682c92b68346a139f7e011f4b72a45ee",
+          "repository_dirty": true,
+          "case_definition_sha256": "5C24E561D2D4E3CDC289281E7C9631ECA6FDA9D7652B177498AC43B4A3A4E3ED",
+          "runtime_sha256": "9107D3A35FFD1A2306FF4A247807B2EEB4280911A9ACC38B63365BEF4B25989C"
+        }
+      },
+      "identity": {
+        "case_definition_sha256": "5C24E561D2D4E3CDC289281E7C9631ECA6FDA9D7652B177498AC43B4A3A4E3ED",
+        "effective_settings_sha256": "6973FC1DA2E20673BAAAE75940A37DE309FD0DC58E98CC9606C23B4EE0E547E8",
+        "embedding_settings_sha256": "84855E3EADB8F092BBE6E6E87D5ECAD071F1981359295FBA2826AEC4630F0397",
+        "fixture_sha256": "7C597F433FD3236556CA6FB3774DF1CBD774AE29DEC61415143577121338E52A",
+        "harness_variant": "baseline",
+        "invocation_id": "4ab6cdde8ab84c078f6f2068c548d28d",
+        "judge_settings_sha256": "86A3403ECB36E19C283750DF3E07A5984AF12994769207E46981D0162835A507",
+        "repository_commit": "81fb9bbc682c92b68346a139f7e011f4b72a45ee",
+        "repository_dirty": true,
+        "runtime_sha256": "9107D3A35FFD1A2306FF4A247807B2EEB4280911A9ACC38B63365BEF4B25989C",
+        "settings_sha256": "9BD35670D0D0AD156B5F4B148A530992988DA094A0F68365D796ECA83C6149B6"
+      },
+      "integrity": {
+        "checks": [
+          {
+            "name": "canonical_completion",
+            "passed": true,
+            "summary": "canonical_completion_observed"
+          },
+          {
+            "name": "source_unchanged",
+            "passed": true,
+            "summary": "source_unchanged"
+          }
+        ],
+        "passed": true
+      },
+      "semantic": {
+        "checks": [
+          {
+            "name": "topic_assignments",
+            "passed": false,
+            "summary": "topic_assignment_dataset_or_artifact_missing"
+          },
+          {
+            "name": "public_group_safe_evaluation",
+            "passed": false,
+            "summary": "topic_evaluation_report_missing_or_invalid"
+          }
+        ],
+        "passed": false,
+        "verdict": "fail"
+      },
+      "judge": {
+        "independence": "independent",
+        "metrics": {
+          "elapsed_seconds": null,
+          "provider_retry_count": 0,
+          "token_usage": null
+        },
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "reason_codes": [],
+        "required": true,
+        "rubric_id": null,
+        "rubric_sha256": null,
+        "scores": {},
+        "status": "blocked",
+        "summary": "semantic_prerequisite_failed",
+        "verdict": "not_evaluated"
+      },
+      "budget": {
+        "exhaustion_reason": null,
+        "invocation_reported_subject_tokens": 1993183,
+        "policy": {
+          "execution_limits": "production_harness_and_llm_settings",
+          "max_reported_invocation_subject_tokens": 4000000,
+          "max_wall_seconds": 900.0,
+          "policy_id": "agent-harness-budget-v2",
+          "token_enforcement": "next_cell_admission"
+        },
+        "provider_attempts_dispatched": 19,
+        "reported_subject_tokens": 618467,
+        "sampling_rounds_admitted": 19,
+        "status": "within_limits"
+      },
+      "turn_metrics": [
+        {
+          "index": 1,
+          "metrics": {
+            "assessment_seconds": null,
+            "derived_dataset_count": 6,
+            "message_counts": {
+              "assistant": 17,
+              "tool_call": 24,
+              "tool_result": 24,
+              "user": 1
+            },
+            "provider_retry_count": 0,
+            "sampling_round_count": 19,
+            "terminal_shape": null,
+            "token_usage": {
+              "cached_input_tokens": 565504,
+              "input_tokens": 595963,
+              "output_tokens": 22504,
+              "total_tokens": 618467
+            },
+            "tool_call_counts_by_name": {
+              "agent.skill.activate": 1,
+              "agent.skill.read_reference": 2,
+              "data.feature.select": 4,
+              "data.query": 4,
+              "data.transform": 2,
+              "knowledge.lookup": 1,
+              "model.apply": 1,
+              "model.metadata": 2,
+              "model.task.query": 2,
+              "model.train": 5
+            },
+            "tool_result_counts_by_status": {
+              "failed": 2,
+              "succeeded": 22
+            },
+            "turn_seconds": 176.1003664000309,
+            "usage_reported_primary_response_count": 19
+          }
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "planned": 28,
+    "reports": 28,
+    "unique_cases": 28,
+    "outcomes": {
+      "pass": 22,
+      "fail": 6
+    },
+    "run_status": {
+      "completed": 28
+    },
+    "subject_tokens_observed": 4465592,
+    "subject_accounting_complete": true,
+    "judge_tokens": 187204,
+    "subject_rounds": 245,
+    "invocations": {
+      "business": {
+        "reports": 11,
+        "outcomes": {
+          "pass": 10,
+          "fail": 1
+        },
+        "subject_tokens": 1030268,
+        "invocation_ids": [
+          "fb1d58692cb747099d2d8e093ba45a22"
+        ]
+      },
+      "legacy": {
+        "reports": 13,
+        "outcomes": {
+          "pass": 9,
+          "fail": 4
+        },
+        "subject_tokens": 2060059,
+        "invocation_ids": [
+          "4ab6cdde8ab84c078f6f2068c548d28d"
+        ]
+      },
+      "confirmation": {
+        "reports": 4,
+        "outcomes": {
+          "pass": 3,
+          "fail": 1
+        },
+        "subject_tokens": 1375265,
+        "invocation_ids": [
+          "5085b974332243958e9fb2540a97bba0"
+        ]
+      }
+    },
+    "identity_values": {
+      "repository_commit": [
+        "81fb9bbc682c92b68346a139f7e011f4b72a45ee"
+      ],
+      "repository_dirty": [
+        "True"
+      ],
+      "runtime_sha256": [
+        "9107D3A35FFD1A2306FF4A247807B2EEB4280911A9ACC38B63365BEF4B25989C"
+      ],
+      "effective_settings_sha256": [
+        "6973FC1DA2E20673BAAAE75940A37DE309FD0DC58E98CC9606C23B4EE0E547E8"
+      ],
+      "embedding_settings_sha256": [
+        "84855E3EADB8F092BBE6E6E87D5ECAD071F1981359295FBA2826AEC4630F0397"
+      ],
+      "judge_settings_sha256": [
+        "86A3403ECB36E19C283750DF3E07A5984AF12994769207E46981D0162835A507"
+      ]
+    },
+    "configuration_files_unchanged": {
+      "subject": true,
+      "judge": true,
+      "embedding": true
+    }
+  }
+}

@@ -14,8 +14,8 @@ from .storage.models import ArtifactKind
 
 
 class DatasetExportArtifact(SQLModel):
-    dataset_id: str
-    artifact_id: str
+    dataset_id: int
+    artifact_id: int
     absolute_path: str
     export_format: str = "xlsx"
 
@@ -36,7 +36,7 @@ class DatasetExportService:
 
     def materialize_dataset_export_artifact(
         self,
-        dataset_id: str,
+        dataset_id: int,
         *,
         metadata_payload: dict[str, Any] | None = None,
     ) -> DatasetExportArtifact:
@@ -86,8 +86,8 @@ class DatasetExportService:
             absolute_path=artifact.absolute_path,
         )
 
-    def _default_workbook_path(self, dataset_id: str, name: str) -> Path:
-        export_dir = self._paths.artifacts / "datasets" / "exports" / dataset_id
+    def _default_workbook_path(self, dataset_id: int, name: str) -> Path:
+        export_dir = self._paths.artifacts / "datasets" / "exports" / str(dataset_id)
         export_dir.mkdir(parents=True, exist_ok=True)
         return export_dir / f"{self._slug(name) or dataset_id}.xlsx"
 

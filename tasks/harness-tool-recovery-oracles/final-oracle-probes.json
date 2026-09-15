@@ -1,0 +1,71 @@
+{
+  "standardized_cluster_report": "accepted; wrong cluster count rejected; using retained diagnostic facts, not reopening deleted artifact",
+  "localized_topic_and_tabular_report": "localized columns accepted; missing feedback rejected; exact recorded 11-row quality-table recipe accepted as Judge evidence without source text",
+  "april_primary_delivery_calibration": [
+    {
+      "label": "bad_primary_correct_reference",
+      "expected": "fail",
+      "result": {
+        "required": false,
+        "rubric_id": null,
+        "rubric_sha256": null,
+        "status": "completed",
+        "verdict": "fail",
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "independence": "independent",
+        "scores": {
+          "delivery_explanation_consistency": 2,
+          "primary_delivery_correctness": 0
+        },
+        "reason_codes": [
+          "primary_delivery_loses_business_rows"
+        ],
+        "summary": "judge_completed",
+        "metrics": {
+          "elapsed_seconds": 23.248882199986838,
+          "token_usage": {
+            "input_tokens": 1956,
+            "cached_input_tokens": 256,
+            "output_tokens": 1074,
+            "total_tokens": 3030
+          },
+          "provider_retry_count": 0
+        }
+      },
+      "matched": true
+    },
+    {
+      "label": "good_primary_bad_comparison",
+      "expected": "pass",
+      "result": {
+        "required": false,
+        "rubric_id": null,
+        "rubric_sha256": null,
+        "status": "completed",
+        "verdict": "pass",
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "independence": "independent",
+        "scores": {
+          "delivery_explanation_consistency": 2,
+          "primary_delivery_correctness": 2
+        },
+        "reason_codes": [
+          "primary_delivery_preserved"
+        ],
+        "summary": "judge_completed",
+        "metrics": {
+          "elapsed_seconds": 8.850062100042123,
+          "token_usage": {
+            "input_tokens": 844,
+            "cached_input_tokens": 256,
+            "output_tokens": 486,
+            "total_tokens": 1330
+          },
+          "provider_retry_count": 0
+        }
+      },
+      "matched": true
+    }
+  ],
+  "evidence_limit": "One-off calibration using real source values and reconstructed export variants; this does not rescore the deleted live artifacts."
+}

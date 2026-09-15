@@ -1,0 +1,54 @@
+{
+  "gates": [
+    {
+      "registered_at_utc": "2026-09-13T15:49:31.676022+00:00",
+      "arm": "g1k",
+      "parent": "g1",
+      "change": {
+        "path": "knowledge.lookup/properties/mode",
+        "before": "auto selects an available retrieval mode.",
+        "after": "auto chooses an available mode; keyword matches terms, semantic matches meaning, hybrid combines both."
+      },
+      "cells": [
+        "g1k:campaign:1",
+        "g1k:campaign:2"
+      ],
+      "reason": "Campaign G1 used 6/4 lookups versus G0 1/3 across two repetitions. Restore only mode description within G1 before advancing to G2; observed cost includes route expansion and one separate SQL DATE/VARCHAR error. This is localization, not a retry until pass.",
+      "schema_sha256": "e1eca4a103aa4da3c81f72a6ba8f6f82952a0f7871ce0144c5392633b51692da",
+      "driver_sha256": "d341c2ca2244cb3e6bf2f6639c38d33f83ade79436dc7c5b567cac71abb38a0a"
+    },
+    {
+      "registered_at_utc": "2026-09-13T15:52:30.362394+00:00",
+      "arm": "g2",
+      "parent": "g1",
+      "cells": [
+        "g2:revenue:1",
+        "g2:restock:1"
+      ],
+      "decision": "Advance only the SQL/chart description branch. G0/G1 SQL source mapping had no alias mismatch and first-layer aggregate ToolFailures were 9/6; shared explanation errors and Judge misses preclude claiming global quality equivalence. Knowledge mode localization produced 2/3 lookups versus G1 6/4 and G0 1/3, but no isolated retrieval-mode misuse; mark that field unresolved and do not delete further Knowledge information. G2 holds Knowledge descriptions identical to G1, as originally registered, so the SQL/chart comparison remains controlled. No combined production candidate is certified.",
+      "next": "Inspect r1 failures and final deliveries before deciding r2. G3 remains gated."
+    },
+    {
+      "registered_at_utc": "2026-09-13T15:57:17.348592+00:00",
+      "arm": "g2g",
+      "parent": "g2",
+      "change": "Restore only data.query.sql and data.transform.sql descriptions to G1 (DuckDB dialect text); keep the shorter graph spec description.",
+      "cells": [
+        "g2g:restock:1",
+        "g2:restock:2"
+      ],
+      "reason": "G2 restock-r1 required six ToolFailure recoveries; G1 restock r1/r2 had zero. Failures include recursive CTE, list concatenation, DATE/VARCHAR, inferred decimal width and missing field. Dialect remains in tool summaries, so causality is not established; localize two parameter annotations and retain another original G2 sample in the same window. G3 is paused.",
+      "schema_sha256": "5b571e928fa3c51a7a5c18657a676b422e634103bb6390293db2440b63a8d47f",
+      "driver_sha256": "841bb27f77e4cc63ffb59cd80241cee6c5bedecdf819052c598051acef69d19f"
+    },
+    {
+      "registered_at_utc": "2026-09-13T16:00:06.654939+00:00",
+      "arm": "g2/g2g",
+      "cells": [
+        "g2:revenue:2",
+        "g2g:revenue:1"
+      ],
+      "decision": "Finish the bounded experiment after these cells. G2 restock-r2 had zero errors (r1 had six), whereas SQL-restored G2g restock-r1 had one missing-column error and did not call graph. Complete the second G2 revenue sample and cover actual graph invocation in G2g via revenue; do not infer effects on graph from an uninvoked tool. The narrow restoration did not establish a stable SQL dialect-description effect. G3 will remain unexecuted: second-layer savings are under 1% and route/Judge variability does not justify deeper semantic deletion in this round."
+    }
+  ]
+}

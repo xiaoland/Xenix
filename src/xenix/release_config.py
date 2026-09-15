@@ -213,6 +213,11 @@ def load_release_config() -> ReleaseConfig:
 
 
 def apply_frozen_otel_environment() -> None:
+    """Replace host OTEL_* environment in frozen builds with embedded config.
+
+    A packaged build must not inherit the end user's OTEL endpoint/export flags,
+    which could redirect or enable telemetry the build did not authorize.
+    """
     payload = _generated_payload()
     if payload is None:
         return

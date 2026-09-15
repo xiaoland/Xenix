@@ -1,0 +1,1 @@
+客户表是 2026-07-01 的业务快照。净消费已按统一口径扣除退款，无需再次扣除。last_contact_date 为空表示从未回访；vip、active 为 True/False；open_service_cases 为未结服务单数。

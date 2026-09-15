@@ -12,10 +12,10 @@ class ArtifactRepository:
         session.refresh(row)
         return row
 
-    def get(self, session: Session, artifact_id: str) -> ArtifactRow | None:
+    def get(self, session: Session, artifact_id: int) -> ArtifactRow | None:
         return session.get(ArtifactRow, artifact_id)
 
-    def delete(self, session: Session, artifact_id: str) -> bool:
+    def delete(self, session: Session, artifact_id: int) -> bool:
         row = self.get(session, artifact_id)
         if row is None:
             return False

@@ -18,6 +18,9 @@ from dataclasses import dataclass, field
 from typing import Any, Iterable, Literal, Mapping, TypeAlias
 
 from ...exceptions import ValidationError
+from .tool_protocol import (
+    InvalidToolArguments,
+)
 
 
 # These are deliberately modest.  They bound provider context and make a
@@ -69,16 +72,10 @@ def _dataset_name(value: Any) -> str | None:
     return value
 
 
-def _bounded_identifier(value: Any, *, label: str) -> str:
-    result = _bounded_text(value, label=label).strip()
-    if not result:
-        raise ValidationError(f"Message block field '{label}' cannot be blank.")
-    # IDs are carried into the provider-facing textual fallback.  They are
-    # opaque domain identities, never local paths; reject a malformed path
-    # here rather than accidentally exposing one through ``to_markdown()``.
-    if "/" in result or "\\" in result:
-        raise ValidationError(f"Message block field '{label}' must not be a path.")
-    return result
+def _bounded_identifier(value: Any, *, label: str) -> int:
+    if type(value) is not int or value < 1:
+        raise ValidationError(f"Message block field '{label}' must be a positive integer.")
+    return value
 
 
 def _bounded_nonnegative_int(value: Any, *, label: str) -> int | None:
@@ -219,7 +216,7 @@ class MarkdownBlock(MessageBlock):
 
 @dataclass(frozen=True)
 class DatasetBlock(MessageBlock):
-    dataset_id: str
+    dataset_id: int
     name: str | None = None
     row_count: int | None = None
     column_count: int | None = None
@@ -262,7 +259,7 @@ class DatasetBlock(MessageBlock):
 
 @dataclass(frozen=True)
 class SourceAttachmentBlock(MessageBlock):
-    artifact_id: str
+    artifact_id: int
     file_name: str | None = None
     source_format: str | None = None
     chatbot_visible: bool | None = None
@@ -379,12 +376,12 @@ class AssistantOutputItem:
 
 @dataclass(frozen=True)
 class ToolCallOutputItem:
-    """A provider tool call in canonical source order."""
+    """A requested tool call in source order, before registry identity resolution."""
 
     provider_call_id: str
     tool_name: str
     provider_name: str
-    arguments: dict[str, object]
+    arguments: dict[str, object] | InvalidToolArguments
     stream_index: int | None = None
 
 

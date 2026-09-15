@@ -1,31 +1,29 @@
 """Versioned, Agent-only acceptance and comparison for benchmark reports.
 
 The live pytest surface deliberately produces measurements.  This module is the
-separate fail-closed consumer which may turn schema-v5 Agent reports into an
-acceptance decision.  It has no service-report input or service-test dependency.
+consumer of the outcome and measurement fields needed for acceptance.  It has no service-report input or service-test dependency.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from collections import Counter
+from dataclasses import dataclass, field
 from enum import StrEnum
 import json
 import math
 from pathlib import Path
 from statistics import median
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any, Iterable, Literal, Mapping, Sequence
 
-from .budgets import BenchmarkBudgetPolicy
+from pydantic import BaseModel, ConfigDict, ValidationError
+
 from .judge_calibration import JudgeCalibrationReport
 
 
-REPORT_POLICY_ID = "agent-harness-report-policy-v1"
+REPORT_POLICY_ID = "agent-harness-report-policy-v3"
 AGENT_REPORT_KIND = "xenix.agent_harness.cell"
-CURRENT_REPORT_SCHEMA_VERSION = 5
+CURRENT_REPORT_SCHEMA_VERSION = 6
 LEGACY_REPORT_SCHEMA_VERSION = 4
-_MAX_REPORT_BYTES = 1_048_576
-_MAX_COLLECTION_SIZE = 128
-_SHA256_LENGTH = 64
 
 
 class ReportPolicyError(ValueError):
@@ -71,11 +69,13 @@ class ReportPolicyDecision:
     reason_codes: tuple[str, ...]
     case_id: str | None = None
     run_ids: tuple[str, ...] = ()
+    observations: tuple[Mapping[str, Any], ...] = ()
+    summary: Mapping[str, Any] = field(default_factory=dict)
 
     def to_payload(self) -> dict[str, Any]:
         return {
             "report_kind": "xenix.agent_harness.policy_decision",
-            "schema_version": 1,
+            "schema_version": 2,
             "policy_id": REPORT_POLICY_ID,
             "evaluation": self.evaluation,
             "qualified": self.qualified,
@@ -84,6 +84,8 @@ class ReportPolicyDecision:
             "reason_codes": list(self.reason_codes),
             "case_id": self.case_id,
             "run_ids": list(self.run_ids),
+            "observations": list(self.observations),
+            "summary": dict(self.summary),
         }
 
 
@@ -102,7 +104,7 @@ class ReportComparison:
     def to_payload(self) -> dict[str, Any]:
         return {
             "report_kind": "xenix.agent_harness.report_comparison",
-            "schema_version": 1,
+            "schema_version": 2,
             "policy_id": REPORT_POLICY_ID,
             "comparable": self.comparable,
             "gate_eligible": self.gate_eligible,
@@ -117,7 +119,7 @@ class ReportComparison:
 def load_agent_report(path: Path) -> LoadedAgentReport:
     """Read one Agent report; schema v4 remains diagnostic-only."""
 
-    payload = _load_json_object(path, maximum_bytes=_MAX_REPORT_BYTES)
+    payload = _load_json_object(path)
     schema_version = payload.get("schema_version")
     if schema_version == LEGACY_REPORT_SCHEMA_VERSION:
         _validate_legacy_identity(payload)
@@ -126,11 +128,11 @@ def load_agent_report(path: Path) -> LoadedAgentReport:
             qualification=ReportQualification.LEGACY_UNQUALIFIED,
             payload=payload,
         )
-    if schema_version != CURRENT_REPORT_SCHEMA_VERSION:
+    if schema_version not in (5, CURRENT_REPORT_SCHEMA_VERSION):
         raise ReportPolicyError("unsupported_report_schema")
-    _validate_v5_report(payload)
+    _validate_report(payload)
     return LoadedAgentReport(
-        schema_version=CURRENT_REPORT_SCHEMA_VERSION,
+        schema_version=schema_version,
         qualification=ReportQualification.QUALIFIED,
         payload=payload,
     )
@@ -138,7 +140,7 @@ def load_agent_report(path: Path) -> LoadedAgentReport:
 
 def load_agent_reports(paths: Iterable[Path]) -> tuple[LoadedAgentReport, ...]:
     resolved = tuple(paths)
-    if not resolved or len(resolved) > _MAX_COLLECTION_SIZE:
+    if not resolved:
         raise ReportPolicyError("report_collection_size_invalid")
     return tuple(load_agent_report(path) for path in resolved)
 
@@ -146,14 +148,17 @@ def load_agent_reports(paths: Iterable[Path]) -> tuple[LoadedAgentReport, ...]:
 def evaluate_characterization(
     reports: Sequence[LoadedAgentReport],
 ) -> ReportPolicyDecision:
-    """Qualify one headless measurement without turning it into a gate."""
+    """Describe every supplied attempt in one same-mode cohort, including failures."""
 
+    shape = _profile_shape(reports) or (0, 0)
     reasons = _measurement_reasons(
         reports,
-        headless_count=1,
-        headed_count=0,
+        headless_count=shape[0],
+        headed_count=shape[1],
         require_semantic_prerequisites=False,
     )
+    if all(shape):
+        reasons.append("characterization_execution_modes_mixed")
     qualified = not reasons
     return _decision(
         evaluation="characterization",
@@ -170,7 +175,7 @@ def evaluate_formal_acceptance(
     *,
     calibrations: Sequence[JudgeCalibrationReport] = (),
 ) -> ReportPolicyDecision:
-    """Apply the v1 formal policy: three headless and one headed cell.
+    """Apply the formal policy: three headless and one headed cell.
 
     Invocation identity is dispatch-local rather than a cohort key.  The four
     cells may therefore come from distinct, independently budgeted pytest
@@ -206,29 +211,27 @@ def compare_report_cohorts(
 
     baseline_shape = _profile_shape(baseline)
     candidate_shape = _profile_shape(candidate)
-    if baseline_shape == (1, 0):
-        baseline_decision = evaluate_characterization(baseline)
-    elif baseline_shape == (3, 1):
+    if baseline_shape == (3, 1):
         baseline_decision = evaluate_formal_acceptance(
             baseline,
             calibrations=calibrations,
         )
     else:
-        baseline_decision = _invalid_shape_decision("baseline", baseline)
-    if candidate_shape == (1, 0):
-        candidate_decision = evaluate_characterization(candidate)
-    elif candidate_shape == (3, 1):
+        baseline_decision = evaluate_characterization(baseline)
+    if candidate_shape == (3, 1):
         candidate_decision = evaluate_formal_acceptance(
             candidate,
             calibrations=calibrations,
         )
     else:
-        candidate_decision = _invalid_shape_decision("candidate", candidate)
+        candidate_decision = evaluate_characterization(candidate)
 
     reasons: list[str] = []
     if baseline_shape != candidate_shape:
         reasons.append("comparison_repetition_policy_mismatch")
-    if not _all_v5(baseline) or not _all_v5(candidate):
+    if any(shape and all(shape) and shape != (3, 1) for shape in (baseline_shape, candidate_shape)):
+        reasons.append("characterization_execution_modes_mixed")
+    if not _all_supported(baseline) or not _all_supported(candidate):
         reasons.append("legacy_report_not_comparable")
     if not reasons:
         if baseline_shape is not None:
@@ -253,9 +256,7 @@ def compare_report_cohorts(
         reasons.extend(_comparison_judge_reasons(baseline, candidate, calibrations))
     comparable = not reasons
     gate_eligible = comparable and baseline_shape == candidate_shape == (3, 1)
-    passed = comparable and (
-        not gate_eligible or candidate_decision.accepted
-    )
+    passed = comparable and (not gate_eligible or candidate_decision.accepted)
     return ReportComparison(
         comparable=comparable,
         gate_eligible=gate_eligible,
@@ -263,9 +264,7 @@ def compare_report_cohorts(
         reason_codes=_unique(reasons),
         baseline=baseline_decision,
         candidate=candidate_decision,
-        metric_deltas=(
-            _metric_deltas(baseline, candidate) if comparable else {}
-        ),
+        metric_deltas=(_metric_deltas(baseline, candidate) if comparable else {}),
     )
 
 
@@ -291,6 +290,11 @@ def _decision(
     reasons: Sequence[str],
 ) -> ReportPolicyDecision:
     case_ids = {report.case_id for report in reports if report.case_id is not None}
+    observations = tuple(_report_observation(report) for report in reports)
+    shape = _profile_shape(reports) or (0, 0)
+    coherent = not _measurement_reasons(
+        reports, headless_count=shape[0], headed_count=shape[1], require_semantic_prerequisites=False
+    ) and (not all(shape) or shape == (3, 1))
     return ReportPolicyDecision(
         evaluation=evaluation,
         qualified=qualified,
@@ -298,10 +302,118 @@ def _decision(
         gate_eligible=gate_eligible,
         reason_codes=_unique(reasons),
         case_id=next(iter(case_ids)) if len(case_ids) == 1 else None,
-        run_ids=tuple(
-            report.run_id for report in reports if report.run_id is not None
-        ),
+        run_ids=tuple(report.run_id for report in reports if report.run_id is not None),
+        observations=observations,
+        summary=_summarize_observations(observations) if coherent else {},
     )
+
+
+def _report_observation(report: LoadedAgentReport) -> dict[str, Any]:
+    """Project task success separately from evaluator availability and resource coverage."""
+
+    payload = report.payload
+    if report.qualification is ReportQualification.LEGACY_UNQUALIFIED:
+        return {"run_id": report.run_id, "outcome": "unscored", "reason": "legacy_unqualified"}
+    status = payload["run_status"]
+    budget = payload["budget"]
+    judge = payload["judge"]
+    semantic = payload["semantic"]
+    budget_reason = budget.get("exhaustion_reason")
+    stop_reason = budget_reason or payload.get("failure_kind") or ""
+    if status in {"invalid_setup", "measurement_error"}:
+        outcome, reason = "unscored", status
+    elif stop_reason.startswith("invocation_token_limit"):
+        # Old reports may have overwritten a completed cell at the dispatch cap.
+        # Their original outcome cannot be recovered from the projected flag.
+        outcome, reason = "unscored", "invocation_budget_interference"
+    elif (
+        status == "budget_exceeded"
+        and budget["status"] == "unverifiable"
+        and budget_reason == payload.get("failure_kind")
+    ):
+        # Older runners labelled a stop caused by missing usage as exhaustion.
+        # A real wall timeout still fails even if its interrupted usage is unknown.
+        outcome, reason = "unscored", "accounting_stopped_execution"
+    elif status in {"budget_exceeded", "runtime_error"}:
+        outcome, reason = "fail", status
+    elif status != "completed":
+        outcome, reason = "unscored", "execution_status_unknown"
+    elif not payload["integrity"]["passed"]:
+        outcome, reason = "unscored", "integrity_not_passed"
+    elif any(not check["passed"] for check in semantic["checks"]):
+        outcome, reason = "fail", "outcome_check_failed"
+    elif not semantic["checks"]:
+        outcome, reason = "unscored", "outcome_evidence_missing"
+    elif judge["required"]:
+        if judge["status"] == "completed" and judge["verdict"] in {"pass", "partial", "fail"}:
+            outcome, reason = judge["verdict"], "judge_verdict"
+        else:
+            outcome, reason = "unscored", "judge_unavailable_or_inconclusive"
+    elif semantic["verdict"] in {"pass", "partial", "fail"}:
+        outcome, reason = semantic["verdict"], "deterministic_verdict"
+    else:
+        outcome, reason = "unscored", "outcome_not_evaluated"
+    metrics = payload["subject_metrics"]
+    reported_responses = metrics.get("usage_reported_primary_response_count")
+    admitted_rounds = budget.get("sampling_rounds_admitted")
+    tokens_complete = (
+        budget["status"] in {"within_limits", "exceeded"}
+        and metrics.get("token_usage") is not None
+        and isinstance(reported_responses, int)
+        and reported_responses == admitted_rounds
+    )
+    return {
+        "run_id": report.run_id,
+        "outcome": outcome,
+        "reason": reason,
+        "run_status": status,
+        "failure_kind": payload.get("failure_kind"),
+        "judge_status": judge["status"],
+        "budget_reason": budget_reason,
+        "reported_subject_tokens": budget["reported_subject_tokens"],
+        "subject_tokens_complete": tokens_complete,
+        "turn_seconds": metrics.get("turn_seconds"),
+        "sampling_rounds": metrics.get("sampling_round_count"),
+        "provenance": {
+            key: payload["identity"].get(key)
+            for key in ("harness_variant", "repository_commit", "repository_dirty", "case_definition_sha256", "runtime_sha256")
+        },
+    }
+
+
+def _summarize_observations(observations: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    counts = Counter(item["outcome"] for item in observations)
+    attempts = len(observations)
+    scored = attempts - counts["unscored"]
+    complete_tokens = sum(bool(item.get("subject_tokens_complete")) for item in observations)
+    observed_tokens = sum(item.get("reported_subject_tokens", 0) for item in observations)
+    total_tokens = observed_tokens if attempts and complete_tokens == attempts else None
+
+    def full_median(key: str) -> float | None:
+        values = [item.get(key) for item in observations]
+        if not values or not all(
+            isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+            for value in values
+        ):
+            return None
+        return float(median(values))
+
+    return {
+        "attempt_count": attempts,
+        "scored_count": scored,
+        "outcome_counts": {key: counts[key] for key in ("pass", "partial", "fail", "unscored")},
+        "pass_rate": counts["pass"] / scored if scored else None,
+        "observed_subject_tokens": observed_tokens,
+        "subject_token_coverage": complete_tokens / attempts if attempts else None,
+        "total_subject_tokens": total_tokens,
+        "effective_subject_tokens_per_pass": (
+            total_tokens / counts["pass"]
+            if total_tokens is not None and counts["pass"] and scored == attempts else None
+        ),
+        "median_turn_seconds": full_median("turn_seconds"),
+        "median_sampling_rounds": full_median("sampling_rounds"),
+        "median_reported_subject_tokens": full_median("reported_subject_tokens") if total_tokens is not None else None,
+    }
 
 
 def _measurement_reasons(
@@ -314,7 +426,7 @@ def _measurement_reasons(
     reasons: list[str] = []
     if len(reports) != headless_count + headed_count:
         reasons.append("repetition_count_invalid")
-    if not _all_v5(reports):
+    if not _all_supported(reports):
         reasons.append("legacy_unqualified")
         return reasons
     payloads = [report.payload for report in reports]
@@ -327,17 +439,17 @@ def _measurement_reasons(
     if len({payload["case_id"] for payload in payloads}) != 1:
         reasons.append("case_identity_mismatch")
     reasons.extend(_cohort_identity_reasons(payloads))
-    for payload in payloads:
-        if payload["run_status"] != "completed":
-            reasons.append("execution_not_completed")
-        if not payload["integrity"]["passed"]:
-            reasons.append("integrity_not_passed")
-        if require_semantic_prerequisites:
+    if require_semantic_prerequisites:
+        for payload in payloads:
+            if payload["run_status"] != "completed":
+                reasons.append("execution_not_completed")
+            if not payload["integrity"]["passed"]:
+                reasons.append("integrity_not_passed")
             semantic_checks = payload["semantic"]["checks"]
             if not semantic_checks or not all(check["passed"] for check in semantic_checks):
                 reasons.append("semantic_prerequisite_not_passed")
-        if payload["budget"]["status"] != "within_limits":
-            reasons.append("budget_not_within_limits")
+            if payload["budget"]["status"] != "within_limits":
+                reasons.append("budget_not_within_limits")
     return list(_unique(reasons))
 
 
@@ -347,38 +459,42 @@ def _cohort_identity_reasons(payloads: Sequence[Mapping[str, Any]]) -> list[str]
     reasons: list[str] = []
     required_identity = (
         "fixture_sha256",
-        "settings_sha256",
         "effective_settings_sha256",
-        "repository_commit",
         "harness_variant",
-        "invocation_id",
-        "case_definition_sha256",
-        "runtime_sha256",
     )
     for payload in payloads:
         identity = payload["identity"]
-        if any(not identity[key] for key in required_identity):
+        if any(not identity.get(key) for key in required_identity):
             reasons.append("identity_incomplete")
-        if identity["repository_dirty"] is not False:
-            reasons.append("repository_not_clean")
     fields = (
+        "schema_version",
         "provider_model",
         "identity.fixture_sha256",
-        "identity.settings_sha256",
         "identity.embedding_settings_sha256",
         "identity.judge_settings_sha256",
-        "identity.repository_commit",
         "identity.effective_settings_sha256",
         "identity.harness_variant",
-        "identity.case_definition_sha256",
-        "identity.runtime_sha256",
         "budget.policy",
     )
     # invocation_id is intentionally absent: it identifies one budget-owning
     # dispatch, while formal acceptance combines four independent dispatches.
-    for field in fields:
-        if len({_nested_value(payload, field) for payload in payloads}) != 1:
-            reasons.append(f"cohort_{field.replace('.', '_')}_mismatch")
+    for key in fields:
+        if len({_nested_value(payload, key) for payload in payloads}) != 1:
+            reasons.append(f"cohort_{key.replace('.', '_')}_mismatch")
+    reasons.extend(_judge_identity_reasons(payloads, prefix="cohort"))
+    return reasons
+
+
+def _judge_identity_reasons(payloads: Sequence[Mapping[str, Any]], *, prefix: str) -> list[str]:
+    # A crash before assessment has no observed rubric. Configured Judge settings
+    # still participate in identity; lack of a response is an outcome, not drift.
+    assessed = [payload for payload in payloads if payload["judge"]["required"] or payload["run_status"] == "completed"]
+    reasons = []
+    for key in ("judge.required", "judge.rubric_id", "judge.rubric_sha256", "judge.provider_model"):
+        values = {_nested_value(payload, key) for payload in assessed}
+        values.discard(None)
+        if len(values) > 1:
+            reasons.append(f"{prefix}_{key.replace('.', '_')}_mismatch")
     return reasons
 
 
@@ -401,12 +517,12 @@ def _semantic_reasons(
     reasons.extend(_calibration_reasons(payloads, calibrations))
     headless = [payload for payload in payloads if payload["execution_mode"] == "headless"]
     headed = [payload for payload in payloads if payload["execution_mode"] == "headed"]
-    verdicts = [payload["semantic"]["verdict"] for payload in headless]
+    verdicts = [payload["judge"]["verdict"] for payload in headless]
     if verdicts.count("pass") < 2:
         reasons.append("headless_semantic_majority_not_passed")
     if any(verdict not in {"pass", "partial"} for verdict in verdicts):
         reasons.append("headless_semantic_disqualifying_verdict")
-    if len(headed) != 1 or headed[0]["semantic"]["verdict"] != "pass":
+    if len(headed) != 1 or headed[0]["judge"]["verdict"] != "pass":
         reasons.append("headed_semantic_not_passed")
     return list(_unique(reasons))
 
@@ -417,11 +533,9 @@ def _judge_cell_reasons(payloads: Sequence[Mapping[str, Any]]) -> list[str]:
         judge = payload["judge"]
         if judge["status"] != "completed":
             reasons.append("judge_not_completed")
-        if judge["independence"] != "independent":
-            reasons.append("judge_not_independent")
-        if not judge["rubric_id"] or not judge["rubric_sha256"]:
+        if not judge.get("rubric_id") or not judge.get("rubric_sha256"):
             reasons.append("judge_rubric_identity_missing")
-        if not judge["provider_model"]:
+        if not judge.get("provider_model"):
             reasons.append("judge_model_missing")
     return reasons
 
@@ -430,6 +544,8 @@ def _calibration_reasons(
     payloads: Sequence[Mapping[str, Any]],
     calibrations: Sequence[JudgeCalibrationReport],
 ) -> list[str]:
+    if not calibrations:
+        return []
     reasons: list[str] = []
     for payload in payloads:
         judge = payload["judge"]
@@ -439,13 +555,13 @@ def _calibration_reasons(
                 calibration
                 for calibration in calibrations
                 if calibration.passed
-                and calibration.rubric_id == judge["rubric_id"]
-                and _hash_equal(calibration.rubric_sha256, judge["rubric_sha256"])
-                and calibration.judge_model == judge["provider_model"]
+                and calibration.rubric_id == judge.get("rubric_id")
+                and _hash_equal(calibration.rubric_sha256, judge.get("rubric_sha256"))
+                and calibration.judge_model == judge.get("provider_model")
                 and calibration.subject_model == payload["provider_model"]
                 and _hash_equal(
                     calibration.judge_settings_sha256,
-                    identity["judge_settings_sha256"],
+                    identity.get("judge_settings_sha256"),
                 )
             ),
             None,
@@ -464,26 +580,20 @@ def _comparison_identity_reasons(
     left = baseline[0].payload
     right = candidate[0].payload
     fields = (
+        "schema_version",
         "case_id",
         "provider_model",
         "identity.fixture_sha256",
-        "identity.settings_sha256",
         "identity.embedding_settings_sha256",
         "identity.judge_settings_sha256",
         "identity.effective_settings_sha256",
-        "identity.case_definition_sha256",
-        "identity.runtime_sha256",
         "budget.policy",
-        "judge.required",
-        "judge.rubric_id",
-        "judge.rubric_sha256",
-        "judge.provider_model",
     )
     return [
         f"comparison_{field.replace('.', '_')}_mismatch"
         for field in fields
         if _nested_value(left, field) != _nested_value(right, field)
-    ]
+    ] + _judge_identity_reasons([report.payload for report in (*baseline, *candidate)], prefix="comparison")
 
 
 def _comparison_judge_reasons(
@@ -494,70 +604,97 @@ def _comparison_judge_reasons(
     payloads = [report.payload for report in (*baseline, *candidate)]
     if not payloads or not any(payload["judge"]["required"] for payload in payloads):
         return []
-    reasons = _judge_cell_reasons(payloads)
-    reasons.extend(_calibration_reasons(payloads, calibrations))
-    return list(_unique(reasons))
+    judged = [payload for payload in payloads if payload["judge"]["status"] == "completed"]
+    return _calibration_reasons(judged, calibrations)
 
 
 def _metric_deltas(
     baseline: Sequence[LoadedAgentReport],
     candidate: Sequence[LoadedAgentReport],
 ) -> dict[str, float | int | None]:
-    def values(reports: Sequence[LoadedAgentReport], key: str) -> list[float]:
-        return [
-            float(value)
-            for report in reports
-            if isinstance((value := report.payload["subject_metrics"].get(key)), (int, float))
-            and not isinstance(value, bool)
-        ]
-
-    baseline_seconds = values(baseline, "turn_seconds")
-    candidate_seconds = values(candidate, "turn_seconds")
-    baseline_tokens = [
-        report.payload["budget"]["reported_subject_tokens"] for report in baseline
-    ]
-    candidate_tokens = [
-        report.payload["budget"]["reported_subject_tokens"] for report in candidate
-    ]
-    return {
-        "median_turn_seconds": _median_delta(baseline_seconds, candidate_seconds),
-        "median_reported_subject_tokens": _median_delta(
-            baseline_tokens,
-            candidate_tokens,
-        ),
-    }
-
-
-def _median_delta(left: Sequence[float | int], right: Sequence[float | int]) -> float | None:
-    if not left or not right:
-        return None
-    return float(median(right) - median(left))
+    left = _summarize_observations(tuple(_report_observation(report) for report in baseline))
+    right = _summarize_observations(tuple(_report_observation(report) for report in candidate))
+    keys = ("median_turn_seconds", "median_sampling_rounds", "median_reported_subject_tokens", "effective_subject_tokens_per_pass")
+    deltas = {key: right[key] - left[key] if left[key] is not None and right[key] is not None else None for key in keys}
+    deltas["pass_rate"] = (
+        right["pass_rate"] - left["pass_rate"]
+        if left["scored_count"] == left["attempt_count"] and right["scored_count"] == right["attempt_count"]
+        else None
+    )
+    return deltas
 
 
 def _profile_shape(reports: Sequence[LoadedAgentReport]) -> tuple[int, int] | None:
-    if not _all_v5(reports):
+    if not _all_supported(reports):
         return None
     modes = [report.payload["execution_mode"] for report in reports]
     return modes.count("headless"), modes.count("headed")
 
 
-def _invalid_shape_decision(label: str, reports: Sequence[LoadedAgentReport]) -> ReportPolicyDecision:
-    return _decision(
-        evaluation=f"{label}_comparison_input",
-        reports=reports,
-        qualified=False,
-        accepted=False,
-        gate_eligible=False,
-        reasons=("comparison_profile_invalid",),
-    )
-
-
-def _all_v5(reports: Sequence[LoadedAgentReport]) -> bool:
+def _all_supported(reports: Sequence[LoadedAgentReport]) -> bool:
     return bool(reports) and all(
-        report.qualification is ReportQualification.QUALIFIED
-        and report.schema_version == CURRENT_REPORT_SCHEMA_VERSION
+        report.qualification is ReportQualification.QUALIFIED and report.schema_version in (5, CURRENT_REPORT_SCHEMA_VERSION)
         for report in reports
     )
+
+
+class _PolicyFields(BaseModel):
+    # Reports are local runner output. Validate what the policy consumes and let
+    # diagnostics evolve without making old measurements unreadable.
+    model_config = ConfigDict(strict=True, extra="ignore")
+
+
+class _CheckFields(_PolicyFields):
+    passed: bool
+
+
+class _IntegrityFields(_PolicyFields):
+    passed: bool
+
+
+class _SemanticFields(_PolicyFields):
+    verdict: Literal["pass", "partial", "fail", "inconclusive", "not_evaluated"]
+    checks: list[_CheckFields]
+
+
+class _JudgeFields(_PolicyFields):
+    required: bool
+    status: str
+    verdict: Literal["pass", "partial", "fail", "inconclusive", "not_evaluated"]
+    rubric_id: str | None = None
+    rubric_sha256: str | None = None
+    provider_model: str | None = None
+
+
+class _BudgetFields(_PolicyFields):
+    status: str
+    policy: dict[str, Any]
+    reported_subject_tokens: int
+    exhaustion_reason: str | None = None
+
+
+class _IdentityFields(_PolicyFields):
+    fixture_sha256: str | None = None
+    effective_settings_sha256: str | None = None
+    embedding_settings_sha256: str | None = None
+    judge_settings_sha256: str | None = None
+    harness_variant: str | None = None
+
+
+class _ReportFields(_PolicyFields):
+    report_kind: Literal["xenix.agent_harness.cell"]
+    case_id: str
+    run_id: str
+    provider_model: str
+    execution_mode: Literal["headless", "headed"]
+    run_status: str
+    failure_kind: str | None = None
+    semantic: _SemanticFields
+    integrity: _IntegrityFields
+    judge: _JudgeFields
+    budget: _BudgetFields
+    identity: _IdentityFields
+    subject_metrics: dict[str, Any]
 
 
 def _validate_legacy_identity(payload: Mapping[str, Any]) -> None:
@@ -565,389 +702,27 @@ def _validate_legacy_identity(payload: Mapping[str, Any]) -> None:
         raise ReportPolicyError("legacy_report_identity_invalid")
 
 
-def _validate_v5_report(payload: Mapping[str, Any]) -> None:
-    _exact_keys(
-        payload,
-        {
-            "report_kind", "schema_version", "case_id", "run_id", "provider_model",
-            "execution_mode", "run_status", "semantic", "integrity", "judge",
-            "subject_metrics", "budget", "identity", "failure_kind",
-        },
-        "report_shape_invalid",
-    )
-    if payload["report_kind"] != AGENT_REPORT_KIND:
-        raise ReportPolicyError("report_kind_invalid")
-    _bounded_string(payload["case_id"], "case_id_invalid", maximum=160)
-    _bounded_string(payload["run_id"], "run_id_invalid", maximum=96)
-    _bounded_string(payload["provider_model"], "provider_model_invalid", maximum=256)
-    _enum_string(payload["execution_mode"], {"headless", "headed"}, "execution_mode_invalid")
-    _enum_string(
-        payload["run_status"],
-        {"completed", "budget_exceeded", "invalid_setup", "runtime_error", "measurement_error"},
-        "run_status_invalid",
-    )
-    _validate_outcome_channel(payload["semantic"], semantic=True)
-    _validate_outcome_channel(payload["integrity"], semantic=False)
-    integrity_checks = payload["integrity"]["checks"]
-    expected_integrity = (
-        payload["run_status"] == "completed"
-        and bool(integrity_checks)
-        and all(check["passed"] for check in integrity_checks)
-    )
-    if payload["integrity"]["passed"] is not expected_integrity:
-        raise ReportPolicyError("integrity_projection_invalid")
-    _validate_judge(payload["judge"])
-    _validate_subject_metrics(payload["subject_metrics"])
-    _validate_budget(payload["budget"])
-    _validate_subject_budget_projection(
-        subject_metrics=payload["subject_metrics"],
-        budget=payload["budget"],
-        run_status=payload["run_status"],
-    )
-    _validate_identity(payload["identity"])
-    _optional_bounded_string(payload["failure_kind"], "failure_kind_invalid", maximum=128)
-
-
-def _validate_outcome_channel(value: object, *, semantic: bool) -> None:
-    channel = _object(value, "outcome_channel_invalid")
-    keys = {"verdict", "passed", "checks"} if semantic else {"passed", "checks"}
-    _exact_keys(channel, keys, "outcome_channel_invalid")
-    if semantic:
-        _enum_string(
-            channel["verdict"],
-            {"pass", "partial", "fail", "inconclusive", "not_evaluated"},
-            "semantic_verdict_invalid",
-        )
-        if channel["passed"] is not (channel["verdict"] == "pass"):
-            raise ReportPolicyError("semantic_projection_invalid")
-    _boolean(channel["passed"], "outcome_passed_invalid")
-    checks = channel["checks"]
-    if not isinstance(checks, list) or len(checks) > 64:
-        raise ReportPolicyError("outcome_checks_invalid")
-    for check in checks:
-        item = _object(check, "outcome_check_invalid")
-        _exact_keys(item, {"name", "passed", "summary"}, "outcome_check_invalid")
-        _bounded_string(item["name"], "outcome_check_invalid", maximum=128)
-        _boolean(item["passed"], "outcome_check_invalid")
-        _bounded_string(item["summary"], "outcome_check_invalid", maximum=512)
-
-
-def _validate_judge(value: object) -> None:
-    judge = _object(value, "judge_shape_invalid")
-    _exact_keys(
-        judge,
-        {
-            "required", "rubric_id", "rubric_sha256", "status", "verdict",
-            "provider_model", "independence", "scores", "reason_codes", "summary", "metrics",
-        },
-        "judge_shape_invalid",
-    )
-    _boolean(judge["required"], "judge_required_invalid")
-    _optional_bounded_string(judge["rubric_id"], "judge_rubric_id_invalid", maximum=128)
-    _optional_sha256(judge["rubric_sha256"], "judge_rubric_sha256_invalid")
-    _enum_string(
-        judge["status"],
-        {"not_requested", "not_configured", "blocked", "invalid_setup", "provider_error", "invalid_response", "completed"},
-        "judge_status_invalid",
-    )
-    _enum_string(
-        judge["verdict"],
-        {"pass", "partial", "fail", "inconclusive", "not_evaluated"},
-        "judge_verdict_invalid",
-    )
-    _optional_bounded_string(judge["provider_model"], "judge_model_invalid", maximum=256)
-    _enum_string(
-        judge["independence"],
-        {"not_applicable", "independent", "same_model"},
-        "judge_independence_invalid",
-    )
-    scores = _object(judge["scores"], "judge_scores_invalid")
-    if len(scores) > 32:
-        raise ReportPolicyError("judge_scores_invalid")
-    for key, score in scores.items():
-        _bounded_string(key, "judge_scores_invalid", maximum=128)
-        _bounded_int(score, "judge_scores_invalid", maximum=2)
-    reason_codes = judge["reason_codes"]
-    if not isinstance(reason_codes, list) or len(reason_codes) > 32:
-        raise ReportPolicyError("judge_reason_codes_invalid")
-    if len(set(reason_codes)) != len(reason_codes):
-        raise ReportPolicyError("judge_reason_codes_invalid")
-    for code in reason_codes:
-        _bounded_string(code, "judge_reason_codes_invalid", maximum=128)
-    _bounded_string(judge["summary"], "judge_summary_invalid", maximum=256)
-    _validate_metrics(judge["metrics"], judge_metrics=True)
-
-
-def _validate_subject_metrics(value: object) -> None:
-    metrics = _object(value, "subject_metrics_invalid")
-    _exact_keys(
-        metrics,
-        {
-            "turn_seconds", "assessment_seconds", "sampling_round_count",
-            "usage_reported_primary_response_count", "token_usage", "message_counts",
-            "tool_call_counts_by_name", "tool_result_counts_by_status",
-            "provider_retry_count", "derived_dataset_count", "terminal_shape",
-        },
-        "subject_metrics_invalid",
-    )
-    _optional_nonnegative_number(metrics["turn_seconds"], "subject_metrics_invalid")
-    _optional_nonnegative_number(metrics["assessment_seconds"], "subject_metrics_invalid")
-    for key in ("sampling_round_count", "provider_retry_count", "derived_dataset_count"):
-        _bounded_int(metrics[key], "subject_metrics_invalid")
-    value_count = metrics["usage_reported_primary_response_count"]
-    if value_count is not None:
-        _bounded_int(value_count, "subject_metrics_invalid")
-    _validate_token_usage(metrics["token_usage"])
-    for key in ("message_counts", "tool_call_counts_by_name", "tool_result_counts_by_status"):
-        _validate_count_map(metrics[key])
-    shape = metrics["terminal_shape"]
-    if shape is not None and (
-        not isinstance(shape, list)
-        or len(shape) != 2
-        or any(isinstance(item, bool) or not isinstance(item, int) or item < 0 for item in shape)
-    ):
-        raise ReportPolicyError("subject_metrics_invalid")
-
-
-def _validate_metrics(value: object, *, judge_metrics: bool) -> None:
-    metrics = _object(value, "judge_metrics_invalid")
-    expected = {"elapsed_seconds", "token_usage", "provider_retry_count"}
-    _exact_keys(metrics, expected, "judge_metrics_invalid")
-    _optional_nonnegative_number(metrics["elapsed_seconds"], "judge_metrics_invalid")
-    _validate_token_usage(metrics["token_usage"])
-    _bounded_int(metrics["provider_retry_count"], "judge_metrics_invalid")
-
-
-def _validate_token_usage(value: object) -> None:
-    if value is None:
-        return
-    usage = _object(value, "token_usage_invalid")
-    _exact_keys(
-        usage,
-        {"input_tokens", "cached_input_tokens", "output_tokens", "total_tokens"},
-        "token_usage_invalid",
-    )
-    for amount in usage.values():
-        _bounded_int(amount, "token_usage_invalid", maximum=100_000_000)
-
-
-def _validate_count_map(value: object) -> None:
-    counts = _object(value, "metric_count_map_invalid")
-    if len(counts) > 128:
-        raise ReportPolicyError("metric_count_map_invalid")
-    for key, count in counts.items():
-        _bounded_string(key, "metric_count_map_invalid", maximum=128)
-        _bounded_int(count, "metric_count_map_invalid", maximum=1_000_000)
-
-
-def _validate_budget(value: object) -> None:
-    budget = _object(value, "budget_shape_invalid")
-    _exact_keys(
-        budget,
-        {
-            "status", "policy", "sampling_rounds_admitted", "provider_attempts_dispatched",
-            "reported_subject_tokens", "invocation_reported_subject_tokens", "exhaustion_reason",
-        },
-        "budget_shape_invalid",
-    )
-    _enum_string(
-        budget["status"],
-        {"within_limits", "exceeded", "unverifiable", "not_evaluated"},
-        "budget_status_invalid",
-    )
-    policy = _object(budget["policy"], "budget_policy_invalid")
-    _exact_keys(
-        policy,
-        {
-            "policy_id", "max_sampling_rounds", "max_wall_seconds",
-            "max_reported_subject_tokens", "max_reported_invocation_subject_tokens",
-            "max_provider_attempts", "token_enforcement",
-        },
-        "budget_policy_invalid",
-    )
-    _bounded_string(policy["policy_id"], "budget_policy_invalid", maximum=96)
-    _bounded_int(policy["max_sampling_rounds"], "budget_policy_invalid", minimum=1, maximum=BenchmarkBudgetPolicy.HARD_MAX_SAMPLING_ROUNDS)
-    _bounded_number(policy["max_wall_seconds"], "budget_policy_invalid", minimum=0.001, maximum=BenchmarkBudgetPolicy.HARD_MAX_WALL_SECONDS)
-    _bounded_int(policy["max_reported_subject_tokens"], "budget_policy_invalid", minimum=1, maximum=BenchmarkBudgetPolicy.HARD_MAX_REPORTED_SUBJECT_TOKENS)
-    _bounded_int(policy["max_reported_invocation_subject_tokens"], "budget_policy_invalid", minimum=1, maximum=BenchmarkBudgetPolicy.HARD_MAX_REPORTED_INVOCATION_SUBJECT_TOKENS)
-    _bounded_int(policy["max_provider_attempts"], "budget_policy_invalid", minimum=1, maximum=BenchmarkBudgetPolicy.HARD_MAX_PROVIDER_ATTEMPTS)
-    if policy["token_enforcement"] != "response_boundary":
-        raise ReportPolicyError("budget_policy_invalid")
-    _bounded_int(budget["sampling_rounds_admitted"], "budget_measurement_invalid", maximum=BenchmarkBudgetPolicy.HARD_MAX_SAMPLING_ROUNDS)
-    _bounded_int(budget["provider_attempts_dispatched"], "budget_measurement_invalid", maximum=100)
-    _bounded_int(budget["reported_subject_tokens"], "budget_measurement_invalid", maximum=100_000_000)
-    _bounded_int(budget["invocation_reported_subject_tokens"], "budget_measurement_invalid", maximum=100_000_000)
-    _optional_bounded_string(budget["exhaustion_reason"], "budget_reason_invalid", maximum=128)
-    if budget["status"] == "within_limits":
-        if (
-            budget["sampling_rounds_admitted"] > policy["max_sampling_rounds"]
-            or budget["provider_attempts_dispatched"]
-            > policy["max_sampling_rounds"] * policy["max_provider_attempts"]
-            or budget["reported_subject_tokens"]
-            > policy["max_reported_subject_tokens"]
-            or budget["invocation_reported_subject_tokens"]
-            > policy["max_reported_invocation_subject_tokens"]
-            or budget["exhaustion_reason"] is not None
-        ):
-            raise ReportPolicyError("budget_projection_invalid")
-    elif budget["status"] in {"exceeded", "unverifiable"} and budget["exhaustion_reason"] is None:
-        raise ReportPolicyError("budget_projection_invalid")
-
-
-def _validate_subject_budget_projection(
-    *,
-    subject_metrics: Mapping[str, Any],
-    budget: Mapping[str, Any],
-    run_status: str,
-) -> None:
-    if subject_metrics["sampling_round_count"] != budget["sampling_rounds_admitted"]:
-        raise ReportPolicyError("subject_budget_projection_invalid")
-    usage = subject_metrics["token_usage"]
-    if usage is not None and usage["total_tokens"] != budget["reported_subject_tokens"]:
-        raise ReportPolicyError("subject_budget_projection_invalid")
-    if run_status == "completed" and (
-        usage is None
-        or subject_metrics["usage_reported_primary_response_count"] is None
-        or budget["status"] != "within_limits"
-    ):
-        raise ReportPolicyError("subject_budget_projection_invalid")
-
-
-def _validate_identity(value: object) -> None:
-    identity = _object(value, "identity_shape_invalid")
-    _exact_keys(
-        identity,
-        {
-            "fixture_sha256", "settings_sha256", "embedding_settings_sha256",
-            "judge_settings_sha256", "repository_commit", "repository_dirty",
-            "effective_settings_sha256", "harness_variant", "invocation_id",
-            "case_definition_sha256", "runtime_sha256",
-        },
-        "identity_shape_invalid",
-    )
-    for key in (
-        "fixture_sha256", "settings_sha256", "embedding_settings_sha256",
-        "judge_settings_sha256", "effective_settings_sha256",
-        "case_definition_sha256", "runtime_sha256",
-    ):
-        _optional_sha256(identity[key], "identity_hash_invalid")
-    _optional_bounded_string(identity["repository_commit"], "repository_commit_invalid", maximum=64)
-    if identity["repository_dirty"] is not None:
-        _boolean(identity["repository_dirty"], "repository_dirty_invalid")
-    _bounded_string(identity["harness_variant"], "harness_variant_invalid", maximum=96)
-    _optional_bounded_string(identity["invocation_id"], "invocation_id_invalid", maximum=96)
-
-
-def _load_json_object(path: Path, *, maximum_bytes: int) -> dict[str, Any]:
+def _validate_report(payload: Mapping[str, Any]) -> None:
     try:
-        if path.stat().st_size > maximum_bytes:
-            raise ReportPolicyError("report_too_large")
-        text = path.read_text(encoding="utf-8")
-        value = json.loads(
-            text,
-            object_pairs_hook=_unique_json_object,
-            parse_constant=_reject_json_constant,
-        )
-    except ReportPolicyError:
-        raise
-    except (OSError, UnicodeError, TypeError, ValueError, json.JSONDecodeError) as exc:
+        _ReportFields.model_validate(payload)
+    except ValidationError as exc:
+        raise ReportPolicyError("report_shape_invalid") from exc
+
+
+def _load_json_object(path: Path) -> dict[str, Any]:
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, ValueError) as exc:
         raise ReportPolicyError("report_json_invalid") from exc
     if not isinstance(value, dict):
         raise ReportPolicyError("report_json_invalid")
     return value
 
 
-def _unique_json_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
-    result: dict[str, Any] = {}
-    for key, value in pairs:
-        if key in result:
-            raise ValueError("duplicate_json_key")
-        result[key] = value
-    return result
-
-
-def _reject_json_constant(_value: str) -> None:
-    raise ValueError("non_standard_json_constant")
-
-
-def _object(value: object, code: str) -> dict[str, Any]:
-    if not isinstance(value, dict):
-        raise ReportPolicyError(code)
-    return value
-
-
-def _exact_keys(value: Mapping[str, Any], expected: set[str], code: str) -> None:
-    if set(value) != expected:
-        raise ReportPolicyError(code)
-
-
-def _bounded_string(value: object, code: str, *, maximum: int) -> None:
-    if not isinstance(value, str) or not value.strip() or len(value) > maximum:
-        raise ReportPolicyError(code)
-
-
-def _optional_bounded_string(value: object, code: str, *, maximum: int) -> None:
-    if value is not None:
-        _bounded_string(value, code, maximum=maximum)
-
-
-def _optional_sha256(value: object, code: str) -> None:
-    if value is None:
-        return
-    if (
-        not isinstance(value, str)
-        or len(value) != _SHA256_LENGTH
-        or any(character.lower() not in "0123456789abcdef" for character in value)
-    ):
-        raise ReportPolicyError(code)
-
-
-def _boolean(value: object, code: str) -> None:
-    if not isinstance(value, bool):
-        raise ReportPolicyError(code)
-
-
-def _enum_string(value: object, choices: set[str], code: str) -> None:
-    if not isinstance(value, str) or value not in choices:
-        raise ReportPolicyError(code)
-
-
-def _bounded_int(
-    value: object,
-    code: str,
-    *,
-    minimum: int = 0,
-    maximum: int = 10_000_000,
-) -> None:
-    if isinstance(value, bool) or not isinstance(value, int) or not minimum <= value <= maximum:
-        raise ReportPolicyError(code)
-
-
-def _bounded_number(
-    value: object,
-    code: str,
-    *,
-    minimum: float,
-    maximum: float,
-) -> None:
-    if (
-        isinstance(value, bool)
-        or not isinstance(value, (int, float))
-        or not math.isfinite(float(value))
-        or not minimum <= float(value) <= maximum
-    ):
-        raise ReportPolicyError(code)
-
-
-def _optional_nonnegative_number(value: object, code: str) -> None:
-    if value is not None:
-        _bounded_number(value, code, minimum=0.0, maximum=1_000_000.0)
-
-
 def _nested_value(payload: Mapping[str, Any], dotted: str) -> Any:
     value: Any = payload
     for key in dotted.split("."):
-        value = value[key]
+        value = value.get(key) if isinstance(value, Mapping) else None
     return _freeze(value)
 
 
@@ -960,11 +735,7 @@ def _freeze(value: Any) -> Any:
 
 
 def _hash_equal(left: object, right: object) -> bool:
-    return (
-        isinstance(left, str)
-        and isinstance(right, str)
-        and left.lower() == right.lower()
-    )
+    return isinstance(left, str) and isinstance(right, str) and left.lower() == right.lower()
 
 
 def _unique(values: Iterable[str]) -> tuple[str, ...]:

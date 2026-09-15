@@ -1,3 +1,5 @@
+> 阶段归档（2026-09-15）：用户已结束 benchmark 优化及相关失败排查。以下为历史记录，旧 Next Step 不再代表待执行任务；当前工作见 [1.5.0 收尾](../minor-1-5-closeout/packet.md)。
+
 # Agent Harness Benchmark Pytest Control Migration
 
 ## Objective

@@ -5,6 +5,7 @@ from __future__ import annotations
 from PySide6.QtCore import QCoreApplication, QEvent, Qt, QTimer
 from PySide6.QtWidgets import QFormLayout, QLabel, QPushButton, QWidget
 
+from ...exceptions import report_exception
 from ...services.knowledge_index_service import (
     KnowledgeIndexOverview,
     KnowledgeIndexService,
@@ -146,6 +147,8 @@ class KnowledgeIndexStatus(QWidget):
             self._cached_status = None
             self._status_failed = True
         self._render_status()
+        if isinstance(result, Exception):
+            report_exception(result)
 
         if (
             isinstance(result, KnowledgeIndexOverview)

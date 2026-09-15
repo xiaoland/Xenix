@@ -1,0 +1,38 @@
+[
+  {
+    "run_id": "30541015a5794f0f83aa2ca2a7520d12",
+    "report": "build/agent-harness-failures/confirmation/business.routing.v1.confirmation-deepseek-deepseek-v4-flash-30541015a5794f0f83aa2ca2a7520d12.json",
+    "run_status": "budget_exceeded",
+    "original_integrity": {
+      "checks": [
+        {
+          "name": "source_inputs_preserved",
+          "passed": true,
+          "summary": "external_inputs_and_imported_datasets"
+        }
+      ],
+      "passed": false
+    },
+    "current_integrity_projection": true,
+    "semantic_verdict_unchanged": "not_evaluated",
+    "case_still_unsuccessful": true
+  },
+  {
+    "run_id": "b42c66b7c85f4a1a9251081d2b1e7950",
+    "report": "build/agent-harness-failures/standard/business.routing.v1.standard-deepseek-deepseek-v4-flash-b42c66b7c85f4a1a9251081d2b1e7950.json",
+    "run_status": "budget_exceeded",
+    "original_integrity": {
+      "checks": [
+        {
+          "name": "source_inputs_preserved",
+          "passed": true,
+          "summary": "external_inputs_and_imported_datasets"
+        }
+      ],
+      "passed": false
+    },
+    "current_integrity_projection": true,
+    "semantic_verdict_unchanged": "not_evaluated",
+    "case_still_unsuccessful": true
+  }
+]

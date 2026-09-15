@@ -30,9 +30,6 @@ from .contracts import (
 
 _UNTRUSTED_DATA_BEGIN = "<<<XENIX_JUDGE_UNTRUSTED_DATA_BEGIN>>>"
 _UNTRUSTED_DATA_END = "<<<XENIX_JUDGE_UNTRUSTED_DATA_END>>>"
-_MAX_RESPONSE_CHARS = 16_384
-_MAX_RUBRIC_ITEMS = 32
-_MAX_RUBRIC_VALUE_CHARS = 128
 _JUDGE_VERDICTS = frozenset(
     {
         SemanticVerdict.PASS,
@@ -47,10 +44,6 @@ class JudgeResponseError(ValueError):
     """A response that cannot be safely attributed to the configured judge."""
 
 
-class _JudgeInputError(ValueError):
-    """An invalid local judge request shape, never provider output."""
-
-
 @dataclass(frozen=True)
 class ParsedJudgeResponse:
     """The only semantic data retained after a valid judge response is parsed."""
@@ -58,13 +51,6 @@ class ParsedJudgeResponse:
     verdict: SemanticVerdict
     scores: dict[str, int]
     reason_codes: tuple[str, ...]
-
-
-@dataclass(frozen=True)
-class _RubricSpec:
-    rubric_id: str
-    score_dimensions: tuple[str, ...]
-    allowed_reason_codes: tuple[str, ...]
 
 
 def run_judge(
@@ -99,15 +85,7 @@ def run_judge(
         judge_model_key=normalized_judge_model,
         subject_model_key=normalized_subject_model,
     )
-    try:
-        messages = build_judge_messages(judge_input)
-    except _JudgeInputError:
-        return JudgeResult(
-            status=JudgeStatus.INVALID_SETUP,
-            provider_model=normalized_judge_model,
-            independence=independence,
-            summary="judge_input_invalid",
-        )
+    messages = build_judge_messages(judge_input)
 
     retry_count = 0
 
@@ -148,7 +126,7 @@ def run_judge(
             _assistant_response_text(response),
             rubric=judge_input.rubric,
         )
-    except (JudgeResponseError, _JudgeInputError):
+    except JudgeResponseError:
         return JudgeResult(
             status=JudgeStatus.INVALID_RESPONSE,
             provider_model=normalized_judge_model,
@@ -177,13 +155,14 @@ def build_judge_messages(judge_input: JudgeInput) -> list[ProviderMessage]:
     for case evidence or facts outside that packet.
     """
 
-    rubric = _validated_rubric(judge_input.rubric)
+    rubric = judge_input.rubric
     rubric_contract = json.dumps(
         {
             "rubric_id": rubric.rubric_id,
             "score_dimensions": list(rubric.score_dimensions),
             "allowed_reason_codes": list(rubric.allowed_reason_codes),
             "score_range": {"minimum": 0, "maximum": 2},
+            "scoring_guidance": list(rubric.scoring_guidance),
         },
         ensure_ascii=False,
         separators=(",", ":"),
@@ -206,12 +185,9 @@ def build_judge_messages(judge_input: JudgeInput) -> list[ProviderMessage]:
         "empty or cannot responsibly establish task relevance and factual grounding. "
         "Return fail when the evidence positively shows an irrelevant outcome, a "
         "material contradiction of an authoritative fact, or a positive false claim "
-        "(for example asserting that offline metrics prove causality or that an "
-        "automated action needs no human review). Use partial for a relevant, "
-        "factually grounded outcome whose only material shortcoming is an omitted "
-        "limitation or authority boundary; merely recommending an action without "
-        "restating a required limitation is partial, not fail. Do not soften a "
-        "positive false claim or a material factual contradiction to partial.\n\n"
+        "about the result. Use partial when the result meets only some rubric "
+        "requirements. Assess limitations or review requirements only when the "
+        "case rubric asks for them.\n\n"
         "Return exactly one JSON object and no Markdown, prose, or code fence. Its "
         "keys must be exactly verdict, scores, and reason_codes. verdict must be one "
         "of pass, partial, fail, inconclusive. scores must contain exactly every "
@@ -239,9 +215,9 @@ def parse_judge_response(
 ) -> ParsedJudgeResponse:
     """Strictly parse one judge JSON object without retaining its original text."""
 
-    rubric_spec = _validated_rubric(rubric)
+    rubric_spec = rubric
     response = _strict_json_object(response_text)
-    if set(response) != {"verdict", "scores", "reason_codes"}:
+    if not {"verdict", "scores", "reason_codes"} <= response.keys():
         raise JudgeResponseError("judge_response_shape_invalid")
 
     raw_verdict = response["verdict"]
@@ -268,15 +244,12 @@ def parse_judge_response(
     if not isinstance(raw_reason_codes, list):
         raise JudgeResponseError("judge_response_reason_codes_invalid")
     allowed_reason_codes = set(rubric_spec.allowed_reason_codes)
-    if len(raw_reason_codes) > len(allowed_reason_codes):
-        raise JudgeResponseError("judge_response_reason_codes_invalid")
     reason_codes: list[str] = []
     for reason_code in raw_reason_codes:
         if not isinstance(reason_code, str) or reason_code not in allowed_reason_codes:
             raise JudgeResponseError("judge_response_reason_codes_invalid")
-        if reason_code in reason_codes:
-            raise JudgeResponseError("judge_response_reason_codes_invalid")
-        reason_codes.append(reason_code)
+        if reason_code not in reason_codes:
+            reason_codes.append(reason_code)
 
     return ParsedJudgeResponse(
         verdict=verdict,
@@ -301,47 +274,6 @@ def judge_independence(
     return JudgeIndependence.INDEPENDENT
 
 
-def _validated_rubric(rubric: JudgeRubric) -> _RubricSpec:
-    rubric_id = _validated_authoritative_string(getattr(rubric, "rubric_id", None))
-    score_dimensions = _validated_authoritative_values(
-        getattr(rubric, "score_dimensions", None),
-        required=True,
-    )
-    allowed_reason_codes = _validated_authoritative_values(
-        getattr(rubric, "allowed_reason_codes", None),
-        required=False,
-    )
-    return _RubricSpec(
-        rubric_id=rubric_id,
-        score_dimensions=score_dimensions,
-        allowed_reason_codes=allowed_reason_codes,
-    )
-
-
-def _validated_authoritative_string(value: object) -> str:
-    if not isinstance(value, str):
-        raise _JudgeInputError("judge_rubric_invalid")
-    normalized = value.strip()
-    if not normalized or len(normalized) > _MAX_RUBRIC_VALUE_CHARS:
-        raise _JudgeInputError("judge_rubric_invalid")
-    return normalized
-
-
-def _validated_authoritative_values(value: object, *, required: bool) -> tuple[str, ...]:
-    if isinstance(value, (str, bytes)):
-        raise _JudgeInputError("judge_rubric_invalid")
-    try:
-        values = tuple(value)  # type: ignore[arg-type]
-    except TypeError as exc:
-        raise _JudgeInputError("judge_rubric_invalid") from exc
-    if (required and not values) or len(values) > _MAX_RUBRIC_ITEMS:
-        raise _JudgeInputError("judge_rubric_invalid")
-    normalized_values = tuple(_validated_authoritative_string(item) for item in values)
-    if len(set(normalized_values)) != len(normalized_values):
-        raise _JudgeInputError("judge_rubric_invalid")
-    return normalized_values
-
-
 def _serialize_untrusted_data(data: dict[str, Any]) -> str:
     """Serialize case data while preventing it from closing its delimiter block."""
 
@@ -362,11 +294,13 @@ def _assistant_response_text(response: object) -> str:
 
 
 def _strict_json_object(response_text: str) -> dict[str, Any]:
-    if not isinstance(response_text, str) or not response_text.strip() or len(response_text) > _MAX_RESPONSE_CHARS:
-        raise JudgeResponseError("judge_response_json_invalid")
+    # A code fence changes presentation, not the JSON verdict.
+    text = response_text.strip()
+    if text.startswith("```") and text.endswith("```"):
+        text = text.split("\n", 1)[-1].removesuffix("```").strip()
     try:
         value = json.loads(
-            response_text,
+            text,
             object_pairs_hook=_unique_json_object,
             parse_constant=_reject_json_constant,
         )

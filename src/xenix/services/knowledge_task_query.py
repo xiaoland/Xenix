@@ -25,8 +25,8 @@ class KnowledgeTaskItem:
     updated_at: datetime
     error_code: str | None
     owner: str
-    owner_id: str
-    import_id: str | None
+    owner_id: int
+    import_id: int | None
     error_summary: str | None = None
     index_kinds: tuple[str, ...] = ()
     can_cancel: bool = False
@@ -56,9 +56,11 @@ class KnowledgeTaskQueryService:
         self,
         *,
         library_id: str = "global",
-        limit: int = 200,
+        limit: int | None = 200,
     ) -> list[KnowledgeTaskItem]:
-        bounded_limit = max(1, min(int(limit), 500))
+        # Cross-domain filtering needs the complete projection, including folded
+        # derivation attempts, before applying its own result limit.
+        bounded_limit = max(1, min(int(limit), 500)) if limit is not None else None
         with self._session_factory() as session:
             imports = list(
                 session.exec(
@@ -83,7 +85,7 @@ class KnowledgeTaskQueryService:
             document_ids = tuple({row.document_id for row in derivations})
             documents = (
                 {
-                    str(row[0]): str(row[1])
+                    row[0]: str(row[1])
                     for row in session.exec(
                         select(KnowledgeDocumentRow.id, KnowledgeDocumentRow.title).where(
                             KnowledgeDocumentRow.id.in_(document_ids)
@@ -103,7 +105,7 @@ class KnowledgeTaskQueryService:
             )
 
         derivations_by_import: dict[str, list[KnowledgeDerivationRow]] = {}
-        derivations_by_generation: dict[tuple[str, str], list[KnowledgeDerivationRow]] = {}
+        derivations_by_generation: dict[tuple[int, int], list[KnowledgeDerivationRow]] = {}
         for row in derivations:
             if row.import_id:
                 derivations_by_import.setdefault(row.import_id, []).append(row)
@@ -112,13 +114,16 @@ class KnowledgeTaskQueryService:
             ).append(row)
 
         items: list[KnowledgeTaskItem] = []
-        folded_derivation_ids: set[str] = set()
+        folded_derivation_ids: set[int] = set()
         for row in imports:
             attempts = sorted(
                 derivations_by_import.get(row.id, ()),
                 key=lambda item: (item.attempt_number, item.updated_at),
             )
             latest = attempts[-1] if attempts else None
+            # Fold derivation attempts into their import row only when the latest
+            # attempt failed and no earlier attempt succeeded; a prior success keeps
+            # attempts visible so a successful import is never re-attributed.
             prior_success = any(item.status == "succeeded" for item in attempts[:-1])
             if latest is not None and not prior_success:
                 folded_derivation_ids.update(item.id for item in attempts)
@@ -151,6 +156,11 @@ class KnowledgeTaskQueryService:
                     owner="derivation" if derivation_retryable else "import",
                     owner_id=latest.id if derivation_retryable and latest is not None else row.id,
                     import_id=row.id,
+                    error_summary=(
+                        latest.error_summary
+                        if latest is not None and not prior_success
+                        else row.error_summary
+                    ),
                     can_cancel=row.status in {"queued", "running"},
                     can_retry=bool(row.retryable or derivation_retryable),
                     can_view_log=True,
@@ -174,6 +184,7 @@ class KnowledgeTaskQueryService:
                     owner="derivation",
                     owner_id=latest.id,
                     import_id=latest.import_id,
+                    error_summary=latest.error_summary,
                     can_retry=bool(latest.retryable and latest.import_id),
                     can_view_log=False,
                 )

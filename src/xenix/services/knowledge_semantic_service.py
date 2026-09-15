@@ -6,6 +6,7 @@ from typing import Sequence
 
 from sqlalchemy.orm import sessionmaker
 
+from ..exceptions import report_exception
 from .embedding_service import (
     EmbeddingProfile,
     EmbeddingService,
@@ -16,11 +17,6 @@ from .knowledge_service import (
     KnowledgeSemanticIntegrityError,
     KnowledgeSemanticUnavailable,
 )
-from .knowledge_projection import (
-    CORPUS_FINGERPRINT_SCHEMA,
-    KnowledgeProjectionIdentity,
-    KnowledgeProjectionSnapshot,
-)
 from .knowledge_storage_maintenance import (
     KnowledgeStorageCleanupResult,
     KnowledgeStorageMaintenance,
@@ -30,7 +26,13 @@ from .knowledge_vector_store import (
     KnowledgeVectorStoreError,
     LanceKnowledgeVectorStore,
 )
-from .storage.models import KnowledgeVectorGenerationRow, generate_id
+from .storage.knowledge_projection import (
+    CORPUS_FINGERPRINT_SCHEMA,
+    KnowledgeProjectionIdentity,
+    KnowledgeProjectionSnapshot,
+)
+from .storage.identity import reserve_ids
+from .storage.models import KnowledgeVectorGenerationRow
 from .storage.repositories.knowledge import KnowledgeRepository
 
 LOGGER = logging.getLogger(__name__)
@@ -42,7 +44,7 @@ class KnowledgeSemanticIndexState:
     profile_fingerprint: str | None
     corpus_fingerprint: str
     unit_count: int
-    generation_id: str | None
+    generation_id: int | None
 
     @property
     def ready(self) -> bool:
@@ -242,7 +244,8 @@ class KnowledgeSemanticService:
                     return
                 self._storage_maintenance.cleanup()
                 self._maintenance_pending = False
-        except Exception:
+        except Exception as exc:
+            report_exception(exc)
             LOGGER.warning("Knowledge vector maintenance was deferred.")
 
     def _rebuild_generation(
@@ -281,7 +284,7 @@ class KnowledgeSemanticService:
                 raise KnowledgeSemanticIntegrityError()
             dimensions = document_batch.dimensions
 
-            generation_id = generate_id()
+            generation_id = reserve_ids(self._session_factory)[0]
             relative_path = self._vector_store.write_generation(
                 generation_id=generation_id,
                 records=[
@@ -297,6 +300,10 @@ class KnowledgeSemanticService:
                 profile_fingerprint=profile.profile_fingerprint,
             )
 
+            # Embedding runs outside any lock/transaction and spans many network
+            # calls; the corpus/profile may change while it is in flight. Re-freeze
+            # the profile and re-check the projection identity immediately before
+            # publishing so a stale-corpus generation is discarded rather than rowed.
             published = False
             try:
                 current_operation = self._embedding_service.freeze()
@@ -348,7 +355,7 @@ class KnowledgeSemanticService:
         profile_fingerprint: str,
         corpus_fingerprint: str,
         dimensions: int | None,
-        expected_unit_ids: Sequence[str],
+        expected_unit_ids: Sequence[int],
         expected_unit_count: int,
     ) -> KnowledgeVectorGenerationRow | None:
         with self._session_factory() as session:

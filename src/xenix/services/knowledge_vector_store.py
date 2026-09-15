@@ -1,23 +1,24 @@
 from __future__ import annotations
 
+import gc
+import json
+import logging
+import math
+import os
+import re
+import shutil
+import time
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
-import gc
 from dataclasses import dataclass
 from enum import StrEnum
 from hashlib import sha256
-import json
-import math
-import os
 from pathlib import Path, PurePosixPath
-import re
-import shutil
 from threading import Lock, RLock
-import time
 from uuid import uuid4
 
 from ..config import AppPaths
-from ..exceptions import ValidationError
+from ..exceptions import ValidationError, report_exception
 from .storage.layout import (
     knowledge_indexes_root,
     knowledge_root,
@@ -26,7 +27,7 @@ from .storage.layout import (
 
 _TABLE_NAME = "units"
 _MANIFEST_FILE_NAME = "manifest.json"
-_MANIFEST_SCHEMA_VERSION = 1
+_MANIFEST_SCHEMA_VERSION = 2
 _MAX_MANIFEST_BYTES = 4_096
 _MANIFEST_KEYS = frozenset(
     {
@@ -39,7 +40,7 @@ _MANIFEST_KEYS = frozenset(
         "unit_ids_sha256",
     }
 )
-_GENERATION_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,80}$")
+_GENERATION_ID_PATTERN = re.compile(r"^[1-9][0-9]*$")
 _SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 _MAX_FINGERPRINT_CHARACTERS = 256
 _VECTOR_STAGE_PREFIX = "vector-"
@@ -87,7 +88,7 @@ class KnowledgeVectorStoreError(ValidationError):
 
 @dataclass(frozen=True)
 class KnowledgeVectorRecord:
-    unit_id: str
+    unit_id: int
     vector: tuple[float, ...]
 
 
@@ -119,7 +120,7 @@ class LanceKnowledgeVectorStore:
     def write_generation(
         self,
         *,
-        generation_id: str,
+        generation_id: int,
         records: Sequence[KnowledgeVectorRecord],
         dimensions: int,
         corpus_fingerprint: str,
@@ -137,7 +138,7 @@ class LanceKnowledgeVectorStore:
     def _write_generation(
         self,
         *,
-        generation_id: str,
+        generation_id: int,
         records: Sequence[KnowledgeVectorRecord],
         dimensions: int,
         corpus_fingerprint: str,
@@ -150,7 +151,7 @@ class LanceKnowledgeVectorStore:
         normalized = self._validated_records(records, dimensions=dimensions)
         unit_ids = [record.unit_id for record in normalized]
         stage = self._staging_root / f"vector-{generation_id}"
-        final = self._indexes_root / generation_id
+        final = self._indexes_root / str(generation_id)
         stage_created = False
         try:
             self._assert_within(stage, self._staging_root)
@@ -205,10 +206,10 @@ class LanceKnowledgeVectorStore:
         self,
         relative_path: str,
         *,
-        expected_generation_id: str,
+        expected_generation_id: int,
         expected_corpus_fingerprint: str,
         expected_profile_fingerprint: str,
-        expected_unit_ids: Sequence[str],
+        expected_unit_ids: Sequence[int],
         expected_count: int,
         expected_dimensions: int,
     ) -> bool:
@@ -227,10 +228,10 @@ class LanceKnowledgeVectorStore:
         self,
         relative_path: str,
         *,
-        expected_generation_id: str,
+        expected_generation_id: int,
         expected_corpus_fingerprint: str,
         expected_profile_fingerprint: str,
-        expected_unit_ids: Sequence[str],
+        expected_unit_ids: Sequence[int],
         expected_count: int,
         expected_dimensions: int,
     ) -> bool:
@@ -262,7 +263,8 @@ class LanceKnowledgeVectorStore:
                 ),
                 expected_unit_ids=unit_ids,
             )
-        except Exception:
+        except Exception as exc:
+            report_exception(exc)
             return False
 
     def search(
@@ -271,7 +273,7 @@ class LanceKnowledgeVectorStore:
         *,
         query_vector: Sequence[float],
         limit: int,
-    ) -> list[str]:
+    ) -> list[int]:
         with self.lifecycle():
             return self._search(
                 relative_path,
@@ -285,7 +287,7 @@ class LanceKnowledgeVectorStore:
         *,
         query_vector: Sequence[float],
         limit: int,
-    ) -> list[str]:
+    ) -> list[int]:
         if limit < 1:
             raise KnowledgeVectorStoreError()
         vector = self._validated_vector(query_vector)
@@ -295,7 +297,7 @@ class LanceKnowledgeVectorStore:
         result = None
         unit_id_column = None
         failed = False
-        unit_ids: list[str] = []
+        unit_ids: list[int] = []
         try:
             import lancedb
 
@@ -308,7 +310,7 @@ class LanceKnowledgeVectorStore:
             query = query.limit(limit)
             result = query.to_arrow()
             unit_id_column = result.column("unit_id")
-            unit_ids = [str(value) for value in unit_id_column.to_pylist()]
+            unit_ids = [int(value) for value in unit_id_column.to_pylist()]
         except Exception as exc:
             failed = True
             self._discard_exception_traceback(exc)
@@ -327,7 +329,7 @@ class LanceKnowledgeVectorStore:
         self,
         relative_path: str,
         *,
-        expected_generation_id: str,
+        expected_generation_id: int,
         expected_corpus_fingerprint: str,
         expected_profile_fingerprint: str,
         expected_count: int,
@@ -358,7 +360,8 @@ class LanceKnowledgeVectorStore:
                     expected_count=expected_count,
                     expected_dimensions=expected_dimensions,
                 )
-            except Exception:
+            except Exception as exc:
+                report_exception(exc)
                 return KnowledgeVectorGenerationState.CORRUPT
             return (
                 KnowledgeVectorGenerationState.USABLE
@@ -390,7 +393,7 @@ class LanceKnowledgeVectorStore:
                     manifest = self._read_manifest(child)
                 except (KnowledgeVectorStoreError, OSError):
                     continue
-                if manifest["generation_id"] == child.name:
+                if str(manifest["generation_id"]) == child.name:
                     entries.append(f"indexes/{child.name}")
             return tuple(sorted(entries))
 
@@ -398,7 +401,7 @@ class LanceKnowledgeVectorStore:
         self,
         relative_path: str,
         *,
-        expected_generation_id: str,
+        expected_generation_id: int,
     ) -> str | None:
         """Atomically detach one exact vector path into same-volume private trash."""
 
@@ -422,7 +425,7 @@ class LanceKnowledgeVectorStore:
         self,
         relative_path: str,
         *,
-        expected_generation_id: str,
+        expected_generation_id: int,
     ) -> bool:
         """Best-effort reclamation for a final directory with no metadata row."""
 
@@ -527,7 +530,7 @@ class LanceKnowledgeVectorStore:
 
             schema = pa.schema(
                 [
-                    pa.field("unit_id", pa.string(), nullable=False),
+                    pa.field("unit_id", pa.int64(), nullable=False),
                     pa.field(
                         "vector",
                         pa.list_(pa.float32(), dimensions),
@@ -563,7 +566,7 @@ class LanceKnowledgeVectorStore:
         path: Path,
         *,
         expected_manifest: dict[str, object],
-        expected_unit_ids: Sequence[str],
+        expected_unit_ids: Sequence[int],
     ) -> bool:
         if not path.is_dir():
             return False
@@ -580,7 +583,7 @@ class LanceKnowledgeVectorStore:
         self,
         path: Path,
         *,
-        expected_generation_id: str,
+        expected_generation_id: int,
         expected_corpus_fingerprint: str,
         expected_profile_fingerprint: str,
         expected_count: int,
@@ -617,7 +620,7 @@ class LanceKnowledgeVectorStore:
         *,
         expected_count: int,
         expected_dimensions: int,
-    ) -> list[str]:
+    ) -> list[int]:
 
         database = None
         table = None
@@ -627,7 +630,7 @@ class LanceKnowledgeVectorStore:
         payload = None
         unit_id_column = None
         failed = False
-        actual_unit_ids: list[str] = []
+        actual_unit_ids: list[int] = []
         try:
             import lancedb
 
@@ -647,7 +650,7 @@ class LanceKnowledgeVectorStore:
                 query = query.limit(expected_count + 1)
                 payload = query.to_arrow()
                 unit_id_column = payload.column("unit_id")
-                actual_unit_ids = [str(value) for value in unit_id_column.to_pylist()]
+                actual_unit_ids = [int(value) for value in unit_id_column.to_pylist()]
                 if len(actual_unit_ids) != expected_count:
                     raise KnowledgeVectorStoreError()
                 actual_unit_ids = self._validated_unit_ids(actual_unit_ids)
@@ -671,11 +674,11 @@ class LanceKnowledgeVectorStore:
         self,
         path: Path,
         *,
-        generation_id: str,
+        generation_id: int,
         corpus_fingerprint: str,
         profile_fingerprint: str,
         dimensions: int,
-        unit_ids: Sequence[str],
+        unit_ids: Sequence[int],
     ) -> None:
         payload = self._manifest_payload(
             generation_id=generation_id,
@@ -717,7 +720,7 @@ class LanceKnowledgeVectorStore:
         if (
             type(payload["schema_version"]) is not int
             or payload["schema_version"] != _MANIFEST_SCHEMA_VERSION
-            or type(payload["generation_id"]) is not str
+            or type(payload["generation_id"]) is not int
             or type(payload["corpus_fingerprint"]) is not str
             or type(payload["profile_fingerprint"]) is not str
             or type(payload["dimensions"]) is not int
@@ -738,11 +741,11 @@ class LanceKnowledgeVectorStore:
     def _manifest_payload(
         cls,
         *,
-        generation_id: str,
+        generation_id: int,
         corpus_fingerprint: str,
         profile_fingerprint: str,
         dimensions: int,
-        unit_ids: Sequence[str],
+        unit_ids: Sequence[int],
     ) -> dict[str, object]:
         return {
             "schema_version": _MANIFEST_SCHEMA_VERSION,
@@ -755,10 +758,10 @@ class LanceKnowledgeVectorStore:
         }
 
     @staticmethod
-    def _unit_ids_digest(unit_ids: Sequence[str]) -> str:
+    def _unit_ids_digest(unit_ids: Sequence[int]) -> str:
         digest = sha256(b"xenix.knowledge.unit-ids.v1\0")
         for unit_id in unit_ids:
-            encoded = unit_id.encode("utf-8")
+            encoded = str(unit_id).encode("ascii")
             digest.update(len(encoded).to_bytes(8, "big"))
             digest.update(encoded)
         return digest.hexdigest()
@@ -787,7 +790,7 @@ class LanceKnowledgeVectorStore:
         self,
         value: str,
         *,
-        expected_generation_id: str,
+        expected_generation_id: int,
     ) -> Path:
         self._validate_generation_id(expected_generation_id)
         if value != f"indexes/{expected_generation_id}":
@@ -795,7 +798,7 @@ class LanceKnowledgeVectorStore:
         return self._resolve_generation_path(value)
 
     @staticmethod
-    def _validate_generation_id(value: str) -> None:
+    def _validate_generation_id(value: int | str) -> None:
         if not _GENERATION_ID_PATTERN.fullmatch(str(value)):
             raise KnowledgeVectorStoreError()
 
@@ -821,19 +824,22 @@ class LanceKnowledgeVectorStore:
     @staticmethod
     def _discard_exception_traceback(exc: Exception) -> None:
         """Drop frames that may otherwise retain native Lance/Arrow handles."""
+        logging.getLogger(__name__).error(
+            "Knowledge vector operation failed", exc_info=(type(exc), exc, exc.__traceback__),
+        )
         exc.__traceback__ = None
         exc.__cause__ = None
         exc.__context__ = None
 
     @staticmethod
-    def _validated_unit_ids(values: Sequence[str]) -> list[str]:
+    def _validated_unit_ids(values: Sequence[int]) -> list[int]:
         if isinstance(values, (str, bytes)):
             raise KnowledgeVectorStoreError()
-        normalized: list[str] = []
-        seen: set[str] = set()
+        normalized: list[int] = []
+        seen: set[int] = set()
         for value in values:
-            unit_id = str(value).strip()
-            if not unit_id or unit_id in seen:
+            unit_id = value
+            if type(unit_id) is not int or unit_id < 1 or unit_id in seen:
                 raise KnowledgeVectorStoreError()
             seen.add(unit_id)
             normalized.append(unit_id)
@@ -851,10 +857,10 @@ class LanceKnowledgeVectorStore:
         if dimensions < 1 or not records:
             raise KnowledgeVectorStoreError()
         normalized: list[KnowledgeVectorRecord] = []
-        seen: set[str] = set()
+        seen: set[int] = set()
         for record in records:
-            unit_id = str(record.unit_id).strip()
-            if not unit_id or unit_id in seen:
+            unit_id = record.unit_id
+            if type(unit_id) is not int or unit_id < 1 or unit_id in seen:
                 raise KnowledgeVectorStoreError()
             vector = cls._validated_vector(record.vector)
             if len(vector) != dimensions:

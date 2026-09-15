@@ -9,7 +9,11 @@ from typing import Any
 
 from ...exceptions import NotFoundError, ValidationError
 from ..llm.providers import ProviderMessage
-from ..llm.tooling import AgentTool, AgentToolSpec, ToolExecutionContext, ToolSuccess
+from ..llm.tool_protocol import (
+    AgentTool,
+    ToolExecutionContext,
+    ToolSuccess,
+)
 from .tool_inputs import AgentSkillActivateInput, AgentSkillResourceInput
 
 
@@ -66,43 +70,20 @@ class AgentSkillCatalog:
         if not self._skills:
             return None
         activated = set(activated_skill_names or set())
-        entries = [
-            {
-                "name": skill.name,
-                "description": skill.description,
-                "active": skill.name in activated,
-                "reference_count": len(skill.resources.get("references", [])),
-                "asset_count": len(skill.resources.get("assets", [])),
-            }
-            for skill in self.list_skills()
-        ]
-        content = (
-            "Xenix Agent Skills are prompt instructions only, never plugins, scripts, filesystem access, or external "
-            "extensions. For a matching inactive skill, call "
-            f"`{AGENT_SKILL_ACTIVATE_TOOL_NAME}` before proceeding; do not activate unrelated skills and follow its "
-            "returned instructions. After activation, read only a listed needed resource with "
-            f"`{AGENT_SKILL_READ_REFERENCE_TOOL_NAME}` or `{AGENT_SKILL_READ_ASSET_TOOL_NAME}`.\n"
-            "<available_agent_skills>"
-            f"{json.dumps(entries, ensure_ascii=False, separators=(',', ':'))}"
-            "</available_agent_skills>"
-        )
-        return ProviderMessage(role="system", content=content)
+        active = [skill.name for skill in self.list_skills() if skill.name in activated]
+        inactive = [skill for skill in self.list_skills() if skill.name not in activated]
+        lines = ["Loaded Skill guidance: " + (", ".join(active) or "none")]
+        if inactive:
+            lines.append(
+                f"Read optional domain guidance through `{AGENT_SKILL_ACTIVATE_TOOL_NAME}`. "
+                "Reading a Skill does not activate tools."
+            )
+            lines.extend(f"- {skill.name}: {skill.description}" for skill in inactive)
+        return ProviderMessage(role="system", content="\n".join(lines))
 
-    def activation_tool_spec(self, *, activated_skill_names: set[str] | None = None) -> AgentToolSpec | None:
-        tool = self.activation_tool(activated_skill_names=activated_skill_names)
-        return tool.spec if tool is not None else None
-
-    def activation_tool(
-        self,
-        *,
-        activated_skill_names: set[str] | None = None,
-    ) -> AgentTool[AgentSkillActivateInput] | None:
-        inactive_names = [
-            skill.name
-            for skill in self.list_skills()
-            if skill.name not in set(activated_skill_names or set())
-        ]
-        if not inactive_names:
+    def activation_tool(self) -> AgentTool[AgentSkillActivateInput] | None:
+        skill_names = [skill.name for skill in self.list_skills()]
+        if not skill_names:
             return None
 
         def activate(
@@ -115,58 +96,38 @@ class AgentSkillCatalog:
             name=AGENT_SKILL_ACTIVATE_TOOL_NAME,
             provider_name=AGENT_SKILL_ACTIVATE_PROVIDER_NAME,
             description=(
-                "Activate one built-in Xenix Agent Skill when the user task matches its description. "
-                "This returns prompt instructions only; it does not execute scripts or read arbitrary files."
+                "Read a Skill's guidance and resource index. Does not activate tools."
             ),
             input_model=AgentSkillActivateInput,
             implementation=activate,
-            provider_field_enums=(("name", tuple(inactive_names)),),
+            provider_field_enums=(("name", tuple(skill_names)),),
         )
 
-    def resource_tool_specs(self, *, activated_skill_names: set[str] | None = None) -> list[AgentToolSpec]:
-        tools = self.resource_tools(
-            activated_skill_names=activated_skill_names,
-            active_skill_names_provider=lambda _context: set(
-                activated_skill_names or set()
-            ),
-        )
-        return [tool.spec for tool in tools]
-
-    def resource_tools(
-        self,
-        *,
-        activated_skill_names: set[str] | None = None,
-        active_skill_names_provider: Callable[[ToolExecutionContext], set[str]],
-    ) -> list[AgentTool[AgentSkillResourceInput]]:
-        activated = set(activated_skill_names or set())
-        active_skills = [skill for skill in self.list_skills() if skill.name in activated]
+    def resource_tools(self) -> list[AgentTool[AgentSkillResourceInput]]:
+        skills = self.list_skills()
         tools: list[AgentTool[AgentSkillResourceInput]] = []
-        if any(skill.resources.get("references") for skill in active_skills):
+        if any(skill.resources.get("references") for skill in skills):
             tools.append(
                 self._resource_tool(
                     tool_name=AGENT_SKILL_READ_REFERENCE_TOOL_NAME,
                     provider_name=AGENT_SKILL_READ_REFERENCE_PROVIDER_NAME,
                     description=(
-                        "Read one reference listed by an already activated Xenix Agent Skill. "
-                        "This returns only UTF-8 reference text embedded in the generated catalog."
+                        "Read a Skill reference by name and path; reading its guidance first is optional."
                     ),
-                    skill_names=[skill.name for skill in active_skills if skill.resources.get("references")],
+                    skill_names=[skill.name for skill in skills if skill.resources.get("references")],
                     resource_reader=self.read_reference,
-                    active_skill_names_provider=active_skill_names_provider,
                 )
             )
-        if any(skill.resources.get("assets") for skill in active_skills):
+        if any(skill.resources.get("assets") for skill in skills):
             tools.append(
                 self._resource_tool(
                     tool_name=AGENT_SKILL_READ_ASSET_TOOL_NAME,
                     provider_name=AGENT_SKILL_READ_ASSET_PROVIDER_NAME,
                     description=(
-                        "Read one asset listed by an already activated Xenix Agent Skill. "
-                        "This returns only UTF-8 asset text embedded in the generated catalog."
+                        "Read a Skill template or example by name and path; reading its guidance first is optional."
                     ),
-                    skill_names=[skill.name for skill in active_skills if skill.resources.get("assets")],
+                    skill_names=[skill.name for skill in skills if skill.resources.get("assets")],
                     resource_reader=self.read_asset,
-                    active_skill_names_provider=active_skill_names_provider,
                 )
             )
         return tools
@@ -179,17 +140,15 @@ class AgentSkillCatalog:
         description: str,
         skill_names: list[str],
         resource_reader: Callable[..., dict[str, Any]],
-        active_skill_names_provider: Callable[[ToolExecutionContext], set[str]],
     ) -> AgentTool[AgentSkillResourceInput]:
         def read_resource(
             input_data: AgentSkillResourceInput,
-            context: ToolExecutionContext,
+            _context: ToolExecutionContext,
         ) -> ToolSuccess:
             return ToolSuccess(
                 resource_reader(
                     skill_name=input_data.skill_name,
                     path=input_data.path,
-                    activated_skill_names=active_skill_names_provider(context),
                 )
             )
 
@@ -209,9 +168,7 @@ class AgentSkillCatalog:
             raise NotFoundError(f"Agent Skill '{skill_name}' was not found.")
         return {
             "skill_name": skill.name,
-            "description": skill.description,
             "instructions": skill.body,
-            "metadata": dict(skill.metadata),
             "resources": {key: sorted(value) for key, value in skill.resources.items()},
         }
 
@@ -220,13 +177,11 @@ class AgentSkillCatalog:
         *,
         skill_name: str,
         path: str,
-        activated_skill_names: set[str] | None = None,
     ) -> dict[str, Any]:
         return self._read_resource(
             kind="references",
             skill_name=skill_name,
             path=path,
-            activated_skill_names=activated_skill_names,
         )
 
     def read_asset(
@@ -234,13 +189,11 @@ class AgentSkillCatalog:
         *,
         skill_name: str,
         path: str,
-        activated_skill_names: set[str] | None = None,
     ) -> dict[str, Any]:
         return self._read_resource(
             kind="assets",
             skill_name=skill_name,
             path=path,
-            activated_skill_names=activated_skill_names,
         )
 
     def _read_resource(
@@ -249,23 +202,11 @@ class AgentSkillCatalog:
         kind: str,
         skill_name: str,
         path: str,
-        activated_skill_names: set[str] | None,
     ) -> dict[str, Any]:
         normalized_skill_name = skill_name.strip()
         skill = self._skills.get(normalized_skill_name)
         if skill is None:
             raise NotFoundError(f"Agent Skill '{skill_name}' was not found.")
-
-        activated = {
-            name.strip()
-            for name in (activated_skill_names or set())
-            if isinstance(name, str) and name.strip()
-        }
-        if skill.name not in activated:
-            raise ValidationError(
-                f"Agent Skill '{skill.name}' must be activated in this Thread before reading resources.",
-                error_code="agent_skill_not_activated",
-            )
 
         normalized_path = _normalize_resource_path(path)
         resources = skill.resources.get(kind, {})
@@ -288,10 +229,6 @@ class AgentSkillCatalog:
             "content": content,
             "size_bytes": len(data),
         }
-
-
-def is_agent_skill_tool(tool_name: str) -> bool:
-    return tool_name.startswith("agent.skill.")
 
 
 def _default_catalog_path() -> Path:

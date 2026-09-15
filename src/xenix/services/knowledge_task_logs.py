@@ -43,7 +43,7 @@ class KnowledgeTaskLogStore:
 
     def append(
         self,
-        import_id: str,
+        import_id: int,
         *,
         phase: str,
         event_code: str,
@@ -84,7 +84,7 @@ class KnowledgeTaskLogStore:
                 stream.write(encoded)
                 stream.flush()
 
-    def read(self, import_id: str) -> tuple[KnowledgeTaskLogEntry, ...]:
+    def read(self, import_id: int) -> tuple[KnowledgeTaskLogEntry, ...]:
         _require_task_id(import_id)
         path = knowledge_import_logs_path(self._paths, import_id)
         with self._lock:
@@ -102,12 +102,12 @@ class KnowledgeTaskLogStore:
                 ) from exc
         return tuple(entries[-_MAX_RETURNED_EVENTS:])
 
-    def remove(self, import_id: str) -> bool:
+    def remove(self, import_id: int) -> bool:
         """Remove one app-owned import task directory without following links."""
 
         _require_task_id(import_id)
         task_root = knowledge_import_task_root(self._paths, import_id)
-        expected_parent = knowledge_import_task_root(self._paths, "0" * 32).parent
+        expected_parent = knowledge_import_task_root(self._paths, 1).parent
         absolute_task_root = Path(os.path.abspath(task_root))
         absolute_parent = Path(os.path.abspath(expected_parent))
         if absolute_task_root.parent != absolute_parent:
@@ -163,8 +163,8 @@ def _read_entries(path: Path) -> list[KnowledgeTaskLogEntry]:
     return entries
 
 
-def _require_task_id(value: str) -> None:
-    if not isinstance(value, str) or _TASK_ID.fullmatch(value) is None:
+def _require_task_id(value: int) -> None:
+    if type(value) is not int or value < 1:
         raise ValidationError("Knowledge task identity is invalid.")
 
 

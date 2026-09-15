@@ -1,17 +1,26 @@
 """Chat shell: composition and signal forwarding.
 
 ``ThreadDetailView`` composes the ``ChatTimeline`` (message/event display and
-scroll follow) and the ``ChatComposer`` (input, attachments, submission intent)
-and forwards their signals through one stable public surface.  It owns no
-timeline or composer private state itself.
+scroll follow), the operation notification bar, and the ``ChatComposer`` (input,
+attachments, submission intent), then forwards their signals through one stable
+public surface.  It owns no timeline or composer private state itself.
 """
 
 from __future__ import annotations
 
 from typing import Any
 
-from PySide6.QtCore import QEvent, Signal
-from PySide6.QtWidgets import QVBoxLayout, QWidget
+from PySide6.QtCore import QEvent, QTimer, Qt, Signal
+from PySide6.QtWidgets import (
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QSizePolicy,
+    QStyle,
+    QToolButton,
+    QVBoxLayout,
+    QWidget,
+)
 
 from .conversation.composer import ChatComposer
 from .conversation.presentation import ComposerAttachmentState, ComposerAttachmentStatus
@@ -24,6 +33,68 @@ from .conversation.widgets import (
     ToolCallItem,
     UsageOverviewItem,
 )
+
+
+class _OperationNotificationBar(QFrame):
+    """Transient feedback for UI operations that are not conversation events."""
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setObjectName("chatOperationNotification")
+        self.setFrameShape(QFrame.StyledPanel)
+        self.setFrameShadow(QFrame.Raised)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+
+        self._icon = QLabel(self)
+        self._icon.setObjectName("chatOperationNotificationIcon")
+        self._icon.setAlignment(Qt.AlignTop | Qt.AlignHCenter)
+        self._icon.setFixedWidth(24)
+
+        self._message = QLabel(self)
+        self._message.setObjectName("chatOperationNotificationMessage")
+        self._message.setWordWrap(True)
+        self._message.setTextInteractionFlags(Qt.TextSelectableByMouse)
+
+        self._close_button = QToolButton(self)
+        self._close_button.setObjectName("chatOperationNotificationClose")
+        self._close_button.setAutoRaise(True)
+        self._close_button.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_TitleBarCloseButton))
+        self._close_button.clicked.connect(self.dismiss)
+
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(12, 9, 8, 9)
+        layout.setSpacing(8)
+        layout.addWidget(self._icon)
+        layout.addWidget(self._message, 1)
+        layout.addWidget(self._close_button, 0, Qt.AlignTop)
+
+        self._dismiss_timer = QTimer(self)
+        self._dismiss_timer.setSingleShot(True)
+        self._dismiss_timer.timeout.connect(self.dismiss)
+        self.retranslate_ui()
+        self.hide()
+
+    def retranslate_ui(self) -> None:
+        self._close_button.setToolTip(self.tr("Close"))
+        self._close_button.setAccessibleName(self.tr("Close"))
+
+    def show_message(self, message: str, *, error: bool, timeout_ms: int | None = 6000) -> None:
+        text = message.strip()
+        if not text:
+            return
+        icon = QStyle.StandardPixmap.SP_MessageBoxCritical if error else QStyle.StandardPixmap.SP_MessageBoxInformation
+        self._icon.setPixmap(self.style().standardIcon(icon).pixmap(18, 18))
+        self._message.setText(text)
+        self.show()
+        self.raise_()
+        if timeout_ms is None:
+            self._dismiss_timer.stop()
+        else:
+            self._dismiss_timer.start(timeout_ms)
+
+    def dismiss(self) -> None:
+        self._dismiss_timer.stop()
+        self.hide()
 
 
 class ThreadDetailView(QWidget):
@@ -44,6 +115,7 @@ class ThreadDetailView(QWidget):
 
         self.timeline = ChatTimeline(self)
         self.composer = ChatComposer(self)
+        self.notification_bar = _OperationNotificationBar(self)
 
         self.composer.message_submitted.connect(self.message_submitted.emit)
         self.composer.files_attached.connect(self.files_attached.emit)
@@ -61,10 +133,12 @@ class ThreadDetailView(QWidget):
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(10)
         root.addWidget(self.timeline, 1)
+        root.addWidget(self.notification_bar, 0)
         root.addWidget(self.composer, 0)
 
     def retranslate_ui(self) -> None:
         self.timeline.retranslate_ui()
+        self.notification_bar.retranslate_ui()
         self.composer.retranslate_ui()
 
     def changeEvent(self, event: QEvent) -> None:
@@ -91,6 +165,18 @@ class ThreadDetailView(QWidget):
 
     def show_error(self, message: str) -> None:
         self.timeline.show_error(message)
+
+    def show_operation_error(self, message: str) -> None:
+        self.notification_bar.show_message(message, error=True)
+
+    def show_submission_error(self, message: str) -> None:
+        self.notification_bar.show_message(message, error=True, timeout_ms=None)
+
+    def show_operation_status(self, message: str) -> None:
+        self.notification_bar.show_message(message, error=False)
+
+    def clear_operation_notification(self) -> None:
+        self.notification_bar.dismiss()
 
     # Composer forwarding -----------------------------------------------------
 

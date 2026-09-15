@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import pytest
 from PySide6.QtWidgets import QToolButton
 from pytestqt.qtbot import QtBot
 
@@ -27,6 +28,59 @@ def test_chat_shell_has_stable_unique_semantic_identities(qtbot: QtBot) -> None:
     assert view.composer.attach_button.accessibleName() == view.tr("Attach files")
     assert view.composer.editor.accessibleName() == view.tr("Message Xenix")
     assert view.timeline.scroll_to_bottom_button.accessibleName() == view.tr("Scroll to bottom")
+
+
+@pytest.mark.parametrize("explanation", [None, "", "Removed incomplete rows."])
+def test_dataset_audit_block_is_rendered_in_tool_detail(explanation, qtbot) -> None:
+    from xenix.services.agent import ChatbotEvent, ChatbotEventAuthor, ChatbotEventKind
+    from xenix.ui.conversation.presentation import coerce_blocks, render_content_blocks
+
+    markdown = render_content_blocks(
+        coerce_blocks(
+            [
+                {
+                    "type": "dataset_audit",
+                    "name": "clean`data",
+                    "dataset_id": 101,
+                    "operation_name": "clean_dataset",
+                    "generation": 2,
+                    "created_at": "2026-09-03T10:00:00+08:00",
+                    "inputs": [
+                        {
+                            "position": 0,
+                            "name": "raw",
+                            "dataset_id": 102,
+                            "alias": "source",
+                        }
+                    ],
+                    "parameters_payload": {"drop_nulls": True},
+                    "agent_explanation": explanation,
+                }
+            ]
+        )
+    )
+
+    assert "### Dataset audit" in markdown
+    assert "Dataset: `clean\\`data` (`101`)" in markdown
+    assert "Input 1: `raw` (`102`) — alias `source`" in markdown
+    assert '"drop_nulls": true' in markdown
+    if explanation:
+        assert explanation in markdown
+    else:
+        assert "Agent-authored explanation" not in markdown
+
+    view = ThreadDetailView()
+    qtbot.addWidget(view)
+    view.render_events([ChatbotEvent(
+        id="history-tool", kind=ChatbotEventKind.TOOL, author=ChatbotEventAuthor.TOOL,
+        tool_name="data.clean", summary="Cleaned dataset",
+        detail_blocks=[{
+            "type": "dataset_audit", "dataset_id": 101,
+            "name": "Cleaned data", "agent_explanation": explanation,
+        }],
+    )])
+    from PySide6.QtWidgets import QTextBrowser
+    assert any("101" in browser.toPlainText() for browser in view.findChildren(QTextBrowser))
 
 
 def test_send_action_accessible_name_tracks_visual_state(qtbot: QtBot, tmp_path) -> None:

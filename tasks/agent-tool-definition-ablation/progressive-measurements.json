@@ -1,0 +1,39 @@
+{
+  "unit": "Unicode characters in compact JSON tool envelopes, not tokens",
+  "scopes": {
+    "all-active": {
+      "tool_count": 19,
+      "chars": {
+        "g0": 15946,
+        "g1": 15138,
+        "g2": 15056,
+        "g3": 14942,
+        "g1k": 15199,
+        "g2g": 15078
+      }
+    },
+    "analysis+preprocessing": {
+      "tool_count": 14,
+      "chars": {
+        "g0": 11734,
+        "g1": 11236,
+        "g2": 11154,
+        "g3": 11040,
+        "g1k": 11297,
+        "g2g": 11176
+      }
+    }
+  },
+  "experiment_script_sha256": {
+    "build/run-progressive-tool-ablation.py": "49d024e04e9a13fd75808cd8bd5edc8a5fb0e2da9c6ac93ff8cd5bb7eee17175",
+    "build/batch-progressive-tool-ablation.py": "41e02cecd82dd2b90b1daf154b66456d6bbcf4ebc8d27541fe82b79d0e6ddc1d",
+    "build/summarize-progressive-tool-ablation.py": "3a4f56ffd5809d7058a61aa7b2a6e528874da919fb435fe09c12c6ed23f6fc6d"
+  },
+  "current_production_all_active_chars": 15062,
+  "note": "G1 controls retain the old graph examples and transformation provenance qualification, adding 76 characters to current production. All experimental deltas are against named arms, not direct production savings.",
+  "final_experiment_script_sha256": {
+    "build/run-progressive-tool-ablation.py": "841bb27f77e4cc63ffb59cd80241cee6c5bedecdf819052c598051acef69d19f",
+    "build/batch-progressive-tool-ablation.py": "41e02cecd82dd2b90b1daf154b66456d6bbcf4ebc8d27541fe82b79d0e6ddc1d",
+    "build/summarize-progressive-tool-ablation.py": "3a4f56ffd5809d7058a61aa7b2a6e528874da919fb435fe09c12c6ed23f6fc6d"
+  }
+}

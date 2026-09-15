@@ -1,22 +1,80 @@
-"""Shared, read-only source and canonical-state helpers for benchmark cases."""
+"""Read-only source, delivery and canonical-state helpers for benchmark cases."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from hashlib import sha256
+import json
 from pathlib import Path
+import re
 from typing import Any
 
-from xenix.services.llm.messages import DatasetBlock, blocks_from_payload
+import polars as pl
 
-from .contracts import BenchmarkCaseServices, BenchmarkInputError
+from xenix.exceptions import NotFoundError, ValidationError
+from xenix.services.dataset_inspection import detect_source_format
+from xenix.services.llm.messages import DatasetBlock, blocks_from_payload
+from xenix.services.tabular import load_tabular_frame
+
+from .contracts import BenchmarkCaseContext, BenchmarkCaseServices, BenchmarkInputError
+
+
+def linked_artifacts(context: BenchmarkCaseContext) -> dict[str, Any]:
+    """Resolve final deliveries without consulting intermediate ToolResults.
+
+    Invalid or unavailable links provide no delivery. Unexpected service or
+    table-reading errors propagate as measurement failures.
+    """
+    messages = list(getattr(context.snapshot, "messages", ()))
+    final_text = str(getattr(messages[-1], "text", "") or "") if messages else ""
+    uris = re.findall(r"artifact://[A-Za-z0-9-]+(?:\?[^)\s>\]]+)?", final_text)
+    artifacts = {}
+    for uri in dict.fromkeys(uris):
+        try:
+            artifact = context.services.artifacts.resolve_uri(uri)
+        except NotFoundError, ValidationError:
+            continue
+        if not artifact.exists or not artifact.ready_to_open:
+            continue
+        path = Path(artifact.absolute_path)
+        if not is_within(path, context.runtime_home):
+            continue
+        artifacts[uri] = artifact
+    return artifacts
+
+
+def linked_tables(context: BenchmarkCaseContext) -> dict[str, pl.DataFrame]:
+    """Read delivered tables independently of Dataset lineage and export kind."""
+    tables = {}
+    for uri, artifact in linked_artifacts(context).items():
+        path = Path(artifact.absolute_path)
+        source_format = detect_source_format(path)
+        if source_format.value != "unknown":
+            tables[uri] = load_tabular_frame(path, source_format)
+    return tables
+
+
+def linked_json_reports(context: BenchmarkCaseContext) -> dict[str, dict[str, Any]]:
+    """Read public JSON facts; unexpected I/O failures remain measurement errors."""
+    reports = {}
+    for uri, artifact in linked_artifacts(context).items():
+        path = Path(artifact.absolute_path)
+        if path.suffix.lower() != ".json":
+            continue
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (UnicodeError, json.JSONDecodeError):
+            continue
+        if isinstance(payload, dict):
+            reports[uri] = payload
+    return reports
 
 
 @dataclass(frozen=True)
 class AttachedSourceState:
     external_sha256: str
-    source_dataset_ids: tuple[str, ...]
-    registered_dataset_sha256: dict[str, str]
+    source_dataset_ids: tuple[int, ...]
+    registered_dataset_sha256: dict[int, str]
 
 
 def capture_attached_source_state(
@@ -26,7 +84,7 @@ def capture_attached_source_state(
     services: BenchmarkCaseServices,
 ) -> AttachedSourceState:
     source_dataset_ids = source_dataset_ids_from_snapshot(snapshot)
-    registered_hashes: dict[str, str] = {}
+    registered_hashes: dict[int, str] = {}
     for dataset_id in source_dataset_ids:
         dataset = services.datasets.get_dataset(dataset_id)
         registered_path = Path(dataset.source_path)
@@ -53,12 +111,12 @@ def attached_source_unchanged(
             sha256_file(Path(services.datasets.get_dataset(dataset_id).source_path)) == digest
             for dataset_id, digest in source_state.registered_dataset_sha256.items()
         )
-    except Exception:
+    except (NotFoundError, FileNotFoundError):
         return False
 
 
-def source_dataset_ids_from_snapshot(snapshot: Any) -> list[str]:
-    dataset_ids: list[str] = []
+def source_dataset_ids_from_snapshot(snapshot: Any) -> list[int]:
+    dataset_ids: list[int] = []
     for message in getattr(snapshot, "messages", []):
         if enum_value(getattr(message, "kind", None)) != "user":
             continue
@@ -74,7 +132,7 @@ def registered_source_ids_for_digest(
     snapshot: Any,
     services: BenchmarkCaseServices,
     digest: str,
-) -> set[str]:
+) -> set[int]:
     """Resolve attachment Dataset identity from the final canonical snapshot.
 
     Multi-attachment submission can emit an early snapshot before every source
@@ -82,7 +140,7 @@ def registered_source_ids_for_digest(
     digest, while identity and lineage resolution use the complete final list.
     """
 
-    matches: set[str] = set()
+    matches: set[int] = set()
     for dataset_id in source_dataset_ids_from_snapshot(snapshot):
         try:
             dataset = services.datasets.get_dataset(dataset_id)
@@ -99,7 +157,7 @@ def source_dataset_ids_for_external_digest(
     snapshot: Any,
     services: BenchmarkCaseServices,
     digest: str,
-) -> set[str]:
+) -> set[int]:
     """Map a canonical Dataset block back to its immutable imported source.
 
     Registered Dataset rows point at app-owned Parquet materializations, so
@@ -111,7 +169,7 @@ def source_dataset_ids_for_external_digest(
     resolver = getattr(services.datasets, "resolve_dataset_source_presentation", None)
     if not callable(resolver):
         return set()
-    matches: set[str] = set()
+    matches: set[int] = set()
     for dataset_id in source_dataset_ids_from_snapshot(snapshot):
         try:
             presentation = resolver(dataset_id)

@@ -1,0 +1,3557 @@
+{
+  "baseline_commit": "41adb2f6c766a95d20b5cb7cd7923686f80b8581",
+  "plan": "progressive-plan.json",
+  "incomplete_attempts": [
+    {
+      "arm": "g0",
+      "task": "routing-r1",
+      "status": "execution_interrupted_without_report",
+      "captured_requests": 16,
+      "captured_responses": 16,
+      "process_exit_code": null,
+      "outcome": null,
+      "subject_tokens": null,
+      "evidence": "build/tool-description-progressive/g0/routing-r1",
+      "reason": "At resumption no Python process remained and no cell report or batch completion was saved. Exact exit cause unknown; do not treat as business failure or completed ablation evidence."
+    },
+    {
+      "arm": "g1",
+      "task": "routing-r1",
+      "status": "execution_interrupted_without_report",
+      "captured_requests": 19,
+      "captured_responses": 19,
+      "process_exit_code": null,
+      "outcome": null,
+      "subject_tokens": null,
+      "evidence": "build/tool-description-progressive/g1/routing-r1",
+      "reason": "At resumption no Python process remained and no cell report or batch completion was saved. Exact exit cause unknown; do not treat as business failure or completed ablation evidence."
+    }
+  ],
+  "runs": [
+    {
+      "arm": "g0",
+      "task": "campaign-r1",
+      "report": "build/tool-description-progressive/g0/campaign-r1/reports/business.campaign.v1.standard-deepseek-deepseek-v4-flash-5f029b0acb3f47fabe3465f22012d2ae.json",
+      "trace_id": "5f029b0acb3f47fabe3465f22012d2ae",
+      "model": "deepseek/deepseek-v4-flash",
+      "run_status": "completed",
+      "outcome": "pass",
+      "outcome_reason": "judge_verdict",
+      "oracle_verdict": "pass",
+      "failed_checks": [],
+      "judge": {
+        "independence": "independent",
+        "metrics": {
+          "elapsed_seconds": 13.106851799995638,
+          "provider_retry_count": 0,
+          "token_usage": {
+            "cached_input_tokens": 1152,
+            "input_tokens": 5823,
+            "output_tokens": 1122,
+            "total_tokens": 6945
+          }
+        },
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "reason_codes": [],
+        "required": true,
+        "rubric_id": "business.campaign_eligibility.explanation.v1",
+        "rubric_sha256": "8A6B83AD1C3AEC7C2EFAB2E62351A7A90BB3D9DDBA28C5BFD64517443B2F6FDA",
+        "scores": {
+          "effective_rule": 2,
+          "exceptions_explained": 2
+        },
+        "status": "completed",
+        "summary": "judge_completed",
+        "verdict": "pass"
+      },
+      "failure_kind": null,
+      "subject_metrics": {
+        "assessment_seconds": 0.00216159998672083,
+        "derived_dataset_count": 1,
+        "message_counts": {
+          "assistant": 5,
+          "tool_call": 8,
+          "tool_result": 8,
+          "user": 1
+        },
+        "provider_retry_count": 0,
+        "sampling_round_count": 5,
+        "terminal_shape": null,
+        "token_usage": {
+          "cached_input_tokens": 23936,
+          "input_tokens": 28451,
+          "output_tokens": 5138,
+          "total_tokens": 33589
+        },
+        "tool_call_counts_by_name": {
+          "agent.skill.activate": 1,
+          "analysis.profile": 1,
+          "data.query": 4,
+          "data.transform": 1,
+          "knowledge.lookup": 1
+        },
+        "tool_result_counts_by_status": {
+          "succeeded": 8
+        },
+        "turn_seconds": 27.541853399947286,
+        "usage_reported_primary_response_count": 5
+      },
+      "identity": {
+        "case_definition_sha256": "91345DE7D5C5A698BE9E90F4755530A5ADCE172825668F508F092587B84B18B3",
+        "effective_settings_sha256": "6973FC1DA2E20673BAAAE75940A37DE309FD0DC58E98CC9606C23B4EE0E547E8",
+        "embedding_settings_sha256": "84855E3EADB8F092BBE6E6E87D5ECAD071F1981359295FBA2826AEC4630F0397",
+        "fixture_sha256": "DDF4B77B17E20F18327824EDA549E2DEEE5FF2DFEBA7005C3F446B7160124733",
+        "harness_variant": "progressive-tool-descriptions-g0",
+        "invocation_id": "d65de2791f9943448c3be2176db98666",
+        "judge_settings_sha256": "86A3403ECB36E19C283750DF3E07A5984AF12994769207E46981D0162835A507",
+        "repository_commit": "41adb2f6c766a95d20b5cb7cd7923686f80b8581",
+        "repository_dirty": true,
+        "runtime_sha256": "3E7E07CE574893944C99A5455753801D9145381BFB6F3CC0555A29F3AB4C1934",
+        "settings_sha256": "9BD35670D0D0AD156B5F4B148A530992988DA094A0F68365D796ECA83C6149B6"
+      },
+      "tool_failures": [],
+      "captured_requests": 5,
+      "tool_exposures": {
+        "result_page": 5,
+        "knowledge_lookup": 5,
+        "agent_skill_activate": 5,
+        "analysis_profile": 4,
+        "analysis_graph": 4,
+        "data_query": 4,
+        "data_transform": 4,
+        "agent_skill_read_reference": 4,
+        "agent_skill_read_asset": 4
+      },
+      "explicit_nonnull_parameter_use": {
+        "knowledge_lookup.query": 1,
+        "knowledge_lookup.mode": 1,
+        "agent_skill_activate.name": 1,
+        "data_query.datasets": 4,
+        "data_query.sql": 4,
+        "data_query.limit": 1,
+        "analysis_profile.dataset_id": 1,
+        "data_transform.datasets": 1,
+        "data_transform.name": 1,
+        "data_transform.explanation": 1,
+        "data_transform.sql": 1
+      },
+      "sent_tool_chars_sum": 30699,
+      "all_captures_description_only": true,
+      "answer_responses": [
+        "build/tool-description-progressive/g0/campaign-r1/capture/14912-005-response.json"
+      ],
+      "review": "build/tool-description-progressive/g0/campaign-r1/review.json"
+    },
+    {
+      "arm": "g0",
+      "task": "campaign-r2",
+      "report": "build/tool-description-progressive/g0/campaign-r2/reports/business.campaign.v1.standard-deepseek-deepseek-v4-flash-17eb7355b14949cda932828f2c0fe0dc.json",
+      "trace_id": "17eb7355b14949cda932828f2c0fe0dc",
+      "model": "deepseek/deepseek-v4-flash",
+      "run_status": "completed",
+      "outcome": "pass",
+      "outcome_reason": "judge_verdict",
+      "oracle_verdict": "pass",
+      "failed_checks": [],
+      "judge": {
+        "independence": "independent",
+        "metrics": {
+          "elapsed_seconds": 13.145908999955282,
+          "provider_retry_count": 0,
+          "token_usage": {
+            "cached_input_tokens": 1152,
+            "input_tokens": 5510,
+            "output_tokens": 1014,
+            "total_tokens": 6524
+          }
+        },
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "reason_codes": [
+          "grounded_delivery"
+        ],
+        "required": true,
+        "rubric_id": "business.campaign_eligibility.explanation.v1",
+        "rubric_sha256": "8A6B83AD1C3AEC7C2EFAB2E62351A7A90BB3D9DDBA28C5BFD64517443B2F6FDA",
+        "scores": {
+          "effective_rule": 2,
+          "exceptions_explained": 2
+        },
+        "status": "completed",
+        "summary": "judge_completed",
+        "verdict": "pass"
+      },
+      "failure_kind": null,
+      "subject_metrics": {
+        "assessment_seconds": 0.0022699999972246587,
+        "derived_dataset_count": 1,
+        "message_counts": {
+          "assistant": 5,
+          "tool_call": 9,
+          "tool_result": 9,
+          "user": 1
+        },
+        "provider_retry_count": 0,
+        "sampling_round_count": 5,
+        "terminal_shape": null,
+        "token_usage": {
+          "cached_input_tokens": 24832,
+          "input_tokens": 32090,
+          "output_tokens": 4476,
+          "total_tokens": 36566
+        },
+        "tool_call_counts_by_name": {
+          "agent.skill.activate": 1,
+          "analysis.profile": 1,
+          "data.query": 3,
+          "data.transform": 1,
+          "knowledge.lookup": 3
+        },
+        "tool_result_counts_by_status": {
+          "succeeded": 9
+        },
+        "turn_seconds": 26.004492000036407,
+        "usage_reported_primary_response_count": 5
+      },
+      "identity": {
+        "case_definition_sha256": "91345DE7D5C5A698BE9E90F4755530A5ADCE172825668F508F092587B84B18B3",
+        "effective_settings_sha256": "6973FC1DA2E20673BAAAE75940A37DE309FD0DC58E98CC9606C23B4EE0E547E8",
+        "embedding_settings_sha256": "84855E3EADB8F092BBE6E6E87D5ECAD071F1981359295FBA2826AEC4630F0397",
+        "fixture_sha256": "DDF4B77B17E20F18327824EDA549E2DEEE5FF2DFEBA7005C3F446B7160124733",
+        "harness_variant": "progressive-tool-descriptions-g0",
+        "invocation_id": "fae26f73d53d42fb8f16c875a146b280",
+        "judge_settings_sha256": "86A3403ECB36E19C283750DF3E07A5984AF12994769207E46981D0162835A507",
+        "repository_commit": "41adb2f6c766a95d20b5cb7cd7923686f80b8581",
+        "repository_dirty": true,
+        "runtime_sha256": "3E7E07CE574893944C99A5455753801D9145381BFB6F3CC0555A29F3AB4C1934",
+        "settings_sha256": "9BD35670D0D0AD156B5F4B148A530992988DA094A0F68365D796ECA83C6149B6"
+      },
+      "tool_failures": [],
+      "captured_requests": 5,
+      "tool_exposures": {
+        "result_page": 5,
+        "knowledge_lookup": 5,
+        "agent_skill_activate": 5,
+        "analysis_profile": 4,
+        "analysis_graph": 4,
+        "data_query": 4,
+        "data_transform": 4,
+        "agent_skill_read_reference": 4,
+        "agent_skill_read_asset": 4
+      },
+      "explicit_nonnull_parameter_use": {
+        "agent_skill_activate.name": 1,
+        "knowledge_lookup.query": 3,
+        "analysis_profile.dataset_id": 1,
+        "data_query.datasets": 3,
+        "data_query.sql": 3,
+        "data_query.limit": 2,
+        "data_transform.datasets": 1,
+        "data_transform.name": 1,
+        "data_transform.sql": 1,
+        "data_transform.explanation": 1
+      },
+      "sent_tool_chars_sum": 30699,
+      "all_captures_description_only": true,
+      "answer_responses": [
+        "build/tool-description-progressive/g0/campaign-r2/capture/11720-005-response.json"
+      ],
+      "review": "build/tool-description-progressive/g0/campaign-r2/review.json"
+    },
+    {
+      "arm": "g0",
+      "task": "restock-r1",
+      "report": "build/tool-description-progressive/g0/restock-r1/reports/business.restock.v1.standard-deepseek-deepseek-v4-flash-65e41c0e9d184ca9ad53b7c644da1df2.json",
+      "trace_id": "65e41c0e9d184ca9ad53b7c644da1df2",
+      "model": "deepseek/deepseek-v4-flash",
+      "run_status": "completed",
+      "outcome": "pass",
+      "outcome_reason": "judge_verdict",
+      "oracle_verdict": "pass",
+      "failed_checks": [],
+      "judge": {
+        "independence": "independent",
+        "metrics": {
+          "elapsed_seconds": 161.16439539997373,
+          "provider_retry_count": 0,
+          "token_usage": {
+            "cached_input_tokens": 1792,
+            "input_tokens": 5239,
+            "output_tokens": 11798,
+            "total_tokens": 17037
+          }
+        },
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "reason_codes": [
+          "grounded_decision"
+        ],
+        "required": true,
+        "rubric_id": "business.restock_decision.explanation.v1",
+        "rubric_sha256": "6A5FA84263DA0DF7657651A75DC069D2AEAE184B465574CB61D8308C8D47394F",
+        "scores": {
+          "business_explanation": 2,
+          "selected_plan": 2
+        },
+        "status": "completed",
+        "summary": "judge_completed",
+        "verdict": "pass"
+      },
+      "failure_kind": null,
+      "subject_metrics": {
+        "assessment_seconds": 0.0012389000039547682,
+        "derived_dataset_count": 1,
+        "message_counts": {
+          "assistant": 7,
+          "tool_call": 10,
+          "tool_result": 10,
+          "user": 1
+        },
+        "provider_retry_count": 0,
+        "sampling_round_count": 7,
+        "terminal_shape": null,
+        "token_usage": {
+          "cached_input_tokens": 55552,
+          "input_tokens": 62874,
+          "output_tokens": 9012,
+          "total_tokens": 71886
+        },
+        "tool_call_counts_by_name": {
+          "agent.skill.activate": 1,
+          "analysis.profile": 1,
+          "data.query": 6,
+          "data.transform": 2
+        },
+        "tool_result_counts_by_status": {
+          "failed": 3,
+          "succeeded": 7
+        },
+        "turn_seconds": 43.991353299992625,
+        "usage_reported_primary_response_count": 7
+      },
+      "identity": {
+        "case_definition_sha256": "24CD6031DA1B7B9F9C70F2D77FD0A5DC29CEBC6947DE3E3FABA05D31F2697C2D",
+        "effective_settings_sha256": "6973FC1DA2E20673BAAAE75940A37DE309FD0DC58E98CC9606C23B4EE0E547E8",
+        "embedding_settings_sha256": "84855E3EADB8F092BBE6E6E87D5ECAD071F1981359295FBA2826AEC4630F0397",
+        "fixture_sha256": "0EEA8E8B1CA68DD617B60DD7BFF33794495981C932A686510B02581E8834267A",
+        "harness_variant": "progressive-tool-descriptions-g0",
+        "invocation_id": "0e5d0138677c4464b24894a10d8079b5",
+        "judge_settings_sha256": "86A3403ECB36E19C283750DF3E07A5984AF12994769207E46981D0162835A507",
+        "repository_commit": "41adb2f6c766a95d20b5cb7cd7923686f80b8581",
+        "repository_dirty": true,
+        "runtime_sha256": "3E7E07CE574893944C99A5455753801D9145381BFB6F3CC0555A29F3AB4C1934",
+        "settings_sha256": "9BD35670D0D0AD156B5F4B148A530992988DA094A0F68365D796ECA83C6149B6"
+      },
+      "tool_failures": [
+        {
+          "call_id": "call_00_iMTNNo0ZigV0cH39ZNgl5138",
+          "tool": "data_query",
+          "arguments": {
+            "datasets": {
+              "o": 2
+            },
+            "sql": "SELECT offer_id, product, cost_yuan, margin_yuan, boxes, arrival_date, max_batches,\n       CASE WHEN arrival_date <= DATE '2026-09-25' AND max_batches > 0 THEN 'eligible' ELSE 'excluded' END AS status,\n       ROUND(margin_yuan/cost_yuan,3) AS margin_per_yuan,\n       ROUND(margin_yuan/boxes,2) AS margin_per_box\nFROM o\nORDER BY status, arrival_date, offer_id",
+            "limit": 50
+          },
+          "response": "build/tool-description-progressive/g0/restock-r1/capture/26180-003-response.json",
+          "type": "tool_failure",
+          "code": "tool_execution_failed",
+          "message": "Binder Error: Cannot compare values of type VARCHAR and type DATE - an explicit cast is required\n\nLINE 2:        CASE WHEN arrival_date <= DATE '2026-09-25' AND max_batches > 0 THEN 'eligible...\n                                      ^",
+          "observed_in": "build/tool-description-progressive/g0/restock-r1/capture/26180-007-request.json"
+        },
+        {
+          "call_id": "call_01_NTn8lWHWDsmUb7eo1FDr7724",
+          "tool": "data_query",
+          "arguments": {
+            "datasets": {
+              "o": 2
+            },
+            "sql": "WITH RECURSIVE\neligible AS (\n  SELECT offer_id, cost_yuan, margin_yuan, boxes, max_batches,\n         row_number() OVER (ORDER BY offer_id) AS idx\n  FROM o\n  WHERE arrival_date <= DATE '2026-09-25' AND max_batches > 0\n),\nnums(n) AS (SELECT 0 UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3),\ndp AS (\n  SELECT 0 AS idx, CAST(0 AS BIGINT) AS cost, CAST(0 AS BIGINT) AS boxes,\n         CAST(0 AS BIGINT) AS margin, CAST('' AS VARCHAR) AS plan\n  UNION ALL\n  SELECT d.idx + 1,\n         d.cost + nums.n * CAST(e.cost_yuan AS BIGINT),\n         d.boxes + nums.n * e.boxes,\n         d.margin + nums.n * CAST(e.margin_yuan AS BIGINT),\n         d.plan || e.offer_id || ':' || CAST(nums.n AS VARCHAR) || ';'\n  FROM dp d\n  JOIN eligible e ON e.idx = d.idx + 1\n  JOIN nums ON nums.n <= e.max_batches\n  WHERE d.cost + nums.n * CAST(e.cost_yuan AS BIGINT) <= 3000\n    AND d.boxes + nums.n * e.boxes <= 18\n)\nSELECT idx, cost, boxes, margin, plan\nFROM dp WHERE idx = 10\nORDER BY margin DESC, cost ASC, boxes ASC\nLIMIT 25",
+            "limit": 25
+          },
+          "response": "build/tool-description-progressive/g0/restock-r1/capture/26180-003-response.json",
+          "type": "tool_failure",
+          "code": "tool_execution_failed",
+          "message": "Binder Error: Cannot compare values of type VARCHAR and type DATE - an explicit cast is required\n\nLINE 6:   WHERE arrival_date <= DATE '2026-09-25' AND max_batches > 0\n                             ^",
+          "observed_in": "build/tool-description-progressive/g0/restock-r1/capture/26180-007-request.json"
+        },
+        {
+          "call_id": "call_01_c7Va7qoohz5UZYFm2zGr7996",
+          "tool": "data_transform",
+          "arguments": {
+            "datasets": {
+              "o": 2
+            },
+            "name": "store_event_replenishment_plan",
+            "sql": "WITH chosen AS (\n  SELECT * FROM (VALUES ('Q203',2),('Q102',1),('Q204',1),('Q509',1)) AS t(offer_id, batches)\n),\ndetail AS (\n  SELECT o.offer_id, o.product, t.batches,\n         CAST(o.cost_yuan AS BIGINT) AS cost_per_batch_yuan,\n         t.batches*CAST(o.cost_yuan AS BIGINT) AS total_cost_yuan,\n         CAST(o.margin_yuan AS BIGINT) AS margin_per_batch_yuan,\n         t.batches*CAST(o.margin_yuan AS BIGINT) AS total_margin_yuan,\n         o.boxes AS boxes_per_batch, t.batches*o.boxes AS total_boxes,\n         o.arrival_date,\n         o.max_batches AS max_batches_available\n  FROM o JOIN chosen t ON o.offer_id = t.offer_id\n)\nSELECT offer_id, product, batches, cost_per_batch_yuan, total_cost_yuan,\n       margin_per_batch_yuan, total_margin_yuan, boxes_per_batch, total_boxes,\n       arrival_date, max_batches_available\nFROM detail\nUNION ALL\nSELECT 'TOTAL', CAST(NULL AS VARCHAR), sum(batches), CAST(NULL AS BIGINT), sum(total_cost_yuan),\n       CAST(NULL AS BIGINT), sum(total_margin_yuan), CAST(NULL AS BIGINT), sum(total_boxes),\n       CAST(NULL AS VARCHAR), CAST(NULL AS BIGINT)\nFROM detail\nORDER BY (offer_id = 'TOTAL'), offer_id",
+            "explanation": "Chosen optimal replenishment plan (margin 1845, cost 2920, boxes 18) for the store event, from exhaustive integer search over eligible offers (arrival <= 2026-09-25, max_batches > 0)."
+          },
+          "response": "build/tool-description-progressive/g0/restock-r1/capture/26180-005-response.json",
+          "type": "tool_failure",
+          "code": "tool_execution_failed",
+          "message": "Binder Error: Could not ORDER BY column \"(detail.offer_id = 'TOTAL')\": add the expression/function to every SELECT, or move the UNION into a FROM clause.\nTraceback (most recent call last):\n  File \"F:\\CODING\\Project\\Xenix_native\\src\\xenix\\services\\preprocessing_worker.py\", line 71, in run_preprocessing_worker_task\n    result = execute_preprocessing_worker_operation(\n        str(request[\"operation\"]),\n        dict(request.get(\"payload\") or {}),\n        paths,\n    )\n  File \"F:\\CODING\\Project\\Xenix_native\\src\\xenix\\services\\preprocessing_worker.py\", line 111, in execute_preprocessing_worker_operation\n    )._transform_in_process(input_data)\n      ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^\n  File \"F:\\CODING\\Project\\Xenix_native\\src\\xenix\\services\\data_transform.py\", line 453, in _transform_in_process\n    with duckdb.connect(database=\":memory:\") as connection:\n         ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^\n  File \"F:\\CODING\\Project\\Xenix_native\\src\\xenix\\services\\data_transform.py\", line 465, in _transform_in_process\n    connection.execute(f\"CREATE OR REPLACE TEMP TABLE output AS {final.query}\")\n    ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n_duckdb.BinderException: Binder Error: Could not ORDER BY column \"(detail.offer_id = 'TOTAL')\": add the expression/function to every SELECT, or move the UNION into a FROM clause.",
+          "observed_in": "build/tool-description-progressive/g0/restock-r1/capture/26180-007-request.json"
+        }
+      ],
+      "captured_requests": 7,
+      "tool_exposures": {
+        "result_page": 7,
+        "knowledge_lookup": 7,
+        "agent_skill_activate": 7,
+        "analysis_profile": 6,
+        "analysis_graph": 6,
+        "data_query": 6,
+        "data_transform": 6,
+        "agent_skill_read_reference": 6,
+        "agent_skill_read_asset": 6
+      },
+      "explicit_nonnull_parameter_use": {
+        "agent_skill_activate.name": 1,
+        "data_query.datasets": 6,
+        "data_query.sql": 6,
+        "data_query.limit": 6,
+        "analysis_profile.dataset_id": 1,
+        "data_transform.datasets": 2,
+        "data_transform.name": 2,
+        "data_transform.sql": 2,
+        "data_transform.explanation": 2
+      },
+      "sent_tool_chars_sum": 45231,
+      "all_captures_description_only": true,
+      "answer_responses": [
+        "build/tool-description-progressive/g0/restock-r1/capture/26180-007-response.json"
+      ],
+      "review": "build/tool-description-progressive/g0/restock-r1/review.json"
+    },
+    {
+      "arm": "g0",
+      "task": "restock-r2",
+      "report": "build/tool-description-progressive/g0/restock-r2/reports/business.restock.v1.standard-deepseek-deepseek-v4-flash-a19f5ffc487d42e2bf3ec7fb9d755a92.json",
+      "trace_id": "a19f5ffc487d42e2bf3ec7fb9d755a92",
+      "model": "deepseek/deepseek-v4-flash",
+      "run_status": "completed",
+      "outcome": "pass",
+      "outcome_reason": "judge_verdict",
+      "oracle_verdict": "pass",
+      "failed_checks": [],
+      "judge": {
+        "independence": "independent",
+        "metrics": {
+          "elapsed_seconds": 28.475247099995613,
+          "provider_retry_count": 0,
+          "token_usage": {
+            "cached_input_tokens": 1792,
+            "input_tokens": 5003,
+            "output_tokens": 2261,
+            "total_tokens": 7264
+          }
+        },
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "reason_codes": [
+          "grounded_decision"
+        ],
+        "required": true,
+        "rubric_id": "business.restock_decision.explanation.v1",
+        "rubric_sha256": "6A5FA84263DA0DF7657651A75DC069D2AEAE184B465574CB61D8308C8D47394F",
+        "scores": {
+          "business_explanation": 2,
+          "selected_plan": 2
+        },
+        "status": "completed",
+        "summary": "judge_completed",
+        "verdict": "pass"
+      },
+      "failure_kind": null,
+      "subject_metrics": {
+        "assessment_seconds": 0.0012300999951548874,
+        "derived_dataset_count": 2,
+        "message_counts": {
+          "assistant": 8,
+          "tool_call": 11,
+          "tool_result": 11,
+          "user": 1
+        },
+        "provider_retry_count": 0,
+        "sampling_round_count": 8,
+        "terminal_shape": null,
+        "token_usage": {
+          "cached_input_tokens": 79360,
+          "input_tokens": 87922,
+          "output_tokens": 10715,
+          "total_tokens": 98637
+        },
+        "tool_call_counts_by_name": {
+          "agent.skill.activate": 1,
+          "analysis.graph": 1,
+          "analysis.profile": 1,
+          "data.query": 3,
+          "data.transform": 4,
+          "knowledge.lookup": 1
+        },
+        "tool_result_counts_by_status": {
+          "failed": 2,
+          "succeeded": 9
+        },
+        "turn_seconds": 60.57954369997606,
+        "usage_reported_primary_response_count": 8
+      },
+      "identity": {
+        "case_definition_sha256": "24CD6031DA1B7B9F9C70F2D77FD0A5DC29CEBC6947DE3E3FABA05D31F2697C2D",
+        "effective_settings_sha256": "6973FC1DA2E20673BAAAE75940A37DE309FD0DC58E98CC9606C23B4EE0E547E8",
+        "embedding_settings_sha256": "84855E3EADB8F092BBE6E6E87D5ECAD071F1981359295FBA2826AEC4630F0397",
+        "fixture_sha256": "0EEA8E8B1CA68DD617B60DD7BFF33794495981C932A686510B02581E8834267A",
+        "harness_variant": "progressive-tool-descriptions-g0",
+        "invocation_id": "19a09e071b974a6c874b74571a75aa4d",
+        "judge_settings_sha256": "86A3403ECB36E19C283750DF3E07A5984AF12994769207E46981D0162835A507",
+        "repository_commit": "41adb2f6c766a95d20b5cb7cd7923686f80b8581",
+        "repository_dirty": true,
+        "runtime_sha256": "3E7E07CE574893944C99A5455753801D9145381BFB6F3CC0555A29F3AB4C1934",
+        "settings_sha256": "9BD35670D0D0AD156B5F4B148A530992988DA094A0F68365D796ECA83C6149B6"
+      },
+      "tool_failures": [
+        {
+          "call_id": "call_00_yuoOzBsxCtdrsPChyEIj4874",
+          "tool": "data_transform",
+          "arguments": {
+            "datasets": {
+              "o": 2
+            },
+            "name": "门店活动补货采购表",
+            "sql": "WITH chosen(offer_id, batches) AS (\n  VALUES ('Q102',1),('Q203',2),('Q204',1),('Q509',1)\n),\nlines AS (\n  SELECT o.offer_id, o.product, c.batches, o.cost_yuan AS cost_per_batch,\n         c.batches*o.cost_yuan AS cost_total, o.margin_yuan AS margin_per_batch,\n         c.batches*o.margin_yuan AS margin_total, o.boxes AS boxes_per_batch,\n         c.batches*o.boxes AS boxes_total, CAST(o.arrival_date AS DATE) AS arrival_date\n  FROM chosen c JOIN o ON o.offer_id = c.offer_id\n)\nSELECT offer_id, product, batches, cost_per_batch, cost_total, margin_per_batch, margin_total,\n       boxes_per_batch, boxes_total, arrival_date\nFROM lines\nUNION ALL\nSELECT '合计', '本次下单合计（4个报价/5批）', SUM(batches), NULL, SUM(cost_total), NULL, SUM(margin_total),\n       NULL, SUM(boxes_total), NULL\nFROM lines\nORDER BY (offer_id='合计'), offer_id"
+          },
+          "response": "build/tool-description-progressive/g0/restock-r2/capture/6672-004-response.json",
+          "type": "tool_failure",
+          "code": "tool_execution_failed",
+          "message": "Binder Error: Could not ORDER BY column \"(lines.offer_id = '合计')\": add the expression/function to every SELECT, or move the UNION into a FROM clause.\nTraceback (most recent call last):\n  File \"F:\\CODING\\Project\\Xenix_native\\src\\xenix\\services\\preprocessing_worker.py\", line 71, in run_preprocessing_worker_task\n    result = execute_preprocessing_worker_operation(\n        str(request[\"operation\"]),\n        dict(request.get(\"payload\") or {}),\n        paths,\n    )\n  File \"F:\\CODING\\Project\\Xenix_native\\src\\xenix\\services\\preprocessing_worker.py\", line 111, in execute_preprocessing_worker_operation\n    )._transform_in_process(input_data)\n      ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^\n  File \"F:\\CODING\\Project\\Xenix_native\\src\\xenix\\services\\data_transform.py\", line 453, in _transform_in_process\n    with duckdb.connect(database=\":memory:\") as connection:\n         ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^\n  File \"F:\\CODING\\Project\\Xenix_native\\src\\xenix\\services\\data_transform.py\", line 465, in _transform_in_process\n    connection.execute(f\"CREATE OR REPLACE TEMP TABLE output AS {final.query}\")\n    ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n_duckdb.BinderException: Binder Error: Could not ORDER BY column \"(lines.offer_id = '合计')\": add the expression/function to every SELECT, or move the UNION into a FROM clause.",
+          "observed_in": "build/tool-description-progressive/g0/restock-r2/capture/6672-008-request.json"
+        },
+        {
+          "call_id": "call_01_d3S3H3Fbj50tqRxXlHjn7233",
+          "tool": "data_transform",
+          "arguments": {
+            "datasets": {
+              "o": 2
+            },
+            "name": "候选报价毛利效率对比",
+            "sql": "WITH chosen(offer_id) AS (VALUES ('Q102'),('Q203'),('Q204'),('Q509'))\nSELECT o.offer_id, o.product,\n       CAST(o.arrival_date AS DATE) AS arrival_date,\n       o.cost_yuan, o.margin_yuan, o.boxes, o.max_batches,\n       ROUND(CAST(o.arrival_date AS DATE) <= DATE '2026-09-25', 0) AS within_cutoff,\n       ROUND(o.cost_yuan/max(o.cost_yuan) OVER (), 4) AS cost_ratio,\n       o.margin_yuan/o.cost_yuan AS margin_per_yuan,\n       o.margin_yuan/o.boxes AS margin_per_box,\n       CASE WHEN c.offer_id IS NULL THEN '未选中' ELSE '已选中' END AS selection\nFROM o LEFT JOIN chosen c USING (offer_id)\nORDER BY margin_per_yuan DESC"
+          },
+          "response": "build/tool-description-progressive/g0/restock-r2/capture/6672-004-response.json",
+          "type": "tool_failure",
+          "code": "tool_execution_failed",
+          "message": "Binder Error: No function matches the given name and argument types 'round(BOOLEAN, INTEGER_LITERAL)'. You might need to add explicit type casts.\n\tCandidate functions:\n\tround(TINYINT) -> TINYINT\n\tround(TINYINT, INTEGER) -> TINYINT\n\tround(SMALLINT) -> SMALLINT\n\tround(SMALLINT, INTEGER) -> SMALLINT\n\tround(INTEGER) -> INTEGER\n\tround(INTEGER, INTEGER) -> INTEGER\n\tround(BIGINT) -> BIGINT\n\tround(BIGINT, INTEGER) -> BIGINT\n\tround(HUGEINT) -> HUGEINT\n\tround(HUGEINT, INTEGER) -> HUGEINT\n\tround(FLOAT) -> FLOAT\n\tround(FLOAT, INTEGER) -> FLOAT\n\tround(DOUBLE) -> DOUBLE\n\tround(DOUBLE, INTEGER) -> DOUBLE\n\tround(DECIMAL) -> DECIMAL\n\tround(DECIMAL, INTEGER) -> DECIMAL\n\n\nLINE 5:        ROUND(CAST(o.arrival_date AS DATE) <= DATE '2026-09-25'...\n               ^\nTraceback (most recent call last):\n  File \"F:\\CODING\\Project\\Xenix_native\\src\\xenix\\services\\preprocessing_worker.py\", line 71, in run_preprocessing_worker_task\n    result = execute_preprocessing_worker_operation(\n        str(request[\"operation\"]),\n        dict(request.get(\"payload\") or {}),\n        paths,\n    )\n  File \"F:\\CODING\\Project\\Xenix_native\\src\\xenix\\services\\preprocessing_worker.py\", line 111, in execute_preprocessing_worker_operation\n    )._transform_in_process(input_data)\n      ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^\n  File \"F:\\CODING\\Project\\Xenix_native\\src\\xenix\\services\\data_transform.py\", line 453, in _transform_in_process\n    with duckdb.connect(database=\":memory:\") as connection:\n         ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^\n  File \"F:\\CODING\\Project\\Xenix_native\\src\\xenix\\services\\data_transform.py\", line 465, in _transform_in_process\n    connection.execute(f\"CREATE OR REPLACE TEMP TABLE output AS {final.query}\")\n    ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n_duckdb.BinderException: Binder Error: No function matches the given name and argument types 'round(BOOLEAN, INTEGER_LITERAL)'. You might need to add explicit type casts.\n\tCandidate functions:\n\tround(TINYINT) -> TINYINT\n\tround(TINYINT, INTEGER) -> TINYINT\n\tround(SMALLINT) -> SMALLINT\n\tround(SMALLINT, INTEGER) -> SMALLINT\n\tround(INTEGER) -> INTEGER\n\tround(INTEGER, INTEGER) -> INTEGER\n\tround(BIGINT) -> BIGINT\n\tround(BIGINT, INTEGER) -> BIGINT\n\tround(HUGEINT) -> HUGEINT\n\tround(HUGEINT, INTEGER) -> HUGEINT\n\tround(FLOAT) -> FLOAT\n\tround(FLOAT, INTEGER) -> FLOAT\n\tround(DOUBLE) -> DOUBLE\n\tround(DOUBLE, INTEGER) -> DOUBLE\n\tround(DECIMAL) -> DECIMAL\n\tround(DECIMAL, INTEGER) -> DECIMAL\n\n\nLINE 5:        ROUND(CAST(o.arrival_date AS DATE) <= DATE '2026-09-25'...\n               ^",
+          "observed_in": "build/tool-description-progressive/g0/restock-r2/capture/6672-008-request.json"
+        }
+      ],
+      "captured_requests": 8,
+      "tool_exposures": {
+        "result_page": 8,
+        "knowledge_lookup": 8,
+        "agent_skill_activate": 8,
+        "analysis_profile": 7,
+        "analysis_graph": 7,
+        "data_query": 7,
+        "data_transform": 7,
+        "agent_skill_read_reference": 7,
+        "agent_skill_read_asset": 7
+      },
+      "explicit_nonnull_parameter_use": {
+        "agent_skill_activate.name": 1,
+        "analysis_profile.dataset_id": 1,
+        "data_query.datasets": 3,
+        "data_query.sql": 3,
+        "data_query.limit": 3,
+        "knowledge_lookup.query": 1,
+        "data_transform.datasets": 4,
+        "data_transform.name": 4,
+        "data_transform.sql": 4,
+        "analysis_graph.dataset_id": 1,
+        "analysis_graph.spec": 1
+      },
+      "sent_tool_chars_sum": 52497,
+      "all_captures_description_only": true,
+      "answer_responses": [
+        "build/tool-description-progressive/g0/restock-r2/capture/6672-008-response.json"
+      ],
+      "review": "build/tool-description-progressive/g0/restock-r2/review.json"
+    },
+    {
+      "arm": "g0",
+      "task": "revenue-r1",
+      "report": "build/tool-description-progressive/g0/revenue-r1/reports/business.revenue.v1.standard-deepseek-deepseek-v4-flash-6792c8b8e48b4529abed95e11750eb7a.json",
+      "trace_id": "6792c8b8e48b4529abed95e11750eb7a",
+      "model": "deepseek/deepseek-v4-flash",
+      "run_status": "completed",
+      "outcome": "fail",
+      "outcome_reason": "judge_verdict",
+      "oracle_verdict": "pass",
+      "failed_checks": [],
+      "judge": {
+        "independence": "independent",
+        "metrics": {
+          "elapsed_seconds": 128.8166140000103,
+          "provider_retry_count": 0,
+          "token_usage": {
+            "cached_input_tokens": 2048,
+            "input_tokens": 5075,
+            "output_tokens": 10637,
+            "total_tokens": 15712
+          }
+        },
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "reason_codes": [
+          "incorrect_business_claim"
+        ],
+        "required": true,
+        "rubric_id": "business.revenue_revision.explanation.v1",
+        "rubric_sha256": "73E55EF6575ABE0E1DDB2D780DE0F0C5E2DB301C5E0CAE1AD1650DE1F1FE17AB",
+        "scores": {
+          "month_close_grounding": 1,
+          "revision_explanation": 2
+        },
+        "status": "completed",
+        "summary": "judge_completed",
+        "verdict": "fail"
+      },
+      "failure_kind": null,
+      "subject_metrics": {
+        "assessment_seconds": 0.0022888000239618123,
+        "derived_dataset_count": 3,
+        "message_counts": {
+          "assistant": 10,
+          "tool_call": 14,
+          "tool_result": 14,
+          "user": 2
+        },
+        "provider_retry_count": 0,
+        "sampling_round_count": 11,
+        "terminal_shape": null,
+        "token_usage": {
+          "cached_input_tokens": 105600,
+          "input_tokens": 113121,
+          "output_tokens": 11375,
+          "total_tokens": 124496
+        },
+        "tool_call_counts_by_name": {
+          "agent.skill.activate": 1,
+          "analysis.graph": 3,
+          "data.query": 6,
+          "data.transform": 3,
+          "knowledge.lookup": 1
+        },
+        "tool_result_counts_by_status": {
+          "failed": 1,
+          "succeeded": 13
+        },
+        "turn_seconds": 62.084073500009254,
+        "usage_reported_primary_response_count": 11
+      },
+      "identity": {
+        "case_definition_sha256": "2D8D0F8633992A1BD0EE9FBEEF5B383572933997C3ADC97C78046156E2CFEFEC",
+        "effective_settings_sha256": "6973FC1DA2E20673BAAAE75940A37DE309FD0DC58E98CC9606C23B4EE0E547E8",
+        "embedding_settings_sha256": "84855E3EADB8F092BBE6E6E87D5ECAD071F1981359295FBA2826AEC4630F0397",
+        "fixture_sha256": "E281B883A03A0DDABD96E1EBF908AECCDFBBAB5FE36C8C9EC212D6F669ADDA70",
+        "harness_variant": "progressive-tool-descriptions-g0",
+        "invocation_id": "fd1ef7bc3754495aa19334f0946a11a2",
+        "judge_settings_sha256": "86A3403ECB36E19C283750DF3E07A5984AF12994769207E46981D0162835A507",
+        "repository_commit": "41adb2f6c766a95d20b5cb7cd7923686f80b8581",
+        "repository_dirty": true,
+        "runtime_sha256": "3E7E07CE574893944C99A5455753801D9145381BFB6F3CC0555A29F3AB4C1934",
+        "settings_sha256": "9BD35670D0D0AD156B5F4B148A530992988DA094A0F68365D796ECA83C6149B6"
+      },
+      "tool_failures": [
+        {
+          "call_id": "call_00_hdE4g9MMfRxAi5pgk8qv7145",
+          "tool": "analysis_graph",
+          "arguments": {
+            "dataset_id": 52,
+            "spec": {
+              "data": {
+                "values": [
+                  {
+                    "区域": "东区",
+                    "版本": "上一版",
+                    "净回款": 40750.0
+                  },
+                  {
+                    "区域": "东区",
+                    "版本": "更新版",
+                    "净回款": 29750.0
+                  },
+                  {
+                    "区域": "西区",
+                    "版本": "上一版",
+                    "净回款": 32900.0
+                  },
+                  {
+                    "区域": "西区",
+                    "版本": "更新版",
+                    "净回款": 32900.0
+                  },
+                  {
+                    "区域": "北区",
+                    "版本": "上一版",
+                    "净回款": 22000.0
+                  },
+                  {
+                    "区域": "北区",
+                    "版本": "更新版",
+                    "净回款": 22000.0
+                  },
+                  {
+                    "区域": "南区",
+                    "版本": "上一版",
+                    "净回款": -1200.0
+                  },
+                  {
+                    "区域": "南区",
+                    "版本": "更新版",
+                    "净回款": -900.0
+                  }
+                ]
+              },
+              "encoding": {
+                "x": {
+                  "field": "区域",
+                  "type": "nominal",
+                  "axis": {
+                    "labelAngle": 0
+                  },
+                  "sort": [
+                    "东区",
+                    "西区",
+                    "北区",
+                    "南区"
+                  ]
+                },
+                "xOffset": {
+                  "field": "版本"
+                },
+                "y": {
+                  "field": "净回款",
+                  "type": "quantitative"
+                },
+                "color": {
+                  "field": "版本",
+                  "type": "nominal",
+                  "scale": {
+                    "domain": [
+                      "上一版",
+                      "更新版"
+                    ],
+                    "range": [
+                      "#b0b8c1",
+                      "#2c7fb8"
+                    ]
+                  }
+                },
+                "tooltip": [
+                  {
+                    "field": "区域"
+                  },
+                  {
+                    "field": "版本"
+                  },
+                  {
+                    "field": "净回款"
+                  }
+                ]
+              },
+              "height": 320,
+              "mark": "bar",
+              "title": "各区域净回款：上一版 vs 更新版（元）",
+              "width": 460
+            }
+          },
+          "response": "build/tool-description-progressive/g0/revenue-r1/capture/12764-008-response.json",
+          "type": "tool_failure",
+          "code": "tool_validation_failed",
+          "message": "analysis.graph spec references unknown field(s): 版本. Use exact dataset columns. Available columns: 区域, 本月已支付订单金额, 本月退款金额, 净回款.",
+          "observed_in": "build/tool-description-progressive/g0/revenue-r1/capture/12764-011-request.json"
+        }
+      ],
+      "captured_requests": 11,
+      "tool_exposures": {
+        "result_page": 11,
+        "knowledge_lookup": 11,
+        "agent_skill_activate": 11,
+        "analysis_profile": 10,
+        "analysis_graph": 10,
+        "data_query": 10,
+        "data_transform": 10,
+        "agent_skill_read_reference": 10,
+        "agent_skill_read_asset": 10
+      },
+      "explicit_nonnull_parameter_use": {
+        "agent_skill_activate.name": 1,
+        "knowledge_lookup.query": 1,
+        "data_query.datasets": 6,
+        "data_query.sql": 6,
+        "data_query.limit": 3,
+        "data_transform.datasets": 3,
+        "data_transform.sql": 3,
+        "data_transform.name": 3,
+        "data_transform.explanation": 3,
+        "analysis_graph.dataset_id": 3,
+        "analysis_graph.spec": 3
+      },
+      "sent_tool_chars_sum": 74295,
+      "all_captures_description_only": true,
+      "answer_responses": [
+        "build/tool-description-progressive/g0/revenue-r1/capture/12764-005-response.json",
+        "build/tool-description-progressive/g0/revenue-r1/capture/12764-011-response.json"
+      ],
+      "review": "build/tool-description-progressive/g0/revenue-r1/review.json"
+    },
+    {
+      "arm": "g0",
+      "task": "revenue-r2",
+      "report": "build/tool-description-progressive/g0/revenue-r2/reports/business.revenue.v1.standard-deepseek-deepseek-v4-flash-80b9dede0cb84de7867578050225728b.json",
+      "trace_id": "80b9dede0cb84de7867578050225728b",
+      "model": "deepseek/deepseek-v4-flash",
+      "run_status": "completed",
+      "outcome": "fail",
+      "outcome_reason": "judge_verdict",
+      "oracle_verdict": "pass",
+      "failed_checks": [],
+      "judge": {
+        "independence": "independent",
+        "metrics": {
+          "elapsed_seconds": 169.94760930002667,
+          "provider_retry_count": 0,
+          "token_usage": {
+            "cached_input_tokens": 2048,
+            "input_tokens": 5181,
+            "output_tokens": 14295,
+            "total_tokens": 19476
+          }
+        },
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "reason_codes": [
+          "incorrect_business_claim"
+        ],
+        "required": true,
+        "rubric_id": "business.revenue_revision.explanation.v1",
+        "rubric_sha256": "73E55EF6575ABE0E1DDB2D780DE0F0C5E2DB301C5E0CAE1AD1650DE1F1FE17AB",
+        "scores": {
+          "month_close_grounding": 2,
+          "revision_explanation": 2
+        },
+        "status": "completed",
+        "summary": "judge_completed",
+        "verdict": "fail"
+      },
+      "failure_kind": null,
+      "subject_metrics": {
+        "assessment_seconds": 0.002369699999690056,
+        "derived_dataset_count": 2,
+        "message_counts": {
+          "assistant": 13,
+          "tool_call": 18,
+          "tool_result": 18,
+          "user": 2
+        },
+        "provider_retry_count": 0,
+        "sampling_round_count": 13,
+        "terminal_shape": null,
+        "token_usage": {
+          "cached_input_tokens": 145664,
+          "input_tokens": 152604,
+          "output_tokens": 13976,
+          "total_tokens": 166580
+        },
+        "tool_call_counts_by_name": {
+          "agent.skill.activate": 1,
+          "analysis.graph": 3,
+          "analysis.profile": 3,
+          "data.query": 8,
+          "data.transform": 2,
+          "knowledge.lookup": 1
+        },
+        "tool_result_counts_by_status": {
+          "failed": 1,
+          "succeeded": 17
+        },
+        "turn_seconds": 68.2592197000049,
+        "usage_reported_primary_response_count": 13
+      },
+      "identity": {
+        "case_definition_sha256": "2D8D0F8633992A1BD0EE9FBEEF5B383572933997C3ADC97C78046156E2CFEFEC",
+        "effective_settings_sha256": "6973FC1DA2E20673BAAAE75940A37DE309FD0DC58E98CC9606C23B4EE0E547E8",
+        "embedding_settings_sha256": "84855E3EADB8F092BBE6E6E87D5ECAD071F1981359295FBA2826AEC4630F0397",
+        "fixture_sha256": "E281B883A03A0DDABD96E1EBF908AECCDFBBAB5FE36C8C9EC212D6F669ADDA70",
+        "harness_variant": "progressive-tool-descriptions-g0",
+        "invocation_id": "35148be1e80b4d0a9980b1732e52993b",
+        "judge_settings_sha256": "86A3403ECB36E19C283750DF3E07A5984AF12994769207E46981D0162835A507",
+        "repository_commit": "41adb2f6c766a95d20b5cb7cd7923686f80b8581",
+        "repository_dirty": true,
+        "runtime_sha256": "3E7E07CE574893944C99A5455753801D9145381BFB6F3CC0555A29F3AB4C1934",
+        "settings_sha256": "9BD35670D0D0AD156B5F4B148A530992988DA094A0F68365D796ECA83C6149B6"
+      },
+      "tool_failures": [
+        {
+          "call_id": "call_00_QGpAk9J0Jb0cphXW41V53427",
+          "tool": "analysis_graph",
+          "arguments": {
+            "dataset_id": 69,
+            "spec": {
+              "$schema": "https://vega-lite.github.io/schema/vega-lite/v5.json",
+              "data": {
+                "values": [
+                  {
+                    "region": "西区",
+                    "version": "更新前",
+                    "net_amount": 32900.0
+                  },
+                  {
+                    "region": "西区",
+                    "version": "更新后",
+                    "net_amount": 32900.0
+                  },
+                  {
+                    "region": "东区",
+                    "version": "更新前",
+                    "net_amount": 40750.0
+                  },
+                  {
+                    "region": "东区",
+                    "version": "更新后",
+                    "net_amount": 29750.0
+                  },
+                  {
+                    "region": "北区",
+                    "version": "更新前",
+                    "net_amount": 22000.0
+                  },
+                  {
+                    "region": "北区",
+                    "version": "更新后",
+                    "net_amount": 22000.0
+                  },
+                  {
+                    "region": "南区",
+                    "version": "更新前",
+                    "net_amount": -1200.0
+                  },
+                  {
+                    "region": "南区",
+                    "version": "更新后",
+                    "net_amount": -900.0
+                  }
+                ]
+              },
+              "height": 240,
+              "width": 460,
+              "title": "各区域净回款：更新前 vs 更新后（元）",
+              "mark": "bar",
+              "encoding": {
+                "y": {
+                  "field": "region",
+                  "type": "nominal",
+                  "title": "区域",
+                  "sort": [
+                    "西区",
+                    "东区",
+                    "北区",
+                    "南区"
+                  ]
+                },
+                "x": {
+                  "field": "net_amount",
+                  "type": "quantitative",
+                  "title": "净回款（元）"
+                },
+                "yOffset": {
+                  "field": "version",
+                  "type": "nominal"
+                },
+                "color": {
+                  "field": "version",
+                  "type": "nominal",
+                  "title": "版本",
+                  "scale": {
+                    "domain": [
+                      "更新前",
+                      "更新后"
+                    ],
+                    "range": [
+                      "#b8c4d4",
+                      "#3b7dd8"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "response": "build/tool-description-progressive/g0/revenue-r2/capture/23376-011-response.json",
+          "type": "tool_failure",
+          "code": "tool_validation_failed",
+          "message": "analysis.graph spec references unknown field(s): net_amount, version. Use exact dataset columns. Available columns: region, paid_orders, paid_amount, refunds, refund_amount, net_amount_new, net_amount_prev, net_change, rank_new, rank_prev.",
+          "observed_in": "build/tool-description-progressive/g0/revenue-r2/capture/23376-013-request.json"
+        }
+      ],
+      "captured_requests": 13,
+      "tool_exposures": {
+        "result_page": 13,
+        "knowledge_lookup": 13,
+        "agent_skill_activate": 13,
+        "analysis_profile": 12,
+        "analysis_graph": 12,
+        "data_query": 12,
+        "data_transform": 12,
+        "agent_skill_read_reference": 12,
+        "agent_skill_read_asset": 12
+      },
+      "explicit_nonnull_parameter_use": {
+        "agent_skill_activate.name": 1,
+        "knowledge_lookup.query": 1,
+        "analysis_profile.dataset_id": 3,
+        "data_query.datasets": 8,
+        "data_query.sql": 8,
+        "data_query.limit": 4,
+        "data_transform.datasets": 2,
+        "data_transform.name": 2,
+        "data_transform.sql": 2,
+        "data_transform.explanation": 2,
+        "analysis_graph.dataset_id": 3,
+        "analysis_graph.spec": 3
+      },
+      "sent_tool_chars_sum": 88827,
+      "all_captures_description_only": true,
+      "answer_responses": [
+        "build/tool-description-progressive/g0/revenue-r2/capture/23376-007-response.json",
+        "build/tool-description-progressive/g0/revenue-r2/capture/23376-013-response.json"
+      ],
+      "review": "build/tool-description-progressive/g0/revenue-r2/review.json"
+    },
+    {
+      "arm": "g0",
+      "task": "routing-r2",
+      "report": "build/tool-description-progressive/g0/routing-r2/reports/business.routing.v1.standard-deepseek-deepseek-v4-flash-10c8ce3a876248c0b6d42ec452759bb3.json",
+      "trace_id": "10c8ce3a876248c0b6d42ec452759bb3",
+      "model": "deepseek/deepseek-v4-flash",
+      "run_status": "completed",
+      "outcome": "pass",
+      "outcome_reason": "judge_verdict",
+      "oracle_verdict": "pass",
+      "failed_checks": [],
+      "judge": {
+        "independence": "independent",
+        "metrics": {
+          "elapsed_seconds": 79.25036450003972,
+          "provider_retry_count": 0,
+          "token_usage": {
+            "cached_input_tokens": 896,
+            "input_tokens": 16179,
+            "output_tokens": 6684,
+            "total_tokens": 22863
+          }
+        },
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "reason_codes": [
+          "grounded_reuse"
+        ],
+        "required": true,
+        "rubric_id": "business.routing_reuse.explanation.v1",
+        "rubric_sha256": "A813A96D29847CB305A36AB2EE5F3F67032B064D8322EFE11D5B58F609B02289",
+        "scores": {
+          "adoption_evidence": 2,
+          "manual_correction_estimate": 2,
+          "selected_analyzer_reused": 2,
+          "usable_queue_labels": 2
+        },
+        "status": "completed",
+        "summary": "judge_completed",
+        "verdict": "pass"
+      },
+      "failure_kind": null,
+      "subject_metrics": {
+        "assessment_seconds": 0.0016699000261723995,
+        "derived_dataset_count": 15,
+        "message_counts": {
+          "assistant": 27,
+          "tool_call": 59,
+          "tool_result": 59,
+          "user": 2
+        },
+        "provider_retry_count": 0,
+        "sampling_round_count": 28,
+        "terminal_shape": null,
+        "token_usage": {
+          "cached_input_tokens": 812032,
+          "input_tokens": 844049,
+          "output_tokens": 23425,
+          "total_tokens": 867474
+        },
+        "tool_call_counts_by_name": {
+          "agent.skill.activate": 2,
+          "agent.skill.read_reference": 2,
+          "analysis.graph": 2,
+          "analysis.profile": 2,
+          "data.feature.select": 4,
+          "data.query": 24,
+          "data.transform": 9,
+          "knowledge.lookup": 1,
+          "model.apply": 6,
+          "model.metadata": 2,
+          "model.train": 5
+        },
+        "tool_result_counts_by_status": {
+          "failed": 2,
+          "succeeded": 57
+        },
+        "turn_seconds": 276.7345219000126,
+        "usage_reported_primary_response_count": 28
+      },
+      "identity": {
+        "case_definition_sha256": "35744EC52709E4BF5D0B14C1BE957256E32C38D1113B494285E9427A16D066AE",
+        "effective_settings_sha256": "6973FC1DA2E20673BAAAE75940A37DE309FD0DC58E98CC9606C23B4EE0E547E8",
+        "embedding_settings_sha256": "84855E3EADB8F092BBE6E6E87D5ECAD071F1981359295FBA2826AEC4630F0397",
+        "fixture_sha256": "52FFEC11EDA483EB18AB85C0A3C9812ECDBA8045AE85A54A157BAC86DB8B4B3A",
+        "harness_variant": "progressive-tool-descriptions-g0",
+        "invocation_id": "e26eac707c884c77a5b629ec9238e82d",
+        "judge_settings_sha256": "86A3403ECB36E19C283750DF3E07A5984AF12994769207E46981D0162835A507",
+        "repository_commit": "41adb2f6c766a95d20b5cb7cd7923686f80b8581",
+        "repository_dirty": true,
+        "runtime_sha256": "3E7E07CE574893944C99A5455753801D9145381BFB6F3CC0555A29F3AB4C1934",
+        "settings_sha256": "9BD35670D0D0AD156B5F4B148A530992988DA094A0F68365D796ECA83C6149B6"
+      },
+      "tool_failures": [
+        {
+          "call_id": "call_03_myiT7pWWJGdYNNuWwkfQ6765",
+          "tool": "data_query",
+          "arguments": {
+            "datasets": {
+              "t": 2
+            },
+            "sql": "select count(distinct channel||'|'||queue) as channel_queue_pairs, count(distinct channel) as channels, count(distinct queue) as queues, count(*) rows from t"
+          },
+          "response": "build/tool-description-progressive/g0/routing-r2/capture/27888-016-response.json",
+          "type": "tool_failure",
+          "code": "tool_execution_failed",
+          "message": "Parser Error: syntax error at or near \"rows\"\n\nLINE 1: ...) as channels, count(distinct queue) as queues, count(*) rows from t) AS xenix_query_result_count\n                                                                    ^",
+          "observed_in": "build/tool-description-progressive/g0/routing-r2/capture/27888-028-request.json"
+        },
+        {
+          "call_id": "call_00_2WkwlAdRyiRKDyY20EzF5869",
+          "tool": "data_query",
+          "arguments": {
+            "datasets": {
+              "c": 199
+            },
+            "sql": "select fold, channel, actual_queue, predicted_queue, confidence, message from c where correct = 0 order by actual_queue, predicted_queue",
+            "limit": 20
+          },
+          "response": "build/tool-description-progressive/g0/routing-r2/capture/27888-017-response.json",
+          "type": "tool_failure",
+          "code": "tool_execution_failed",
+          "message": "Binder Error: Referenced column \"message\" not found in FROM clause!\nCandidate bindings: \"customer_batch\", \"channel\"\n\nLINE 1: ... fold, channel, actual_queue, predicted_queue, confidence, message from c where correct = 0 order by actual_queue,...\n                                                                      ^",
+          "observed_in": "build/tool-description-progressive/g0/routing-r2/capture/27888-028-request.json"
+        }
+      ],
+      "captured_requests": 28,
+      "tool_exposures": {
+        "result_page": 28,
+        "knowledge_lookup": 28,
+        "agent_skill_activate": 28,
+        "analysis_profile": 27,
+        "analysis_graph": 27,
+        "data_query": 27,
+        "data_transform": 27,
+        "data_feature_select": 27,
+        "model_metadata": 27,
+        "model_train": 27,
+        "model_hyper_train": 27,
+        "model_apply": 27,
+        "model_task_query": 27,
+        "agent_skill_read_reference": 27,
+        "agent_skill_read_asset": 27
+      },
+      "explicit_nonnull_parameter_use": {
+        "agent_skill_activate.name": 2,
+        "knowledge_lookup.query": 1,
+        "analysis_profile.dataset_id": 2,
+        "agent_skill_read_reference.skill_name": 2,
+        "agent_skill_read_reference.path": 2,
+        "data_query.datasets": 24,
+        "data_query.sql": 24,
+        "data_query.limit": 9,
+        "model_metadata.model_key": 1,
+        "model_metadata.include_details": 2,
+        "data_feature_select.dataset_id": 4,
+        "data_feature_select.model_key": 4,
+        "data_feature_select.role_bindings": 4,
+        "model_train.binding_id": 5,
+        "model_train.models": 5,
+        "model_train.params_by_model": 5,
+        "model_train.run_name": 5,
+        "model_metadata.model_family": 1,
+        "model_apply.trained_model_id": 6,
+        "model_apply.input_sources": 5,
+        "data_transform.datasets": 9,
+        "data_transform.sql": 9,
+        "data_transform.name": 9,
+        "data_transform.explanation": 9,
+        "model_apply.input_rows": 1,
+        "model_apply.input_rows.header_index_map": 1,
+        "model_apply.input_rows.header_index_map.message": 1,
+        "model_apply.input_rows.data": 1,
+        "analysis_graph.dataset_id": 2,
+        "analysis_graph.spec": 2,
+        "analysis_profile.field_limit": 1
+      },
+      "sent_tool_chars_sum": 338784,
+      "all_captures_description_only": true,
+      "answer_responses": [
+        "build/tool-description-progressive/g0/routing-r2/capture/27888-022-response.json",
+        "build/tool-description-progressive/g0/routing-r2/capture/27888-028-response.json"
+      ],
+      "review": "build/tool-description-progressive/g0/routing-r2/review.json"
+    },
+    {
+      "arm": "g1",
+      "task": "campaign-r1",
+      "report": "build/tool-description-progressive/g1/campaign-r1/reports/business.campaign.v1.standard-deepseek-deepseek-v4-flash-20706228d46c4fcdbfa961cba2b9e19f.json",
+      "trace_id": "20706228d46c4fcdbfa961cba2b9e19f",
+      "model": "deepseek/deepseek-v4-flash",
+      "run_status": "completed",
+      "outcome": "pass",
+      "outcome_reason": "judge_verdict",
+      "oracle_verdict": "pass",
+      "failed_checks": [],
+      "judge": {
+        "independence": "independent",
+        "metrics": {
+          "elapsed_seconds": 16.308125099982135,
+          "provider_retry_count": 0,
+          "token_usage": {
+            "cached_input_tokens": 1152,
+            "input_tokens": 5627,
+            "output_tokens": 1385,
+            "total_tokens": 7012
+          }
+        },
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "reason_codes": [
+          "grounded_delivery"
+        ],
+        "required": true,
+        "rubric_id": "business.campaign_eligibility.explanation.v1",
+        "rubric_sha256": "8A6B83AD1C3AEC7C2EFAB2E62351A7A90BB3D9DDBA28C5BFD64517443B2F6FDA",
+        "scores": {
+          "effective_rule": 2,
+          "exceptions_explained": 2
+        },
+        "status": "completed",
+        "summary": "judge_completed",
+        "verdict": "pass"
+      },
+      "failure_kind": null,
+      "subject_metrics": {
+        "assessment_seconds": 0.0022639999515376985,
+        "derived_dataset_count": 2,
+        "message_counts": {
+          "assistant": 9,
+          "tool_call": 15,
+          "tool_result": 15,
+          "user": 1
+        },
+        "provider_retry_count": 0,
+        "sampling_round_count": 9,
+        "terminal_shape": null,
+        "token_usage": {
+          "cached_input_tokens": 63744,
+          "input_tokens": 71379,
+          "output_tokens": 7176,
+          "total_tokens": 78555
+        },
+        "tool_call_counts_by_name": {
+          "agent.skill.activate": 1,
+          "analysis.graph": 1,
+          "analysis.profile": 1,
+          "data.query": 4,
+          "data.transform": 2,
+          "knowledge.lookup": 6
+        },
+        "tool_result_counts_by_status": {
+          "succeeded": 15
+        },
+        "turn_seconds": 43.66587329999311,
+        "usage_reported_primary_response_count": 9
+      },
+      "identity": {
+        "case_definition_sha256": "91345DE7D5C5A698BE9E90F4755530A5ADCE172825668F508F092587B84B18B3",
+        "effective_settings_sha256": "6973FC1DA2E20673BAAAE75940A37DE309FD0DC58E98CC9606C23B4EE0E547E8",
+        "embedding_settings_sha256": "84855E3EADB8F092BBE6E6E87D5ECAD071F1981359295FBA2826AEC4630F0397",
+        "fixture_sha256": "DDF4B77B17E20F18327824EDA549E2DEEE5FF2DFEBA7005C3F446B7160124733",
+        "harness_variant": "progressive-tool-descriptions-g1",
+        "invocation_id": "58ffc9f6410546a48a039c29a4b13a54",
+        "judge_settings_sha256": "86A3403ECB36E19C283750DF3E07A5984AF12994769207E46981D0162835A507",
+        "repository_commit": "41adb2f6c766a95d20b5cb7cd7923686f80b8581",
+        "repository_dirty": true,
+        "runtime_sha256": "3E7E07CE574893944C99A5455753801D9145381BFB6F3CC0555A29F3AB4C1934",
+        "settings_sha256": "9BD35670D0D0AD156B5F4B148A530992988DA094A0F68365D796ECA83C6149B6"
+      },
+      "tool_failures": [],
+      "captured_requests": 9,
+      "tool_exposures": {
+        "result_page": 9,
+        "knowledge_lookup": 9,
+        "agent_skill_activate": 9,
+        "analysis_profile": 7,
+        "analysis_graph": 7,
+        "data_query": 7,
+        "data_transform": 7,
+        "agent_skill_read_reference": 7,
+        "agent_skill_read_asset": 7
+      },
+      "explicit_nonnull_parameter_use": {
+        "knowledge_lookup.query": 6,
+        "agent_skill_activate.name": 1,
+        "analysis_profile.dataset_id": 1,
+        "knowledge_lookup.mode": 2,
+        "data_query.datasets": 4,
+        "data_query.sql": 4,
+        "data_query.limit": 1,
+        "data_transform.datasets": 2,
+        "data_transform.name": 2,
+        "data_transform.sql": 2,
+        "data_transform.explanation": 2,
+        "analysis_graph.dataset_id": 1,
+        "analysis_graph.spec": 1
+      },
+      "sent_tool_chars_sum": 51749,
+      "all_captures_description_only": true,
+      "answer_responses": [
+        "build/tool-description-progressive/g1/campaign-r1/capture/14704-009-response.json"
+      ],
+      "review": "build/tool-description-progressive/g1/campaign-r1/review.json"
+    },
+    {
+      "arm": "g1",
+      "task": "campaign-r2",
+      "report": "build/tool-description-progressive/g1/campaign-r2/reports/business.campaign.v1.standard-deepseek-deepseek-v4-flash-8a74a94c59d34c389502418088eac75c.json",
+      "trace_id": "8a74a94c59d34c389502418088eac75c",
+      "model": "deepseek/deepseek-v4-flash",
+      "run_status": "completed",
+      "outcome": "pass",
+      "outcome_reason": "judge_verdict",
+      "oracle_verdict": "pass",
+      "failed_checks": [],
+      "judge": {
+        "independence": "independent",
+        "metrics": {
+          "elapsed_seconds": 17.98466949997237,
+          "provider_retry_count": 0,
+          "token_usage": {
+            "cached_input_tokens": 1152,
+            "input_tokens": 5277,
+            "output_tokens": 1625,
+            "total_tokens": 6902
+          }
+        },
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "reason_codes": [
+          "grounded_delivery"
+        ],
+        "required": true,
+        "rubric_id": "business.campaign_eligibility.explanation.v1",
+        "rubric_sha256": "8A6B83AD1C3AEC7C2EFAB2E62351A7A90BB3D9DDBA28C5BFD64517443B2F6FDA",
+        "scores": {
+          "effective_rule": 2,
+          "exceptions_explained": 2
+        },
+        "status": "completed",
+        "summary": "judge_completed",
+        "verdict": "pass"
+      },
+      "failure_kind": null,
+      "subject_metrics": {
+        "assessment_seconds": 0.0019964000093750656,
+        "derived_dataset_count": 1,
+        "message_counts": {
+          "assistant": 7,
+          "tool_call": 10,
+          "tool_result": 10,
+          "user": 1
+        },
+        "provider_retry_count": 0,
+        "sampling_round_count": 7,
+        "terminal_shape": null,
+        "token_usage": {
+          "cached_input_tokens": 40576,
+          "input_tokens": 48137,
+          "output_tokens": 3410,
+          "total_tokens": 51547
+        },
+        "tool_call_counts_by_name": {
+          "agent.skill.activate": 1,
+          "analysis.profile": 1,
+          "data.query": 3,
+          "data.transform": 1,
+          "knowledge.lookup": 4
+        },
+        "tool_result_counts_by_status": {
+          "failed": 1,
+          "succeeded": 9
+        },
+        "turn_seconds": 26.01923729997361,
+        "usage_reported_primary_response_count": 7
+      },
+      "identity": {
+        "case_definition_sha256": "91345DE7D5C5A698BE9E90F4755530A5ADCE172825668F508F092587B84B18B3",
+        "effective_settings_sha256": "6973FC1DA2E20673BAAAE75940A37DE309FD0DC58E98CC9606C23B4EE0E547E8",
+        "embedding_settings_sha256": "84855E3EADB8F092BBE6E6E87D5ECAD071F1981359295FBA2826AEC4630F0397",
+        "fixture_sha256": "DDF4B77B17E20F18327824EDA549E2DEEE5FF2DFEBA7005C3F446B7160124733",
+        "harness_variant": "progressive-tool-descriptions-g1",
+        "invocation_id": "ba42a43e3dea4006ab59fbae83a47339",
+        "judge_settings_sha256": "86A3403ECB36E19C283750DF3E07A5984AF12994769207E46981D0162835A507",
+        "repository_commit": "41adb2f6c766a95d20b5cb7cd7923686f80b8581",
+        "repository_dirty": true,
+        "runtime_sha256": "3E7E07CE574893944C99A5455753801D9145381BFB6F3CC0555A29F3AB4C1934",
+        "settings_sha256": "9BD35670D0D0AD156B5F4B148A530992988DA094A0F68365D796ECA83C6149B6"
+      },
+      "tool_failures": [
+        {
+          "call_id": "call_00_NZu76UqoeiKqlBhYkuKs8542",
+          "tool": "data_query",
+          "arguments": {
+            "datasets": {
+              "c": 16
+            },
+            "sql": "SELECT\n  customer_id, city, net_spend_90d_yuan, last_contact_date, vip, open_service_cases, active,\n  CASE WHEN city IN ('南京','苏州') THEN 1 ELSE 0 END AS city_ok,\n  CASE WHEN active THEN 1 ELSE 0 END AS active_ok,\n  CASE WHEN vip OR net_spend_90d_yuan >= 1000 THEN 1 ELSE 0 END AS spend_ok,\n  CASE WHEN last_contact_date IS NULL OR DATE '2026-07-01' - last_contact_date >= 30 THEN 1 ELSE 0 END AS interval_ok,\n  CASE WHEN open_service_cases = 0 THEN 1 ELSE 0 END AS cases_ok,\n  CASE WHEN city IN ('南京','苏州') AND active\n        AND (vip OR net_spend_90d_yuan >= 1000)\n        AND (last_contact_date IS NULL OR DATE '2026-07-01' - last_contact_date >= 30)\n        AND open_service_cases = 0\n       THEN 1 ELSE 0 END AS eligible\nFROM c\nORDER BY eligible DESC, city, customer_id;",
+            "limit": 200
+          },
+          "response": "build/tool-description-progressive/g1/campaign-r2/capture/22712-003-response.json",
+          "type": "tool_failure",
+          "code": "tool_execution_failed",
+          "message": "Binder Error: No function matches the given name and argument types '-(DATE, VARCHAR)'. You might need to add explicit type casts.\n\tCandidate functions:\n\t-(TINYINT) -> TINYINT\n\t-(TINYINT, TINYINT) -> TINYINT\n\t-(SMALLINT) -> SMALLINT\n\t-(SMALLINT, SMALLINT) -> SMALLINT\n\t-(INTEGER) -> INTEGER\n\t-(INTEGER, INTEGER) -> INTEGER\n\t-(BIGINT) -> BIGINT\n\t-(BIGINT, BIGINT) -> BIGINT\n\t-(HUGEINT) -> HUGEINT\n\t-(HUGEINT, HUGEINT) -> HUGEINT\n\t-(FLOAT) -> FLOAT\n\t-(FLOAT, FLOAT) -> FLOAT\n\t-(DOUBLE) -> DOUBLE\n\t-(DOUBLE, DOUBLE) -> DOUBLE\n\t-(DECIMAL) -> DECIMAL\n\t-(DECIMAL, DECIMAL) -> DECIMAL\n\t-(UTINYINT) -> UTINYINT\n\t-(UTINYINT, UTINYINT) -> UTINYINT\n\t-(USMALLINT) -> USMALLINT\n\t-(USMALLINT, USMALLINT) -> USMALLINT\n\t-(UINTEGER) -> UINTEGER\n\t-(UINTEGER, UINTEGER) -> UINTEGER\n\t-(UBIGINT) -> UBIGINT\n\t-(UBIGINT, UBIGINT) -> UBIGINT\n\t-(UHUGEINT) -> UHUGEINT\n\t-(UHUGEINT, UHUGEINT) -> UHUGEINT\n\t-(BIGNUM) -> BIGNUM\n\t-(BIGNUM, BIGNUM) -> BIGNUM\n\t-(DATE, DATE) -> BIGINT\n\t-(DATE, INTEGER) -> DATE\n\t-(TIMESTAMP, TIMESTAMP) -> INTERVAL\n\t-(INTERVAL, INTERVAL) -> INTERVAL\n\t-(DATE, INTERVAL) -> TIMESTAMP\n\t-(TIME, INTERVAL) -> TIME\n\t-(TIMESTAMP, INTERVAL) -> TIMESTAMP\n\t-(TIME WITH TIME ZONE, INTERVAL) -> TIME WITH TIME ZONE\n\t-(INTERVAL) -> INTERVAL\n\t-(TIMESTAMP WITH TIME ZONE, INTERVAL) -> TIMESTAMP WITH TIME ZONE\n\t-(TIMESTAMP WITH TIME ZONE, TIMESTAMP WITH TIME ZONE) -> INTERVAL\n\n\nLINE 6:   CASE WHEN last_contact_date IS NULL OR DATE '2026-07-01' - last_contact_date >= 30 THEN 1 ELSE 0 END AS interval_ok,\n                                                                   ^",
+          "observed_in": "build/tool-description-progressive/g1/campaign-r2/capture/22712-007-request.json"
+        }
+      ],
+      "captured_requests": 7,
+      "tool_exposures": {
+        "result_page": 7,
+        "knowledge_lookup": 7,
+        "agent_skill_activate": 7,
+        "analysis_profile": 6,
+        "analysis_graph": 6,
+        "data_query": 6,
+        "data_transform": 6,
+        "agent_skill_read_reference": 6,
+        "agent_skill_read_asset": 6
+      },
+      "explicit_nonnull_parameter_use": {
+        "knowledge_lookup.query": 4,
+        "agent_skill_activate.name": 1,
+        "analysis_profile.dataset_id": 1,
+        "data_query.datasets": 3,
+        "data_query.sql": 3,
+        "data_query.limit": 2,
+        "data_transform.datasets": 1,
+        "data_transform.name": 1,
+        "data_transform.explanation": 1,
+        "data_transform.sql": 1
+      },
+      "sent_tool_chars_sum": 43232,
+      "all_captures_description_only": true,
+      "answer_responses": [
+        "build/tool-description-progressive/g1/campaign-r2/capture/22712-007-response.json"
+      ],
+      "review": "build/tool-description-progressive/g1/campaign-r2/review.json"
+    },
+    {
+      "arm": "g1",
+      "task": "restock-r1",
+      "report": "build/tool-description-progressive/g1/restock-r1/reports/business.restock.v1.standard-deepseek-deepseek-v4-flash-471694af4e9d43ec94bcbb281fa22c22.json",
+      "trace_id": "471694af4e9d43ec94bcbb281fa22c22",
+      "model": "deepseek/deepseek-v4-flash",
+      "run_status": "completed",
+      "outcome": "fail",
+      "outcome_reason": "judge_verdict",
+      "oracle_verdict": "pass",
+      "failed_checks": [],
+      "judge": {
+        "independence": "independent",
+        "metrics": {
+          "elapsed_seconds": 86.27850970003055,
+          "provider_retry_count": 0,
+          "token_usage": {
+            "cached_input_tokens": 1792,
+            "input_tokens": 4238,
+            "output_tokens": 6996,
+            "total_tokens": 11234
+          }
+        },
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "reason_codes": [
+          "grounded_decision",
+          "incorrect_business_claim"
+        ],
+        "required": true,
+        "rubric_id": "business.restock_decision.explanation.v1",
+        "rubric_sha256": "6A5FA84263DA0DF7657651A75DC069D2AEAE184B465574CB61D8308C8D47394F",
+        "scores": {
+          "business_explanation": 0,
+          "selected_plan": 2
+        },
+        "status": "completed",
+        "summary": "judge_completed",
+        "verdict": "fail"
+      },
+      "failure_kind": null,
+      "subject_metrics": {
+        "assessment_seconds": 0.0010682999854907393,
+        "derived_dataset_count": 1,
+        "message_counts": {
+          "assistant": 6,
+          "tool_call": 7,
+          "tool_result": 7,
+          "user": 1
+        },
+        "provider_retry_count": 0,
+        "sampling_round_count": 6,
+        "terminal_shape": null,
+        "token_usage": {
+          "cached_input_tokens": 35328,
+          "input_tokens": 40271,
+          "output_tokens": 7558,
+          "total_tokens": 47829
+        },
+        "tool_call_counts_by_name": {
+          "agent.skill.activate": 1,
+          "analysis.graph": 1,
+          "data.query": 3,
+          "data.transform": 1,
+          "knowledge.lookup": 1
+        },
+        "tool_result_counts_by_status": {
+          "succeeded": 7
+        },
+        "turn_seconds": 38.54447020002408,
+        "usage_reported_primary_response_count": 6
+      },
+      "identity": {
+        "case_definition_sha256": "24CD6031DA1B7B9F9C70F2D77FD0A5DC29CEBC6947DE3E3FABA05D31F2697C2D",
+        "effective_settings_sha256": "6973FC1DA2E20673BAAAE75940A37DE309FD0DC58E98CC9606C23B4EE0E547E8",
+        "embedding_settings_sha256": "84855E3EADB8F092BBE6E6E87D5ECAD071F1981359295FBA2826AEC4630F0397",
+        "fixture_sha256": "0EEA8E8B1CA68DD617B60DD7BFF33794495981C932A686510B02581E8834267A",
+        "harness_variant": "progressive-tool-descriptions-g1",
+        "invocation_id": "78ab85fcad84404eb04d50ec2cae5586",
+        "judge_settings_sha256": "86A3403ECB36E19C283750DF3E07A5984AF12994769207E46981D0162835A507",
+        "repository_commit": "41adb2f6c766a95d20b5cb7cd7923686f80b8581",
+        "repository_dirty": true,
+        "runtime_sha256": "3E7E07CE574893944C99A5455753801D9145381BFB6F3CC0555A29F3AB4C1934",
+        "settings_sha256": "9BD35670D0D0AD156B5F4B148A530992988DA094A0F68365D796ECA83C6149B6"
+      },
+      "tool_failures": [],
+      "captured_requests": 6,
+      "tool_exposures": {
+        "result_page": 6,
+        "knowledge_lookup": 6,
+        "agent_skill_activate": 6,
+        "analysis_profile": 5,
+        "analysis_graph": 5,
+        "data_query": 5,
+        "data_transform": 5,
+        "agent_skill_read_reference": 5,
+        "agent_skill_read_asset": 5
+      },
+      "explicit_nonnull_parameter_use": {
+        "agent_skill_activate.name": 1,
+        "knowledge_lookup.query": 1,
+        "data_query.datasets": 3,
+        "data_query.sql": 3,
+        "data_query.limit": 3,
+        "data_transform.datasets": 1,
+        "data_transform.sql": 1,
+        "data_transform.name": 1,
+        "data_transform.explanation": 1,
+        "analysis_graph.dataset_id": 1,
+        "analysis_graph.spec": 1
+      },
+      "sent_tool_chars_sum": 36289,
+      "all_captures_description_only": true,
+      "answer_responses": [
+        "build/tool-description-progressive/g1/restock-r1/capture/26636-006-response.json"
+      ],
+      "review": "build/tool-description-progressive/g1/restock-r1/review.json"
+    },
+    {
+      "arm": "g1",
+      "task": "restock-r2",
+      "report": "build/tool-description-progressive/g1/restock-r2/reports/business.restock.v1.standard-deepseek-deepseek-v4-flash-32cc08532694487d947b8264e8af4bd7.json",
+      "trace_id": "32cc08532694487d947b8264e8af4bd7",
+      "model": "deepseek/deepseek-v4-flash",
+      "run_status": "completed",
+      "outcome": "pass",
+      "outcome_reason": "judge_verdict",
+      "oracle_verdict": "pass",
+      "failed_checks": [],
+      "judge": {
+        "independence": "independent",
+        "metrics": {
+          "elapsed_seconds": 24.835035900003277,
+          "provider_retry_count": 0,
+          "token_usage": {
+            "cached_input_tokens": 1792,
+            "input_tokens": 4964,
+            "output_tokens": 2205,
+            "total_tokens": 7169
+          }
+        },
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "reason_codes": [
+          "grounded_decision"
+        ],
+        "required": true,
+        "rubric_id": "business.restock_decision.explanation.v1",
+        "rubric_sha256": "6A5FA84263DA0DF7657651A75DC069D2AEAE184B465574CB61D8308C8D47394F",
+        "scores": {
+          "business_explanation": 2,
+          "selected_plan": 2
+        },
+        "status": "completed",
+        "summary": "judge_completed",
+        "verdict": "pass"
+      },
+      "failure_kind": null,
+      "subject_metrics": {
+        "assessment_seconds": 0.0011778000043705106,
+        "derived_dataset_count": 1,
+        "message_counts": {
+          "assistant": 5,
+          "tool_call": 5,
+          "tool_result": 5,
+          "user": 1
+        },
+        "provider_retry_count": 0,
+        "sampling_round_count": 5,
+        "terminal_shape": null,
+        "token_usage": {
+          "cached_input_tokens": 22400,
+          "input_tokens": 25961,
+          "output_tokens": 5008,
+          "total_tokens": 30969
+        },
+        "tool_call_counts_by_name": {
+          "agent.skill.activate": 1,
+          "analysis.profile": 1,
+          "data.query": 2,
+          "data.transform": 1
+        },
+        "tool_result_counts_by_status": {
+          "succeeded": 5
+        },
+        "turn_seconds": 26.254242900002282,
+        "usage_reported_primary_response_count": 5
+      },
+      "identity": {
+        "case_definition_sha256": "24CD6031DA1B7B9F9C70F2D77FD0A5DC29CEBC6947DE3E3FABA05D31F2697C2D",
+        "effective_settings_sha256": "6973FC1DA2E20673BAAAE75940A37DE309FD0DC58E98CC9606C23B4EE0E547E8",
+        "embedding_settings_sha256": "84855E3EADB8F092BBE6E6E87D5ECAD071F1981359295FBA2826AEC4630F0397",
+        "fixture_sha256": "0EEA8E8B1CA68DD617B60DD7BFF33794495981C932A686510B02581E8834267A",
+        "harness_variant": "progressive-tool-descriptions-g1",
+        "invocation_id": "5368149c95714ff9a77f1816ab47f64f",
+        "judge_settings_sha256": "86A3403ECB36E19C283750DF3E07A5984AF12994769207E46981D0162835A507",
+        "repository_commit": "41adb2f6c766a95d20b5cb7cd7923686f80b8581",
+        "repository_dirty": true,
+        "runtime_sha256": "3E7E07CE574893944C99A5455753801D9145381BFB6F3CC0555A29F3AB4C1934",
+        "settings_sha256": "9BD35670D0D0AD156B5F4B148A530992988DA094A0F68365D796ECA83C6149B6"
+      },
+      "tool_failures": [],
+      "captured_requests": 5,
+      "tool_exposures": {
+        "result_page": 5,
+        "knowledge_lookup": 5,
+        "agent_skill_activate": 5,
+        "analysis_profile": 4,
+        "analysis_graph": 4,
+        "data_query": 4,
+        "data_transform": 4,
+        "agent_skill_read_reference": 4,
+        "agent_skill_read_asset": 4
+      },
+      "explicit_nonnull_parameter_use": {
+        "agent_skill_activate.name": 1,
+        "analysis_profile.dataset_id": 1,
+        "data_query.datasets": 2,
+        "data_query.sql": 2,
+        "data_query.limit": 2,
+        "data_transform.datasets": 1,
+        "data_transform.sql": 1,
+        "data_transform.name": 1,
+        "data_transform.explanation": 1
+      },
+      "sent_tool_chars_sum": 29346,
+      "all_captures_description_only": true,
+      "answer_responses": [
+        "build/tool-description-progressive/g1/restock-r2/capture/25148-005-response.json"
+      ],
+      "review": "build/tool-description-progressive/g1/restock-r2/review.json"
+    },
+    {
+      "arm": "g1",
+      "task": "revenue-r1",
+      "report": "build/tool-description-progressive/g1/revenue-r1/reports/business.revenue.v1.standard-deepseek-deepseek-v4-flash-8393e6a79861440c8a8492f011f2026d.json",
+      "trace_id": "8393e6a79861440c8a8492f011f2026d",
+      "model": "deepseek/deepseek-v4-flash",
+      "run_status": "completed",
+      "outcome": "pass",
+      "outcome_reason": "judge_verdict",
+      "oracle_verdict": "pass",
+      "failed_checks": [],
+      "judge": {
+        "independence": "independent",
+        "metrics": {
+          "elapsed_seconds": 75.80522509996081,
+          "provider_retry_count": 0,
+          "token_usage": {
+            "cached_input_tokens": 2048,
+            "input_tokens": 5278,
+            "output_tokens": 6129,
+            "total_tokens": 11407
+          }
+        },
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "reason_codes": [
+          "grounded_delivery"
+        ],
+        "required": true,
+        "rubric_id": "business.revenue_revision.explanation.v1",
+        "rubric_sha256": "73E55EF6575ABE0E1DDB2D780DE0F0C5E2DB301C5E0CAE1AD1650DE1F1FE17AB",
+        "scores": {
+          "month_close_grounding": 2,
+          "revision_explanation": 2
+        },
+        "status": "completed",
+        "summary": "judge_completed",
+        "verdict": "pass"
+      },
+      "failure_kind": null,
+      "subject_metrics": {
+        "assessment_seconds": 0.002226600016001612,
+        "derived_dataset_count": 3,
+        "message_counts": {
+          "assistant": 12,
+          "tool_call": 13,
+          "tool_result": 13,
+          "user": 2
+        },
+        "provider_retry_count": 0,
+        "sampling_round_count": 12,
+        "terminal_shape": null,
+        "token_usage": {
+          "cached_input_tokens": 109696,
+          "input_tokens": 116279,
+          "output_tokens": 10569,
+          "total_tokens": 126848
+        },
+        "tool_call_counts_by_name": {
+          "agent.skill.activate": 1,
+          "analysis.graph": 3,
+          "data.query": 4,
+          "data.transform": 4,
+          "knowledge.lookup": 1
+        },
+        "tool_result_counts_by_status": {
+          "failed": 2,
+          "succeeded": 11
+        },
+        "turn_seconds": 62.19530909997411,
+        "usage_reported_primary_response_count": 12
+      },
+      "identity": {
+        "case_definition_sha256": "2D8D0F8633992A1BD0EE9FBEEF5B383572933997C3ADC97C78046156E2CFEFEC",
+        "effective_settings_sha256": "6973FC1DA2E20673BAAAE75940A37DE309FD0DC58E98CC9606C23B4EE0E547E8",
+        "embedding_settings_sha256": "84855E3EADB8F092BBE6E6E87D5ECAD071F1981359295FBA2826AEC4630F0397",
+        "fixture_sha256": "E281B883A03A0DDABD96E1EBF908AECCDFBBAB5FE36C8C9EC212D6F669ADDA70",
+        "harness_variant": "progressive-tool-descriptions-g1",
+        "invocation_id": "3a4eccad16ab412abc76f0b5c1055dc8",
+        "judge_settings_sha256": "86A3403ECB36E19C283750DF3E07A5984AF12994769207E46981D0162835A507",
+        "repository_commit": "41adb2f6c766a95d20b5cb7cd7923686f80b8581",
+        "repository_dirty": true,
+        "runtime_sha256": "3E7E07CE574893944C99A5455753801D9145381BFB6F3CC0555A29F3AB4C1934",
+        "settings_sha256": "9BD35670D0D0AD156B5F4B148A530992988DA094A0F68365D796ECA83C6149B6"
+      },
+      "tool_failures": [
+        {
+          "call_id": "call_00_i5YNjM1MGH055c4GRJF67609",
+          "tool": "analysis_graph",
+          "arguments": {
+            "dataset_id": 49,
+            "spec": {
+              "$schema": "https://vega-lite.github.io/schema/vega-lite/v5.json",
+              "data": {
+                "values": [
+                  {
+                    "区域": "东区",
+                    "版本": "上一版",
+                    "净回款": 40750
+                  },
+                  {
+                    "区域": "东区",
+                    "版本": "更新后",
+                    "净回款": 29750
+                  },
+                  {
+                    "区域": "西区",
+                    "版本": "上一版",
+                    "净回款": 32900
+                  },
+                  {
+                    "区域": "西区",
+                    "版本": "更新后",
+                    "净回款": 32900
+                  },
+                  {
+                    "区域": "北区",
+                    "版本": "上一版",
+                    "净回款": 22000
+                  },
+                  {
+                    "区域": "北区",
+                    "版本": "更新后",
+                    "净回款": 22000
+                  },
+                  {
+                    "区域": "南区",
+                    "版本": "上一版",
+                    "净回款": -1200
+                  },
+                  {
+                    "区域": "南区",
+                    "版本": "更新后",
+                    "净回款": -900
+                  }
+                ]
+              },
+              "encoding": {
+                "x": {
+                  "field": "区域",
+                  "type": "nominal",
+                  "axis": {
+                    "labelFontSize": 13
+                  }
+                },
+                "xOffset": {
+                  "field": "版本",
+                  "type": "nominal"
+                },
+                "y": {
+                  "field": "净回款",
+                  "type": "quantitative",
+                  "axis": {
+                    "title": "净回款（元）"
+                  }
+                },
+                "color": {
+                  "field": "版本",
+                  "type": "nominal",
+                  "scale": {
+                    "range": [
+                      "#B0BEC5",
+                      "#F58518"
+                    ]
+                  }
+                },
+                "tooltip": [
+                  {
+                    "field": "区域"
+                  },
+                  {
+                    "field": "版本"
+                  },
+                  {
+                    "field": "净回款",
+                    "format": ",.2f"
+                  }
+                ]
+              },
+              "layer": [
+                {
+                  "mark": {
+                    "type": "bar"
+                  },
+                  "encoding": {
+                    "x": {
+                      "field": "区域",
+                      "type": "nominal"
+                    },
+                    "xOffset": {
+                      "field": "版本",
+                      "type": "nominal"
+                    },
+                    "y": {
+                      "field": "净回款",
+                      "type": "quantitative"
+                    },
+                    "color": {
+                      "field": "版本",
+                      "type": "nominal",
+                      "scale": {
+                        "range": [
+                          "#B0BEC5",
+                          "#F58518"
+                        ]
+                      }
+                    }
+                  }
+                },
+                {
+                  "mark": {
+                    "type": "text",
+                    "dy": -6,
+                    "fontSize": 10
+                  },
+                  "encoding": {
+                    "x": {
+                      "field": "区域",
+                      "type": "nominal"
+                    },
+                    "xOffset": {
+                      "field": "版本",
+                      "type": "nominal"
+                    },
+                    "y": {
+                      "field": "净回款",
+                      "type": "quantitative"
+                    },
+                    "text": {
+                      "field": "净回款",
+                      "type": "quantitative",
+                      "format": ",.0f"
+                    }
+                  }
+                }
+              ],
+              "width": 460,
+              "height": 320,
+              "title": "各区域净回款：上一版 vs 更新后（元）"
+            }
+          },
+          "response": "build/tool-description-progressive/g1/revenue-r1/capture/6320-008-response.json",
+          "type": "tool_failure",
+          "code": "tool_validation_failed",
+          "message": "analysis.graph spec references unknown field(s): 版本. Use exact dataset columns. Available columns: 区域, 本月订单数, 本月已支付订单金额, 本月退款笔数, 本月退款金额, 净回款.",
+          "observed_in": "build/tool-description-progressive/g1/revenue-r1/capture/6320-012-request.json"
+        },
+        {
+          "call_id": "call_00_95tD0q3sqP4SzvO7TzJB7346",
+          "tool": "data_transform",
+          "arguments": {
+            "datasets": {
+              "v1": 26,
+              "v2": 49
+            },
+            "database_name": "unused",
+            "explanation": "整理上一版与更新后净回款的区域对比，供图表使用。",
+            "name": "净回款版本对比",
+            "sql": "SELECT a.区域, '上一版' AS 版本, a.净回款 FROM v1 a\nUNION ALL\nSELECT b.区域, '更新后' AS 版本, b.净回款 FROM v2 b\nUNION ALL\nSELECT c.区域, '变化' AS 版本, (d.净回款 - c.净回款) AS 净回款\nFROM v1 c JOIN v2 d ON c.区域 = d.区域"
+          },
+          "response": "build/tool-description-progressive/g1/revenue-r1/capture/6320-009-response.json",
+          "type": "tool_failure",
+          "code": "llm_tool_arguments_invalid",
+          "message": "Tool arguments do not match the registered input model.",
+          "details": {
+            "schema_keyword": "additionalProperties",
+            "validation_errors": [
+              {
+                "field": "database_name",
+                "message": "Extra inputs are not permitted"
+              }
+            ]
+          },
+          "retryable": false,
+          "observed_in": "build/tool-description-progressive/g1/revenue-r1/capture/6320-012-request.json"
+        }
+      ],
+      "captured_requests": 12,
+      "tool_exposures": {
+        "result_page": 12,
+        "knowledge_lookup": 12,
+        "agent_skill_activate": 12,
+        "analysis_profile": 11,
+        "analysis_graph": 11,
+        "data_query": 11,
+        "data_transform": 11,
+        "agent_skill_read_reference": 11,
+        "agent_skill_read_asset": 11
+      },
+      "explicit_nonnull_parameter_use": {
+        "agent_skill_activate.name": 1,
+        "knowledge_lookup.query": 1,
+        "data_query.datasets": 4,
+        "data_query.sql": 4,
+        "data_query.limit": 4,
+        "data_transform.datasets": 4,
+        "data_transform.sql": 4,
+        "data_transform.name": 4,
+        "data_transform.explanation": 4,
+        "analysis_graph.dataset_id": 3,
+        "analysis_graph.spec": 3,
+        "data_transform.database_name": 1
+      },
+      "sent_tool_chars_sum": 77947,
+      "all_captures_description_only": true,
+      "answer_responses": [
+        "build/tool-description-progressive/g1/revenue-r1/capture/6320-005-response.json",
+        "build/tool-description-progressive/g1/revenue-r1/capture/6320-012-response.json"
+      ],
+      "review": "build/tool-description-progressive/g1/revenue-r1/review.json"
+    },
+    {
+      "arm": "g1",
+      "task": "revenue-r2",
+      "report": "build/tool-description-progressive/g1/revenue-r2/reports/business.revenue.v1.standard-deepseek-deepseek-v4-flash-dbfb0c81c1d7489db5262b9271b7d74c.json",
+      "trace_id": "dbfb0c81c1d7489db5262b9271b7d74c",
+      "model": "deepseek/deepseek-v4-flash",
+      "run_status": "completed",
+      "outcome": "pass",
+      "outcome_reason": "judge_verdict",
+      "oracle_verdict": "pass",
+      "failed_checks": [],
+      "judge": {
+        "independence": "independent",
+        "metrics": {
+          "elapsed_seconds": 35.689456499996595,
+          "provider_retry_count": 0,
+          "token_usage": {
+            "cached_input_tokens": 2048,
+            "input_tokens": 4937,
+            "output_tokens": 3302,
+            "total_tokens": 8239
+          }
+        },
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "reason_codes": [
+          "grounded_delivery"
+        ],
+        "required": true,
+        "rubric_id": "business.revenue_revision.explanation.v1",
+        "rubric_sha256": "73E55EF6575ABE0E1DDB2D780DE0F0C5E2DB301C5E0CAE1AD1650DE1F1FE17AB",
+        "scores": {
+          "month_close_grounding": 2,
+          "revision_explanation": 2
+        },
+        "status": "completed",
+        "summary": "judge_completed",
+        "verdict": "pass"
+      },
+      "failure_kind": null,
+      "subject_metrics": {
+        "assessment_seconds": 0.0024462000001221895,
+        "derived_dataset_count": 2,
+        "message_counts": {
+          "assistant": 11,
+          "tool_call": 12,
+          "tool_result": 12,
+          "user": 2
+        },
+        "provider_retry_count": 0,
+        "sampling_round_count": 11,
+        "terminal_shape": null,
+        "token_usage": {
+          "cached_input_tokens": 90752,
+          "input_tokens": 95653,
+          "output_tokens": 9354,
+          "total_tokens": 105007
+        },
+        "tool_call_counts_by_name": {
+          "agent.skill.activate": 1,
+          "analysis.graph": 3,
+          "data.query": 5,
+          "data.transform": 3
+        },
+        "tool_result_counts_by_status": {
+          "failed": 2,
+          "succeeded": 10
+        },
+        "turn_seconds": 50.82599380001193,
+        "usage_reported_primary_response_count": 11
+      },
+      "identity": {
+        "case_definition_sha256": "2D8D0F8633992A1BD0EE9FBEEF5B383572933997C3ADC97C78046156E2CFEFEC",
+        "effective_settings_sha256": "6973FC1DA2E20673BAAAE75940A37DE309FD0DC58E98CC9606C23B4EE0E547E8",
+        "embedding_settings_sha256": "84855E3EADB8F092BBE6E6E87D5ECAD071F1981359295FBA2826AEC4630F0397",
+        "fixture_sha256": "E281B883A03A0DDABD96E1EBF908AECCDFBBAB5FE36C8C9EC212D6F669ADDA70",
+        "harness_variant": "progressive-tool-descriptions-g1",
+        "invocation_id": "cdfdb9db611042788a6051a1e448c83b",
+        "judge_settings_sha256": "86A3403ECB36E19C283750DF3E07A5984AF12994769207E46981D0162835A507",
+        "repository_commit": "41adb2f6c766a95d20b5cb7cd7923686f80b8581",
+        "repository_dirty": true,
+        "runtime_sha256": "3E7E07CE574893944C99A5455753801D9145381BFB6F3CC0555A29F3AB4C1934",
+        "settings_sha256": "9BD35670D0D0AD156B5F4B148A530992988DA094A0F68365D796ECA83C6149B6"
+      },
+      "tool_failures": [
+        {
+          "call_id": "call_00_sBJyXzR5g0kKoI9v6j5e7593",
+          "tool": "data_transform",
+          "arguments": {
+            "datasets": {
+              "o": 2,
+              "s": 5,
+              "r": 7
+            },
+            "name": "2026-06 区域净回款汇总",
+            "explanation": "按 2026-06-01~2026-06-30 口径：订单去重后按 order_id 计一次、仅 status=paid；退款去重后按 refund_id 计一次、按 refund_date 归月；门店区域取自 stores 表；四个区域全列，净回款可负。",
+            "sql": "WITH ord AS (\n  SELECT order_id, MIN(store_id) AS store_id, MAX(amount_yuan) AS amount\n  FROM o\n  WHERE status = 'paid'\n    AND paid_date BETWEEN DATE '2026-06-01' AND DATE '2026-06-30'\n  GROUP BY order_id\n),\nord_store AS (\n  SELECT order_id, MIN(store_id) AS store_id FROM o GROUP BY order_id\n),\nref AS (\n  SELECT refund_id, MIN(order_id) AS order_id, MAX(amount_yuan) AS amount\n  FROM r\n  WHERE refund_date BETWEEN DATE '2026-06-01' AND DATE '2026-06-30'\n  GROUP BY refund_id\n),\nsales AS (\n  SELECT st.region, SUM(ord.amount) AS paid_amount\n  FROM ord JOIN s st ON ord.store_id = st.store_id\n  GROUP BY st.region\n),\nrefr AS (\n  SELECT st.region, SUM(ref.amount) AS refund_amount\n  FROM ref JOIN ord_store os ON ref.order_id = os.order_id\n           JOIN s st ON os.store_id = st.store_id\n  GROUP BY st.region\n)\nSELECT s.region,\n       ROUND(COALESCE(sa.paid_amount, 0), 2) AS paid_amount_yuan,\n       ROUND(COALESCE(rf.refund_amount, 0), 2) AS refund_amount_yuan,\n       ROUND(COALESCE(sa.paid_amount, 0) - COALESCE(rf.refund_amount, 0), 2) AS net_receipts_yuan\nFROM (SELECT DISTINCT region FROM s) s\nLEFT JOIN sales sa ON sa.region = s.region\nLEFT JOIN refr  rf ON rf.region = s.region\nORDER BY net_receipts_yuan DESC"
+          },
+          "response": "build/tool-description-progressive/g1/revenue-r2/capture/17128-003-response.json",
+          "type": "tool_failure",
+          "code": "tool_execution_failed",
+          "message": "Binder Error: Cannot mix values of type VARCHAR and DATE in BETWEEN clause - an explicit cast is required\n\nLINE 5:     AND paid_date BETWEEN DATE '2026-06-01' AND DATE '2026-06-30'\n                          ^\nTraceback (most recent call last):\n  File \"F:\\CODING\\Project\\Xenix_native\\src\\xenix\\services\\preprocessing_worker.py\", line 71, in run_preprocessing_worker_task\n    result = execute_preprocessing_worker_operation(\n        str(request[\"operation\"]),\n        dict(request.get(\"payload\") or {}),\n        paths,\n    )\n  File \"F:\\CODING\\Project\\Xenix_native\\src\\xenix\\services\\preprocessing_worker.py\", line 111, in execute_preprocessing_worker_operation\n    )._transform_in_process(input_data)\n      ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^\n  File \"F:\\CODING\\Project\\Xenix_native\\src\\xenix\\services\\data_transform.py\", line 453, in _transform_in_process\n    with duckdb.connect(database=\":memory:\") as connection:\n         ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^\n  File \"F:\\CODING\\Project\\Xenix_native\\src\\xenix\\services\\data_transform.py\", line 465, in _transform_in_process\n    connection.execute(f\"CREATE OR REPLACE TEMP TABLE output AS {final.query}\")\n    ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n_duckdb.BinderException: Binder Error: Cannot mix values of type VARCHAR and DATE in BETWEEN clause - an explicit cast is required\n\nLINE 5:     AND paid_date BETWEEN DATE '2026-06-01' AND DATE '2026-06-30'\n                          ^",
+          "observed_in": "build/tool-description-progressive/g1/revenue-r2/capture/17128-011-request.json"
+        },
+        {
+          "call_id": "call_00_0SErK8szwkoZz2H4T1ZW4910",
+          "tool": "analysis_graph",
+          "arguments": {
+            "dataset_id": 28,
+            "spec": {
+              "title": {
+                "text": "2026年6月各区域净回款（元）",
+                "fontSize": 15
+              },
+              "width": 480,
+              "height": 300,
+              "data": {
+                "values": [
+                  {
+                    "region": "东区",
+                    "net": 40750.0
+                  },
+                  {
+                    "region": "西区",
+                    "net": 32900.0
+                  },
+                  {
+                    "region": "北区",
+                    "net": 22000.0
+                  },
+                  {
+                    "region": "南区",
+                    "net": -1200.0
+                  }
+                ]
+              },
+              "mark": {
+                "type": "bar",
+                "tooltip": true
+              },
+              "encoding": {
+                "x": {
+                  "field": "region",
+                  "type": "nominal",
+                  "axis": {
+                    "labelAngle": 0
+                  },
+                  "sort": [
+                    "东区",
+                    "西区",
+                    "北区",
+                    "南区"
+                  ],
+                  "title": "区域"
+                },
+                "y": {
+                  "field": "net",
+                  "type": "quantitative",
+                  "title": "净回款（元）"
+                },
+                "color": {
+                  "condition": {
+                    "test": "datum.net < 0",
+                    "value": "#d62728"
+                  },
+                  "value": "#4c78a8"
+                }
+              }
+            }
+          },
+          "response": "build/tool-description-progressive/g1/revenue-r2/capture/17128-005-response.json",
+          "type": "tool_failure",
+          "code": "tool_validation_failed",
+          "message": "analysis.graph spec references unknown field(s): net. Use exact dataset columns. Available columns: region, paid_amount_yuan, refund_amount_yuan, net_receipts_yuan.",
+          "observed_in": "build/tool-description-progressive/g1/revenue-r2/capture/17128-011-request.json"
+        }
+      ],
+      "captured_requests": 11,
+      "tool_exposures": {
+        "result_page": 11,
+        "knowledge_lookup": 11,
+        "agent_skill_activate": 11,
+        "analysis_profile": 10,
+        "analysis_graph": 10,
+        "data_query": 10,
+        "data_transform": 10,
+        "agent_skill_read_reference": 10,
+        "agent_skill_read_asset": 10
+      },
+      "explicit_nonnull_parameter_use": {
+        "agent_skill_activate.name": 1,
+        "data_query.datasets": 5,
+        "data_query.sql": 5,
+        "data_query.limit": 5,
+        "data_transform.datasets": 3,
+        "data_transform.name": 3,
+        "data_transform.explanation": 3,
+        "data_transform.sql": 3,
+        "analysis_graph.dataset_id": 3,
+        "analysis_graph.spec": 3
+      },
+      "sent_tool_chars_sum": 71004,
+      "all_captures_description_only": true,
+      "answer_responses": [
+        "build/tool-description-progressive/g1/revenue-r2/capture/17128-007-response.json",
+        "build/tool-description-progressive/g1/revenue-r2/capture/17128-011-response.json"
+      ],
+      "review": "build/tool-description-progressive/g1/revenue-r2/review.json"
+    },
+    {
+      "arm": "g1",
+      "task": "routing-r2",
+      "report": "build/tool-description-progressive/g1/routing-r2/reports/business.routing.v1.standard-deepseek-deepseek-v4-flash-d70a1f72327d4e70905f5f63da84a855.json",
+      "trace_id": "d70a1f72327d4e70905f5f63da84a855",
+      "model": "deepseek/deepseek-v4-flash",
+      "run_status": "completed",
+      "outcome": "pass",
+      "outcome_reason": "judge_verdict",
+      "oracle_verdict": "pass",
+      "failed_checks": [],
+      "judge": {
+        "independence": "independent",
+        "metrics": {
+          "elapsed_seconds": 74.10206369997468,
+          "provider_retry_count": 0,
+          "token_usage": {
+            "cached_input_tokens": 896,
+            "input_tokens": 11365,
+            "output_tokens": 5856,
+            "total_tokens": 17221
+          }
+        },
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "reason_codes": [],
+        "required": true,
+        "rubric_id": "business.routing_reuse.explanation.v1",
+        "rubric_sha256": "A813A96D29847CB305A36AB2EE5F3F67032B064D8322EFE11D5B58F609B02289",
+        "scores": {
+          "adoption_evidence": 2,
+          "manual_correction_estimate": 2,
+          "selected_analyzer_reused": 2,
+          "usable_queue_labels": 2
+        },
+        "status": "completed",
+        "summary": "judge_completed",
+        "verdict": "pass"
+      },
+      "failure_kind": null,
+      "subject_metrics": {
+        "assessment_seconds": 0.0013669999898411334,
+        "derived_dataset_count": 8,
+        "message_counts": {
+          "assistant": 25,
+          "tool_call": 38,
+          "tool_result": 38,
+          "user": 2
+        },
+        "provider_retry_count": 0,
+        "sampling_round_count": 26,
+        "terminal_shape": null,
+        "token_usage": {
+          "cached_input_tokens": 721408,
+          "input_tokens": 750404,
+          "output_tokens": 27302,
+          "total_tokens": 777706
+        },
+        "tool_call_counts_by_name": {
+          "agent.skill.activate": 3,
+          "agent.skill.read_reference": 3,
+          "analysis.graph": 3,
+          "analysis.profile": 2,
+          "data.feature.select": 2,
+          "data.query": 9,
+          "data.transform": 6,
+          "knowledge.lookup": 1,
+          "model.apply": 2,
+          "model.metadata": 1,
+          "model.task.query": 1,
+          "model.train": 5
+        },
+        "tool_result_counts_by_status": {
+          "failed": 1,
+          "succeeded": 37
+        },
+        "turn_seconds": 265.68411450006533,
+        "usage_reported_primary_response_count": 26
+      },
+      "identity": {
+        "case_definition_sha256": "35744EC52709E4BF5D0B14C1BE957256E32C38D1113B494285E9427A16D066AE",
+        "effective_settings_sha256": "6973FC1DA2E20673BAAAE75940A37DE309FD0DC58E98CC9606C23B4EE0E547E8",
+        "embedding_settings_sha256": "84855E3EADB8F092BBE6E6E87D5ECAD071F1981359295FBA2826AEC4630F0397",
+        "fixture_sha256": "52FFEC11EDA483EB18AB85C0A3C9812ECDBA8045AE85A54A157BAC86DB8B4B3A",
+        "harness_variant": "progressive-tool-descriptions-g1",
+        "invocation_id": "10a1084b436c413bbda6b6fdba6b0bd9",
+        "judge_settings_sha256": "86A3403ECB36E19C283750DF3E07A5984AF12994769207E46981D0162835A507",
+        "repository_commit": "41adb2f6c766a95d20b5cb7cd7923686f80b8581",
+        "repository_dirty": true,
+        "runtime_sha256": "3E7E07CE574893944C99A5455753801D9145381BFB6F3CC0555A29F3AB4C1934",
+        "settings_sha256": "9BD35670D0D0AD156B5F4B148A530992988DA094A0F68365D796ECA83C6149B6"
+      },
+      "tool_failures": [
+        {
+          "call_id": "call_01_3NfpBqFrcqQ7HPLZyYQB8627",
+          "tool": "analysis_graph",
+          "arguments": {
+            "dataset_id": 150,
+            "spec": {
+              "encoding": {
+                "color": {
+                  "field": "flag",
+                  "scale": {
+                    "domain": [
+                      "ok",
+                      "MISROUTE"
+                    ],
+                    "range": [
+                      "#4C78A8",
+                      "#E45756"
+                    ]
+                  },
+                  "title": "是否与历史队列一致",
+                  "type": "nominal"
+                },
+                "tooltip": [
+                  {
+                    "field": "queue",
+                    "title": "历史队列"
+                  },
+                  {
+                    "field": "prediction",
+                    "title": "模型预测"
+                  },
+                  {
+                    "field": "prediction_score",
+                    "title": "置信度",
+                    "format": ".3f"
+                  },
+                  {
+                    "field": "message",
+                    "title": "工单内容"
+                  }
+                ],
+                "x": {
+                  "field": "ticket_id",
+                  "sort": "-y",
+                  "title": "工单（按置信度排序）",
+                  "type": "nominal"
+                },
+                "y": {
+                  "axis": {
+                    "format": ".0%"
+                  },
+                  "field": "prediction_score",
+                  "title": "模型置信度",
+                  "type": "quantitative"
+                }
+              },
+              "mark": {
+                "type": "bar"
+              },
+              "title": "未见批次 18 张工单的预测置信度（最低置信度的一张即误分单）"
+            }
+          },
+          "response": "build/tool-description-progressive/g1/routing-r2/capture/25516-018-response.json",
+          "type": "tool_failure",
+          "code": "tool_validation_failed",
+          "message": "analysis.graph spec references unknown field(s): flag. Use exact dataset columns. Available columns: ticket_id, customer_batch, channel, message, queue, prediction, prediction_score.",
+          "observed_in": "build/tool-description-progressive/g1/routing-r2/capture/25516-026-request.json"
+        }
+      ],
+      "captured_requests": 26,
+      "tool_exposures": {
+        "result_page": 26,
+        "knowledge_lookup": 26,
+        "agent_skill_activate": 26,
+        "data_integrate": 25,
+        "analysis_profile": 25,
+        "analysis_graph": 25,
+        "data_clean": 25,
+        "data_clean_metadata": 25,
+        "data_tokenize": 25,
+        "data_query": 25,
+        "data_transform": 25,
+        "data_feature_select": 25,
+        "model_metadata": 25,
+        "model_train": 25,
+        "model_hyper_train": 25,
+        "model_apply": 25,
+        "model_task_query": 25,
+        "agent_skill_read_reference": 25,
+        "agent_skill_read_asset": 25
+      },
+      "explicit_nonnull_parameter_use": {
+        "agent_skill_activate.name": 3,
+        "knowledge_lookup.query": 1,
+        "agent_skill_read_reference.skill_name": 3,
+        "agent_skill_read_reference.path": 3,
+        "analysis_profile.dataset_id": 2,
+        "data_query.datasets": 9,
+        "data_query.sql": 9,
+        "data_query.limit": 6,
+        "model_metadata.model_key": 1,
+        "model_metadata.include_details": 1,
+        "data_feature_select.dataset_id": 2,
+        "data_feature_select.model_key": 2,
+        "data_feature_select.role_bindings": 2,
+        "model_train.binding_id": 5,
+        "model_train.models": 5,
+        "model_train.params_by_model": 5,
+        "model_train.run_name": 5,
+        "data_transform.datasets": 6,
+        "data_transform.sql": 6,
+        "data_transform.name": 6,
+        "data_transform.explanation": 6,
+        "model_task_query.task_ids": 1,
+        "model_task_query.include_details": 1,
+        "model_apply.trained_model_id": 2,
+        "model_apply.input_sources": 2,
+        "analysis_graph.dataset_id": 3,
+        "analysis_graph.spec": 3
+      },
+      "sent_tool_chars_sum": 380024,
+      "all_captures_description_only": true,
+      "answer_responses": [
+        "build/tool-description-progressive/g1/routing-r2/capture/25516-021-response.json",
+        "build/tool-description-progressive/g1/routing-r2/capture/25516-026-response.json"
+      ],
+      "review": "build/tool-description-progressive/g1/routing-r2/review.json"
+    },
+    {
+      "arm": "g1k",
+      "task": "campaign-r1",
+      "report": "build/tool-description-progressive/g1k/campaign-r1/reports/business.campaign.v1.standard-deepseek-deepseek-v4-flash-8ee1fed1b1704b16a2467bac76a86605.json",
+      "trace_id": "8ee1fed1b1704b16a2467bac76a86605",
+      "model": "deepseek/deepseek-v4-flash",
+      "run_status": "completed",
+      "outcome": "pass",
+      "outcome_reason": "judge_verdict",
+      "oracle_verdict": "pass",
+      "failed_checks": [],
+      "judge": {
+        "independence": "independent",
+        "metrics": {
+          "elapsed_seconds": 34.60424309998052,
+          "provider_retry_count": 0,
+          "token_usage": {
+            "cached_input_tokens": 1152,
+            "input_tokens": 5425,
+            "output_tokens": 2990,
+            "total_tokens": 8415
+          }
+        },
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "reason_codes": [
+          "grounded_delivery"
+        ],
+        "required": true,
+        "rubric_id": "business.campaign_eligibility.explanation.v1",
+        "rubric_sha256": "8A6B83AD1C3AEC7C2EFAB2E62351A7A90BB3D9DDBA28C5BFD64517443B2F6FDA",
+        "scores": {
+          "effective_rule": 2,
+          "exceptions_explained": 2
+        },
+        "status": "completed",
+        "summary": "judge_completed",
+        "verdict": "pass"
+      },
+      "failure_kind": null,
+      "subject_metrics": {
+        "assessment_seconds": 0.0020590000203810632,
+        "derived_dataset_count": 1,
+        "message_counts": {
+          "assistant": 7,
+          "tool_call": 9,
+          "tool_result": 9,
+          "user": 1
+        },
+        "provider_retry_count": 0,
+        "sampling_round_count": 7,
+        "terminal_shape": null,
+        "token_usage": {
+          "cached_input_tokens": 53376,
+          "input_tokens": 61258,
+          "output_tokens": 6655,
+          "total_tokens": 67913
+        },
+        "tool_call_counts_by_name": {
+          "agent.skill.activate": 1,
+          "analysis.graph": 2,
+          "analysis.profile": 1,
+          "data.query": 2,
+          "data.transform": 1,
+          "knowledge.lookup": 2
+        },
+        "tool_result_counts_by_status": {
+          "failed": 1,
+          "succeeded": 8
+        },
+        "turn_seconds": 34.560514400014654,
+        "usage_reported_primary_response_count": 7
+      },
+      "identity": {
+        "case_definition_sha256": "91345DE7D5C5A698BE9E90F4755530A5ADCE172825668F508F092587B84B18B3",
+        "effective_settings_sha256": "6973FC1DA2E20673BAAAE75940A37DE309FD0DC58E98CC9606C23B4EE0E547E8",
+        "embedding_settings_sha256": "84855E3EADB8F092BBE6E6E87D5ECAD071F1981359295FBA2826AEC4630F0397",
+        "fixture_sha256": "DDF4B77B17E20F18327824EDA549E2DEEE5FF2DFEBA7005C3F446B7160124733",
+        "harness_variant": "progressive-tool-descriptions-g1k",
+        "invocation_id": "0f3723f93e044bcabe459a43c63ce9d9",
+        "judge_settings_sha256": "86A3403ECB36E19C283750DF3E07A5984AF12994769207E46981D0162835A507",
+        "repository_commit": "41adb2f6c766a95d20b5cb7cd7923686f80b8581",
+        "repository_dirty": true,
+        "runtime_sha256": "3E7E07CE574893944C99A5455753801D9145381BFB6F3CC0555A29F3AB4C1934",
+        "settings_sha256": "9BD35670D0D0AD156B5F4B148A530992988DA094A0F68365D796ECA83C6149B6"
+      },
+      "tool_failures": [
+        {
+          "call_id": "call_00_rMGdXeZVqJ6W7tFP4JCP0456",
+          "tool": "analysis_graph",
+          "arguments": {
+            "dataset_id": 40,
+            "spec": {
+              "title": "老客回访判定结果分布（2026-07-01 快照，N=32）",
+              "width": 560,
+              "height": 320,
+              "data": {
+                "values": [
+                  {
+                    "类别": "入选",
+                    "客户数": 11
+                  },
+                  {
+                    "类别": "距上次回访不足30天",
+                    "客户数": 7
+                  },
+                  {
+                    "类别": "城市非南京/苏州",
+                    "客户数": 6
+                  },
+                  {
+                    "类别": "净消费<1000元且非VIP",
+                    "客户数": 3
+                  },
+                  {
+                    "类别": "有未结服务单",
+                    "客户数": 3
+                  },
+                  {
+                    "类别": "非在营客户",
+                    "客户数": 2
+                  }
+                ]
+              },
+              "mark": {
+                "type": "bar",
+                "tooltip": true
+              },
+              "encoding": {
+                "y": {
+                  "field": "类别",
+                  "type": "nominal",
+                  "sort": "-x",
+                  "title": null,
+                  "axis": {
+                    "labelLimit": 200
+                  }
+                },
+                "x": {
+                  "field": "客户数",
+                  "type": "quantitative",
+                  "title": "客户数"
+                },
+                "color": {
+                  "condition": {
+                    "test": "datum.类别 === '入选'",
+                    "value": "#2e7d32"
+                  },
+                  "value": "#c0392b"
+                }
+              }
+            }
+          },
+          "response": "build/tool-description-progressive/g1k/campaign-r1/capture/13004-005-response.json",
+          "type": "tool_failure",
+          "code": "tool_validation_failed",
+          "message": "analysis.graph spec references unknown field(s): 客户数, 类别. Use exact dataset columns. Available columns: customer_id, city, net_spend_90d_yuan, last_contact_date, vip, open_service_cases, active, days_since_contact, eligible, decision_reason.",
+          "observed_in": "build/tool-description-progressive/g1k/campaign-r1/capture/13004-007-request.json"
+        }
+      ],
+      "captured_requests": 7,
+      "tool_exposures": {
+        "result_page": 7,
+        "knowledge_lookup": 7,
+        "agent_skill_activate": 7,
+        "analysis_profile": 6,
+        "analysis_graph": 6,
+        "data_query": 6,
+        "data_transform": 6,
+        "agent_skill_read_reference": 6,
+        "agent_skill_read_asset": 6
+      },
+      "explicit_nonnull_parameter_use": {
+        "knowledge_lookup.query": 2,
+        "agent_skill_activate.name": 1,
+        "analysis_profile.dataset_id": 1,
+        "data_query.datasets": 2,
+        "data_query.sql": 2,
+        "data_query.limit": 2,
+        "data_transform.datasets": 1,
+        "data_transform.sql": 1,
+        "data_transform.name": 1,
+        "data_transform.explanation": 1,
+        "analysis_graph.dataset_id": 2,
+        "analysis_graph.spec": 2
+      },
+      "sent_tool_chars_sum": 43659,
+      "all_captures_description_only": true,
+      "answer_responses": [
+        "build/tool-description-progressive/g1k/campaign-r1/capture/13004-007-response.json"
+      ],
+      "review": "build/tool-description-progressive/g1k/campaign-r1/review.json"
+    },
+    {
+      "arm": "g1k",
+      "task": "campaign-r2",
+      "report": "build/tool-description-progressive/g1k/campaign-r2/reports/business.campaign.v1.standard-deepseek-deepseek-v4-flash-174c2d739e564778b4b60d61bb358274.json",
+      "trace_id": "174c2d739e564778b4b60d61bb358274",
+      "model": "deepseek/deepseek-v4-flash",
+      "run_status": "completed",
+      "outcome": "pass",
+      "outcome_reason": "judge_verdict",
+      "oracle_verdict": "pass",
+      "failed_checks": [],
+      "judge": {
+        "independence": "independent",
+        "metrics": {
+          "elapsed_seconds": 29.36341029999312,
+          "provider_retry_count": 0,
+          "token_usage": {
+            "cached_input_tokens": 1152,
+            "input_tokens": 5736,
+            "output_tokens": 2430,
+            "total_tokens": 8166
+          }
+        },
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "reason_codes": [
+          "grounded_delivery"
+        ],
+        "required": true,
+        "rubric_id": "business.campaign_eligibility.explanation.v1",
+        "rubric_sha256": "8A6B83AD1C3AEC7C2EFAB2E62351A7A90BB3D9DDBA28C5BFD64517443B2F6FDA",
+        "scores": {
+          "effective_rule": 2,
+          "exceptions_explained": 2
+        },
+        "status": "completed",
+        "summary": "judge_completed",
+        "verdict": "pass"
+      },
+      "failure_kind": null,
+      "subject_metrics": {
+        "assessment_seconds": 0.002098000026308,
+        "derived_dataset_count": 1,
+        "message_counts": {
+          "assistant": 6,
+          "tool_call": 10,
+          "tool_result": 10,
+          "user": 1
+        },
+        "provider_retry_count": 0,
+        "sampling_round_count": 6,
+        "terminal_shape": null,
+        "token_usage": {
+          "cached_input_tokens": 31616,
+          "input_tokens": 37367,
+          "output_tokens": 7155,
+          "total_tokens": 44522
+        },
+        "tool_call_counts_by_name": {
+          "agent.skill.activate": 1,
+          "analysis.profile": 1,
+          "data.query": 4,
+          "data.transform": 1,
+          "knowledge.lookup": 3
+        },
+        "tool_result_counts_by_status": {
+          "succeeded": 10
+        },
+        "turn_seconds": 37.73303629999282,
+        "usage_reported_primary_response_count": 6
+      },
+      "identity": {
+        "case_definition_sha256": "91345DE7D5C5A698BE9E90F4755530A5ADCE172825668F508F092587B84B18B3",
+        "effective_settings_sha256": "6973FC1DA2E20673BAAAE75940A37DE309FD0DC58E98CC9606C23B4EE0E547E8",
+        "embedding_settings_sha256": "84855E3EADB8F092BBE6E6E87D5ECAD071F1981359295FBA2826AEC4630F0397",
+        "fixture_sha256": "DDF4B77B17E20F18327824EDA549E2DEEE5FF2DFEBA7005C3F446B7160124733",
+        "harness_variant": "progressive-tool-descriptions-g1k",
+        "invocation_id": "17b5026c020147d3939acf6b454e80c6",
+        "judge_settings_sha256": "86A3403ECB36E19C283750DF3E07A5984AF12994769207E46981D0162835A507",
+        "repository_commit": "41adb2f6c766a95d20b5cb7cd7923686f80b8581",
+        "repository_dirty": true,
+        "runtime_sha256": "3E7E07CE574893944C99A5455753801D9145381BFB6F3CC0555A29F3AB4C1934",
+        "settings_sha256": "9BD35670D0D0AD156B5F4B148A530992988DA094A0F68365D796ECA83C6149B6"
+      },
+      "tool_failures": [],
+      "captured_requests": 6,
+      "tool_exposures": {
+        "result_page": 6,
+        "knowledge_lookup": 6,
+        "agent_skill_activate": 6,
+        "analysis_profile": 5,
+        "analysis_graph": 5,
+        "data_query": 5,
+        "data_transform": 5,
+        "agent_skill_read_reference": 5,
+        "agent_skill_read_asset": 5
+      },
+      "explicit_nonnull_parameter_use": {
+        "agent_skill_activate.name": 1,
+        "knowledge_lookup.query": 3,
+        "analysis_profile.dataset_id": 1,
+        "data_query.datasets": 4,
+        "data_query.sql": 4,
+        "data_query.limit": 1,
+        "data_transform.datasets": 1,
+        "data_transform.name": 1,
+        "data_transform.explanation": 1,
+        "data_transform.sql": 1
+      },
+      "sent_tool_chars_sum": 36655,
+      "all_captures_description_only": true,
+      "answer_responses": [
+        "build/tool-description-progressive/g1k/campaign-r2/capture/21196-006-response.json"
+      ],
+      "review": "build/tool-description-progressive/g1k/campaign-r2/review.json"
+    },
+    {
+      "arm": "g2",
+      "task": "restock-r1",
+      "report": "build/tool-description-progressive/g2/restock-r1/reports/business.restock.v1.standard-deepseek-deepseek-v4-flash-1f4d2b0807d44a38b612fc6169f72882.json",
+      "trace_id": "1f4d2b0807d44a38b612fc6169f72882",
+      "model": "deepseek/deepseek-v4-flash",
+      "run_status": "completed",
+      "outcome": "fail",
+      "outcome_reason": "judge_verdict",
+      "oracle_verdict": "pass",
+      "failed_checks": [],
+      "judge": {
+        "independence": "independent",
+        "metrics": {
+          "elapsed_seconds": 184.17167309997603,
+          "provider_retry_count": 0,
+          "token_usage": {
+            "cached_input_tokens": 1792,
+            "input_tokens": 7953,
+            "output_tokens": 14184,
+            "total_tokens": 22137
+          }
+        },
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "reason_codes": [
+          "incorrect_business_claim"
+        ],
+        "required": true,
+        "rubric_id": "business.restock_decision.explanation.v1",
+        "rubric_sha256": "6A5FA84263DA0DF7657651A75DC069D2AEAE184B465574CB61D8308C8D47394F",
+        "scores": {
+          "business_explanation": 0,
+          "selected_plan": 2
+        },
+        "status": "completed",
+        "summary": "judge_completed",
+        "verdict": "fail"
+      },
+      "failure_kind": null,
+      "subject_metrics": {
+        "assessment_seconds": 0.0017185999895446002,
+        "derived_dataset_count": 2,
+        "message_counts": {
+          "assistant": 10,
+          "tool_call": 13,
+          "tool_result": 13,
+          "user": 1
+        },
+        "provider_retry_count": 0,
+        "sampling_round_count": 11,
+        "terminal_shape": null,
+        "token_usage": {
+          "cached_input_tokens": 77056,
+          "input_tokens": 83464,
+          "output_tokens": 8748,
+          "total_tokens": 92212
+        },
+        "tool_call_counts_by_name": {
+          "agent.skill.activate": 1,
+          "analysis.profile": 1,
+          "data.query": 7,
+          "data.transform": 3,
+          "knowledge.lookup": 1
+        },
+        "tool_result_counts_by_status": {
+          "failed": 6,
+          "succeeded": 7
+        },
+        "turn_seconds": 50.693414200039115,
+        "usage_reported_primary_response_count": 11
+      },
+      "identity": {
+        "case_definition_sha256": "24CD6031DA1B7B9F9C70F2D77FD0A5DC29CEBC6947DE3E3FABA05D31F2697C2D",
+        "effective_settings_sha256": "6973FC1DA2E20673BAAAE75940A37DE309FD0DC58E98CC9606C23B4EE0E547E8",
+        "embedding_settings_sha256": "84855E3EADB8F092BBE6E6E87D5ECAD071F1981359295FBA2826AEC4630F0397",
+        "fixture_sha256": "0EEA8E8B1CA68DD617B60DD7BFF33794495981C932A686510B02581E8834267A",
+        "harness_variant": "progressive-tool-descriptions-g2",
+        "invocation_id": "b790de0668064b5a80f4c9a777e818a9",
+        "judge_settings_sha256": "86A3403ECB36E19C283750DF3E07A5984AF12994769207E46981D0162835A507",
+        "repository_commit": "41adb2f6c766a95d20b5cb7cd7923686f80b8581",
+        "repository_dirty": true,
+        "runtime_sha256": "3E7E07CE574893944C99A5455753801D9145381BFB6F3CC0555A29F3AB4C1934",
+        "settings_sha256": "9BD35670D0D0AD156B5F4B148A530992988DA094A0F68365D796ECA83C6149B6"
+      },
+      "tool_failures": [
+        {
+          "call_id": "call_00_U31rtbSuXaKYgctMaKIF7201",
+          "tool": "data_query",
+          "arguments": {
+            "datasets": {
+              "o": 2
+            },
+            "sql": "WITH eligible AS (\n  SELECT offer_id, cost_yuan, margin_yuan, boxes, max_batches,\n         row_number() OVER (ORDER BY offer_id) AS rn\n  FROM o WHERE arrival_date <= DATE '2026-09-25'\n),\ncombos AS (\n  SELECT 0 AS rn, CAST([] AS INTEGER[]) AS ns, 0.0 AS cost, 0.0 AS box_use, 0.0 AS margin\n  FROM (SELECT 1)\n  UNION ALL\n  SELECT e.rn, c.ns || k.n, c.cost + k.n*e.cost_yuan, c.box_use + k.n*e.boxes, c.margin + k.n*e.margin_yuan\n  FROM combos c\n  JOIN eligible e ON e.rn = c.rn + 1\n  CROSS JOIN LATERAL (SELECT unnest(range(0, e.max_batches+1)) AS n) k\n)\nSELECT ns, cost, box_use, margin\nFROM combos\nWHERE rn = (SELECT max(rn) FROM eligible) AND cost <= 3000 AND box_use <= 18\nORDER BY margin DESC, cost ASC\nLIMIT 10",
+            "limit": 10
+          },
+          "response": "build/tool-description-progressive/g2/restock-r1/capture/14764-003-response.json",
+          "type": "tool_failure",
+          "code": "tool_execution_failed",
+          "message": "Binder Error: Circular reference to CTE \"combos\", use WITH RECURSIVE to use recursive CTEs.\n\nLINE 11:   FROM combos c\n                ^",
+          "observed_in": "build/tool-description-progressive/g2/restock-r1/capture/14764-011-request.json"
+        },
+        {
+          "call_id": "call_00_8KRoN2BjcdkZSNyS8DrO4036",
+          "tool": "data_query",
+          "arguments": {
+            "datasets": {
+              "o": 2
+            },
+            "limit": 10,
+            "sql": "WITH RECURSIVE eligible AS (\n  SELECT offer_id, cost_yuan, margin_yuan, boxes, max_batches,\n         row_number() OVER (ORDER BY offer_id) AS rn\n  FROM o WHERE arrival_date <= DATE '2026-09-25'\n),\ncombos AS (\n  SELECT 0 AS rn, CAST([] AS INTEGER[]) AS ns, 0.0 AS cost, 0.0 AS box_use, 0.0 AS margin\n  FROM (SELECT 1)\n  UNION ALL\n  SELECT e.rn, c.ns || k.n, c.cost + k.n*e.cost_yuan, c.box_use + k.n*e.boxes, c.margin + k.n*e.margin_yuan\n  FROM combos c\n  JOIN eligible e ON e.rn = c.rn + 1\n  CROSS JOIN LATERAL (SELECT unnest(range(0, e.max_batches+1)) AS n) k\n)\nSELECT ns, cost, box_use, margin\nFROM combos\nWHERE rn = (SELECT max(rn) FROM eligible) AND cost <= 3000 AND box_use <= 18\nORDER BY margin DESC, cost ASC\nLIMIT 10"
+          },
+          "response": "build/tool-description-progressive/g2/restock-r1/capture/14764-004-response.json",
+          "type": "tool_failure",
+          "code": "tool_execution_failed",
+          "message": "Binder Error: Cannot compare values of type VARCHAR and type DATE - an explicit cast is required\n\nLINE 4:   FROM o WHERE arrival_date <= DATE '2026-09-25'\n                                    ^",
+          "observed_in": "build/tool-description-progressive/g2/restock-r1/capture/14764-011-request.json"
+        },
+        {
+          "call_id": "call_00_ok4iqEekUunYH7MY0Az90345",
+          "tool": "data_query",
+          "arguments": {
+            "datasets": {
+              "o": 2
+            },
+            "limit": 10,
+            "sql": "WITH RECURSIVE eligible AS (\n  SELECT offer_id, cost_yuan, margin_yuan, boxes, max_batches,\n         row_number() OVER (ORDER BY offer_id) AS rn\n  FROM o WHERE CAST(arrival_date AS DATE) <= DATE '2026-09-25'\n),\ncombos AS (\n  SELECT 0 AS rn, CAST([] AS INTEGER[]) AS ns, 0.0 AS cost, 0.0 AS box_use, 0.0 AS margin\n  FROM (SELECT 1)\n  UNION ALL\n  SELECT e.rn, c.ns || k.n, c.cost + k.n*e.cost_yuan, c.box_use + k.n*e.boxes, c.margin + k.n*e.margin_yuan\n  FROM combos c\n  JOIN eligible e ON e.rn = c.rn + 1\n  CROSS JOIN LATERAL (SELECT unnest(range(0, e.max_batches+1)) AS n) k\n)\nSELECT ns, cost, box_use, margin\nFROM combos\nWHERE rn = (SELECT max(rn) FROM eligible) AND cost <= 3000 AND box_use <= 18\nORDER BY margin DESC, cost ASC\nLIMIT 10"
+          },
+          "response": "build/tool-description-progressive/g2/restock-r1/capture/14764-005-response.json",
+          "type": "tool_failure",
+          "code": "tool_execution_failed",
+          "message": "Binder Error: Cannot concatenate types INTEGER[] and BIGINT - an explicit cast is required\n\nLINE 10:   SELECT e.rn, c.ns || k.n, c.cost + k.n*e.cost_yuan, c.box_use + k.n*e.boxes,...\n                                ^",
+          "observed_in": "build/tool-description-progressive/g2/restock-r1/capture/14764-011-request.json"
+        },
+        {
+          "call_id": "call_00_ET_zhUUWWwnO1cBHTzQb2QV2087",
+          "tool": "data_query",
+          "arguments": {
+            "datasets": {
+              "o": 2
+            },
+            "limit": 10,
+            "sql": "WITH RECURSIVE eligible AS (\n  SELECT offer_id, cost_yuan, margin_yuan, boxes, max_batches,\n         row_number() OVER (ORDER BY offer_id) AS rn\n  FROM o WHERE CAST(arrival_date AS DATE) <= DATE '2026-09-25'\n),\ncombos AS (\n  SELECT 0 AS rn, CAST([] AS INTEGER[]) AS ns, 0.0 AS cost, 0.0 AS box_use, 0.0 AS margin\n  FROM (SELECT 1)\n  UNION ALL\n  SELECT e.rn, c.ns || CAST(k.n AS INTEGER), c.cost + k.n*e.cost_yuan, c.box_use + k.n*e.boxes, c.margin + k.n*e.margin_yuan\n  FROM combos c\n  JOIN eligible e ON e.rn = c.rn + 1\n  CROSS JOIN LATERAL (SELECT unnest(range(0, CAST(e.max_batches AS BIGINT)+1)) AS n) k\n)\nSELECT ns, cost, box_use, margin\nFROM combos\nWHERE rn = (SELECT max(rn) FROM eligible) AND cost <= 3000 AND box_use <= 18\nORDER BY margin DESC, cost ASC\nLIMIT 10"
+          },
+          "response": "build/tool-description-progressive/g2/restock-r1/capture/14764-006-response.json",
+          "type": "tool_failure",
+          "code": "tool_execution_failed",
+          "message": "Binder Error: Cannot concatenate types INTEGER[] and INTEGER - an explicit cast is required\n\nLINE 10:   SELECT e.rn, c.ns || CAST(k.n AS INTEGER), c.cost + k.n*e.cost_yuan, c.box_use...\n                                ^",
+          "observed_in": "build/tool-description-progressive/g2/restock-r1/capture/14764-011-request.json"
+        },
+        {
+          "call_id": "call_00_rbkjzt5Ei0HtQ9d4E88X2520",
+          "tool": "data_query",
+          "arguments": {
+            "datasets": {
+              "o": 2
+            },
+            "limit": 10,
+            "sql": "WITH RECURSIVE eligible AS (\n  SELECT offer_id, cost_yuan, margin_yuan, boxes, max_batches,\n         row_number() OVER (ORDER BY offer_id) AS rn\n  FROM o WHERE CAST(arrival_date AS DATE) <= DATE '2026-09-25'\n),\ncombos AS (\n  SELECT 0 AS rn, CAST([] AS INTEGER[]) AS ns, 0.0 AS cost, 0.0 AS box_use, 0.0 AS margin\n  FROM (SELECT 1)\n  UNION ALL\n  SELECT e.rn, list_append(c.ns, CAST(k.n AS INTEGER)), c.cost + k.n*e.cost_yuan, c.box_use + k.n*e.boxes, c.margin + k.n*e.margin_yuan\n  FROM combos c\n  JOIN eligible e ON e.rn = c.rn + 1\n  CROSS JOIN LATERAL (SELECT unnest(range(0, CAST(e.max_batches AS BIGINT)+1)) AS n) k\n)\nSELECT ns, cost, box_use, margin\nFROM combos\nWHERE rn = (SELECT max(rn) FROM eligible) AND cost <= 3000 AND box_use <= 18\nORDER BY margin DESC, cost ASC\nLIMIT 10"
+          },
+          "response": "build/tool-description-progressive/g2/restock-r1/capture/14764-007-response.json",
+          "type": "tool_failure",
+          "code": "tool_execution_failed",
+          "message": "Conversion Error: Could not cast value 1560.000000 to DECIMAL(2,1)\n\nLINE 10: ...  SELECT e.rn, list_append(c.ns, CAST(k.n AS INTEGER)), c.cost + k.n*e.cost_yuan, c.box_use + k.n*e.boxes, c.margin + k...\n                                                                           ^",
+          "observed_in": "build/tool-description-progressive/g2/restock-r1/capture/14764-011-request.json"
+        },
+        {
+          "call_id": "call_01_nWg0tuiIS7A78GRXHq6L6962",
+          "tool": "data_transform",
+          "arguments": {
+            "datasets": {
+              "o": 2
+            },
+            "name": "报价评估_可采购性",
+            "sql": "SELECT offer_id,\n       product,\n       arrival_date,\n       CASE WHEN CAST(arrival_date AS DATE) <= DATE '2026-09-25' THEN '可采购' ELSE '不可采购(到货超期)' END AS eligibility,\n       cost_yuan,\n       margin_yuan,\n       boxes,\n       max_batches,\n       ROUND(margin_yuan / boxes, 2) AS margin_per_box,\n       ROUND(margin_yuan / cost_yuan, 3) AS margin_per_yuan,\n       margin_yuan * max_batches AS max_line_margin,\n       cost_yuan * max_batches AS max_line_cost,\n       boxes * max_batches AS max_line_boxes\nFROM o\nORDER BY eligible_flag DESC, margin_per_box DESC",
+            "explanation": "评估全部 12 个报价的到货资格与每批效率指标，用于说明选择依据与被排除项。"
+          },
+          "response": "build/tool-description-progressive/g2/restock-r1/capture/14764-009-response.json",
+          "type": "tool_failure",
+          "code": "tool_execution_failed",
+          "message": "Binder Error: Referenced column \"eligible_flag\" not found in FROM clause!\nCandidate bindings: \"margin_yuan\"\n\nLINE 15: ORDER BY eligible_flag DESC, margin_per_box DESC\n                  ^\nTraceback (most recent call last):\n  File \"F:\\CODING\\Project\\Xenix_native\\src\\xenix\\services\\preprocessing_worker.py\", line 71, in run_preprocessing_worker_task\n    result = execute_preprocessing_worker_operation(\n        str(request[\"operation\"]),\n        dict(request.get(\"payload\") or {}),\n        paths,\n    )\n  File \"F:\\CODING\\Project\\Xenix_native\\src\\xenix\\services\\preprocessing_worker.py\", line 111, in execute_preprocessing_worker_operation\n    )._transform_in_process(input_data)\n      ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^\n  File \"F:\\CODING\\Project\\Xenix_native\\src\\xenix\\services\\data_transform.py\", line 453, in _transform_in_process\n    with duckdb.connect(database=\":memory:\") as connection:\n         ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^\n  File \"F:\\CODING\\Project\\Xenix_native\\src\\xenix\\services\\data_transform.py\", line 465, in _transform_in_process\n    connection.execute(f\"CREATE OR REPLACE TEMP TABLE output AS {final.query}\")\n    ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n_duckdb.BinderException: Binder Error: Referenced column \"eligible_flag\" not found in FROM clause!\nCandidate bindings: \"margin_yuan\"\n\nLINE 15: ORDER BY eligible_flag DESC, margin_per_box DESC\n                  ^",
+          "observed_in": "build/tool-description-progressive/g2/restock-r1/capture/14764-011-request.json"
+        }
+      ],
+      "captured_requests": 11,
+      "tool_exposures": {
+        "result_page": 11,
+        "knowledge_lookup": 11,
+        "agent_skill_activate": 11,
+        "analysis_profile": 10,
+        "analysis_graph": 10,
+        "data_query": 10,
+        "data_transform": 10,
+        "agent_skill_read_reference": 10,
+        "agent_skill_read_asset": 10
+      },
+      "explicit_nonnull_parameter_use": {
+        "agent_skill_activate.name": 1,
+        "knowledge_lookup.query": 1,
+        "data_query.datasets": 7,
+        "data_query.sql": 7,
+        "data_query.limit": 7,
+        "analysis_profile.dataset_id": 1,
+        "data_transform.datasets": 3,
+        "data_transform.name": 3,
+        "data_transform.sql": 3,
+        "data_transform.explanation": 3
+      },
+      "sent_tool_chars_sum": 70184,
+      "all_captures_description_only": true,
+      "answer_responses": [
+        "build/tool-description-progressive/g2/restock-r1/capture/14764-011-response.json"
+      ],
+      "review": "build/tool-description-progressive/g2/restock-r1/review.json"
+    },
+    {
+      "arm": "g2",
+      "task": "restock-r2",
+      "report": "build/tool-description-progressive/g2/restock-r2/reports/business.restock.v1.standard-deepseek-deepseek-v4-flash-cfb067a8f9c8456fa3857d83869da05b.json",
+      "trace_id": "cfb067a8f9c8456fa3857d83869da05b",
+      "model": "deepseek/deepseek-v4-flash",
+      "run_status": "completed",
+      "outcome": "pass",
+      "outcome_reason": "judge_verdict",
+      "oracle_verdict": "pass",
+      "failed_checks": [],
+      "judge": {
+        "independence": "independent",
+        "metrics": {
+          "elapsed_seconds": 22.311722100013867,
+          "provider_retry_count": 0,
+          "token_usage": {
+            "cached_input_tokens": 1792,
+            "input_tokens": 6975,
+            "output_tokens": 1851,
+            "total_tokens": 8826
+          }
+        },
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "reason_codes": [
+          "grounded_decision"
+        ],
+        "required": true,
+        "rubric_id": "business.restock_decision.explanation.v1",
+        "rubric_sha256": "6A5FA84263DA0DF7657651A75DC069D2AEAE184B465574CB61D8308C8D47394F",
+        "scores": {
+          "business_explanation": 2,
+          "selected_plan": 2
+        },
+        "status": "completed",
+        "summary": "judge_completed",
+        "verdict": "pass"
+      },
+      "failure_kind": null,
+      "subject_metrics": {
+        "assessment_seconds": 0.001520699996035546,
+        "derived_dataset_count": 1,
+        "message_counts": {
+          "assistant": 5,
+          "tool_call": 8,
+          "tool_result": 8,
+          "user": 1
+        },
+        "provider_retry_count": 0,
+        "sampling_round_count": 5,
+        "terminal_shape": null,
+        "token_usage": {
+          "cached_input_tokens": 25472,
+          "input_tokens": 30876,
+          "output_tokens": 6165,
+          "total_tokens": 37041
+        },
+        "tool_call_counts_by_name": {
+          "agent.skill.activate": 1,
+          "analysis.graph": 1,
+          "analysis.profile": 1,
+          "data.query": 3,
+          "data.transform": 1,
+          "knowledge.lookup": 1
+        },
+        "tool_result_counts_by_status": {
+          "succeeded": 8
+        },
+        "turn_seconds": 32.74001519999001,
+        "usage_reported_primary_response_count": 5
+      },
+      "identity": {
+        "case_definition_sha256": "24CD6031DA1B7B9F9C70F2D77FD0A5DC29CEBC6947DE3E3FABA05D31F2697C2D",
+        "effective_settings_sha256": "6973FC1DA2E20673BAAAE75940A37DE309FD0DC58E98CC9606C23B4EE0E547E8",
+        "embedding_settings_sha256": "84855E3EADB8F092BBE6E6E87D5ECAD071F1981359295FBA2826AEC4630F0397",
+        "fixture_sha256": "0EEA8E8B1CA68DD617B60DD7BFF33794495981C932A686510B02581E8834267A",
+        "harness_variant": "progressive-tool-descriptions-g2",
+        "invocation_id": "f14b1972ea104edd822e01977e2ade67",
+        "judge_settings_sha256": "86A3403ECB36E19C283750DF3E07A5984AF12994769207E46981D0162835A507",
+        "repository_commit": "41adb2f6c766a95d20b5cb7cd7923686f80b8581",
+        "repository_dirty": true,
+        "runtime_sha256": "3E7E07CE574893944C99A5455753801D9145381BFB6F3CC0555A29F3AB4C1934",
+        "settings_sha256": "9BD35670D0D0AD156B5F4B148A530992988DA094A0F68365D796ECA83C6149B6"
+      },
+      "tool_failures": [],
+      "captured_requests": 5,
+      "tool_exposures": {
+        "result_page": 5,
+        "knowledge_lookup": 5,
+        "agent_skill_activate": 5,
+        "analysis_profile": 4,
+        "analysis_graph": 4,
+        "data_query": 4,
+        "data_transform": 4,
+        "agent_skill_read_reference": 4,
+        "agent_skill_read_asset": 4
+      },
+      "explicit_nonnull_parameter_use": {
+        "agent_skill_activate.name": 1,
+        "knowledge_lookup.query": 1,
+        "analysis_profile.dataset_id": 1,
+        "data_query.datasets": 3,
+        "data_query.sql": 3,
+        "data_query.limit": 3,
+        "data_transform.datasets": 1,
+        "data_transform.name": 1,
+        "data_transform.sql": 1,
+        "data_transform.explanation": 1,
+        "analysis_graph.dataset_id": 1,
+        "analysis_graph.spec": 1
+      },
+      "sent_tool_chars_sum": 29018,
+      "all_captures_description_only": true,
+      "answer_responses": [
+        "build/tool-description-progressive/g2/restock-r2/capture/25072-005-response.json"
+      ],
+      "review": "build/tool-description-progressive/g2/restock-r2/review.json"
+    },
+    {
+      "arm": "g2",
+      "task": "revenue-r1",
+      "report": "build/tool-description-progressive/g2/revenue-r1/reports/business.revenue.v1.standard-deepseek-deepseek-v4-flash-3890b6894b5b466b889df41342c49507.json",
+      "trace_id": "3890b6894b5b466b889df41342c49507",
+      "model": "deepseek/deepseek-v4-flash",
+      "run_status": "completed",
+      "outcome": "fail",
+      "outcome_reason": "judge_verdict",
+      "oracle_verdict": "pass",
+      "failed_checks": [],
+      "judge": {
+        "independence": "independent",
+        "metrics": {
+          "elapsed_seconds": 93.65622200001962,
+          "provider_retry_count": 0,
+          "token_usage": {
+            "cached_input_tokens": 2048,
+            "input_tokens": 4960,
+            "output_tokens": 7751,
+            "total_tokens": 12711
+          }
+        },
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "reason_codes": [
+          "incorrect_business_claim",
+          "ambiguous_delivery"
+        ],
+        "required": true,
+        "rubric_id": "business.revenue_revision.explanation.v1",
+        "rubric_sha256": "73E55EF6575ABE0E1DDB2D780DE0F0C5E2DB301C5E0CAE1AD1650DE1F1FE17AB",
+        "scores": {
+          "month_close_grounding": 2,
+          "revision_explanation": 1
+        },
+        "status": "completed",
+        "summary": "judge_completed",
+        "verdict": "fail"
+      },
+      "failure_kind": null,
+      "subject_metrics": {
+        "assessment_seconds": 0.002215999993495643,
+        "derived_dataset_count": 2,
+        "message_counts": {
+          "assistant": 11,
+          "tool_call": 12,
+          "tool_result": 12,
+          "user": 2
+        },
+        "provider_retry_count": 0,
+        "sampling_round_count": 11,
+        "terminal_shape": null,
+        "token_usage": {
+          "cached_input_tokens": 97152,
+          "input_tokens": 104797,
+          "output_tokens": 10094,
+          "total_tokens": 114891
+        },
+        "tool_call_counts_by_name": {
+          "agent.skill.activate": 1,
+          "analysis.graph": 2,
+          "data.query": 7,
+          "data.transform": 2
+        },
+        "tool_result_counts_by_status": {
+          "succeeded": 12
+        },
+        "turn_seconds": 50.8397254999727,
+        "usage_reported_primary_response_count": 11
+      },
+      "identity": {
+        "case_definition_sha256": "2D8D0F8633992A1BD0EE9FBEEF5B383572933997C3ADC97C78046156E2CFEFEC",
+        "effective_settings_sha256": "6973FC1DA2E20673BAAAE75940A37DE309FD0DC58E98CC9606C23B4EE0E547E8",
+        "embedding_settings_sha256": "84855E3EADB8F092BBE6E6E87D5ECAD071F1981359295FBA2826AEC4630F0397",
+        "fixture_sha256": "E281B883A03A0DDABD96E1EBF908AECCDFBBAB5FE36C8C9EC212D6F669ADDA70",
+        "harness_variant": "progressive-tool-descriptions-g2",
+        "invocation_id": "53586b85013c47e7a249bc3bd013055b",
+        "judge_settings_sha256": "86A3403ECB36E19C283750DF3E07A5984AF12994769207E46981D0162835A507",
+        "repository_commit": "41adb2f6c766a95d20b5cb7cd7923686f80b8581",
+        "repository_dirty": true,
+        "runtime_sha256": "3E7E07CE574893944C99A5455753801D9145381BFB6F3CC0555A29F3AB4C1934",
+        "settings_sha256": "9BD35670D0D0AD156B5F4B148A530992988DA094A0F68365D796ECA83C6149B6"
+      },
+      "tool_failures": [],
+      "captured_requests": 11,
+      "tool_exposures": {
+        "result_page": 11,
+        "knowledge_lookup": 11,
+        "agent_skill_activate": 11,
+        "analysis_profile": 10,
+        "analysis_graph": 10,
+        "data_query": 10,
+        "data_transform": 10,
+        "agent_skill_read_reference": 10,
+        "agent_skill_read_asset": 10
+      },
+      "explicit_nonnull_parameter_use": {
+        "agent_skill_activate.name": 1,
+        "data_query.datasets": 7,
+        "data_query.sql": 7,
+        "data_query.limit": 7,
+        "data_transform.datasets": 2,
+        "data_transform.sql": 2,
+        "data_transform.name": 2,
+        "data_transform.explanation": 2,
+        "analysis_graph.dataset_id": 2,
+        "analysis_graph.spec": 2
+      },
+      "sent_tool_chars_sum": 70184,
+      "all_captures_description_only": true,
+      "answer_responses": [
+        "build/tool-description-progressive/g2/revenue-r1/capture/20856-006-response.json",
+        "build/tool-description-progressive/g2/revenue-r1/capture/20856-011-response.json"
+      ],
+      "review": "build/tool-description-progressive/g2/revenue-r1/review.json"
+    },
+    {
+      "arm": "g2",
+      "task": "revenue-r2",
+      "report": "build/tool-description-progressive/g2/revenue-r2/reports/business.revenue.v1.standard-deepseek-deepseek-v4-flash-353ea297246b4230bbc12f70f8689a8e.json",
+      "trace_id": "353ea297246b4230bbc12f70f8689a8e",
+      "model": "deepseek/deepseek-v4-flash",
+      "run_status": "completed",
+      "outcome": "fail",
+      "outcome_reason": "judge_verdict",
+      "oracle_verdict": "pass",
+      "failed_checks": [],
+      "judge": {
+        "independence": "independent",
+        "metrics": {
+          "elapsed_seconds": 162.3854713999899,
+          "provider_retry_count": 0,
+          "token_usage": {
+            "cached_input_tokens": 2048,
+            "input_tokens": 5471,
+            "output_tokens": 13540,
+            "total_tokens": 19011
+          }
+        },
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "reason_codes": [
+          "incorrect_business_claim"
+        ],
+        "required": true,
+        "rubric_id": "business.revenue_revision.explanation.v1",
+        "rubric_sha256": "73E55EF6575ABE0E1DDB2D780DE0F0C5E2DB301C5E0CAE1AD1650DE1F1FE17AB",
+        "scores": {
+          "month_close_grounding": 1,
+          "revision_explanation": 2
+        },
+        "status": "completed",
+        "summary": "judge_completed",
+        "verdict": "fail"
+      },
+      "failure_kind": null,
+      "subject_metrics": {
+        "assessment_seconds": 0.0030402999836951494,
+        "derived_dataset_count": 2,
+        "message_counts": {
+          "assistant": 11,
+          "tool_call": 18,
+          "tool_result": 18,
+          "user": 2
+        },
+        "provider_retry_count": 0,
+        "sampling_round_count": 11,
+        "terminal_shape": null,
+        "token_usage": {
+          "cached_input_tokens": 105088,
+          "input_tokens": 112982,
+          "output_tokens": 10449,
+          "total_tokens": 123431
+        },
+        "tool_call_counts_by_name": {
+          "agent.skill.activate": 1,
+          "analysis.graph": 2,
+          "analysis.profile": 4,
+          "data.query": 8,
+          "data.transform": 2,
+          "knowledge.lookup": 1
+        },
+        "tool_result_counts_by_status": {
+          "succeeded": 18
+        },
+        "turn_seconds": 63.08231709996471,
+        "usage_reported_primary_response_count": 11
+      },
+      "identity": {
+        "case_definition_sha256": "2D8D0F8633992A1BD0EE9FBEEF5B383572933997C3ADC97C78046156E2CFEFEC",
+        "effective_settings_sha256": "6973FC1DA2E20673BAAAE75940A37DE309FD0DC58E98CC9606C23B4EE0E547E8",
+        "embedding_settings_sha256": "84855E3EADB8F092BBE6E6E87D5ECAD071F1981359295FBA2826AEC4630F0397",
+        "fixture_sha256": "E281B883A03A0DDABD96E1EBF908AECCDFBBAB5FE36C8C9EC212D6F669ADDA70",
+        "harness_variant": "progressive-tool-descriptions-g2",
+        "invocation_id": "c67d5815fe3344c58dbc42e85053a43b",
+        "judge_settings_sha256": "86A3403ECB36E19C283750DF3E07A5984AF12994769207E46981D0162835A507",
+        "repository_commit": "41adb2f6c766a95d20b5cb7cd7923686f80b8581",
+        "repository_dirty": true,
+        "runtime_sha256": "3E7E07CE574893944C99A5455753801D9145381BFB6F3CC0555A29F3AB4C1934",
+        "settings_sha256": "9BD35670D0D0AD156B5F4B148A530992988DA094A0F68365D796ECA83C6149B6"
+      },
+      "tool_failures": [],
+      "captured_requests": 11,
+      "tool_exposures": {
+        "result_page": 11,
+        "knowledge_lookup": 11,
+        "agent_skill_activate": 11,
+        "analysis_profile": 10,
+        "analysis_graph": 10,
+        "data_query": 10,
+        "data_transform": 10,
+        "agent_skill_read_reference": 10,
+        "agent_skill_read_asset": 10
+      },
+      "explicit_nonnull_parameter_use": {
+        "agent_skill_activate.name": 1,
+        "knowledge_lookup.query": 1,
+        "analysis_profile.dataset_id": 4,
+        "data_query.datasets": 8,
+        "data_query.sql": 8,
+        "data_query.limit": 8,
+        "data_transform.datasets": 2,
+        "data_transform.name": 2,
+        "data_transform.sql": 2,
+        "data_transform.explanation": 2,
+        "analysis_graph.dataset_id": 2,
+        "analysis_graph.spec": 2
+      },
+      "sent_tool_chars_sum": 70184,
+      "all_captures_description_only": true,
+      "answer_responses": [
+        "build/tool-description-progressive/g2/revenue-r2/capture/19728-007-response.json",
+        "build/tool-description-progressive/g2/revenue-r2/capture/19728-011-response.json"
+      ],
+      "review": "build/tool-description-progressive/g2/revenue-r2/review.json"
+    },
+    {
+      "arm": "g2g",
+      "task": "restock-r1",
+      "report": "build/tool-description-progressive/g2g/restock-r1/reports/business.restock.v1.standard-deepseek-deepseek-v4-flash-9e4806c935db4c42974e3a5bf978724c.json",
+      "trace_id": "9e4806c935db4c42974e3a5bf978724c",
+      "model": "deepseek/deepseek-v4-flash",
+      "run_status": "completed",
+      "outcome": "pass",
+      "outcome_reason": "judge_verdict",
+      "oracle_verdict": "pass",
+      "failed_checks": [],
+      "judge": {
+        "independence": "independent",
+        "metrics": {
+          "elapsed_seconds": 13.54702980001457,
+          "provider_retry_count": 0,
+          "token_usage": {
+            "cached_input_tokens": 1792,
+            "input_tokens": 4748,
+            "output_tokens": 1077,
+            "total_tokens": 5825
+          }
+        },
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "reason_codes": [
+          "grounded_decision"
+        ],
+        "required": true,
+        "rubric_id": "business.restock_decision.explanation.v1",
+        "rubric_sha256": "6A5FA84263DA0DF7657651A75DC069D2AEAE184B465574CB61D8308C8D47394F",
+        "scores": {
+          "business_explanation": 2,
+          "selected_plan": 2
+        },
+        "status": "completed",
+        "summary": "judge_completed",
+        "verdict": "pass"
+      },
+      "failure_kind": null,
+      "subject_metrics": {
+        "assessment_seconds": 0.0011599999852478504,
+        "derived_dataset_count": 3,
+        "message_counts": {
+          "assistant": 7,
+          "tool_call": 11,
+          "tool_result": 11,
+          "user": 1
+        },
+        "provider_retry_count": 0,
+        "sampling_round_count": 7,
+        "terminal_shape": null,
+        "token_usage": {
+          "cached_input_tokens": 65024,
+          "input_tokens": 72554,
+          "output_tokens": 12076,
+          "total_tokens": 84630
+        },
+        "tool_call_counts_by_name": {
+          "agent.skill.activate": 1,
+          "analysis.profile": 1,
+          "data.query": 5,
+          "data.transform": 3,
+          "knowledge.lookup": 1
+        },
+        "tool_result_counts_by_status": {
+          "failed": 1,
+          "succeeded": 10
+        },
+        "turn_seconds": 63.04080299998168,
+        "usage_reported_primary_response_count": 7
+      },
+      "identity": {
+        "case_definition_sha256": "24CD6031DA1B7B9F9C70F2D77FD0A5DC29CEBC6947DE3E3FABA05D31F2697C2D",
+        "effective_settings_sha256": "6973FC1DA2E20673BAAAE75940A37DE309FD0DC58E98CC9606C23B4EE0E547E8",
+        "embedding_settings_sha256": "84855E3EADB8F092BBE6E6E87D5ECAD071F1981359295FBA2826AEC4630F0397",
+        "fixture_sha256": "0EEA8E8B1CA68DD617B60DD7BFF33794495981C932A686510B02581E8834267A",
+        "harness_variant": "progressive-tool-descriptions-g2g",
+        "invocation_id": "cdc3a49101af45b59c2a954ca9851251",
+        "judge_settings_sha256": "86A3403ECB36E19C283750DF3E07A5984AF12994769207E46981D0162835A507",
+        "repository_commit": "41adb2f6c766a95d20b5cb7cd7923686f80b8581",
+        "repository_dirty": true,
+        "runtime_sha256": "3E7E07CE574893944C99A5455753801D9145381BFB6F3CC0555A29F3AB4C1934",
+        "settings_sha256": "9BD35670D0D0AD156B5F4B148A530992988DA094A0F68365D796ECA83C6149B6"
+      },
+      "tool_failures": [
+        {
+          "call_id": "call_01_fbO4s6axhDGZoRhFbdhy9506",
+          "tool": "data_query",
+          "arguments": {
+            "datasets": {
+              "o": 2
+            },
+            "sql": "WITH e AS (\n  SELECT offer_id, cost_yuan, margin_yuan, boxes, max_batches, CAST(arrival_date AS DATE) AS ad\n  FROM o\n)\nSELECT offer_id, product, cost_yuan, margin_yuan, boxes, arrival_date, max_batches,\n       CASE WHEN ad <= DATE '2026-09-25' AND max_batches > 0 THEN 'eligible' ELSE 'excluded' END AS status,\n       ROUND(margin_yuan/boxes,1) AS margin_per_box,\n       ROUND(margin_yuan/cost_yuan,3) AS margin_per_yuan\nFROM e ORDER BY ad, offer_id"
+          },
+          "response": "build/tool-description-progressive/g2g/restock-r1/capture/13692-003-response.json",
+          "type": "tool_failure",
+          "code": "tool_execution_failed",
+          "message": "Binder Error: Referenced column \"product\" not found in FROM clause!\nCandidate bindings: \"ad\"\n\nLINE 5: SELECT offer_id, product, cost_yuan, margin_yuan, boxes, arrival_date, max_b...\n                         ^",
+          "observed_in": "build/tool-description-progressive/g2g/restock-r1/capture/13692-007-request.json"
+        }
+      ],
+      "captured_requests": 7,
+      "tool_exposures": {
+        "result_page": 7,
+        "knowledge_lookup": 7,
+        "agent_skill_activate": 7,
+        "analysis_profile": 6,
+        "analysis_graph": 6,
+        "data_query": 6,
+        "data_transform": 6,
+        "agent_skill_read_reference": 6,
+        "agent_skill_read_asset": 6
+      },
+      "explicit_nonnull_parameter_use": {
+        "agent_skill_activate.name": 1,
+        "knowledge_lookup.query": 1,
+        "analysis_profile.dataset_id": 1,
+        "data_query.datasets": 5,
+        "data_query.sql": 5,
+        "data_query.limit": 1,
+        "data_transform.datasets": 3,
+        "data_transform.name": 3,
+        "data_transform.explanation": 3,
+        "data_transform.sql": 3
+      },
+      "sent_tool_chars_sum": 42872,
+      "all_captures_description_only": true,
+      "answer_responses": [
+        "build/tool-description-progressive/g2g/restock-r1/capture/13692-007-response.json"
+      ],
+      "review": "build/tool-description-progressive/g2g/restock-r1/review.json"
+    },
+    {
+      "arm": "g2g",
+      "task": "revenue-r1",
+      "report": "build/tool-description-progressive/g2g/revenue-r1/reports/business.revenue.v1.standard-deepseek-deepseek-v4-flash-4676b2f6c0634003b063b9cb03d32e3a.json",
+      "trace_id": "4676b2f6c0634003b063b9cb03d32e3a",
+      "model": "deepseek/deepseek-v4-flash",
+      "run_status": "completed",
+      "outcome": "pass",
+      "outcome_reason": "judge_verdict",
+      "oracle_verdict": "pass",
+      "failed_checks": [],
+      "judge": {
+        "independence": "independent",
+        "metrics": {
+          "elapsed_seconds": 49.295551000046544,
+          "provider_retry_count": 0,
+          "token_usage": {
+            "cached_input_tokens": 2048,
+            "input_tokens": 6340,
+            "output_tokens": 4384,
+            "total_tokens": 10724
+          }
+        },
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "reason_codes": [
+          "grounded_delivery"
+        ],
+        "required": true,
+        "rubric_id": "business.revenue_revision.explanation.v1",
+        "rubric_sha256": "73E55EF6575ABE0E1DDB2D780DE0F0C5E2DB301C5E0CAE1AD1650DE1F1FE17AB",
+        "scores": {
+          "month_close_grounding": 2,
+          "revision_explanation": 2
+        },
+        "status": "completed",
+        "summary": "judge_completed",
+        "verdict": "pass"
+      },
+      "failure_kind": null,
+      "subject_metrics": {
+        "assessment_seconds": 0.003165600006468594,
+        "derived_dataset_count": 5,
+        "message_counts": {
+          "assistant": 10,
+          "tool_call": 15,
+          "tool_result": 15,
+          "user": 2
+        },
+        "provider_retry_count": 0,
+        "sampling_round_count": 10,
+        "terminal_shape": null,
+        "token_usage": {
+          "cached_input_tokens": 115712,
+          "input_tokens": 124750,
+          "output_tokens": 14367,
+          "total_tokens": 139117
+        },
+        "tool_call_counts_by_name": {
+          "agent.skill.activate": 2,
+          "analysis.graph": 2,
+          "data.query": 5,
+          "data.transform": 5,
+          "knowledge.lookup": 1
+        },
+        "tool_result_counts_by_status": {
+          "succeeded": 15
+        },
+        "turn_seconds": 89.04578949999996,
+        "usage_reported_primary_response_count": 10
+      },
+      "identity": {
+        "case_definition_sha256": "2D8D0F8633992A1BD0EE9FBEEF5B383572933997C3ADC97C78046156E2CFEFEC",
+        "effective_settings_sha256": "6973FC1DA2E20673BAAAE75940A37DE309FD0DC58E98CC9606C23B4EE0E547E8",
+        "embedding_settings_sha256": "84855E3EADB8F092BBE6E6E87D5ECAD071F1981359295FBA2826AEC4630F0397",
+        "fixture_sha256": "E281B883A03A0DDABD96E1EBF908AECCDFBBAB5FE36C8C9EC212D6F669ADDA70",
+        "harness_variant": "progressive-tool-descriptions-g2g",
+        "invocation_id": "82b54c47dcec42a694c95cfc119d2079",
+        "judge_settings_sha256": "86A3403ECB36E19C283750DF3E07A5984AF12994769207E46981D0162835A507",
+        "repository_commit": "41adb2f6c766a95d20b5cb7cd7923686f80b8581",
+        "repository_dirty": true,
+        "runtime_sha256": "3E7E07CE574893944C99A5455753801D9145381BFB6F3CC0555A29F3AB4C1934",
+        "settings_sha256": "9BD35670D0D0AD156B5F4B148A530992988DA094A0F68365D796ECA83C6149B6"
+      },
+      "tool_failures": [],
+      "captured_requests": 10,
+      "tool_exposures": {
+        "result_page": 10,
+        "knowledge_lookup": 10,
+        "agent_skill_activate": 10,
+        "data_integrate": 9,
+        "analysis_profile": 9,
+        "analysis_graph": 9,
+        "data_clean": 9,
+        "data_clean_metadata": 9,
+        "data_tokenize": 9,
+        "data_query": 9,
+        "data_transform": 9,
+        "data_feature_select": 9,
+        "agent_skill_read_reference": 9,
+        "agent_skill_read_asset": 9
+      },
+      "explicit_nonnull_parameter_use": {
+        "agent_skill_activate.name": 2,
+        "knowledge_lookup.query": 1,
+        "data_query.datasets": 5,
+        "data_query.sql": 5,
+        "data_query.limit": 5,
+        "data_transform.datasets": 5,
+        "data_transform.name": 5,
+        "data_transform.explanation": 5,
+        "data_transform.sql": 5,
+        "analysis_graph.dataset_id": 2,
+        "analysis_graph.spec": 2
+      },
+      "sent_tool_chars_sum": 102158,
+      "all_captures_description_only": true,
+      "answer_responses": [
+        "build/tool-description-progressive/g2g/revenue-r1/capture/24984-005-response.json",
+        "build/tool-description-progressive/g2g/revenue-r1/capture/24984-010-response.json"
+      ],
+      "review": "build/tool-description-progressive/g2g/revenue-r1/review.json"
+    }
+  ]
+}

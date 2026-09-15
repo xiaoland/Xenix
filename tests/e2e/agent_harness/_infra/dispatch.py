@@ -1,17 +1,11 @@
-"""Case-agnostic pytest dispatch for the Agent Harness end-to-end benchmark.
-
-The CLI entry points under ``scripts/`` are thin shells over this module, and
-the offline ``_infra_tests`` import the same functions directly.  Keeping the
-selector validation and argument building here means tests depend on the
-benchmark's own package rather than reaching back into ``scripts/`` (which is
-only on ``sys.path`` as a side effect of an in-process pytest launch).
-"""
+"""Shared pytest selection for the headless and headed benchmark commands."""
 
 from __future__ import annotations
 
+from pathlib import Path
+
 BENCHMARK_PLUGIN = "tests.e2e.agent_harness._infra.pytest_plugin"
 BENCHMARK_ROOT = "tests/e2e/agent_harness"
-INFRA_TEST_ROOT = "tests/e2e/agent_harness/_infra_tests"
 
 
 def benchmark_pytest_arguments(arguments: list[str]) -> list[str]:
@@ -34,12 +28,14 @@ def benchmark_pytest_arguments(arguments: list[str]) -> list[str]:
             "Agent Harness selectors must name a live case under "
             f"{BENCHMARK_ROOT}."
         )
-    collection_targets = list(explicit_targets) or [BENCHMARK_ROOT]
+    collection_targets = list(explicit_targets) or [
+        f"{BENCHMARK_ROOT}/{path.name}::{path.stem}"
+        for path in sorted(Path(__file__).resolve().parents[1].glob("test_business_*.py"))
+    ]
     return [
         "--direct",
         "-p",
         BENCHMARK_PLUGIN,
-        f"--ignore={INFRA_TEST_ROOT}",
         *collection_targets,
         "--run-agent-harness",
         *(
@@ -50,35 +46,6 @@ def benchmark_pytest_arguments(arguments: list[str]) -> list[str]:
     ]
 
 
-def safe_check_pytest_options(arguments: list[str]) -> list[str]:
-    """Keep the provider-free check fixed to its owned ``_infra_tests`` tree."""
-
-    allowed_exact = {
-        "--collect-only",
-        "--disable-warnings",
-        "--help",
-        "-q",
-        "-s",
-        "-v",
-        "-vv",
-        "-vvv",
-        "-x",
-    }
-    allowed_prefixes = ("--capture=", "--durations=", "--maxfail=", "--tb=")
-    rejected = tuple(
-        argument
-        for argument in arguments
-        if argument not in allowed_exact
-        and not argument.startswith(allowed_prefixes)
-    )
-    if rejected:
-        raise SystemExit(
-            "benchmark-agent-harness-check accepts reporting options only; "
-            "its offline test selection is fixed."
-        )
-    return arguments
-
-
 def _benchmark_target(argument: str) -> str | None:
     normalized = argument.replace("\\", "/").removeprefix("./")
     path = normalized.split("::", 1)[0].rstrip("/")
@@ -86,8 +53,6 @@ def _benchmark_target(argument: str) -> str | None:
         path == BENCHMARK_ROOT
         or path.startswith(f"{BENCHMARK_ROOT}/test_")
     ):
-        return None
-    if path == INFRA_TEST_ROOT or "/_infra" in path:
         return None
     return argument
 

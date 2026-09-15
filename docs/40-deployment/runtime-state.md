@@ -130,13 +130,6 @@ manifest and active pointer. Setup self-tests the final generation path—not on
 short staging path—before publishing `active.json`, so native Windows model-path
 failures cannot be reported as ready.
 
-Knowledge retrieval projection v3 uses deterministic Unit identities. The v22→v23
-migration preserves source/canonical content, clears active v2 retrieval pointers,
-and lets the derivation owner republish Units and indexes. Vector status derives the
-expected identities from bounded document metadata; builds consume one frozen
-SQLite projection snapshot and may publish/succeed only while that identity remains
-current.
-
 Knowledge Import performs a separate startup-only reconciliation before its worker
 starts. SQLite source/canonical references are materialized first; only strictly
 recognized, unreferenced source CAS directories, canonical bundles, and source or

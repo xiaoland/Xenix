@@ -1,0 +1,146 @@
+{
+  "run_id": "107dc84161e44f6a915774f042286aae",
+  "case_id": "business.routing.v1.confirmation",
+  "run_status": "completed",
+  "semantic": {
+    "checks": [
+      {
+        "name": "turn_1.answer_completed",
+        "passed": true,
+        "summary": "terminal_assistant_answer"
+      },
+      {
+        "name": "turn_1.deliveries_accessible",
+        "passed": true,
+        "summary": "linked_artifacts_readable"
+      },
+      {
+        "name": "turn_1.reusable_analyzer_saved",
+        "passed": true,
+        "summary": "saved_model_ids=[120]"
+      },
+      {
+        "name": "turn_2.answer_completed",
+        "passed": true,
+        "summary": "terminal_assistant_answer"
+      },
+      {
+        "name": "turn_2.deliveries_accessible",
+        "passed": true,
+        "summary": "linked_artifacts_readable"
+      },
+      {
+        "name": "turn_2.complete_batch_quality",
+        "passed": true,
+        "summary": "accuracy=1.0; required=0.9"
+      },
+      {
+        "name": "turn_2.saved_analyzer_reused",
+        "passed": true,
+        "summary": "delivered_predictions_reference_same_persisted_model"
+      }
+    ],
+    "passed": true,
+    "verdict": "pass"
+  },
+  "integrity": {
+    "checks": [
+      {
+        "name": "source_inputs_preserved",
+        "passed": true,
+        "summary": "external_inputs_and_imported_datasets"
+      }
+    ],
+    "passed": true
+  },
+  "judge": {
+    "independence": "independent",
+    "metrics": {
+      "elapsed_seconds": 156.7799343999941,
+      "provider_retry_count": 0,
+      "token_usage": {
+        "cached_input_tokens": 896,
+        "input_tokens": 39395,
+        "output_tokens": 7122,
+        "total_tokens": 46517
+      }
+    },
+    "provider_model": "deepseek/deepseek-v4-pro",
+    "reason_codes": [
+      "grounded_reuse"
+    ],
+    "required": true,
+    "rubric_id": "business.routing_reuse.explanation.v1",
+    "rubric_sha256": "A813A96D29847CB305A36AB2EE5F3F67032B064D8322EFE11D5B58F609B02289",
+    "scores": {
+      "adoption_evidence": 2,
+      "manual_correction_estimate": 2,
+      "selected_analyzer_reused": 2,
+      "usable_queue_labels": 2
+    },
+    "status": "completed",
+    "summary": "judge_completed",
+    "verdict": "pass"
+  },
+  "subject_metrics": {
+    "assessment_seconds": 0.0035342000192031264,
+    "derived_dataset_count": 13,
+    "message_counts": {
+      "assistant": 37,
+      "tool_call": 60,
+      "tool_result": 60,
+      "user": 2
+    },
+    "provider_retry_count": 0,
+    "sampling_round_count": 37,
+    "terminal_shape": null,
+    "token_usage": {
+      "cached_input_tokens": 1958656,
+      "input_tokens": 2128561,
+      "output_tokens": 37020,
+      "total_tokens": 2165581
+    },
+    "tool_call_counts_by_name": {
+      "agent.skill.activate": 1,
+      "agent.skill.read_reference": 1,
+      "agent.tools.activate": 2,
+      "analysis.graph": 1,
+      "analysis.profile": 2,
+      "data.feature.select": 5,
+      "data.query": 19,
+      "data.transform": 8,
+      "knowledge.lookup": 1,
+      "model.apply": 5,
+      "model.metadata": 2,
+      "model.task.query": 2,
+      "model.train": 11
+    },
+    "tool_result_counts_by_status": {
+      "failed": 1,
+      "succeeded": 59
+    },
+    "turn_seconds": 527.0896217999398,
+    "usage_reported_primary_response_count": 37
+  },
+  "report_path": "F:\\CODING\\Project\\Xenix_native\\build\\text-strategy-routing-confirmation\\business.routing.v1.confirmation-deepseek-deepseek-v4-flash-107dc84161e44f6a915774f042286aae.json",
+  "performance_caveat": "Packaging ran concurrently; elapsed time is not a controlled performance comparison.",
+  "actual_prediction_check": {
+    "artifact_uri": "artifact://354",
+    "prediction_column": "suggested_queue",
+    "row_count": 30,
+    "correct": 28,
+    "accuracy": 0.9333333333333333,
+    "errors": [
+      {
+        "ticket_id": "T-324AC726",
+        "predicted": "退换货",
+        "expected": "物流"
+      },
+      {
+        "ticket_id": "T-D00705F3",
+        "predicted": "发票",
+        "expected": "物流"
+      }
+    ]
+  }
+}

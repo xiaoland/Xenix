@@ -1,0 +1,89 @@
+{
+  "baseline_commit": "f077816",
+  "schema_contract_changes": [
+    "data.query",
+    "data.transform"
+  ],
+  "scopes": {
+    "inactive": {
+      "before": 1635,
+      "after": 1574
+    },
+    "xenix-data-analysis": {
+      "before": 7914,
+      "after": 6867
+    },
+    "xenix-data-preprocessing": {
+      "before": 10431,
+      "after": 9339
+    },
+    "xenix-data-modeling": {
+      "before": 13135,
+      "after": 11682
+    },
+    "xenix-data-analysis+xenix-data-preprocessing": {
+      "before": 12382,
+      "after": 11160
+    },
+    "xenix-data-analysis+xenix-data-modeling+xenix-data-preprocessing": {
+      "before": 16594,
+      "after": 15062
+    }
+  },
+  "manual": {
+    "single_source_and_indexes": "sum=45",
+    "joined_rows": [
+      {
+        "region": "East",
+        "total": 30.0
+      },
+      {
+        "region": "West",
+        "total": 15.0
+      }
+    ],
+    "lineage": {
+      "dataset_id": 7,
+      "name": "region totals",
+      "generation": 1,
+      "operation_name": "data.transform",
+      "parameters_payload": {
+        "sql": "SELECT region, SUM(amount) AS total FROM orders JOIN stores USING (store_id) GROUP BY region ORDER BY region",
+        "column_reference": "names",
+        "name": "region totals"
+      },
+      "agent_explanation": "Group orders by store region.",
+      "tool_call_message_id": null,
+      "created_at": "2026-09-13T11:34:32.064450",
+      "inputs": [
+        {
+          "dataset_id": 2,
+          "name": "orders",
+          "position": 0,
+          "alias": "orders"
+        },
+        {
+          "dataset_id": 5,
+          "name": "stores",
+          "position": 1,
+          "alias": "stores"
+        }
+      ]
+    },
+    "artifact_resolves": true,
+    "old_arguments": {
+      "exception": "ValidationError",
+      "message": "Tool arguments do not match the registered input model."
+    },
+    "scope": "real registry, SQLite Dataset/Artifact, SQL and preprocessing workers; no model or canonical ToolCall"
+  },
+  "source_sha256": {
+    "src/xenix/services/agent/tool_inputs.py": "ded5d1726a59856b96774dba15e8f4cc9e5b554f3db7ebe2a46c527b17ab79b0",
+    "src/xenix/services/agent/_data_tools.py": "305c9ea51a425bb99288c11f8aacde135e4f6f89d2fcad11b50ee9a5e02ab165",
+    "src/xenix/services/knowledge_derivation_service.py": "36e244e9cf456617ccbeff5672dbb2a48c4cfa4bbbb5189db9147c53d03e489d",
+    "src/xenix/services/agent/skills/xenix-data-analysis/references/duckdb-sql-recipes.md": "e763c72110dbe74e2e37df87cdf5df172b1a4c572647d87a691932b19d2bea53",
+    "src/xenix/services/agent/skills/xenix-data-analysis/references/association-analysis.md": "8d1711b87ad5611e8183dd889b0599e8bb933beee852d4e028546e46c844c277",
+    "src/xenix/services/agent/skills/xenix-data-preprocessing/references/preprocessing-tools.md": "1258f547474e327f35386929b9eb5f41754a8842715410bebddbff83bcd1e1db",
+    "docs/30-unit-tdd/README.md": "9b217a376d4c0d116cc3c4990906484281422bd97bae9585e9d5eb5ada3c56a0"
+  }
+}

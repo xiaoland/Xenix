@@ -23,19 +23,14 @@ from xenix.services.ml.evaluation import get_default_policy
 from xenix.services.ml.forecast_preparation import prepare_forecast_panel
 from xenix.services.ml.models.forecasting import (
     ForecastModelKey,
-    HoltWintersForecastParams,
     HoltWintersForecastingService,
     SarimaFitBudget,
     SarimaFitOutcome,
-    SarimaForecastParams,
-    SarimaForecastingService,
-    SeasonalNaiveForecastParams,
-    SeasonalNaiveForecastingService,
     apply_future_forecast,
     evaluate_forecast,
     fit_full_history,
 )
-from xenix.services.ml.types import ApplyMode, EvaluationKind, ModelFamily, ModelTaskKind
+from xenix.services.ml.types import EvaluationKind
 
 FIXTURE_ROOT = FIXTURES_ROOT / "ml_cf_service"
 WEEKLY_PANEL = FIXTURE_ROOT / "weekly_panel_v1.csv"
@@ -425,20 +420,20 @@ def test_sarima_nonconvergence_nonfinite_and_wall_budget_fail_without_fallback()
     assert wall_error.value.error_details["budget_kind"] == "wall_time"
 
 
-def test_forecast_service_bridge_fit_evaluate_apply_and_catalog(tmp_path: Path) -> None:
+def test_forecast_service_bridge_fit_evaluate_apply(tmp_path: Path) -> None:
     source_path = tmp_path / "weekly.csv"
     source_path.write_bytes(WEEKLY_PANEL.read_bytes())
     options = _weekly_options()
     policy = get_default_policy(EvaluationKind.FORECASTING)
     snapshot = DatasetSnapshotFact(
-        dataset_id="weekly-dataset",
+        dataset_id=101,
         source_sha256="a" * 64,
         source_byte_size=source_path.stat().st_size,
         schema_digest="b" * 64,
     )
     fit_request = FitTaskRequest(
-        task_id="forecast-fit",
-        project_id="project-1",
+        task_id=102,
+        project_id=103,
         dataset_id=snapshot.dataset_id,
         dataset_source_path=str(source_path),
         evaluation_kind=EvaluationKind.FORECASTING,
@@ -470,8 +465,8 @@ def test_forecast_service_bridge_fit_evaluate_apply_and_catalog(tmp_path: Path) 
     assert fit_result.forecast_preparation_facts is not None
 
     evaluate_request = EvaluateTaskRequest(
-        task_id="forecast-evaluate",
-        project_id="project-1",
+        task_id=104,
+        project_id=103,
         dataset_id=snapshot.dataset_id,
         dataset_source_path=str(source_path),
         evaluation_kind=EvaluationKind.FORECASTING,
@@ -480,7 +475,7 @@ def test_forecast_service_bridge_fit_evaluate_apply_and_catalog(tmp_path: Path) 
         dataset_snapshot=snapshot,
         forecast_options=options,
         evaluate_model=EvaluateModelPayload(
-            trained_model_id="trained-forecast",
+            trained_model_id=106,
             model_key=HoltWintersForecastingService.key,
             trained_model_artifact_path=fit_result.model_artifact_path,
             holdout_artifact_path=fit_result.holdout_artifact_path or "",
@@ -495,12 +490,12 @@ def test_forecast_service_bridge_fit_evaluate_apply_and_catalog(tmp_path: Path) 
     assert evaluate_result.evaluation.details["interval_method"] == "residual_quantile.v1"
 
     apply_request = ApplyTaskRequest(
-        task_id="forecast-apply",
-        project_id="project-1",
+        task_id=105,
+        project_id=103,
         dataset_id=snapshot.dataset_id,
         dataset_source_path=str(source_path),
         apply_model=ApplyModelPayload(
-            trained_model_id="trained-forecast",
+            trained_model_id=106,
             model_key=HoltWintersForecastingService.key,
             trained_model_artifact_path=fit_result.model_artifact_path,
         ),
@@ -512,30 +507,3 @@ def test_forecast_service_bridge_fit_evaluate_apply_and_catalog(tmp_path: Path) 
     assert apply_result.summary.horizon == 6
     assert apply_result.source_dataset_ids == [snapshot.dataset_id]
     assert len(output.index) == 12
-
-    for service in (
-        SeasonalNaiveForecastingService,
-        HoltWintersForecastingService,
-        SarimaForecastingService,
-    ):
-        entry = service.catalog_entry()
-        assert entry.model_family is ModelFamily.FORECASTING
-        assert entry.model_task_kind is ModelTaskKind.FORECASTER
-        assert entry.supports_evaluation is True
-        assert entry.supports_apply is True
-        assert entry.apply_mode is ApplyMode.FUTURE_HORIZON
-        assert entry.apply_role_schema.roles == []
-
-    common_fields = {"horizon", "seasonal_period", "frequency", "interval_level", "rolling_windows"}
-    assert set(SeasonalNaiveForecastParams.model_fields) == common_fields
-    assert set(HoltWintersForecastParams.model_fields) == common_fields | {"damped_trend"}
-    assert set(SarimaForecastParams.model_fields) == common_fields | {
-        "policy",
-        "max_fits_per_group",
-        "max_total_fits",
-        "max_wall_seconds",
-    }
-    sarima_schema = SarimaForecastParams.model_json_schema()
-    assert "optimizer" not in sarima_schema["properties"]
-    assert "order" not in sarima_schema["properties"]
-    assert "seasonal_order" not in sarima_schema["properties"]

@@ -19,9 +19,8 @@ from uuid import uuid4
 from zipfile import ZipFile, ZipInfo
 
 from ..config import AppPaths, package_root
-from ..exceptions import ValidationError
+from ..exceptions import ValidationError, report_exception
 from ..release_config import ReleaseConfig, load_release_config
-
 
 NATIVE_OCR_PROTOCOL_VERSION = 2
 RUNTIME_MANIFEST_SCHEMA_VERSION = 1
@@ -56,19 +55,7 @@ class PaddleOcrStatus:
     reason_code: str | None = None
     runtime_id: str | None = None
     model_pack_id: str | None = None
-    generation_id: str | None = None
-
-    @property
-    def installed(self) -> bool:
-        return self.state in {PaddleOcrState.READY, PaddleOcrState.REPAIR_REQUIRED}
-
-    @property
-    def models_ready(self) -> bool:
-        return self.state is PaddleOcrState.READY
-
-    @property
-    def detail(self) -> str | None:
-        return self.reason_code
+    generation_id: int | None = None
 
 
 @dataclass(frozen=True)
@@ -199,7 +186,7 @@ class ReleasePaddleOcrBundleSource:
 
 @dataclass(frozen=True)
 class PaddleOcrRuntime:
-    generation_id: str
+    generation_id: int
     generation_path: Path
     executable_path: Path
     detection_model_path: Path
@@ -224,7 +211,7 @@ class PaddleOcrRuntime:
 
 @dataclass(frozen=True)
 class PaddleOcrRuntimeDescriptor:
-    generation_id: str
+    generation_id: int
     runtime_id: str
     model_pack_id: str
     engine: str
@@ -328,11 +315,6 @@ class PaddleOcrDeploymentService:
             generation_id=runtime.generation_id,
         )
 
-    def status(self) -> PaddleOcrStatus:
-        """Compatibility alias for existing service consumers."""
-
-        return self.status_snapshot()
-
     def install(self, progress: Callable[[str], None] | None = None) -> PaddleOcrStatus:
         source = self._bundle_source
         if source is None:
@@ -416,9 +398,6 @@ class PaddleOcrDeploymentService:
                 _remove_private_tree(staging_root, root=self._staging)
             self._clear_transient_if(PaddleOcrState.INSTALLING)
 
-    def repair(self, progress: Callable[[str], None] | None = None) -> PaddleOcrStatus:
-        return self.install(progress)
-
     def verify_active(self) -> PaddleOcrStatus:
         self._set_transient(PaddleOcrStatus(PaddleOcrState.CHECKING, "verifying"))
         try:
@@ -433,7 +412,8 @@ class PaddleOcrDeploymentService:
             )
         except FileNotFoundError:
             return PaddleOcrStatus(PaddleOcrState.NOT_INSTALLED, "runtime_missing")
-        except Exception:
+        except Exception as exc:
+            report_exception(exc)
             return PaddleOcrStatus(PaddleOcrState.REPAIR_REQUIRED, "verification_failed")
         finally:
             self._clear_transient_if(PaddleOcrState.CHECKING)
@@ -576,7 +556,7 @@ class PaddleOcrDeploymentService:
         self,
         generation_path: Path,
         *,
-        generation_id: str,
+        generation_id: int,
         expected_catalog: PaddleOcrBundleCatalog | None,
         verify_all_files: bool,
     ) -> PaddleOcrRuntime:
@@ -696,7 +676,8 @@ class PaddleOcrSession(AbstractContextManager["PaddleOcrSession"]):
         if exc_type is None and self._process is not None and self._process.poll() is None:
             try:
                 self.request("shutdown", {}, timeout=5)
-            except Exception:
+            except Exception as exc:
+                report_exception(exc)
                 pass
         self.close()
         return False

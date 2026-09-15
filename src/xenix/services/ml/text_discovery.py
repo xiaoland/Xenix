@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import hashlib
-import json
 import math
 import re
 from dataclasses import dataclass
@@ -19,7 +18,7 @@ from sklearn.metrics import adjusted_rand_score, silhouette_score
 from sklearn.metrics.pairwise import cosine_similarity
 
 from ...exceptions import ValidationError
-from .digests import prediction_digest
+from .digests import prediction_digest, sha256_json
 from .text_preparation import (
     PreparedTextCorpus,
     TextPreparationQualityFacts,
@@ -1260,8 +1259,7 @@ def _sha256(value: str) -> str:
 
 
 def _json_digest(value: Any) -> str:
-    payload = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False)
-    return _sha256(payload)
+    return sha256_json(value, allow_nan=False)
 
 
 def _digest_values(values: Sequence[str]) -> str:

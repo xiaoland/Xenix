@@ -14,21 +14,21 @@ Setup.
 
 `develop` is the integration line. Promote it through a same-repository
 `develop -> main` pull request. Native CI is scoped to PRs targeting `main`; its
-single stable `Native CI` check is required. Do not locally merge and push `main`.
-A task-specific `feat/* -> main` draft PR is a documented exception for CI
-acceptance against a clean `main` baseline; it never merges. Do not open ordinary
-feature-branch PRs directly to `main`.
+single stable `Native CI` check is required. Do not locally merge and push `main`, and do not open feature-branch PRs directly to `main`.
 
 Merging the promotion PR creates a release-eligible `main` result but publishes
 nothing. The only release authorization is a pushed immutable
 `v<project-version>` tag on the current or any historical eligible promotion
 result. The selected commit must:
 
-- be the recorded merge outcome of exactly one same-repository
-  `develop -> main` promotion PR;
 - occur in `origin/main` first-parent history;
 - contain the supported release protocol;
 - declare the same project version as the tag.
+
+The promotion PR number is recorded as best-effort provenance in the release
+manifest and is not a release gate. `main` is already restricted to
+merge-commit pull requests by the `main-promotion` ruleset, so first-parent
+membership alone establishes the promoted state.
 
 Promotion CI is the test authority for the reviewed source. The tag workflow
 re-verifies release identity, runs repository checks, and builds and exercises the
@@ -61,8 +61,9 @@ retried from the unchanged tag and commit.
 
 The tag starts the only `Native Release` workflow:
 
-1. a secretless job verifies tag, version, commit, promotion PR, `main`
-   first-parent membership, and release-protocol identity;
+1. a secretless job verifies tag, version, commit, `main` first-parent
+   membership, and release-protocol identity, and records the promotion PR
+   as best-effort provenance;
 2. the `native-release` Environment admits the verified `v*` ref and supplies
    release configuration and secrets;
 3. the Windows job re-verifies the identity and repository checks on the tag SHA;
@@ -81,8 +82,9 @@ dispatch, or second release approval.
 ## Publication Contract
 
 The release manifest records schema/protocol version, SemVer, tag, commit,
-promotion PR, workflow run/attempt, toolchain, dependency-lock hash, packaged
-smoke result, and every artifact's path, size, type, and SHA-256.
+promotion PR when resolvable, workflow run/attempt, toolchain, dependency-lock
+hash, packaged smoke result, and every artifact's path, size, type, and
+SHA-256.
 
 The publisher is a single globally serialized writer. It:
 
@@ -100,8 +102,11 @@ The publisher is a single globally serialized writer. It:
 OSS cannot atomically replace all mutable projections. A failure before the
 canonical feed update leaves the previous release authoritative, although
 intended-public unreferenced files or partially updated projections can exist.
-The unchanged-tag retry deterministically converges. A conflicting immutable
-object fails closed.
+The unchanged-tag retry deterministically converges only when the package
+build is reproducible; packaging pins `SOURCE_DATE_EPOCH` to the tag commit
+and normalizes archive mtimes for this reason. A conflicting immutable object
+fails closed. If a non-reproducible build orphans immutable objects, delete
+them with `pdm run release-publish --cleanup-orphans <tag>` before retrying.
 
 The bucket stays private by default. Anonymous read exposes only `published/*`.
 Routine writes to that prefix outside the release/rollback writer are prohibited.

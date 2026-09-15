@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import threading
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -124,6 +125,7 @@ class SoftwareUpdateController(QObject):
             try:
                 status = worker()
             except Exception as exc:
+                logging.getLogger(__name__).exception("UI operation failed: %s", exc)
                 current = service.status
                 status = UpdateStatus(
                     UpdateState.FAILED,
@@ -221,6 +223,9 @@ class SoftwareUpdateController(QObject):
                 )
 
     def _apply_update(self) -> UpdateStatus:
+        # apply() may return control from the update service's own thread; passing
+        # the signal's emit as the callback marshals the final quit onto the GUI
+        # thread. Calling app.quit() directly here would touch Qt off the GUI thread.
         self._update_service.apply(self._quit_for_update.emit)
         return self._update_service.status
 

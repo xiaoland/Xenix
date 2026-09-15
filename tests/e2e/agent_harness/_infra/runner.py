@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from hashlib import sha256
@@ -25,8 +26,10 @@ from xenix.services.knowledge_derivation_service import KnowledgeDerivationServi
 from xenix.services.knowledge_import_service import KnowledgeImportService
 from xenix.services.knowledge_index_service import KnowledgeIndexService
 from xenix.services.llm import FrozenLLMSettingsSource, LLMService, LLMSettings
+from xenix.services.llm.messages import ToolCallOutputItem
 from xenix.services.ml.worker_settings import MLWorkerSettingsService
 from xenix.services.storage import StorageBootstrapService
+from xenix.services.storage.repositories import KnowledgeRepository
 
 from .contracts import (
     AgentHarnessBenchmarkResult,
@@ -40,6 +43,9 @@ from .contracts import (
     BenchmarkInputError,
     BenchmarkMetrics,
     BenchmarkRunStatus,
+    BenchmarkTraceResult,
+    BenchmarkTurnObservation,
+    BenchmarkTurnResult,
     JudgeResult,
     JudgeStatus,
     SemanticVerdict,
@@ -47,7 +53,6 @@ from .contracts import (
 )
 from .budgets import (
     BenchmarkBudgetController,
-    BenchmarkBudgetError,
     BenchmarkBudgetPolicy,
     BenchmarkBudgetSnapshot,
     BenchmarkBudgetStatus,
@@ -55,6 +60,7 @@ from .budgets import (
     run_isolated_call,
 )
 from .judge import judge_independence, run_judge
+from .telemetry import BenchmarkTrace, exception_payload, load_trace_journal
 
 
 LLM_SETTINGS_PATH_ENV = "XENIX_AGENT_BENCHMARK_LLM_SETTINGS_PATH"
@@ -74,6 +80,7 @@ class BenchmarkSettingsError(ValueError):
 class BenchmarkRun:
     result: AgentHarnessBenchmarkResult
     persisted: bool
+    output_path: Path | None = None
 
 
 @dataclass(frozen=True)
@@ -93,7 +100,7 @@ class _StreamMeasurements:
     snapshot: Any | None = None
     source_state: Any | None = None
     source_state_captured: bool = False
-    pending_message_ids: set[str] | None = None
+    pending_message_ids: set[int] | None = None
     provider_retry_count: int = 0
     title_event_count: int = 0
     final_snapshot_seen: bool = False
@@ -104,7 +111,7 @@ class _StreamMeasurements:
 
     def observe(self, event: Any, *, case: BenchmarkCase, services: BenchmarkCaseServices) -> None:
         pending_message_id = getattr(event, "pending_message_id", None)
-        if isinstance(pending_message_id, str) and pending_message_id:
+        if isinstance(pending_message_id, int) and pending_message_id:
             self.pending_message_ids.add(pending_message_id)
         event_kind = getattr(event, "kind", None)
         if event_kind == "connection":
@@ -124,8 +131,8 @@ class _StreamMeasurements:
                 self.source_state_captured = True
 
 
-class _BoundedLLMService(LLMService):
-    """Real provider gateway with benchmark-only request admission guards."""
+class _MeteredLLMService(LLMService):
+    """Production provider gateway with passive benchmark usage observations."""
 
     def __init__(
         self,
@@ -134,6 +141,8 @@ class _BoundedLLMService(LLMService):
     ) -> None:
         super().__init__(settings_source)
         self._budget = budget
+        self.sampling_responses: list[dict[str, Any]] = []
+        self.trace: BenchmarkTrace | None = None
 
     def complete(
         self,
@@ -145,12 +154,13 @@ class _BoundedLLMService(LLMService):
         before_provider_request: Callable[[], None] | None = None,
     ) -> Any:
         self._budget.begin_sampling_round()
+        self._record_budget("benchmark.subject.sampling_started")
         response = super().complete(
             fq_model_key=fq_model_key,
             messages=messages,
             tools=tools,
             retry_callback=retry_callback,
-            before_provider_request=self._admission(before_provider_request),
+            before_provider_request=self._count_provider_request(before_provider_request),
         )
         self._observe_response(response)
         return response
@@ -164,33 +174,65 @@ class _BoundedLLMService(LLMService):
         before_provider_request: Callable[[], None] | None = None,
     ) -> Iterator[Any]:
         self._budget.begin_sampling_round()
+        self._record_budget("benchmark.subject.sampling_started")
         for event in super().stream(
             fq_model_key=fq_model_key,
             messages=messages,
             tools=tools,
-            before_provider_request=self._admission(before_provider_request),
+            before_provider_request=self._count_provider_request(before_provider_request),
         ):
             response = getattr(event, "response", None)
             if response is not None:
                 self._observe_response(response)
             yield event
 
-    def _admission(
+    def _count_provider_request(
         self,
         original: Callable[[], None] | None,
     ) -> Callable[[], None]:
-        def admit() -> None:
+        def observe() -> None:
             if original is not None:
                 original()
-            self._budget.admit_provider_attempt()
+            self._budget.observe_provider_attempt()
 
-        return admit
+        return observe
 
     def _observe_response(self, response: Any) -> None:
         usage = LLMTokenUsage.from_payload(getattr(response, "usage_payload", None))
+        self.sampling_responses.append({
+            "round": self._budget.snapshot().sampling_rounds_admitted,
+            "reported_tokens": usage.total_tokens if usage is not None else None,
+            "usage": usage.to_payload() if usage is not None else None,
+            "tool_calls": [
+                {"provider_call_id": item.provider_call_id, "name": item.tool_name}
+                for item in response.output_items if isinstance(item, ToolCallOutputItem)
+            ],
+        })
         self._budget.observe_subject_response(
             usage.total_tokens if usage is not None else None
         )
+        self._record_budget("benchmark.subject.usage")
+
+    def _record_budget(self, name: str) -> None:
+        if self.trace is not None:
+            with self.trace.span(name) as event:
+                event["budget"] = self._budget.snapshot().to_payload()
+
+
+def _delivery_diagnostics(value: Any) -> dict[str, Any]:
+    """Keep completion evidence locally without copying intermediate tables into reports."""
+    facts: dict[str, Any] = {"serialized_bytes": len(json.dumps(value, ensure_ascii=False).encode("utf-8"))}
+    if isinstance(value, dict):
+        for key in ("timed_out", "task_ids", "ml_task_id", "dataset_id", "result_dataset_id", "artifact_id", "uri"):
+            if key in value:
+                facts[key] = value[key]
+        if "trained_model_ids" in value:
+            facts["trained_model_ids"] = value["trained_model_ids"]
+            facts["models"] = value.get("models", [])
+        result = value.get("result")
+        if isinstance(result, dict):
+            facts["result"] = _delivery_diagnostics(result)
+    return facts
 
 
 class _HeadlessBenchmarkCell:
@@ -210,9 +252,11 @@ class _HeadlessBenchmarkCell:
         self._knowledge_import = None
         self._knowledge_derivation = None
         self._knowledge_index = None
+        self._scheduler = None
         try:
             self._storage = StorageBootstrapService().initialize(paths)
-            llm = _BoundedLLMService(FrozenLLMSettingsSource(settings), budget)
+            llm = _MeteredLLMService(FrozenLLMSettingsSource(settings), budget)
+            self.llm = llm
             worker_settings = MLWorkerSettingsService(paths)
             embedding_settings_service = EmbeddingSettingsService(paths)
             if embedding_settings is not None:
@@ -227,6 +271,7 @@ class _HeadlessBenchmarkCell:
                     paths.logs / LLM_USAGE_JOURNAL_FILE_NAME
                 ),
             )
+            self._scheduler = services.scheduler
             self._knowledge_index = KnowledgeIndexService(
                 session_factory=self._storage.session_factory,
                 semantic_service=services.knowledge_semantic,
@@ -242,11 +287,13 @@ class _HeadlessBenchmarkCell:
                 paths=paths,
                 session_factory=self._storage.session_factory,
                 artifact_service=services.artifacts,
+                knowledge_repository=KnowledgeRepository(),
                 canonical_ready_notifier=self._knowledge_derivation.enqueue_generation,
             )
             self.harness = services.harness
             self.datasets = services.datasets
             self.artifacts = services.artifacts
+            self.models = services.ml
             self.preparation_services = BenchmarkCasePreparationServices(
                 knowledge_import=self._knowledge_import,
                 knowledge_derivation=self._knowledge_derivation,
@@ -281,6 +328,8 @@ class _HeadlessBenchmarkCell:
         if self._closed:
             return
         self._closed = True
+        if self._scheduler is not None:
+            self._scheduler.shutdown()
         if self._knowledge_import is not None:
             self._knowledge_import.shutdown()
         if self._knowledge_derivation is not None:
@@ -360,12 +409,8 @@ def _load_judge_configuration(
             model_key=selected_model or None,
             setup_error=f"judge_{setup_error}",
         )
-    effective_settings = settings.model_copy(
-        deep=True,
-        update={"retry_attempts": DEFAULT_BUDGET_POLICY.max_provider_attempts},
-    )
     return _JudgeConfiguration(
-        settings=effective_settings,
+        settings=settings,
         settings_sha256=settings_sha256,
         model_key=selected_model,
     )
@@ -421,7 +466,7 @@ def run_benchmark(
         resolved_settings_path = resolve_llm_settings_path(settings_path)
         settings, settings_sha256 = load_settings_snapshot(resolved_settings_path)
         model_key = selected_model_key(settings, requested_model)
-        effective_settings = _effective_subject_settings(settings, budget_policy)
+        effective_settings = _effective_subject_settings(settings)
         effective_settings_sha256 = _sha256_text(
             effective_settings.model_dump_json()
         )
@@ -581,6 +626,7 @@ def run_benchmark(
         prefix="xenix-agent-benchmark-parent-",
         ignore_cleanup_errors=True,
     ) as temporary_parent:
+        trace_journal_path = Path(temporary_parent) / f"{run_id}.trace.jsonl"
         outcome = run_isolated_call(
             _run_model_cell,
             {
@@ -588,18 +634,19 @@ def run_benchmark(
                 "case": case,
                 "execution_mode": execution_mode,
                 "settings": effective_settings,
-                "settings_path": resolved_settings_path,
-                "settings_sha256": settings_sha256,
                 "embedding_settings": embedding_settings,
-                "embedding_settings_path": resolved_embedding_settings_path,
-                "embedding_settings_sha256": embedding_settings_sha256,
                 "model_key": model_key,
                 "identity": cell_identity,
                 "judge_configuration": judge_configuration,
                 "budget_policy": budget_policy,
                 "temporary_parent": Path(temporary_parent),
+                "trace_journal_path": trace_journal_path,
             },
             timeout_seconds=budget_policy.max_wall_seconds,
+        )
+        recovered_trace = BenchmarkTraceResult(
+            trace_id=run_id,
+            events=load_trace_journal(trace_journal_path),
         )
     if outcome.status is IsolatedCallStatus.COMPLETED and isinstance(
         outcome.value,
@@ -621,6 +668,7 @@ def run_benchmark(
             ),
             identity=cell_identity,
             failure_kind="process_wall_time_exceeded",
+            trace=recovered_trace,
         )
     else:
         result = AgentHarnessBenchmarkResult(
@@ -636,7 +684,10 @@ def run_benchmark(
             ),
             identity=cell_identity,
             failure_kind=outcome.failure_kind or "child_process_failed",
+            trace=recovered_trace,
         )
+    if outcome.status is not IsolatedCallStatus.COMPLETED:
+        result = _recover_partial_task(result)
     invocation_total = (
         invocation_reported_subject_tokens
         + result.budget.reported_subject_tokens
@@ -645,26 +696,84 @@ def run_benchmark(
         result.budget,
         invocation_reported_subject_tokens=invocation_total,
     )
-    if (
-        result.run_status is BenchmarkRunStatus.COMPLETED
-        and invocation_total
-        > budget_policy.max_reported_invocation_subject_tokens
-    ):
-        result_budget = replace(
-            result_budget,
-            status=BenchmarkBudgetStatus.EXCEEDED,
-            exhaustion_reason="invocation_token_limit_exceeded",
-        )
-        result = replace(
-            result,
-            run_status=BenchmarkRunStatus.BUDGET_EXCEEDED,
-            semantic_verdict=SemanticVerdict.NOT_EVALUATED,
-            budget=result_budget,
-            failure_kind="invocation_token_limit_exceeded",
-        )
-    else:
-        result = replace(result, budget=result_budget)
+    # Dispatch stops subsequent cells at its aggregate cap. A completed task's
+    # outcome must not depend on the cost of tasks that happened to precede it.
+    result = replace(result, budget=result_budget)
     return _persist_result(output_directory, result)
+
+
+def _metrics_from_payload(payload: dict[str, Any]) -> BenchmarkMetrics:
+    values = dict(payload)
+    usage = values.get("token_usage")
+    values["token_usage"] = TokenUsage(**usage) if usage is not None else None
+    shape = values.get("terminal_shape")
+    values["terminal_shape"] = tuple(shape) if shape is not None else None
+    return BenchmarkMetrics(**values)
+
+
+def _recover_partial_task(result: AgentHarnessBenchmarkResult) -> AgentHarnessBenchmarkResult:
+    """Retain completed requests and observed cost if the process dies mid-task."""
+    events = result.trace.events if result.trace is not None else ()
+    turns = []
+    metrics = result.subject_metrics
+    budget = result.budget
+    planned = result.planned_turn_count
+    active_turn = 0
+    last_budget_event = None
+    for event in events:
+        attributes = event.attributes
+        if event.name == "benchmark.turn.start":
+            active_turn = attributes["user_turn"]
+            planned = attributes["planned_turn_count"]
+        if event.name == "benchmark.turn.checkpoint":
+            payload = attributes["result"]
+            turns.append(
+                BenchmarkTurnResult(
+                    index=payload["index"],
+                    run_status=BenchmarkRunStatus(payload["run_status"]),
+                    failure_kind=payload["failure_kind"],
+                    subject_metrics=_metrics_from_payload(payload["subject_metrics"]),
+                    delivery_evidence=tuple(payload.get("delivery_evidence", ())),
+                    request_text=payload.get("request_text"),
+                    attachment_names=tuple(payload.get("attachment_names", ())),
+                )
+            )
+            metrics = _metrics_from_payload(attributes["cumulative_metrics"])
+        if "budget" in attributes:
+            last_budget_event = event.name
+            payload = attributes["budget"]
+            budget = replace(
+                budget,
+                sampling_rounds_admitted=payload["sampling_rounds_admitted"],
+                provider_attempts_dispatched=payload["provider_attempts_dispatched"],
+                reported_subject_tokens=payload["reported_subject_tokens"],
+            )
+    if active_turn > len(turns):
+        turns.append(
+            BenchmarkTurnResult(
+                index=active_turn,
+                run_status=result.run_status,
+                failure_kind=result.failure_kind,
+                subject_metrics=BenchmarkMetrics(
+                    sampling_round_count=budget.sampling_rounds_admitted - metrics.sampling_round_count,
+                ),
+            )
+        )
+        # No complete conversation projection survives this request. Do not
+        # mislabel earlier usage/message counts as complete task measurements.
+        metrics = replace(
+            metrics,
+            token_usage=None,
+            usage_reported_primary_response_count=None,
+            sampling_round_count=budget.sampling_rounds_admitted,
+        )
+    if last_budget_event == "benchmark.subject.sampling_started":
+        budget = replace(
+            budget,
+            status=BenchmarkBudgetStatus.UNVERIFIABLE,
+            exhaustion_reason="interrupted_provider_usage_unavailable",
+        )
+    return replace(result, turns=tuple(turns), planned_turn_count=planned, subject_metrics=metrics, budget=budget)
 
 
 def _run_model_cell(
@@ -673,20 +782,18 @@ def _run_model_cell(
     case: BenchmarkCase,
     execution_mode: BenchmarkExecutionMode,
     settings: LLMSettings,
-    settings_path: Path,
-    settings_sha256: str,
     embedding_settings: EmbeddingSettings | None,
-    embedding_settings_path: Path | None,
-    embedding_settings_sha256: str | None,
     model_key: str,
     identity: BenchmarkIdentity,
     judge_configuration: _JudgeConfiguration,
     budget_policy: BenchmarkBudgetPolicy,
     temporary_parent: Path,
+    trace_journal_path: Path,
 ) -> AgentHarnessBenchmarkResult:
+    trace_recorder = BenchmarkTrace(run_id, trace_journal_path)
     setup_error = _model_setup_error(settings, model_key)
     if setup_error is not None:
-        return _invalid_result(
+        result = _invalid_result(
             case_id=case.case_id,
             provider_model=model_key,
             execution_mode=execution_mode,
@@ -694,6 +801,13 @@ def _run_model_cell(
             failure_kind=setup_error,
             run_id=run_id,
             budget_policy=budget_policy,
+        )
+        return replace(
+            result,
+            trace=BenchmarkTraceResult(
+                trace_id=trace_recorder.trace_id,
+                events=trace_recorder.events,
+            ),
         )
 
     budget = BenchmarkBudgetController(budget_policy)
@@ -703,6 +817,8 @@ def _run_model_cell(
     failure_kind: str | None = None
     assessment: BenchmarkCaseAssessment | None = None
     judge_result = JudgeResult()
+    turns: list[BenchmarkTurnObservation] = []
+    planned_turn_count: int | None = None
     with tempfile.TemporaryDirectory(
         prefix="cell-",
         dir=temporary_parent,
@@ -711,86 +827,215 @@ def _run_model_cell(
         paths = _benchmark_paths(Path(temporary_root) / "runtime")
         cell: Any | None = None
         case_services: BenchmarkCaseServices | None = None
-        thread_id: str | None = None
+        thread_id: int | None = None
         turn_seconds = 0.0
         try:
-            cell = _open_benchmark_cell(
-                execution_mode=execution_mode,
-                paths=paths,
-                settings=settings,
-                embedding_settings=embedding_settings,
-                budget=budget,
-            )
+            with trace_recorder.span(
+                "benchmark.cell.open",
+                execution_mode=execution_mode.value,
+                provider_model=model_key,
+                runtime_home=str(paths.home),
+            ):
+                cell = _open_benchmark_cell(
+                    execution_mode=execution_mode,
+                    paths=paths,
+                    settings=settings,
+                    embedding_settings=embedding_settings,
+                    budget=budget,
+                )
             case_services = BenchmarkCaseServices(
                 datasets=cell.datasets,
                 artifacts=cell.artifacts,
+                models=cell.models,
             )
-            before_dataset_ids = {
-                dataset.id for dataset in cell.datasets.list_datasets()
-            }
-            title = _synthetic_title(case.case_id, model_key, run_id)
-            thread_id = cell.create_thread(title=title, fq_model_key=model_key)
-            _prepare_case(
-                case=case,
-                services=cell.preparation_services,
-            )
-            started_at = time.perf_counter()
-            try:
-                cell.execute_submission(
-                    submission=case.build_submission(
-                        thread_id=thread_id,
-                        fq_model_key=model_key,
-                    ),
-                    measurements=measurements,
+            cell.llm.trace = trace_recorder
+            with trace_recorder.span("benchmark.case.prepare", case_id=case.case_id) as event:
+                before_dataset_ids = {
+                    dataset.id for dataset in cell.datasets.list_datasets()
+                }
+                title = _synthetic_title(case.case_id, model_key, run_id)
+                thread_id = cell.create_thread(title=title, fq_model_key=model_key)
+                event["gen_ai.conversation.id"] = thread_id
+                _prepare_case(
                     case=case,
-                    services=case_services,
+                    services=cell.preparation_services,
                 )
-            except BenchmarkBudgetError as exc:
-                run_status = BenchmarkRunStatus.BUDGET_EXCEEDED
-                failure_kind = exc.code
-            except Exception as exc:
-                run_status = BenchmarkRunStatus.RUNTIME_ERROR
-                failure_kind = _exception_kind(exc)
-            finally:
-                turn_seconds = time.perf_counter() - started_at
-
-            if measurements.title_event_count and run_status is BenchmarkRunStatus.COMPLETED:
-                run_status = BenchmarkRunStatus.MEASUREMENT_ERROR
-                failure_kind = "unexpected_title_event"
-
-            if measurements.snapshot is None and thread_id is not None:
-                try:
-                    measurements.snapshot = cell.harness.get_thread_snapshot(thread_id)
-                except Exception:
+            build_submissions = getattr(case, "build_submissions", None)
+            submissions = (
+                tuple(build_submissions(thread_id=thread_id, fq_model_key=model_key))
+                if build_submissions
+                else (case.build_submission(thread_id=thread_id, fq_model_key=model_key),)
+            )
+            planned_turn_count = len(submissions)
+            if not submissions:
+                raise BenchmarkInputError("task_has_no_submissions")
+            previous_metrics = BenchmarkMetrics()
+            total_retries = 0
+            for index, submission in enumerate(submissions, start=1):
+                # UI completion flags and attachment capture belong to one request;
+                # cumulative usage observations and the production thread belong to the task.
+                measurements = _StreamMeasurements()
+                started_at = time.perf_counter()
+                with trace_recorder.span(
+                    "benchmark.turn.start", user_turn=index, planned_turn_count=planned_turn_count
+                ):
                     pass
-            run_dataset_ids = frozenset(
-                dataset.id for dataset in cell.datasets.list_datasets()
-            ) - before_dataset_ids
-            try:
-                assessment_started_at = time.perf_counter()
-                assessment = case.assess(
-                    context=BenchmarkCaseContext(
-                        snapshot=measurements.snapshot,
-                        source_state=measurements.source_state,
-                        run_dataset_ids=run_dataset_ids,
-                        runtime_home=paths.home,
-                        settings_unchanged=(
-                            _sha256_file(settings_path) == settings_sha256
-                            and (
-                                embedding_settings_path is None
-                                or (
-                                    embedding_settings_sha256 is not None
-                                    and _sha256_file(embedding_settings_path)
-                                    == embedding_settings_sha256
+                with trace_recorder.span(
+                    "benchmark.subject.execute",
+                    **{
+                        "user_turn": index,
+                        "gen_ai.operation.name": "invoke_agent",
+                        "gen_ai.request.model": model_key,
+                        "gen_ai.conversation.id": thread_id,
+                    },
+                ) as event:
+                    try:
+                        cell.execute_submission(
+                            submission=submission,
+                            measurements=measurements,
+                            case=case,
+                            services=case_services,
+                        )
+                    except Exception as exc:
+                        run_status = BenchmarkRunStatus.RUNTIME_ERROR
+                        failure_kind = _exception_kind(exc)
+                        event["exception"] = exception_payload(exc)
+                    elapsed = time.perf_counter() - started_at
+                    turn_seconds += elapsed
+                    total_retries += measurements.provider_retry_count
+                    turn_budget = budget.snapshot()
+                    if run_status is BenchmarkRunStatus.COMPLETED:
+                        if turn_budget.status is BenchmarkBudgetStatus.UNVERIFIABLE:
+                            run_status = BenchmarkRunStatus.MEASUREMENT_ERROR
+                            failure_kind = turn_budget.exhaustion_reason
+                    if measurements.snapshot is None:
+                        measurements.snapshot = cell.harness.get_thread_snapshot(thread_id)
+                    if measurements.title_event_count and run_status is BenchmarkRunStatus.COMPLETED:
+                        run_status = BenchmarkRunStatus.MEASUREMENT_ERROR
+                        failure_kind = "unexpected_title_event"
+                    event["provider_retry_count"] = measurements.provider_retry_count
+                    event["final_snapshot_seen"] = measurements.final_snapshot_seen
+                    event["run_status"] = run_status.value
+                    event["failure_kind"] = failure_kind
+                    messages = list(getattr(measurements.snapshot, "messages", ()))
+                    event["final_text"] = str(getattr(messages[-1], "text", "") or "") if messages else ""
+                cumulative_metrics = _collect_metrics(
+                    sampling_responses=cell.llm.sampling_responses,
+                    dataset_service=cell.datasets,
+                    snapshot=measurements.snapshot,
+                    turn_seconds=turn_seconds,
+                    assessment_seconds=None,
+                    pending_message_ids=measurements.pending_message_ids,
+                    provider_retry_count=total_retries,
+                    terminal_shape=None,
+                    budget=budget,
+                )
+                turn_result = BenchmarkTurnResult(
+                    index=index,
+                    run_status=run_status,
+                    failure_kind=failure_kind,
+                    subject_metrics=_incremental_metrics(cumulative_metrics, previous_metrics, elapsed),
+                    request_text=submission.text if build_submissions is not None else None,
+                    attachment_names=tuple(Path(item.file_path).name for item in submission.source_attachments)
+                    if build_submissions is not None
+                    else (),
+                )
+                evidence = None
+                try:
+                    capture_turn = getattr(case, "capture_turn", None)
+                    if capture_turn is not None:
+                        with trace_recorder.span("benchmark.turn.capture", user_turn=index):
+                            evidence = capture_turn(
+                                context=BenchmarkCaseContext(
+                                    snapshot=measurements.snapshot,
+                                    services=case_services,
+                                    source_state=measurements.source_state,
+                                    runtime_home=paths.home,
+                                    run_dataset_ids=frozenset(dataset.id for dataset in cell.datasets.list_datasets())
+                                    - before_dataset_ids,
+                                    turns=tuple(turns),
                                 )
                             )
-                        ),
-                        services=case_services,
+                except Exception as exc:
+                    if run_status is BenchmarkRunStatus.COMPLETED:
+                        run_status = BenchmarkRunStatus.MEASUREMENT_ERROR
+                        failure_kind = _exception_kind(exc)
+                    turn_result = replace(turn_result, run_status=run_status, failure_kind=failure_kind)
+                turns.append(
+                    BenchmarkTurnObservation(
+                        snapshot=deepcopy(measurements.snapshot),
+                        evidence=evidence,
+                        result=turn_result,
                     )
                 )
+                report_evidence = getattr(evidence, "report_evidence", None)
+                if report_evidence is not None:
+                    turns[-1] = replace(
+                        turns[-1], result=replace(turn_result, delivery_evidence=report_evidence(index))
+                    )
+                with trace_recorder.span("benchmark.turn.checkpoint", user_turn=index) as event:
+                    event["result"] = turns[-1].result.to_payload()
+                    event["cumulative_metrics"] = cumulative_metrics.to_payload()
+                    event["budget"] = budget.snapshot().to_payload()
+                    event["planned_turn_count"] = planned_turn_count
+                previous_metrics = cumulative_metrics
+                subject_metrics = cumulative_metrics
+                if run_status is not BenchmarkRunStatus.COMPLETED:
+                    break
+            measurements.provider_retry_count = total_retries
+            run_dataset_ids = frozenset(dataset.id for dataset in cell.datasets.list_datasets()) - before_dataset_ids
+            with trace_recorder.span("benchmark.subject.outcome") as event:
+                event["sampling_responses"] = cell.llm.sampling_responses
+                messages = list(getattr(measurements.snapshot, "messages", []))
+                results = {
+                    message.tool_call_message_id: message
+                    for message in messages
+                    if getattr(message, "tool_call_message_id", None)
+                }
+                event["final_text"] = str(getattr(messages[-1], "text", "") or "") if messages else ""
+                event["tool_calls"] = [
+                    {
+                        "name": message.tool_id,
+                        "provider_call_id": message.provider_call_id,
+                        "arguments": message.arguments_payload,
+                        **(
+                            {"raw_arguments": message.content_payload["raw_arguments"]}
+                            if "raw_arguments" in (message.content_payload or {}) else {}
+                        ),
+                        "status": getattr(results.get(message.id), "result_status", None),
+                        "delivery": _delivery_diagnostics(getattr(results.get(message.id), "value_payload", None)),
+                        "failure": (
+                            results[message.id].value_payload
+                            if getattr(results.get(message.id), "result_status", None) == "failed"
+                            else None
+                        ),
+                    }
+                    for message in messages
+                    if getattr(message, "tool_id", None)
+                ]
+                event["datasets"] = [
+                    {"id": dataset.id, "name": dataset.name}
+                    for dataset in cell.datasets.list_datasets()
+                    if dataset.id in run_dataset_ids
+                ]
+            try:
+                assessment_started_at = time.perf_counter()
+                with trace_recorder.span("benchmark.case.assess", case_id=case.case_id) as event:
+                    assessment = case.assess(
+                        context=BenchmarkCaseContext(
+                            snapshot=measurements.snapshot,
+                            source_state=measurements.source_state,
+                            run_dataset_ids=run_dataset_ids,
+                            runtime_home=paths.home,
+                            services=case_services,
+                            turns=tuple(turns),
+                        )
+                    )
+                    event["semantic_check_count"] = len(assessment.semantic_checks)
+                    event["integrity_check_count"] = len(assessment.integrity_checks)
                 assessment_seconds = time.perf_counter() - assessment_started_at
                 subject_metrics = _collect_metrics(
-                    harness=cell.harness,
+                    sampling_responses=cell.llm.sampling_responses,
                     dataset_service=cell.datasets,
                     snapshot=measurements.snapshot,
                     turn_seconds=turn_seconds,
@@ -806,7 +1051,7 @@ def _run_model_cell(
                     failure_kind = _exception_kind(exc)
                 try:
                     subject_metrics = _collect_metrics(
-                        harness=cell.harness,
+                        sampling_responses=cell.llm.sampling_responses,
                         dataset_service=cell.datasets,
                         snapshot=measurements.snapshot,
                         turn_seconds=turn_seconds,
@@ -829,7 +1074,8 @@ def _run_model_cell(
             if cell is not None:
                 case_services = None
                 try:
-                    cell.close()
+                    with trace_recorder.span("benchmark.cell.close"):
+                        cell.close()
                 except Exception as exc:
                     if run_status is BenchmarkRunStatus.COMPLETED:
                         run_status = BenchmarkRunStatus.RUNTIME_ERROR
@@ -844,22 +1090,22 @@ def _run_model_cell(
                     )
         budget_snapshot = budget.snapshot()
         if run_status is BenchmarkRunStatus.COMPLETED:
-            if budget_snapshot.status is BenchmarkBudgetStatus.EXCEEDED:
-                run_status = BenchmarkRunStatus.BUDGET_EXCEEDED
-                failure_kind = budget_snapshot.exhaustion_reason
-            elif budget_snapshot.status is BenchmarkBudgetStatus.UNVERIFIABLE:
+            if budget_snapshot.status is BenchmarkBudgetStatus.UNVERIFIABLE:
                 run_status = BenchmarkRunStatus.MEASUREMENT_ERROR
                 failure_kind = budget_snapshot.exhaustion_reason
-            elif not _usage_projection_matches(subject_metrics, budget_snapshot):
-                run_status = BenchmarkRunStatus.MEASUREMENT_ERROR
-                failure_kind = "subject_usage_projection_mismatch"
         try:
-            judge_result = _evaluate_judge(
-                assessment=assessment,
-                run_status=run_status,
-                configuration=judge_configuration,
-                subject_model_key=model_key,
-            )
+            with trace_recorder.span(
+                "benchmark.judge.evaluate",
+                requested=judge_configuration.enabled,
+                provider_model=judge_configuration.model_key or "unconfigured",
+            ) as event:
+                judge_result = _evaluate_judge(
+                    assessment=assessment,
+                    run_status=run_status,
+                    configuration=judge_configuration,
+                    subject_model_key=model_key,
+                )
+                event["judge_status"] = judge_result.status.value
         except Exception:
             judge_result = JudgeResult(
                 required=bool(assessment and assessment.judge_required),
@@ -887,6 +1133,16 @@ def _run_model_cell(
         judge=judge_result,
         identity=identity,
         failure_kind=failure_kind,
+        planned_turn_count=planned_turn_count,
+        turns=tuple(
+            replace(turn.result, semantic_checks=assessment.turn_checks[index])
+            if assessment is not None and index < len(assessment.turn_checks) else turn.result
+            for index, turn in enumerate(turns)
+        ),
+        trace=BenchmarkTraceResult(
+            trace_id=trace_recorder.trace_id,
+            events=trace_recorder.events,
+        ),
     )
 
 
@@ -912,7 +1168,7 @@ def _open_benchmark_cell(
             paths=paths,
             settings=settings,
             embedding_settings=embedding_settings,
-            bounded_llm=_BoundedLLMService(
+            metered_llm=_MeteredLLMService(
                 FrozenLLMSettingsSource(settings),
                 budget,
             ),
@@ -933,12 +1189,12 @@ def _prepare_case(
 
 def _collect_metrics(
     *,
-    harness: Any,
+    sampling_responses: list[dict[str, Any]],
     dataset_service: Any,
     snapshot: Any | None,
     turn_seconds: float,
     assessment_seconds: float | None,
-    pending_message_ids: set[str],
+    pending_message_ids: set[int],
     provider_retry_count: int,
     terminal_shape: tuple[int, int] | None,
     budget: BenchmarkBudgetController,
@@ -956,7 +1212,7 @@ def _collect_metrics(
         if kind == "tool_result":
             status = _enum_value(getattr(message, "result_status", None)) or "unknown"
             tool_result_counts[status] = tool_result_counts.get(status, 0) + 1
-    usage_count, token_usage = _usage_metrics(harness, snapshot)
+    usage_count, token_usage = _provider_usage_metrics(sampling_responses)
     return BenchmarkMetrics(
         turn_seconds=turn_seconds,
         assessment_seconds=assessment_seconds,
@@ -972,37 +1228,43 @@ def _collect_metrics(
     )
 
 
-def _usage_metrics(harness: Any, snapshot: Any | None) -> tuple[int | None, TokenUsage | None]:
-    if snapshot is None:
-        return None, None
-    total_request_count = 0
-    aggregate: TokenUsage | None = None
-    for event in harness.project_chatbot_events(snapshot):
-        if _enum_value(getattr(event, "kind", None)) != "usage":
-            continue
-        payload = getattr(event, "usage_payload", None)
-        usage = LLMTokenUsage.from_payload(payload)
-        if usage is None:
-            continue
-        request_count = payload.get("request_count") if isinstance(payload, dict) else None
-        if not isinstance(request_count, int) or isinstance(request_count, bool) or request_count < 1:
-            continue
-        total_request_count += request_count
-        current = TokenUsage(
-            input_tokens=usage.input_tokens,
-            cached_input_tokens=usage.cached_input_tokens,
-            output_tokens=usage.output_tokens,
-            total_tokens=usage.total_tokens,
-        )
-        aggregate = current if aggregate is None else TokenUsage(
-            input_tokens=aggregate.input_tokens + current.input_tokens,
-            cached_input_tokens=aggregate.cached_input_tokens + current.cached_input_tokens,
-            output_tokens=aggregate.output_tokens + current.output_tokens,
-            total_tokens=aggregate.total_tokens + current.total_tokens,
-        )
-    if aggregate is None:
-        return None, None
-    return total_request_count, aggregate
+def _incremental_metrics(current: BenchmarkMetrics, previous: BenchmarkMetrics, seconds: float) -> BenchmarkMetrics:
+    """Snapshots contain the whole conversation; report each request's delta once."""
+    def counts(field: str) -> dict[str, int]:
+        before = getattr(previous, field)
+        return {key: value - before.get(key, 0) for key, value in getattr(current, field).items() if value != before.get(key, 0)}
+
+    usage = current.token_usage
+    if usage is not None and previous.token_usage is not None:
+        usage = TokenUsage(**{
+            key: value - getattr(previous.token_usage, key)
+            for key, value in usage.to_payload().items()
+        })
+    response_count = current.usage_reported_primary_response_count
+    if response_count is not None:
+        response_count -= previous.usage_reported_primary_response_count or 0
+    return BenchmarkMetrics(
+        turn_seconds=seconds,
+        sampling_round_count=current.sampling_round_count - previous.sampling_round_count,
+        usage_reported_primary_response_count=response_count,
+        token_usage=usage,
+        message_counts=counts("message_counts"),
+        tool_call_counts_by_name=counts("tool_call_counts_by_name"),
+        tool_result_counts_by_status=counts("tool_result_counts_by_status"),
+        provider_retry_count=current.provider_retry_count - previous.provider_retry_count,
+        derived_dataset_count=current.derived_dataset_count - previous.derived_dataset_count,
+    )
+
+
+def _provider_usage_metrics(responses: list[dict[str, Any]]) -> tuple[int, TokenUsage | None]:
+    """Count actual provider responses even if a user turn never reaches completion."""
+    usages = [response["usage"] for response in responses if response.get("usage") is not None]
+    if len(usages) != len(responses):
+        return len(usages), None
+    return len(usages), TokenUsage(**{
+        key: sum(usage[key] for usage in usages)
+        for key in ("input_tokens", "cached_input_tokens", "output_tokens", "total_tokens")
+    })
 
 
 def _evaluate_judge(
@@ -1126,6 +1388,7 @@ def _judge_rubric_identity(
             "rubric_id": rubric.rubric_id,
             "score_dimensions": list(rubric.score_dimensions),
             "allowed_reason_codes": list(rubric.allowed_reason_codes),
+            **({"scoring_guidance": list(rubric.scoring_guidance)} if rubric.scoring_guidance else {}),
         },
         ensure_ascii=False,
         separators=(",", ":"),
@@ -1155,13 +1418,13 @@ def _persist_result(
     result: AgentHarnessBenchmarkResult,
 ) -> BenchmarkRun:
     try:
-        _write_result(output_directory, result)
+        output_path = _write_result(output_directory, result)
     except OSError:
         return BenchmarkRun(result=result, persisted=False)
-    return BenchmarkRun(result=result, persisted=True)
+    return BenchmarkRun(result=result, persisted=True, output_path=output_path)
 
 
-def _write_result(output_directory: Path, result: AgentHarnessBenchmarkResult) -> None:
+def _write_result(output_directory: Path, result: AgentHarnessBenchmarkResult) -> Path:
     output_directory.mkdir(parents=True, exist_ok=True)
     file_name = "-".join(
         (
@@ -1177,6 +1440,7 @@ def _write_result(output_directory: Path, result: AgentHarnessBenchmarkResult) -
         encoding="utf-8",
     )
     temporary.replace(destination)
+    return destination.resolve()
 
 
 def _invalid_result(
@@ -1225,12 +1489,10 @@ def _model_setup_error(settings: LLMSettings, model_key: str) -> str | None:
 
 def _effective_subject_settings(
     settings: LLMSettings,
-    policy: BenchmarkBudgetPolicy,
 ) -> LLMSettings:
     return settings.model_copy(
         deep=True,
         update={
-            "retry_attempts": policy.max_provider_attempts,
             "thread_title_fq_model_key": "",
             "turn_completion_guard_fq_model_key": "",
         },
@@ -1300,16 +1562,6 @@ def _runtime_sha256() -> str:
         for name in benchmark_runtime_files
     )
     return _sha256_text("|".join(components))
-
-
-def _usage_projection_matches(
-    metrics: BenchmarkMetrics,
-    budget: BenchmarkBudgetSnapshot,
-) -> bool:
-    usage = metrics.token_usage
-    if usage is None:
-        return False
-    return usage.total_tokens == budget.reported_subject_tokens
 
 
 def _benchmark_paths(home: Path) -> AppPaths:

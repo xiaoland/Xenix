@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import hashlib
-import json
 import math
 from dataclasses import dataclass
 from enum import StrEnum
@@ -10,6 +8,8 @@ from typing import Any
 import numpy as np
 import pandas as pd
 from pydantic import BaseModel, ConfigDict, Field
+
+from .digests import sha256_json
 
 
 EVALUATION_PROTOCOL = "recommendation_ranking.v1"
@@ -946,22 +946,8 @@ def _item_pair(left: str, right: str) -> tuple[str, str]:
 
 
 def _holdout_hash(source_digest: str, user: str, item: str) -> str:
-    return hashlib.sha256(
-        json.dumps(
-            [source_digest, user, item],
-            ensure_ascii=False,
-            separators=(",", ":"),
-        ).encode("utf-8")
-    ).hexdigest()
+    return sha256_json([source_digest, user, item])
 
 
 def _digest(payload: Any) -> str:
-    return hashlib.sha256(
-        json.dumps(
-            payload,
-            sort_keys=True,
-            ensure_ascii=False,
-            separators=(",", ":"),
-            default=str,
-        ).encode("utf-8")
-    ).hexdigest()
+    return sha256_json(payload, default=str)

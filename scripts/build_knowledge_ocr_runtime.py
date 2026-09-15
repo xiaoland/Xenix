@@ -292,9 +292,6 @@ def _resolve_cmake() -> str:
         if path.is_file():
             return str(path)
         raise RuntimeError("XENIX_CMAKE does not name an existing executable.")
-    discovered = shutil.which("cmake")
-    if discovered:
-        return discovered
     for installation in _visual_studio_installations():
         candidate = (
             installation
@@ -309,6 +306,9 @@ def _resolve_cmake() -> str:
         )
         if candidate.is_file():
             return str(candidate)
+    discovered = shutil.which("cmake")
+    if discovered:
+        return discovered
     raise RuntimeError("CMake was not found; install the Visual Studio C++ CMake tools.")
 
 

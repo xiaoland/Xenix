@@ -1,0 +1,36 @@
+{
+  "purpose": "Manual parent-dispatch experiment with a frozen completed child result; no provider call, no new scored benchmark run.",
+  "frozen_source": "build\\agent-harness-failures\\standard\\business.restock.v1.budget_tight-deepseek-deepseek-v4-flash-d4bd23a934a945ce859dcc33193e9e20.json",
+  "observations": [
+    {
+      "prior_tokens": 0,
+      "run_status": "completed",
+      "semantic": "pass",
+      "judge": "pass",
+      "cell_budget": "within_limits",
+      "invocation_total": 53960,
+      "next_cell_halted": null,
+      "failure_kind": null
+    },
+    {
+      "prior_tokens": 3999999,
+      "run_status": "completed",
+      "semantic": "pass",
+      "judge": "pass",
+      "cell_budget": "within_limits",
+      "invocation_total": 4053959,
+      "next_cell_halted": "invocation_token_limit_reached",
+      "failure_kind": null
+    },
+    {
+      "prior_tokens": 4000000,
+      "run_status": "budget_exceeded",
+      "semantic": "not_evaluated",
+      "judge": "not_evaluated",
+      "cell_budget": "exceeded",
+      "invocation_total": 4000000,
+      "next_cell_halted": "invocation_token_limit_reached",
+      "failure_kind": "invocation_token_limit_reached"
+    }
+  ]
+}

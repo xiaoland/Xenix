@@ -177,16 +177,26 @@ def _create_v14_fixture(db_path: Path) -> None:
         connection.execute("PRAGMA user_version=14")
 
 
-def test_fresh_bootstrap_creates_v25_target_schema(monkeypatch, tmp_path: Path) -> None:
+def test_fresh_bootstrap_creates_current_target_schema(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
     paths = ensure_app_dirs(get_app_paths())
     context = StorageBootstrapService().initialize(paths)
 
-    assert context.schema_version == CURRENT_SCHEMA_VERSION == 25
-    assert get_user_version(context.engine) == 25
+    assert context.schema_version == CURRENT_SCHEMA_VERSION
+    assert get_user_version(context.engine) == CURRENT_SCHEMA_VERSION
     inspector = inspect(context.engine)
     tables = set(inspector.get_table_names())
     assert {"conversation_thread", "conversation_message", "artifact"}.issubset(tables)
+    assert {"dataset_derivation", "dataset_derivation_input"}.issubset(tables)
+    assert "job" in tables
+    assert _table_columns(context, "job") == {
+        "id", "domain", "kind", "reference", "status", "phase",
+        "error_summary", "created_at", "updated_at", "started_at", "finished_at",
+    }
+    assert {
+        constraint["name"]
+        for constraint in inspector.get_unique_constraints("job")
+    } == {"uq_job_domain_reference"}
     assert {
         "knowledge_document",
         "knowledge_unit",
@@ -248,22 +258,23 @@ def test_v14_upgrade_preserves_artifact_and_converts_complete_history(monkeypatc
     _create_v14_fixture(database_path(paths))
     context = StorageBootstrapService().initialize(paths)
 
-    assert context.schema_version == 25
+    assert context.schema_version == CURRENT_SCHEMA_VERSION
     with context.session_factory() as session:
-        artifact = session.get(ArtifactRow, "artifact-1")
+        artifact = session.exec(select(ArtifactRow)).one()
         assert artifact is not None
         assert artifact.kind is ArtifactKind.FILE
         assert artifact.metadata_payload == {"domain": "fact"}
         assert artifact.preview_payload == {"preview": True}
         messages = session.exec(select(ConversationMessageRow).order_by(ConversationMessageRow.sequence_index)).all()
-    assert [message.id for message in messages] == ["user-1", "call-1", "result-1", "user-2"]
+    assert len({message.id for message in messages}) == 4
+    assert all(isinstance(message.id, int) for message in messages)
     assert [message.kind for message in messages] == [
         ConversationMessageKind.USER,
         ConversationMessageKind.TOOL_CALL,
         ConversationMessageKind.TOOL_RESULT,
         ConversationMessageKind.USER,
     ]
-    assert messages[2].tool_call_message_id == "call-1"
+    assert messages[2].tool_call_message_id == messages[1].id
     assert messages[1].provider_call_id == "provider-call-1"
     assert messages[1].content_payload == {"tool_name": "data.query", "provider_name": "data_query"}
     assert messages[-1].client_submission_id == "submission-2"

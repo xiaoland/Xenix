@@ -1,0 +1,31 @@
+ticket_id,customer_batch,channel,message
+T-01CA1F80,NEW-06,微信,I do not need a new invoice; I need a refund for the returned kettle.
+T-0888DC4E,NEW-09,电话,I am not returning anything; please fix the misspelled name on the invoice.
+T-16BB7C67,NEW-08,邮件,Our receiving dock is closed; redirect the delivery to the front desk.
+T-16F2635E,NEW-08,电话,The replacement works; only the invoice company address needs updating.
+T-19319633,NEW-03,微信,我把退货单号填错了，请协助确认退货进度。
+T-21A86FBE,NEW-02,电话,物流运费也需要计入发票金额，能重新开票吗？
+T-27665CB9,NEW-06,邮件,The delivery proof belongs to another street; please investigate the parcel.
+T-324AC726,NEW-07,邮件,Can the carrier hold the shipment until I return from travel?
+T-4C3D7D1F,NEW-05,电话,Delivery is complete; our finance team still needs the tax invoice.
+T-50C283D5,NEW-07,电话,Please add the freight charge to the invoice for this shipment.
+T-5D93E98D,NEW-06,电话,"The refund is settled, but we require a credit invoice for bookkeeping."
+T-64D7200C,NEW-00,电话,货已经收到也不用退，问题是没有电子发票。
+T-66DD6A46,NEW-04,邮件,自提点关门了，需要更换包裹领取地点。
+T-6C1C4FE8,NEW-05,微信,"The courier delivered correctly, but the item is faulty and needs replacing."
+T-8A9021BB,NEW-08,微信,The exchange was approved but I now prefer a refund.
+T-8B6752AF,NEW-00,邮件,我不退货，只是物流页面显示寄回仓库，请重新投递。
+T-96BE5028,NEW-01,邮件,包裹还没送到，运单却显示放在保安室，能帮忙找吗？
+T-9E4CE963,NEW-03,邮件,商品已备货一周，什么时候能有快递揽件记录？
+T-AEDC6615,NEW-01,微信,运输外箱完好，里面的电器无法开机，希望换新。
+T-B943C179,NEW-02,邮件,办公室周末无人值班，请通知派件员工作日送。
+T-C2E10ECE,NEW-09,微信,Please arrange a replacement for the cracked serving plate.
+T-C5018310,NEW-09,邮件,The first carton arrived but the remaining shipment has stalled.
+T-C64BA76C,NEW-02,微信,售后退货已签收十天了，退款仍是处理中。
+T-D00705F3,NEW-05,邮件,No invoice issue here; I only need a working tracking number.
+T-DA3BF390,NEW-07,微信,Can you refund the second returned unit as well as the first?
+T-E1742BAE,NEW-03,电话,收件邮箱正确但开票附件损坏，请重新发送。
+T-E3E086FC,NEW-01,电话,退货退款已完成，只差红字发票提交财务。
+T-E8FF1343,NEW-00,微信,发票已经正常收到，但商品坏了，我要走退款。
+T-EE65408F,NEW-04,电话,发票备注的订单号写错，影响公司报销。
+T-F7F8AD2D,NEW-04,微信,尺码与标签不一致，需要换一件合身的。

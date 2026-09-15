@@ -1,17 +1,14 @@
 from __future__ import annotations
 
-from datetime import date, datetime
 import logging
 import math
-from pathlib import Path
 import re
+from datetime import date, datetime
+from pathlib import Path
 from time import perf_counter
 from typing import Literal
 
-try:
-    import polars as pl
-except Exception:  # pragma: no cover - depends on local runtime state
-    pl = None
+import polars as pl
 from pydantic import ConfigDict, Field
 from sqlmodel import SQLModel
 
@@ -21,7 +18,6 @@ from .dataset_inspection import detect_source_format
 from .dataset_service import DatasetService
 from .storage.models import DatasetSourceFormat
 from .tabular import TabularRuntimeError, load_tabular_frame
-
 
 DEFAULT_PROFILE_FIELD_LIMIT = 40
 MAX_PROFILE_FIELD_LIMIT = 80
@@ -52,7 +48,7 @@ class _ProfileModel(SQLModel):
 
 
 class ProfileDatasetInput(_ProfileModel):
-    dataset_id: str = Field(min_length=1)
+    dataset_id: int = Field(ge=1)
     field_limit: int = Field(
         default=DEFAULT_PROFILE_FIELD_LIMIT,
         ge=1,
@@ -139,7 +135,7 @@ class ProfileTruncation(_ProfileModel):
 
 
 class ProfileDatasetResult(_ProfileModel):
-    dataset_id: str
+    dataset_id: int
     scope: ProfileScope = "whole_dataset"
     basic: ProfileBasicFacts
     fields: list[ProfileFieldFact] = Field(default_factory=list)
@@ -156,7 +152,7 @@ class AnalysisProfileService:
     def profile_dataset(self, input_data: ProfileDatasetInput) -> ProfileDatasetResult:
         started_at = perf_counter()
         with start_span("analysis.profile"):
-            dataset_id = input_data.dataset_id.strip()
+            dataset_id = input_data.dataset_id
             if not dataset_id:
                 raise ValidationError("Dataset id cannot be empty.")
             dataset = self._dataset_service.get_dataset(dataset_id)
@@ -220,7 +216,7 @@ class AnalysisProfileService:
     def _load_frame(
         self,
         *,
-        dataset_id: str,
+        dataset_id: int,
         source_path: Path,
         source_format: DatasetSourceFormat,
     ) -> pl.DataFrame:
@@ -252,7 +248,7 @@ class AnalysisProfileService:
     def _tabular_runtime_validation_error(
         self,
         *,
-        dataset_id: str,
+        dataset_id: int,
         source_format: DatasetSourceFormat,
         exc: Exception,
         phase: str | None = None,

@@ -1,0 +1,33 @@
+{
+  "observed_at_utc": "2026-09-13T15:31:13.780046+00:00",
+  "attempts": [
+    {
+      "arm": "g0",
+      "task": "routing-r1",
+      "status": "execution_interrupted_without_report",
+      "captured_requests": 16,
+      "captured_responses": 16,
+      "process_exit_code": null,
+      "outcome": null,
+      "subject_tokens": null,
+      "evidence": "build/tool-description-progressive/g0/routing-r1",
+      "reason": "At resumption no Python process remained and no cell report or batch completion was saved. Exact exit cause unknown; do not treat as business failure or completed ablation evidence."
+    },
+    {
+      "arm": "g1",
+      "task": "routing-r1",
+      "status": "execution_interrupted_without_report",
+      "captured_requests": 19,
+      "captured_responses": 19,
+      "process_exit_code": null,
+      "outcome": null,
+      "subject_tokens": null,
+      "evidence": "build/tool-description-progressive/g1/routing-r1",
+      "reason": "At resumption no Python process remained and no cell report or batch completion was saved. Exact exit cause unknown; do not treat as business failure or completed ablation evidence."
+    }
+  ],
+  "replacement_cells": [
+    "g1:routing:2",
+    "g0:routing:2"
+  ]
+}

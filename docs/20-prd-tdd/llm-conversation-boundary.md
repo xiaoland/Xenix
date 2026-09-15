@@ -44,13 +44,14 @@ Tool modules.
 
 - `LLMConversationService` is the sole canonical Thread/Message writer. It
   owns the provider-facing transcript, pending/final Message lifecycle, and
-  the `AgentTool` protocol, registry, scope validation, and invocation.
+  the `AgentTool` protocol, registry, definition visibility, and invocation.
 - A production AgentTool's strict typed input model is the single call-contract
   authority. The provider-facing JSON Schema is a bounded portable projection
   of that model, never a separately maintained definition; invocation validates
   the admitted arguments into that model before calling its typed
   implementation. Cross-field rules remain model validation rather than
   provider-schema combinators.
+- Registration and invocation depend on the typed Tool contract, while provider definitions are a derived display projection. Skill guidance history likewise controls context presentation only; reading a catalog resource by Skill name and path does not require a prior guidance read or a committed activation record.
 - Agent Harness owns transient application coordination only: source import,
   the decision to sample, Thread-pause requests, and snapshot-to-Chatbot-event
   projection. It does not directly write or mutate canonical Messages, dispatch
@@ -59,6 +60,7 @@ Tool modules.
 - Chatbot UI submits intent and renders Chatbot Events. It neither accesses a
   conversation repository nor infers protocol state from storage rows or raw
   Tool payloads.
+- Expected failures from local UI commands such as opening a link use transient operation feedback outside the timeline. Internal exception presentation is owned by [Unit TDD](../30-unit-tdd/application-composition.md#error-reporting). A terminal Harness submission failure uses a dismissible notification outside the timeline that remains until the next submission or Thread selection, while failures already represented by Chatbot Events, including connection retries and Tool failures, remain visible in the conversation UI.
 - Final Messages are durable. A pending sampling Message is the sole
   provisional canonical state. There is no persistent `Turn`, `Run`,
   `ConversationStore`, execution ledger, or automatic cross-process recovery.
@@ -66,15 +68,34 @@ Tool modules.
   an Assistant Message when the provider emitted one. A ToolResult directly
   identifies its ToolCall; neither Artifact nor observability becomes
   conversation provenance.
+- Provider parsing preserves the requested wire Tool name without requiring it to appear in the advertised definitions. Conversation resolves that name through the full registry; invocation checks registration and typed arguments, independently of definition visibility. Unknown Tools and invalid arguments, including malformed JSON or a non-object root, become canonical failed ToolResults without losing the response's usage or blocking other valid calls in that response. Registered Tools with valid arguments may execute before their definitions have been activated.
+- An undecodable Tool call retains its original argument text in canonical content and has no decoded argument payload. Invocation returns its parse failure, including the JSON error position when available, without executing the Tool. History replay sends the original argument text and its paired failed result so the model can correct the call through the ordinary Harness loop. Complete and streaming responses use the same argument parser; empty argument text is an invalid call, not an implicit empty object. Unusable response envelopes or missing call identities remain Provider errors.
+- Skill reading and Tool activation are independent operations. Skill reading returns domain guidance and a resource index without changing business Tool visibility; Tool activation changes visibility without loading Skill content. Each is projected from its own successful canonical ToolCall arguments and paired terminal status, independently of whether its result was paged. The built-in `result.page` remains available in every tool scope and returns the requested page directly without repaging its envelope.
+- Completed training and tuning Tools associate each retained model with its evaluation facts and public Artifact handles, so delivering an evaluation report does not require a second status query. Pending work remains discoverable through `model.task.query`, which returns related evaluation status and result summaries; full persisted diagnostics are available on explicit request.
 - A ToolResult stores one bounded direct JSON value. Tabular Tools choose XTT
   before returning; known and normalized failures use the typed `ToolFailure`
   value. Provider adapters only encode that value for their wire protocol, and
   Chatbot projection only copies/renders it; neither owns a raw-result fallback
   or a second semantic result representation.
+- A ToolResult whose serialized JSON exceeds the canonical 64 KiB payload bound is materialized
+  once into a filesystem-backed paged store (`state/paged_results/`) and the
+  boundary returns a bounded paged handle (`result_id`, `total_chars`, `page_size`,
+  `offset`, first page, `has_more`) instead of truncating or failing. The generic
+  `result.page` Tool reads later pages by character range. The store is a bounded
+  replay surface, not a second semantic authority or conversation record; it is
+  cleaned on Thread deletion and by age-based GC at startup.
+- The inline and exchange budgets apply to the returned value or page handle, not to the complete result before paging. Large successful results remain available through the page store without a separate raw-result byte cap.
 - DatasetService owns materialized data and original-source provenance. After a
   snapshot is loaded, Harness may derive an ephemeral source attachment for
   Chatbot display. That presentation is not canonical content, provider input,
   or a recovery record; a missing original source is a soft display result.
+- The LLM boundary passes the staged ToolCall Message identity into Tool execution.
+  A Dataset-producing Tool may persist that stable reference with DatasetService
+  derivation evidence before the ToolCall is finalized. Harness later resolves the
+  evidence by that reference and projects it into the matching Tool event; it does
+  not parse ToolResult content or create a second result authority. Agent-authored
+  explanations are annotations, not system-verified evidence.
+- The session Dataset view composes canonical Dataset attachments, persisted derivations associated with ToolCall identities, and ML outputs associated with public task handles returned in canonical ToolResults. Result handles determine membership only; Dataset/ML records determine names, inputs, operations and generations. Imported and legacy ML datasets do not need synthetic derivation rows or a migration to appear.
 - Thinking, activity, connection, and usage are Chatbot Events. Observability
   may retain bounded diagnostics/usage but never restores, repairs, or replays
   conversation or Tool state.
@@ -196,6 +217,10 @@ The UI opening target is a short-lived desktop capability, not ordinary event
 content. A missing/malformed source therefore cannot prevent the snapshot from
 opening or cause provider/canonical data to gain a local path.
 
+The same post-snapshot seam may attach Dataset derivation evidence to a Tool event
+by its ToolCall identity. Unlike source presentation, this evidence is persisted
+Dataset authority; the Chatbot block remains only its read-only UI projection.
+
 ## Safety and Change Rules
 
 - Application/runtime Thread deletion goes through `LLMConversationService`.
@@ -218,10 +243,9 @@ opening or cause provider/canonical data to gain a local path.
 
 - Harness coordination, Tool sequencing, direct ToolResult/XTT continuity, and
   the command/snapshot boundary: `tests/agent/test_agent_harness_first_slice.py`.
-- Agent skill scope and AgentTool projection:
-  `tests/agent/test_agent_skill_tool_scope.py`,
-  `tests/agent/test_agent_ml_tool_projection.py`, and the per-domain projection
-  tests under `tests/agent/`.
+- Skill reading, independent Tool activation and history reload: `tests/agent/test_agent_harness_first_slice.py`.
+- ToolResult paging: `tests/llm/test_tool_result_pagination.py`.
+- Chatbot projection of Dataset audit evidence: `tests/ui/test_chatbot_contract.py`.
 - Knowledge retrieval and the lookup Tool:
   `tests/knowledge/test_knowledge_retrieval.py` and
   `tests/knowledge/test_knowledge_lookup_tool.py`.

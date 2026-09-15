@@ -87,6 +87,10 @@ class KnowledgeStorageMaintenance:
                 self._delete_metadata(row.id)
                 corrupt_deleted += 1
 
+            # A metadata row only protects its directory from orphan quarantine
+            # when its stored relative_path is self-consistent (indexes/<row.id>).
+            # A row whose path disagrees with its own id cannot be proven to own
+            # those bytes, so that directory stays eligible for quarantine.
             referenced_paths = {
                 row.relative_path
                 for row in self._list_metadata()
@@ -131,7 +135,7 @@ class KnowledgeStorageMaintenance:
         with self._session_factory() as session:
             return self._repository.list_all_vector_generations(session)
 
-    def _delete_metadata(self, generation_id: str) -> None:
+    def _delete_metadata(self, generation_id: int) -> None:
         with self._session_factory() as session:
             self._repository.delete_vector_generation(session, generation_id)
             session.commit()

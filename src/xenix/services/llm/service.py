@@ -19,7 +19,9 @@ from .providers import (
     ProviderResponse,
     ProviderStreamEvent,
 )
-from .tooling import AgentToolSpec
+from .tool_protocol import (
+    AgentToolSpec,
+)
 
 SETTINGS_FILE_NAME = "agent_settings.json"
 DEFAULT_PROVIDER_KEY = "openai"
@@ -289,6 +291,10 @@ class LLMService:
             try:
                 stream = getattr(provider, "stream", None)
                 if callable(stream):
+                    # Buffer deltas until the attempt succeeds so a retryable
+                    # mid-stream error never replays partial text twice.
+                    # Tool-call-progress deltas carry no text content, so they
+                    # stream live to keep the UI progress indicator immediate.
                     buffered_events = []
                     events = stream(messages, tools)
                     for event in events:
@@ -501,6 +507,13 @@ def load_packaged_trial_llm_config() -> PackagedTrialLLMConfig:
 
 
 def sanitize_settings_for_save(settings: LLMSettings) -> LLMSettings:
+    """Strip the packaged trial secret before persisting settings.
+
+    The packaged trial API key is embedded in the release config and must never be
+    copied into the writable agent_settings.json. Only the trial provider is
+    sanitized; user-entered provider keys are the user's own credential and are
+    persisted as entered.
+    """
     providers: list[LLMProviderConfig] = []
     for provider in settings.providers:
         if provider.dialect_config.get("secret_source") == PACKAGED_TRIAL_SECRET_SOURCE:

@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import hashlib
-import json
 from collections.abc import Callable, Sequence
 from enum import StrEnum
 from typing import Any
@@ -15,6 +13,8 @@ from sklearn.metrics import (
     davies_bouldin_score,
     silhouette_score,
 )
+
+from .digests import sha256_json
 
 
 STABILITY_PROTOCOL = "subsample_80pct_5seed_ari.v1"
@@ -553,11 +553,4 @@ def _optional_float(value: Any) -> float | None:
 
 
 def _digest(payload: Any) -> str:
-    serialized = json.dumps(
-        payload,
-        sort_keys=True,
-        separators=(",", ":"),
-        ensure_ascii=False,
-        default=str,
-    )
-    return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+    return sha256_json(payload, default=str)

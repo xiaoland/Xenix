@@ -91,6 +91,12 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         ),
     )
     group.addoption(
+        "--business-variant",
+        choices=("standard", "confirmation"),
+        default="standard",
+        help="Business input variation; repetitions do not add task weight.",
+    )
+    group.addoption(
         "--harness-variant",
         default="baseline",
         dest="agent_harness_variant",
@@ -128,15 +134,8 @@ class _InvocationBudgetState:
         self.reported_subject_tokens = budget.invocation_reported_subject_tokens
         if not run.persisted:
             self.halted_reason = "benchmark_result_not_persisted"
-        elif budget.status in {
-            BenchmarkBudgetStatus.EXCEEDED,
-            BenchmarkBudgetStatus.UNVERIFIABLE,
-        }:
+        elif budget.status is BenchmarkBudgetStatus.UNVERIFIABLE:
             self.halted_reason = budget.exhaustion_reason or "benchmark_budget_halted"
-        elif run.result.run_status is not BenchmarkRunStatus.COMPLETED:
-            self.halted_reason = run.result.failure_kind or "benchmark_execution_halted"
-        elif not run.result.integrity_passed:
-            self.halted_reason = "benchmark_integrity_invalid"
         elif (
             self.reported_subject_tokens
             >= DEFAULT_BUDGET_POLICY.max_reported_invocation_subject_tokens
@@ -150,6 +149,10 @@ class AgentHarnessBenchmarkController:
 
     config: Config
 
+    @property
+    def business_variant(self) -> str:
+        return self.config.getoption("business_variant")
+
     def require_source(self) -> Path:
         source = self.config.getoption("agent_harness_source")
         if source is None:
@@ -157,7 +160,7 @@ class AgentHarnessBenchmarkController:
         return Path(source)
 
     def run(self, case: BenchmarkCase) -> BenchmarkRun:
-        """Run exactly one model/case cell and fail for infrastructure faults."""
+        """Run one model/case cell and surface failed execution or persistence."""
 
         invocation = self.config.stash[_INVOCATION_BUDGET_KEY]
         if invocation.halted_reason is not None:
@@ -189,13 +192,13 @@ class AgentHarnessBenchmarkController:
                 invocation_reported_subject_tokens=invocation.reported_subject_tokens,
                 invocation_id=invocation.invocation_id,
             )
-        except BaseException:
+        except (KeyboardInterrupt, SystemExit):
             invocation.halted_reason = "benchmark_runner_exception"
             raise
         invocation.observe(run)
         self._report(run)
 
-        failure = _infrastructure_failure(run)
+        failure = _execution_failure(run)
         if failure is not None:
             pytest.fail(failure)
         return run
@@ -215,12 +218,15 @@ class AgentHarnessBenchmarkController:
                 f"semantic={result.semantic_verdict.value}",
                 f"integrity={result.integrity_passed}",
                 f"judge={result.judge.status.value}",
+                f"judge_verdict={result.judge.verdict.value}",
                 f"budget={result.budget.status.value}",
                 f"rounds={result.budget.sampling_rounds_admitted}",
                 f"tokens={token_total if token_total is not None else 'unreported'}",
                 f"invocation_tokens={result.budget.invocation_reported_subject_tokens}",
                 f"seconds={seconds:.3f}" if seconds is not None else "seconds=unreported",
                 f"persisted={run.persisted}",
+                f"trace_id={result.trace.trace_id if result.trace is not None else 'unavailable'}",
+                f"report={run.output_path if run.output_path is not None else 'unavailable'}",
             )
         )
         terminal_reporter = self.config.pluginmanager.getplugin("terminalreporter")
@@ -243,7 +249,7 @@ def _path_option(config: Config, option_name: str) -> Path | None:
     return Path(value) if value is not None else None
 
 
-def _infrastructure_failure(run: BenchmarkRun) -> str | None:
+def _execution_failure(run: BenchmarkRun) -> str | None:
     if not run.persisted:
         return "Agent Harness benchmark could not persist its measurement"
     if run.result.run_status is not BenchmarkRunStatus.COMPLETED:

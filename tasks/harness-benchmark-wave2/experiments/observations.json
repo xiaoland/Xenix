@@ -1,0 +1,227 @@
+{
+  "purpose": "Design probe only; authored subset-choice offers, not production demand or a live Agent result.",
+  "offers": [
+    {
+      "sku": "A",
+      "cost": 160,
+      "contribution": 240,
+      "boxes": 6,
+      "arrival_days": 2
+    },
+    {
+      "sku": "B",
+      "cost": 160,
+      "contribution": 240,
+      "boxes": 6,
+      "arrival_days": 2
+    },
+    {
+      "sku": "C",
+      "cost": 100,
+      "contribution": 130,
+      "boxes": 4,
+      "arrival_days": 3
+    },
+    {
+      "sku": "D",
+      "cost": 70,
+      "contribution": 85,
+      "boxes": 3,
+      "arrival_days": 1
+    },
+    {
+      "sku": "E",
+      "cost": 60,
+      "contribution": 72,
+      "boxes": 2,
+      "arrival_days": 1
+    },
+    {
+      "sku": "F",
+      "cost": 30,
+      "contribution": 28,
+      "boxes": 1,
+      "arrival_days": 1
+    },
+    {
+      "sku": "G",
+      "cost": 120,
+      "contribution": 230,
+      "boxes": 4,
+      "arrival_days": 8
+    },
+    {
+      "sku": "H",
+      "cost": 200,
+      "contribution": 320,
+      "boxes": 10,
+      "arrival_days": 4
+    }
+  ],
+  "scenarios": {
+    "standard": {
+      "budget": 300,
+      "capacity": 10,
+      "deadline": 5,
+      "feasible_plan_count": 31,
+      "best_contribution": 370,
+      "optimal_plans": [
+        {
+          "skus": [
+            "B",
+            "C"
+          ],
+          "cost": 260,
+          "boxes": 10,
+          "contribution": 370
+        },
+        {
+          "skus": [
+            "A",
+            "C"
+          ],
+          "cost": 260,
+          "boxes": 10,
+          "contribution": 370
+        }
+      ]
+    },
+    "budget_only_changes": {
+      "budget": 240,
+      "capacity": 10,
+      "deadline": 5,
+      "feasible_plan_count": 24,
+      "best_contribution": 325,
+      "optimal_plans": [
+        {
+          "skus": [
+            "B",
+            "D"
+          ],
+          "cost": 230,
+          "boxes": 9,
+          "contribution": 325
+        },
+        {
+          "skus": [
+            "A",
+            "D"
+          ],
+          "cost": 230,
+          "boxes": 9,
+          "contribution": 325
+        }
+      ]
+    },
+    "margin_only_changes_decision": {
+      "budget": 300,
+      "capacity": 10,
+      "deadline": 5,
+      "feasible_plan_count": 31,
+      "best_contribution": 353,
+      "optimal_plans": [
+        {
+          "skus": [
+            "B",
+            "D",
+            "F"
+          ],
+          "cost": 260,
+          "boxes": 10,
+          "contribution": 353
+        },
+        {
+          "skus": [
+            "A",
+            "D",
+            "F"
+          ],
+          "cost": 260,
+          "boxes": 10,
+          "contribution": 353
+        }
+      ]
+    },
+    "margin_only_preserves_decision": {
+      "budget": 300,
+      "capacity": 10,
+      "deadline": 5,
+      "feasible_plan_count": 31,
+      "best_contribution": 380,
+      "optimal_plans": [
+        {
+          "skus": [
+            "B",
+            "C"
+          ],
+          "cost": 260,
+          "boxes": 10,
+          "contribution": 380
+        },
+        {
+          "skus": [
+            "A",
+            "C"
+          ],
+          "cost": 260,
+          "boxes": 10,
+          "contribution": 380
+        }
+      ]
+    },
+    "arrival_only_changes_decision": {
+      "budget": 300,
+      "capacity": 10,
+      "deadline": 5,
+      "feasible_plan_count": 44,
+      "best_contribution": 470,
+      "optimal_plans": [
+        {
+          "skus": [
+            "B",
+            "G"
+          ],
+          "cost": 280,
+          "boxes": 10,
+          "contribution": 470
+        },
+        {
+          "skus": [
+            "A",
+            "G"
+          ],
+          "cost": 280,
+          "boxes": 10,
+          "contribution": 470
+        }
+      ]
+    },
+    "no_affordable_batch": {
+      "budget": 20,
+      "capacity": 10,
+      "deadline": 5,
+      "feasible_plan_count": 1,
+      "best_contribution": 0,
+      "optimal_plans": [
+        {
+          "skus": [],
+          "cost": 0,
+          "boxes": 0,
+          "contribution": 0
+        }
+      ]
+    }
+  },
+  "observations": {
+    "distinct_optimal_plans_are_accepted": true,
+    "largest_individual_contribution_is_suboptimal": {
+      "skus": [
+        "H"
+      ],
+      "contribution": 320
+    },
+    "empty_plan_is_correct_only_in_no_affordable_batch_scenario": true,
+    "row_order_and_identity_changes_preserve_business_choice": true,
+    "single_business_changes_have_computable_effects": true
+  }
+}

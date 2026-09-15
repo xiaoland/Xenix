@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import queue
 import shutil
@@ -18,8 +19,10 @@ from pydantic import (
     PositiveInt,
     StringConstraints,
     TypeAdapter,
-    ValidationError as PydanticValidationError,
     model_validator,
+)
+from pydantic import (
+    ValidationError as PydanticValidationError,
 )
 
 from ..config import AppPaths
@@ -33,7 +36,7 @@ from .windows_process_tree import arm_current_process_tree
 
 _MAX_RESULT_BYTES = 256 * 1024
 _DEFAULT_OPERATION_TIMEOUT_SECONDS = 15 * 60
-TaskId = Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{32}$")]
+TaskId = PositiveInt
 Sha256 = Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{64}$")]
 EventToken = Annotated[str, StringConstraints(pattern=r"^[a-z0-9_.-]{1,80}$")]
 BoundedWarning = Annotated[str, StringConstraints(max_length=200)]
@@ -167,7 +170,7 @@ class LocalKnowledgeImportWorkerRunner:
         process = context.Process(
             target=_managed_knowledge_import_worker_entry,
             args=(self._entrypoint, request, event_queue),
-            name=f"xenix-knowledge-import-{request.import_id[:8]}",
+            name=f"xenix-knowledge-import-{request.import_id}",
         )
         timed_out = False
         cancelled = False
@@ -320,7 +323,8 @@ def knowledge_import_worker_entry(
     def on_event(event: KnowledgeImportWorkerEvent) -> None:
         try:
             event_queue.put_nowait(event)
-        except Exception:
+        except Exception as exc:
+            logging.getLogger(__name__).exception("Operation failed: %s", exc)
             pass
 
     _run_worker_operation(request, on_event=on_event)
@@ -411,6 +415,7 @@ def _run_worker_operation(
         write_worker_result(result_path, result)
         _emit(on_event, "completed", "worker_succeeded")
     except Exception as exc:
+        logging.getLogger(__name__).exception("Operation failed: %s", exc)
         error_code = getattr(exc, "error_code", None)
         if not isinstance(error_code, str) or not error_code.startswith("knowledge_"):
             error_code = "knowledge_import_failed"

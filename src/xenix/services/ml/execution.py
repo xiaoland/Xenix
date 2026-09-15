@@ -16,6 +16,10 @@ from .worker_settings import MLWorkerConfig
 
 
 WORKER_BUNDLE_VERSION = "source-v1"
+# Exhaustive set of request-JSON keys that carry local filesystem paths and must
+# be rewritten to staged remote paths before an SSH worker runs. Any new
+# path-bearing field added to a request DTO must be added here, or SSH execution
+# hands the remote host a local-only path.
 PATH_KEYS = {
     "dataset_source_path",
     "trained_model_artifact_path",
@@ -337,11 +341,11 @@ class SshMLWorkerRunner:
 
     def _write_failure_result(self, task_dir: Path, message: str) -> None:
         request_path = task_dir / "request.json"
-        task_id = task_dir.name
+        task_id = int(task_dir.name)
         if request_path.exists():
             try:
                 payload = json.loads(request_path.read_text(encoding="utf-8"))
-                task_id = str(payload.get("task_id") or task_id)
+                task_id = payload.get("task_id") or task_id
             except json.JSONDecodeError:
                 pass
         (task_dir / "result.json").write_text(
@@ -377,7 +381,7 @@ def _remote_bundle_parent(worker: MLWorkerConfig) -> str:
     return f"{_remote_root(worker)}/worker-bundles/{WORKER_BUNDLE_VERSION}"
 
 
-def _remote_task_dir(worker: MLWorkerConfig, task_id: str) -> str:
+def _remote_task_dir(worker: MLWorkerConfig, task_id: int) -> str:
     return f"{_remote_root(worker)}/tasks/{task_id}"
 
 

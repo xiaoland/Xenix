@@ -12,7 +12,7 @@ class ProjectRepository:
         session.refresh(row)
         return row
 
-    def get(self, session: Session, project_id: str) -> ProjectRow | None:
+    def get(self, session: Session, project_id: int) -> ProjectRow | None:
         return session.get(ProjectRow, project_id)
 
     def list_all(self, session: Session) -> list[ProjectRow]:

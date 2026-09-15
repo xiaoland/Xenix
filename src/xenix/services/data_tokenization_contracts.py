@@ -16,12 +16,25 @@ class StagedTextResourceInput(BaseModel):
 
     model_config = ConfigDict(extra="forbid", strict=True)
 
-    dataset_id: str = Field(min_length=1, max_length=128)
+    dataset_id: int = Field(ge=1)
     absolute_path: str = Field(min_length=1)
     source_sha256: Sha256
 
 
-class TextPreparationInput(BaseModel):
+class TextProcessingOptions(BaseModel):
+    """Portable choices retained with an analyzer, independent of resource staging."""
+
+    text_strategy: Literal["words", "characters", "pretokenized"] = Field(
+        default="words", description="Words use multilingual segmentation; characters use character n-grams; pretokenized uses whitespace-separated tokens without re-segmenting."
+    )
+    stopword_policy: Literal["none", "business"] = Field(
+        default="business", description="Words/pretokenized only: none keeps words; business applies built-in stopwords. Explicit stopword datasets additionally filter tokens."
+    )
+    minimum_token_length: int = Field(default=2, ge=1, le=20, description="Words/pretokenized only: length filter; 1 retains Chinese single characters.")
+    character_ngram_max: int = Field(default=4, ge=2, le=6, description="Character strategy uses lengths 2 through this value.")
+
+
+class TextPreparationInput(TextProcessingOptions):
     """Narrow preparation command accepted after Dataset references are staged."""
 
     model_config = ConfigDict(extra="forbid", strict=True)

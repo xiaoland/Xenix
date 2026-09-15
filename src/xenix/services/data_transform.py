@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -77,6 +78,10 @@ _DISALLOWED_KEYWORDS = {
     "update",
     "vacuum",
 }
+# Transform permits CREATE TEMP/INSERT/UPDATE/DELETE because it executes in an
+# ephemeral in-memory DuckDB holding only registered bindings and the required
+# `output` relation, so write statements cannot reach any source file. The query
+# validator (above) forbids them outright for a read-only projection.
 _TRANSFORM_DISALLOWED_KEYWORDS = {
     "alter",
     "attach",
@@ -124,7 +129,7 @@ ColumnReferenceMode = Literal["names", "indexes"]
 
 class DatasetSqlBinding(SQLModel):
     alias: str
-    dataset_id: str
+    dataset_id: int
     source_path: str
 
 
@@ -198,13 +203,7 @@ class DuckDbSqlValidator:
         if disallowed:
             raise ValidationError(f"SQL contains unsupported statement keyword: {disallowed[0]}.")
 
-        for index, token in enumerate(significant):
-            if token.kind == "word" and token.lower in _DISALLOWED_FUNCTIONS:
-                next_token = significant[index + 1] if index + 1 < len(significant) else None
-                if next_token is None or next_token.value == "(":
-                    raise ValidationError(f"SQL cannot call DuckDB file scan function '{token.value}'.")
-            if token.kind == "string" and self._previous_word(significant, index) in {"from", "join"}:
-                raise ValidationError("SQL cannot read direct file paths; use registered dataset bindings.")
+        self._validate_no_file_authority(significant)
 
         referenced_aliases = sorted(
             {
@@ -213,9 +212,6 @@ class DuckDbSqlValidator:
                 if token.lower in {alias.lower() for alias in aliases}
             }
         )
-        if not referenced_aliases:
-            raise ValidationError("SQL must reference at least one registered dataset binding.")
-
         return {
             "statement": first_word,
             "read_only": True,
@@ -251,13 +247,11 @@ class DuckDbSqlValidator:
                 if token.lower in {alias.lower() for alias in aliases}
             }
         )
-        if not referenced_aliases:
-            raise ValidationError("SQL must reference at least one registered dataset binding.")
         return {
             "statement": first_word,
             "read_only": False,
             "single_statement": False,
-            "requires_output_relation": "output",
+            "result_selection": "final_query_or_output_relation",
             "bindings": aliases,
             "referenced_bindings": referenced_aliases,
         }
@@ -268,16 +262,13 @@ class DuckDbSqlValidator:
             normalized = normalized[:-1].rstrip()
         return normalized
 
-    def normalize_alias(self, alias: str) -> str:
-        return self._normalize_alias(alias)
-
     def _validate_aliases(self, bindings: list[DatasetSqlBinding]) -> list[str]:
         if not bindings:
             raise ValidationError("At least one dataset binding is required.")
         aliases: list[str] = []
         seen: set[str] = set()
         for binding in bindings:
-            alias = self._normalize_alias(binding.alias)
+            alias = self.normalize_alias(binding.alias)
             lowered = alias.lower()
             if lowered in seen:
                 raise ValidationError(f"Dataset binding alias '{alias}' is duplicated.")
@@ -285,7 +276,7 @@ class DuckDbSqlValidator:
             aliases.append(alias)
         return aliases
 
-    def _normalize_alias(self, alias: str) -> str:
+    def normalize_alias(self, alias: str) -> str:
         normalized = str(alias or "").strip()
         if not normalized:
             raise ValidationError("Dataset binding alias cannot be empty.")
@@ -466,10 +457,14 @@ class DataQueryTransformService:
                         temp_dir=Path(temp_dir),
                         column_reference=input_data.column_reference,
                     )
-                    if validation_summary["statement"] in {"select", "with"}:
-                        connection.execute(f"CREATE TEMP TABLE output AS {sql}")
+                    statements = connection.extract_statements(sql)
+                    for statement in statements[:-1]:
+                        connection.execute(statement)
+                    final = statements[-1]
+                    if final.type == duckdb.StatementType.SELECT:
+                        connection.execute(f"CREATE OR REPLACE TEMP TABLE output AS {final.query}")
                     else:
-                        connection.execute(sql)
+                        connection.execute(final)
                     try:
                         columns = self._output_columns(connection)
                         row_count = self._output_row_count(connection)
@@ -479,10 +474,10 @@ class DataQueryTransformService:
                         )
                     except duckdb.CatalogException as exc:
                         raise ValidationError(
-                            "Transform SQL scripts must leave a final relation named output."
+                            "Transform SQL must end in a SELECT query or leave a relation named output."
                         ) from exc
                 self._validate_transform_output(temp_output_path)
-                temp_output_path.replace(output_path)
+                shutil.move(temp_output_path, output_path)
             transform_report = {
                 "row_count": row_count,
                 "columns": columns,

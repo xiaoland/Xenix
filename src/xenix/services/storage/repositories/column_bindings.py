@@ -12,5 +12,5 @@ class DatasetColumnBindingRepository:
         session.refresh(row)
         return row
 
-    def get(self, session: Session, binding_id: str) -> DatasetColumnBindingRow | None:
+    def get(self, session: Session, binding_id: int) -> DatasetColumnBindingRow | None:
         return session.get(DatasetColumnBindingRow, binding_id)

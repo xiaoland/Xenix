@@ -14,6 +14,8 @@ Artifact links use one authority:
 artifact://<artifact_id>
 ```
 
+`artifact_id` is the Artifact's persistent integer ID written in decimal, for example `artifact://42`. It is the same ID returned by services and Tools, with no separate short-name mapping.
+
 Dataset ids identify registered data for later service or tool input. They are not
 link authorities. A derived dataset intended for user download must also have a
 ready export artifact.
@@ -57,11 +59,8 @@ requests a normal openable artifact. Both retain the same artifact id authority.
   after local finalization and registration.
 - A missing registration or registered file is a service error and activation
   fails.
-- Tool results expose identities, not prebuilt artifact URI strings; conversation
-  presentation owns markdown construction.
+- Tool results expose integer identities and may include the canonical Artifact URI; conversation presentation owns Markdown construction.
 
 ## Verification
 
-URI parsing and activation are covered through the Agent tool projection tests
-under `tests/agent/`, the artifact registration test under `tests/storage/`, and
-the end-to-end Agent artifact-link checks under `tests/e2e/agent_harness/`.
+URI parsing and registration are covered by `tests/storage/test_storage_artifacts.py`; producing ML service paths and end-to-end Agent artifact links are covered under `tests/ml/` and `tests/e2e/agent_harness/`.

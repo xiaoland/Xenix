@@ -1,0 +1,206 @@
+from __future__ import annotations
+
+import os
+from pathlib import Path
+
+import pytest
+from pydantic import BaseModel, ConfigDict
+
+from xenix.exceptions import ValidationError
+from xenix.services.llm.tool_result_page_store import ToolResultPageStore
+from xenix.services.llm.tool_registry import AgentToolRegistry
+from xenix.services.llm.tool_protocol import (
+    AgentTool,
+    MAX_TOOL_PAYLOAD_BYTES,
+    ToolExecutionContext,
+    ToolSuccess,
+    tool_failure_from_exception,
+)
+
+
+class EmptyToolInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+
+def _context() -> ToolExecutionContext:
+    return ToolExecutionContext(thread_id=101, tool_call_message_id=102)
+
+
+def _registry(tmp_path: Path) -> AgentToolRegistry:
+    return AgentToolRegistry(paged_results_dir=tmp_path / "pages")
+
+
+def test_store_saves_and_pages_by_codepoint(tmp_path: Path) -> None:
+    store = ToolResultPageStore(tmp_path / "pages")
+    text = "中文" * 2500  # 5000 Unicode code points
+    result_id = store.save(thread_id=103, tool_call_message_id=104, text=text)
+
+    first = store.read_page(result_id, offset=0, limit=1024)
+    assert first.text == text[:1024]
+    assert first.total_chars == len(text)
+    assert first.has_more is True
+
+    tail = store.read_page(result_id, offset=len(text) - 1024, limit=1024)
+    assert tail.text == text[len(text) - 1024 :]
+    assert tail.has_more is False
+
+
+def test_store_rejects_unknown_or_malformed_id(tmp_path: Path) -> None:
+    store = ToolResultPageStore(tmp_path / "pages")
+    with pytest.raises(ValidationError):
+        store.read_page("../../etc/passwd", offset=0, limit=10)
+    with pytest.raises(ValidationError):
+        store.read_page("0" * 32, offset=0, limit=10)
+
+
+def test_store_delete_for_thread_and_gc(tmp_path: Path) -> None:
+    store = ToolResultPageStore(tmp_path / "pages")
+    store.save(thread_id=105, tool_call_message_id=107, text="a" * 10)
+    doomed = store.save(thread_id=106, tool_call_message_id=108, text="b" * 10)
+
+    assert store.delete_for_thread(106) == 1
+    with pytest.raises(ValidationError):
+        store.read_page(doomed, offset=0, limit=10)
+
+    old = store.save(thread_id=105, tool_call_message_id=109, text="c" * 10)
+    os.utime(tmp_path / "pages" / f"{old}.txt", (0, 0))
+    assert store.collect_garbage(max_age_seconds=1) >= 1
+
+
+def test_invoke_returns_small_result_inline(tmp_path: Path) -> None:
+    registry = _registry(tmp_path)
+    registry.register(AgentTool(
+        name="data.small",
+        provider_name="data_small",
+        description="small",
+        input_model=EmptyToolInput,
+        implementation=lambda _args, _ctx: ToolSuccess(value={"ok": True}),
+    ))
+    outcome = registry.invoke(
+        tool_name="data.small",
+
+        arguments={},
+        context=_context(),
+    )
+    assert isinstance(outcome, ToolSuccess)
+    assert outcome.value == {"ok": True}
+
+
+def test_inline_budget_counts_serialized_unicode_bytes(tmp_path: Path) -> None:
+    registry = _registry(tmp_path)
+    # JSON quotes take two bytes; each Chinese code point takes three.
+    text = "中" * ((MAX_TOOL_PAYLOAD_BYTES - 2) // 3)
+    registry.register(AgentTool(
+        name="data.inline",
+        provider_name="data_inline",
+        description="inline",
+        input_model=EmptyToolInput,
+        implementation=lambda _args, _ctx: ToolSuccess(value=text),
+    ))
+    registry.register(AgentTool(
+        name="data.paged",
+        provider_name="data_paged",
+        description="paged",
+        input_model=EmptyToolInput,
+        implementation=lambda _args, _ctx: ToolSuccess(value=text + "中"),
+    ))
+    inline = registry.invoke(
+        tool_name="data.inline",
+
+        arguments={},
+        context=_context(),
+    )
+    assert isinstance(inline, ToolSuccess)
+    assert inline.value == text
+
+    paged = registry.invoke(
+        tool_name="data.paged",
+
+        arguments={},
+        context=_context(),
+    )
+    assert isinstance(paged, ToolSuccess)
+    assert "result_id" in paged.value
+
+
+def test_invoke_pages_oversized_result_and_reads_next_page(tmp_path: Path) -> None:
+    registry = _registry(tmp_path)
+    large = "中文" * 600_000
+    registry.register(AgentTool(
+        name="data.big",
+        provider_name="data_big",
+        description="big",
+        input_model=EmptyToolInput,
+        implementation=lambda _args, _ctx: ToolSuccess(value=large),
+    ))
+    outcome = registry.invoke(
+        tool_name="data.big",
+
+        arguments={},
+        context=_context(),
+    )
+    assert isinstance(outcome, ToolSuccess)
+    value = outcome.value
+    assert value["total_chars"] == len(large)
+    assert value["offset"] == 0
+    assert value["page_size"] == 1024
+    assert value["has_more"] is True
+    assert value["text"] == large[:1024]
+
+    page = registry.invoke(
+        tool_name="result.page",
+
+        arguments={"result_id": value["result_id"], "offset": 1024, "limit": 1024},
+        context=_context(),
+    )
+    assert isinstance(page, ToolSuccess)
+    assert page.value["text"] == large[1024:2048]
+    assert page.value["has_more"] is True
+    assert page.value["total_chars"] == len(large)
+
+    tail = registry.invoke(
+        tool_name="result.page",
+
+        arguments={"result_id": value["result_id"], "offset": len(large) - 10, "limit": 1024},
+        context=_context(),
+    )
+    assert tail.value["text"] == large[-10:]
+    assert tail.value["has_more"] is False
+
+
+def test_invoke_without_store_rejects_oversized_result(tmp_path: Path) -> None:
+    registry = AgentToolRegistry()
+    registry.register(AgentTool(
+        name="data.big",
+        provider_name="data_big",
+        description="big",
+        input_model=EmptyToolInput,
+        implementation=lambda _args, _ctx: ToolSuccess(value="x" * MAX_TOOL_PAYLOAD_BYTES),
+    ))
+    with pytest.raises(ValidationError):
+        registry.invoke(
+            tool_name="data.big",
+
+            arguments={},
+            context=_context(),
+        )
+
+
+def test_tool_failure_preserves_unexpected_exception_message() -> None:
+    failure = tool_failure_from_exception(RuntimeError("File C:\\data\\missing.csv was not found."))
+    assert failure.code == "tool_execution_failed"
+    assert failure.message == "File C:\\data\\missing.csv was not found."
+
+
+def test_tool_failure_preserves_validation_details_and_hints() -> None:
+    exc = ValidationError(
+        "Column 'amount' is not numeric.",
+        error_code="data_column_not_numeric",
+        error_details={"field": "amount"},
+        repair_hints=["Select a numeric column."],
+    )
+    failure = tool_failure_from_exception(exc)
+    assert failure.code == "data_column_not_numeric"
+    assert failure.message == "Column 'amount' is not numeric."
+    assert failure.details == {"field": "amount"}
+    assert failure.repair_hints == ("Select a numeric column.",)

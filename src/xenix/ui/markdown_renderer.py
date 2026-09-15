@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from marko import HTMLRenderer, Markdown
@@ -9,9 +10,83 @@ from marko.helpers import MarkoExtension
 
 
 def render_chat_markdown(markdown: str, *, inline_artifact_images: bool) -> str:
+    """Render a Chatbot markdown string into display HTML.
+
+    Returns HTML with a fixed pre-wrap code-block style. Raw HTML in the input is
+    escaped (never rendered) because the input is untrusted model output. When
+    inline_artifact_images is true, artifact:// image links render inline;
+    otherwise they degrade to link text.
+    """
     renderer = _InlineArtifactRenderer if inline_artifact_images else _LinkOnlyArtifactRenderer
-    html = Markdown(renderer=renderer, extensions=[_SAFE_GFM_EXTENSION]).convert(markdown).rstrip()
+    normalized = _separate_gfm_tables(markdown)
+    html = Markdown(renderer=renderer, extensions=[_SAFE_GFM_EXTENSION]).convert(normalized).rstrip()
     return _wrap_code_blocks(html)
+
+
+_FENCE_OPENING = re.compile(r"^ {0,3}(`{3,}|~{3,})")
+_TABLE_ROW_SPLITTER = re.compile(r"\s*(?<!\\)\|\s*")
+_TABLE_DELIMITER_CELL = re.compile(r":?-+:?")
+
+
+def _separate_gfm_tables(markdown: str) -> str:
+    """Let a GFM table start after model prose without requiring a blank line.
+
+    Marko keeps a pipe table inside the preceding paragraph when an LLM emits
+    only one newline before its header. Insert the missing block boundary for
+    unambiguous header/delimiter pairs, while leaving fenced code unchanged.
+    """
+    lines = markdown.splitlines(keepends=True)
+    output: list[str] = []
+    fence: tuple[str, int] | None = None
+
+    for index, line in enumerate(lines):
+        stripped_line = line.rstrip("\r\n")
+        if fence is not None:
+            marker, minimum_length = fence
+            if re.fullmatch(rf" {{0,3}}{re.escape(marker)}{{{minimum_length},}}[ \t]*", stripped_line):
+                fence = None
+            output.append(line)
+            continue
+
+        opening = _FENCE_OPENING.match(stripped_line)
+        if opening is not None:
+            marker_run = opening.group(1)
+            fence = (marker_run[0], len(marker_run))
+            output.append(line)
+            continue
+
+        if (
+            output
+            and output[-1].strip()
+            and index + 1 < len(lines)
+            and _is_gfm_table_pair(stripped_line, lines[index + 1].rstrip("\r\n"))
+        ):
+            output.append("\r\n" if output[-1].endswith("\r\n") else "\n")
+        output.append(line)
+
+    return "".join(output)
+
+
+def _is_gfm_table_pair(header: str, delimiter: str) -> bool:
+    header_cells = _table_cells(header)
+    delimiter_cells = _table_cells(delimiter)
+    return (
+        "|" in header
+        and bool(header_cells)
+        and len(header_cells) == len(delimiter_cells)
+        and all(_TABLE_DELIMITER_CELL.fullmatch(cell.strip()) for cell in delimiter_cells)
+    )
+
+
+def _table_cells(line: str) -> list[str]:
+    if re.match(r" {0,3}\S", line) is None:
+        return []
+    cells = _TABLE_ROW_SPLITTER.split(line.strip())
+    if cells and not cells[0]:
+        cells.pop(0)
+    if cells and not cells[-1]:
+        cells.pop()
+    return cells
 
 
 def normalize_artifact_uri(uri: str) -> str:
@@ -38,6 +113,8 @@ def _wrap_code_blocks(html: str) -> str:
 class _BaseChatRenderer(HTMLRenderer):
     inline_artifact_images = False
 
+    # Chat Markdown comes from untrusted model output: escape raw HTML so the
+    # model can only inject text/styling, never HTML structure, into the surface.
     def render_html_block(self, element) -> str:  # type: ignore[override]
         return self.escape_html(element.body)
 

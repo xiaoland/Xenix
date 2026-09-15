@@ -1,54 +1,11 @@
-# Personalized Recommendation Reference
+# Recommendation
 
-Use this reference for explicit-rating user-to-item Top-K recommendation. It does not apply to the legacy base-item similarity lookup, implicit clicks/views, matrix factorization, or hybrid/content recommendation.
+`recommendation.collaborative_top_k` supports explicit user-item ratings. Bind `user`, `item`, numeric `rating`, and optionally `time`. Larger ratings mean stronger preference; the positive-rating threshold should reflect the actual scale. `recommendation.item_similarity` instead answers which items resemble a base item.
 
-## Admission
+The shallow parameters include `top_k`, minimum user/item support, and `positive_rating_threshold`. Model metadata supplies exact contracts if needed. Candidate generation and holdout construction are implemented by the service.
 
-Require one row grain that represents a user-item rating event and bind:
+Returned evaluation compares the candidate with popularity on the same held-out truth. NDCG and MRR describe ranking quality; Recall and HitRate describe recovery; coverage and short lists explain reach. Use these facts to explain relevant tradeoffs without reconstructing evaluation from displayed rows.
 
-- `user`: stable account/customer/member identity;
-- `item`: stable product/content/offer identity;
-- `rating`: finite numeric explicit preference where larger means more positive;
-- optional `time`: a valid event timestamp used only for latest-positive holdout.
+Apply accepts a Dataset or inline rows containing the trained user column. Known users receive personalized unseen candidates where supported; cold users receive popularity fallback. Unseen items lack retained interaction evidence. The result contains user_id, rank, recommended_item, score, and strategy, with public Dataset and Artifact handles.
 
-Profile counts, missingness, duplicates, cardinality, and rating range first. If the business meaning of “positive” is unresolved, use one focused aggregation over the rating field or ask the user. Do not infer a five-star scale from a field name.
-
-## Model and parameters
-
-Browse `model_family: "recommendation"`, then inspect `recommendation.collaborative_top_k` directly. Fill only its advertised shallow schema:
-
-- `top_k`: requested list length;
-- `min_user_interactions`: minimum history needed for evaluation eligibility;
-- `min_item_interactions`: minimum training-side support for a candidate item;
-- `positive_rating_threshold`: business-defined positive preference boundary.
-
-Candidate generation, similarity shrinkage, holdout membership, popularity formula, tie-breaks, seeds, and metric formulas remain service policy.
-
-## Evaluation
-
-With a valid `time` role, evaluation holds out each eligible user's latest positive interaction. Without time, it uses a recorded deterministic hash-positive holdout. There is no silent policy switch.
-
-Candidate and popularity baseline must use the same truth and candidate catalog. Interpret:
-
-- NDCG@K: whether relevant held-out items appear near the top;
-- Recall@K and HitRate@K: whether the held-out positive is recovered;
-- MRR@K: how early the first relevant result appears;
-- coverage: how much of the candidate catalog is used;
-- novelty/diversity: supporting discovery evidence, not relevance truth;
-- short lists: users for whom fewer than K valid unseen candidates exist.
-
-Any seen-item violation invalidates the ranking regardless of average metrics. Require the authoritative Evaluate task and linked report Artifact; never reconstruct evaluation from displayed recommendation rows.
-
-## Apply and cold start
-
-Call `model.apply` with the retained `trained_model_id` and a registered Dataset or inline rows containing exactly the trained user-column name. The local result contains `user_id`, `rank`, `recommended_item`, `score`, and `strategy`.
-
-- known user: personalized collaborative ranking, with deterministic popularity completion when needed;
-- cold user: deterministic popularity fallback;
-- cold item: unsupported because an unseen item has no retained interaction evidence.
-
-Do not request user/item ranking rows through task-query output. Link the registered result Dataset and Artifact for local review.
-
-## Interpretation boundary
-
-Offline ranking evidence measures recovery under a historical holdout. It does not prove incremental conversion, revenue, satisfaction, fairness, or causal uplift. Recommend a controlled online experiment, guardrail metrics, periodic retraining, coverage/short-list monitoring, and human review where recommendations affect high-risk decisions.
+Deliver the requested rankings and evaluation. Offline recovery of historical preferences does not establish incremental revenue or conversion.

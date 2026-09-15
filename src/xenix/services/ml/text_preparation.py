@@ -14,7 +14,7 @@ import pandas as pd
 from pydantic import BaseModel, ConfigDict, Field
 
 from ...exceptions import ValidationError
-from ..data_tokenization_contracts import StagedTextResourceInput, TextPreparationInput
+from ..data_tokenization_contracts import StagedTextResourceInput, TextPreparationInput, TextProcessingOptions
 
 _MULTILINGUAL_PROFILE: Literal["multilingual_business_v1"] = "multilingual_business_v1"
 _NORMALIZATION_POLICY: Literal["unicode_nfkc_casefold_mask_entities.v1"] = (
@@ -94,12 +94,12 @@ class _StrictFact(BaseModel):
 
 
 class TextResourceReference(_StrictFact):
-    dataset_id: str = Field(min_length=1, max_length=128)
+    dataset_id: int = Field(ge=1)
     source_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     term_count: int = Field(ge=0, le=_MAX_RESOURCE_TERMS)
 
 
-class TextPreparationSpecification(_StrictFact):
+class TextPreparationSpecification(_StrictFact, TextProcessingOptions):
     profile_key: Literal["multilingual_business_v1"] = _MULTILINGUAL_PROFILE
     normalization_policy_key: Literal["unicode_nfkc_casefold_mask_entities.v1"] = _NORMALIZATION_POLICY
     tokenizer_policy_key: Literal["jieba_multilingual_business.v1"] = _TOKENIZER_POLICY
@@ -164,6 +164,7 @@ class TextClassificationEvaluationFacts(_StrictFact):
 
 
 class TextClassificationApplyFacts(_StrictFact):
+    feature_coverage: dict[str, Any] = Field(default_factory=dict)
     specification: TextPreparationSpecification
     preparation: TextPreparationQualityFacts
     vectorization: TextVectorizationFacts
@@ -235,9 +236,21 @@ class TextPreparer:
                 raw_text = ""
             else:
                 raw_text = str(value)
-            normalized = normalize_multilingual_text(raw_text)
+            strategy = getattr(self.specification, "text_strategy", "words")
+            normalized = (
+                " ".join(raw_text.split()) if strategy == "pretokenized"
+                else normalize_multilingual_text(raw_text)
+            )
             template = template_fingerprint(normalized)
-            tokens = _tokenize_normalized(normalized, tokenizer=tokenizer, stopwords=self.stopwords)
+            minimum_length = getattr(self.specification, "minimum_token_length", 2)
+            if strategy == "pretokenized":
+                tokens = [word for word in normalized.split() if word not in self.stopwords and len(word) >= minimum_length]
+            elif strategy == "characters":
+                tokens = list(normalized)
+            else:
+                tokens = _tokenize_normalized(
+                    normalized, tokenizer=tokenizer, stopwords=self.stopwords, minimum_length=minimum_length,
+                )
             custom_match_count += sum(token in self.custom_terms for token in tokens)
             has_cjk = bool(re.search(r"[\u3400-\u9fff]", normalized))
             has_latin = bool(re.search(r"[a-z]", normalized))
@@ -250,7 +263,8 @@ class TextPreparer:
             template_fingerprints.append(_digest(template) if template else "")
             token_sets.append(frozenset(_TEMPLATE_TOKEN_RE.findall(template)))
 
-        prepared_values = [" ".join(tokens) for tokens in token_rows]
+        separator = "" if getattr(self.specification, "text_strategy", "words") == "characters" else " "
+        prepared_values = [separator.join(tokens) for tokens in token_rows]
         source_row_count = len(prepared_values)
         non_empty_count = sum(bool(value) for value in prepared_values)
         quality = TextPreparationQualityFacts(
@@ -289,7 +303,7 @@ def build_text_preparer(input_data: TextPreparationInput) -> TextPreparer:
         )
     custom_terms, custom_references = _load_resource_terms(input_data.custom_dictionary_resources)
     custom_stopwords, stopword_references = _load_resource_terms(input_data.stopword_resources)
-    stopwords = set(_MULTILINGUAL_BUSINESS_STOPWORDS)
+    stopwords = set(_MULTILINGUAL_BUSINESS_STOPWORDS) if input_data.stopword_policy == "business" else set()
     stopwords.update(custom_stopwords)
     ngram_max = 2 if input_data.phrase_mode == "unigram_bigram" else 1
     resource_payload = {
@@ -303,6 +317,7 @@ def build_text_preparer(input_data: TextPreparationInput) -> TextPreparer:
         "tokenizer_policy_key": _TOKENIZER_POLICY,
         "phrase_mode": input_data.phrase_mode,
         "ngram_max": ngram_max,
+        **{name: getattr(input_data, name) for name in TextProcessingOptions.model_fields},
         **resource_payload,
         "resource_identity_digest": resource_digest,
     }
@@ -312,6 +327,7 @@ def build_text_preparer(input_data: TextPreparationInput) -> TextPreparer:
         tokenizer_policy_key=_TOKENIZER_POLICY,
         phrase_mode=input_data.phrase_mode,
         ngram_max=ngram_max,
+        **{name: getattr(input_data, name) for name in TextProcessingOptions.model_fields},
         custom_dictionary_references=custom_references,
         stopword_references=stopword_references,
         resource_identity_digest=resource_digest,
@@ -447,6 +463,7 @@ def _tokenize_normalized(
     *,
     tokenizer: jieba.Tokenizer,
     stopwords: frozenset[str],
+    minimum_length: int = 2,
 ) -> list[str]:
     if not normalized:
         return []
@@ -456,7 +473,7 @@ def _tokenize_normalized(
             token = raw_token.strip()
             if not token or token in stopwords:
                 continue
-            if token not in {"<url>", "<email>", "<number>"} and len(token) < 2:
+            if token not in {"<url>", "<email>", "<number>"} and len(token) < minimum_length:
                 continue
             tokens.append(token)
     return tokens

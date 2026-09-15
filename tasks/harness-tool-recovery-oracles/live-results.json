@@ -1,0 +1,515 @@
+{
+  "as_of_utc": "2026-09-14T07:02:59.841826+00:00",
+  "expected_cells": 10,
+  "completed_reports": 10,
+  "results": [
+    {
+      "case_id": "cleaning.april_dine_in_sales",
+      "report": "build/agent-harness-recovery-oracles/attempt-2/complex/cleaning.april_dine_in_sales-deepseek-deepseek-v4-flash-5efb5916100f48a099ee571ea7ee77df.json",
+      "sha256": "501e490a8461f7a8a740f07ed031281c09599e62d1ea12da280f049b220a2fed",
+      "run_status": "completed",
+      "semantic": "fail",
+      "checks": [
+        {
+          "name": "public_cleaned_table",
+          "passed": true,
+          "summary": "linked_table_readable"
+        },
+        {
+          "name": "header_promoted",
+          "passed": false,
+          "summary": "business_columns_missing_or_ambiguous"
+        },
+        {
+          "name": "business_rows_preserved",
+          "passed": false,
+          "summary": "business_rows_or_values_differ"
+        }
+      ],
+      "judge": "not_evaluated",
+      "judge_summary": "judge_not_requested",
+      "judge_reason_codes": [],
+      "rounds": 18,
+      "observed_subject_tokens": 443084,
+      "judge_tokens": null,
+      "failed_tools": [
+        {
+          "name": "data.query",
+          "failure": {
+            "code": "tool_execution_failed",
+            "message": "Binder Error: Referenced column \"dt\" was not found because the FROM clause is missing\n\nLINE 4:  sum(CASE WHEN dt<'2026-04-01' OR dt>'2026-04-30' THEN 1 ELSE 0 END) out_o...\n                       ^",
+            "type": "tool_failure"
+          }
+        },
+        {
+          "name": "data.transform",
+          "failure": {
+            "code": "tool_execution_failed",
+            "message": "Binder Error: Referenced column \"c0\" not found in FROM clause!\nCandidate bindings: \"column_2\", \"column_3\", \"column_4\", \"column_5\", \"column_6\"\n\nLINE 3:   WHERE c0 NOT LIKE '营业日期【%'   -- 表头筛选说明行\n                ^",
+            "type": "tool_failure"
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "ml.cluster_selection_v1",
+      "report": "build/agent-harness-recovery-oracles/attempt-2/complex/ml.cluster_selection_v1-deepseek-deepseek-v4-flash-274c9fbb016f4442b70a8cb692552b6f.json",
+      "sha256": "ada2f0ac1d64cbf808433523b18ac78f582c4208e9dae544681cfdb7674f1400",
+      "run_status": "completed",
+      "semantic": "fail",
+      "checks": [
+        {
+          "name": "exact_selected_assignment_dataset",
+          "passed": true,
+          "summary": "permutation_invariant_k3_assignment_observed"
+        },
+        {
+          "name": "public_trustworthiness_report",
+          "passed": false,
+          "summary": "linked_recomputable_cluster_report_missing"
+        }
+      ],
+      "judge": "not_evaluated",
+      "judge_summary": "semantic_prerequisite_failed",
+      "judge_reason_codes": [],
+      "rounds": 14,
+      "observed_subject_tokens": 229719,
+      "judge_tokens": null,
+      "failed_tools": [
+        {
+          "name": "analysis.graph",
+          "failure": {
+            "code": "llm_tool_arguments_invalid",
+            "details": {
+              "schema_keyword": "required",
+              "validation_errors": [
+                {
+                  "field": "dataset_id",
+                  "message": "Field required"
+                },
+                {
+                  "field": "datasets",
+                  "message": "Extra inputs are not permitted"
+                }
+              ]
+            },
+            "message": "Tool arguments do not match the registered input model.",
+            "retryable": false,
+            "type": "tool_failure"
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "ml.forecast_validation_v1",
+      "report": "build/agent-harness-recovery-oracles/attempt-2/complex/ml.forecast_validation_v1-deepseek-deepseek-v4-flash-e631aa7e7e1344f2b2adf374acca928d.json",
+      "sha256": "94c87d830887442f585a14de7590b4ae8396979727cb4613a5c46fb04c563c9e",
+      "run_status": "completed",
+      "semantic": "pass",
+      "checks": [
+        {
+          "name": "exact_future_forecast_dataset",
+          "passed": true,
+          "summary": "two_group_six_month_forecast_observed"
+        },
+        {
+          "name": "public_future_artifact",
+          "passed": true,
+          "summary": "linked_future_artifact_observed"
+        },
+        {
+          "name": "public_temporal_evaluation",
+          "passed": true,
+          "summary": "linked_same_fold_evaluation_observed"
+        }
+      ],
+      "judge": "pass",
+      "judge_summary": "judge_completed",
+      "judge_reason_codes": [
+        "clear_grounded_explanation"
+      ],
+      "rounds": 17,
+      "observed_subject_tokens": 290565,
+      "judge_tokens": {
+        "cached_input_tokens": 256,
+        "input_tokens": 2662,
+        "output_tokens": 5625,
+        "total_tokens": 8287
+      },
+      "failed_tools": [
+        {
+          "name": "data.query",
+          "failure": {
+            "code": "tool_execution_failed",
+            "message": "Binder Error: No function matches the given name and argument types 'month(VARCHAR)'. You might need to add explicit type casts.\n\tCandidate functions:\n\tmonth(DATE) -> BIGINT\n\tmonth(INTERVAL) -> BIGINT\n\tmonth(TIMESTAMP) -> BIGINT\n\tmonth(TIMESTAMP WITH TIME ZONE) -> BIGINT\n\n\nLINE 2:   ROUND(AVG(CASE WHEN MONTH(month)=1 THEN demand_units END),0) AS m01,\n                              ^",
+            "type": "tool_failure"
+          }
+        },
+        {
+          "name": "model.train",
+          "failure": {
+            "code": "tool_validation_failed",
+            "message": "ML task '45' finished with status 'failed'. Forecast history is too short; at least 90 periods per group are required.",
+            "type": "tool_failure"
+          }
+        },
+        {
+          "name": "analysis.graph",
+          "failure": {
+            "code": "tool_validation_failed",
+            "message": "analysis.graph spec.data conflicts with the selected Dataset. Omit data or use {\"name\":\"data\"} to reference that Dataset. Inline values and other sources are not substituted for it.",
+            "type": "tool_failure"
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "ml.recommendation_ranking_v1",
+      "report": "build/agent-harness-recovery-oracles/attempt-2/complex/ml.recommendation_ranking_v1-deepseek-deepseek-v4-flash-96e4cdc4648748108f29e28f7362260f.json",
+      "sha256": "536100e44c5ad376d4c9a1d2cdfb197626f4d7a7ffe790188a675a22e81f7a5c",
+      "run_status": "runtime_error",
+      "semantic": "not_evaluated",
+      "checks": [
+        {
+          "name": "exact_private_top_k",
+          "passed": false,
+          "summary": "linked_rankings_missing_or_incorrect"
+        },
+        {
+          "name": "public_ranking_evaluation",
+          "passed": false,
+          "summary": "linked_ranking_evaluation_missing"
+        }
+      ],
+      "judge": "not_evaluated",
+      "judge_summary": "subject_run_not_completed",
+      "judge_reason_codes": [],
+      "rounds": 13,
+      "observed_subject_tokens": 143180,
+      "judge_tokens": null,
+      "failed_tools": [
+        {
+          "name": "agent.tools.activate",
+          "failure": {
+            "code": "tool_validation_failed",
+            "message": "Unknown tool names or namespaces: data.profile",
+            "type": "tool_failure"
+          }
+        },
+        {
+          "name": "data.query",
+          "failure": {
+            "code": "llm_tool_arguments_invalid",
+            "details": {
+              "schema_keyword": "required",
+              "validation_errors": [
+                {
+                  "field": "datasets",
+                  "message": "Field required"
+                },
+                {
+                  "field": "sql",
+                  "message": "Field required"
+                },
+                {
+                  "field": "query",
+                  "message": "Extra inputs are not permitted"
+                }
+              ]
+            },
+            "message": "Tool arguments do not match the registered input model.",
+            "retryable": false,
+            "type": "tool_failure"
+          }
+        },
+        {
+          "name": "data.query",
+          "failure": {
+            "code": "llm_tool_arguments_invalid",
+            "details": {
+              "schema_keyword": "required",
+              "validation_errors": [
+                {
+                  "field": "datasets",
+                  "message": "Field required"
+                },
+                {
+                  "field": "sql",
+                  "message": "Field required"
+                },
+                {
+                  "field": "query",
+                  "message": "Extra inputs are not permitted"
+                }
+              ]
+            },
+            "message": "Tool arguments do not match the registered input model.",
+            "retryable": false,
+            "type": "tool_failure"
+          }
+        },
+        {
+          "name": "data.query",
+          "failure": {
+            "code": "llm_tool_arguments_invalid",
+            "details": {
+              "schema_keyword": "type",
+              "validation_errors": [
+                {
+                  "field": "datasets",
+                  "message": "Input should be a valid dictionary"
+                }
+              ]
+            },
+            "message": "Tool arguments do not match the registered input model.",
+            "retryable": false,
+            "type": "tool_failure"
+          }
+        },
+        {
+          "name": "data.query",
+          "failure": {
+            "code": "llm_tool_arguments_invalid",
+            "details": {
+              "schema_keyword": "type",
+              "validation_errors": [
+                {
+                  "field": "datasets",
+                  "message": "Input should be a valid dictionary"
+                }
+              ]
+            },
+            "message": "Tool arguments do not match the registered input model.",
+            "retryable": false,
+            "type": "tool_failure"
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "ml.text_grouped_classification_v1",
+      "report": "build/agent-harness-recovery-oracles/attempt-2/complex/ml.text_grouped_classification_v1-deepseek-deepseek-v4-flash-1c69bd3d857f48589605207f80bd76d7.json",
+      "sha256": "79ce9fa829b21e23a64c5ae93a1e6d7b976eb49ddc879fc85665964b14870fa8",
+      "run_status": "completed",
+      "semantic": "pass",
+      "checks": [
+        {
+          "name": "exact_raw_text_predictions",
+          "passed": true,
+          "summary": "exact_raw_text_predictions_observed"
+        },
+        {
+          "name": "public_prediction_artifact",
+          "passed": true,
+          "summary": "linked_prediction_artifact_observed"
+        },
+        {
+          "name": "public_group_safe_evaluation",
+          "passed": true,
+          "summary": "candidate_dummy_and_isolation_facts_observed"
+        }
+      ],
+      "judge": "pass",
+      "judge_summary": "judge_completed",
+      "judge_reason_codes": [
+        "complete_grounded_outcome"
+      ],
+      "rounds": 16,
+      "observed_subject_tokens": 207458,
+      "judge_tokens": {
+        "cached_input_tokens": 384,
+        "input_tokens": 2207,
+        "output_tokens": 1922,
+        "total_tokens": 4129
+      },
+      "failed_tools": [
+        {
+          "name": "data.transform",
+          "failure": {
+            "code": "tool_execution_failed",
+            "message": "Catalog Error: Table with name t does not exist!\nDid you mean \"pg_tables\"?\n\nLINE 7: ...  ROUND((SELECT max(q.cnt) FROM (SELECT count(*) AS cnt FROM t GROUP BY queue) q) * 1.0 /\n                                                                        ^",
+            "type": "tool_failure"
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "ml.text_topic_discovery_v1",
+      "report": "build/agent-harness-recovery-oracles/attempt-2/complex/ml.text_topic_discovery_v1-deepseek-deepseek-v4-flash-7f33375b4fa040e8b23c042c2ef7ef1d.json",
+      "sha256": "79cb2e50c81be7806d5f1aff0ac4bfdb75e7530167cfd61fbdf43bc6265de3e1",
+      "run_status": "completed",
+      "semantic": "fail",
+      "checks": [
+        {
+          "name": "topic_assignments",
+          "passed": false,
+          "summary": "linked_topic_assignments_missing_or_incorrect"
+        },
+        {
+          "name": "reusable_topic_model",
+          "passed": true,
+          "summary": "linked_model_available"
+        },
+        {
+          "name": "public_quality_evidence",
+          "passed": false,
+          "summary": "linked_quality_facts_missing"
+        }
+      ],
+      "judge": "not_evaluated",
+      "judge_summary": "semantic_prerequisite_failed",
+      "judge_reason_codes": [],
+      "rounds": 16,
+      "observed_subject_tokens": 269109,
+      "judge_tokens": null,
+      "failed_tools": []
+    },
+    {
+      "case_id": "business.restock.v1.margin_higher",
+      "report": "build/agent-harness-recovery-oracles/attempt-2/simple/business.restock.v1.margin_higher-deepseek-deepseek-v4-flash-2f4463b61cc642bfb88b1ff0982f4bf4.json",
+      "sha256": "932387b951147da557bfbaf4e493b023846e60a99f83e4d925f6297853e67b6b",
+      "run_status": "completed",
+      "semantic": "pass",
+      "checks": [
+        {
+          "name": "turn_1.answer_completed",
+          "passed": true,
+          "summary": "terminal_assistant_answer"
+        },
+        {
+          "name": "turn_1.deliveries_accessible",
+          "passed": true,
+          "summary": "linked_artifacts_readable"
+        },
+        {
+          "name": "turn_1.feasible_decision_available",
+          "passed": true,
+          "summary": "candidate_count=1"
+        },
+        {
+          "name": "turn_1.optimal_decision_available",
+          "passed": true,
+          "summary": "best_feasible_margin_cents=188500; optimum=188500"
+        }
+      ],
+      "judge": "pass",
+      "judge_summary": "judge_completed",
+      "judge_reason_codes": [
+        "grounded_decision"
+      ],
+      "rounds": 7,
+      "observed_subject_tokens": 68901,
+      "judge_tokens": {
+        "cached_input_tokens": 1024,
+        "input_tokens": 4960,
+        "output_tokens": 972,
+        "total_tokens": 5932
+      },
+      "failed_tools": [
+        {
+          "name": "data.query",
+          "failure": {
+            "code": "tool_execution_failed",
+            "message": "Conversion Error: Could not cast value 1560.000000 to DECIMAL(2,1)\n\nLINE 11:   SELECT r.rn+1, r.cost + g.n*e.cost_yuan, r.boxes + g.n*e.boxes, r.margin + g.n...\n                                 ^",
+            "type": "tool_failure"
+          }
+        },
+        {
+          "name": "data.transform",
+          "failure": {
+            "code": "tool_execution_failed",
+            "message": "Binder Error: Could not ORDER BY column \"CASE  WHEN ((d.offer_id = 'TOTAL')) THEN (1) ELSE 0 END\": add the expression/function to every SELECT, or move the UNION into a FROM clause.",
+            "type": "tool_failure"
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "ml.cleaning_service_tickets",
+      "report": "build/agent-harness-recovery-oracles/attempt-2/simple/ml.cleaning_service_tickets-deepseek-deepseek-v4-flash-5753148a6a0c4cadaf978f95be5b72db.json",
+      "sha256": "3855d68d6ca5812386fd0bf7f88250cd40d4b6e0f899cb9dc679f0ad7e2ff659",
+      "run_status": "completed",
+      "semantic": "pass",
+      "checks": [
+        {
+          "name": "exact_cleaned_dataset",
+          "passed": true,
+          "summary": "exact_cleaned_dataset_observed"
+        },
+        {
+          "name": "public_artifact_linked",
+          "passed": true,
+          "summary": "public_artifact_link_observed"
+        }
+      ],
+      "judge": "not_evaluated",
+      "judge_summary": "judge_not_requested",
+      "judge_reason_codes": [],
+      "rounds": 7,
+      "observed_subject_tokens": 47617,
+      "judge_tokens": null,
+      "failed_tools": [
+        {
+          "name": "data.clean",
+          "failure": {
+            "code": "tool_validation_failed",
+            "message": "validation.non_negative.params requires column_index or column_name.",
+            "type": "tool_failure"
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "ml.forecasting_seasonal_naive_transform",
+      "report": "build/agent-harness-recovery-oracles/attempt-2/simple/ml.forecasting_seasonal_naive_transform-deepseek-deepseek-v4-flash-9a9f58c33ded4910ab4cf6d25fe7b23a.json",
+      "sha256": "d5ab923c47128b05e807a9b2fc10be19d9062721f5a751a3689f36088c8b71d2",
+      "run_status": "completed",
+      "semantic": "pass",
+      "checks": [
+        {
+          "name": "exact_seasonal_naive_dataset",
+          "passed": true,
+          "summary": "exact_seasonal_naive_dataset_observed"
+        },
+        {
+          "name": "public_artifact_linked",
+          "passed": true,
+          "summary": "public_artifact_link_observed"
+        }
+      ],
+      "judge": "not_evaluated",
+      "judge_summary": "judge_not_requested",
+      "judge_reason_codes": [],
+      "rounds": 7,
+      "observed_subject_tokens": 59292,
+      "judge_tokens": null,
+      "failed_tools": []
+    },
+    {
+      "case_id": "ml.text_keyword_frequency",
+      "report": "build/agent-harness-recovery-oracles/attempt-2/simple/ml.text_keyword_frequency-deepseek-deepseek-v4-flash-d32b358191154c9682b2e323583e4db4.json",
+      "sha256": "d70c9e19eacf0c1fc9800f76e51d73de92535e8a5807c271eceb6722a0f76e7c",
+      "run_status": "completed",
+      "semantic": "pass",
+      "checks": [
+        {
+          "name": "exact_keyword_frequency_dataset",
+          "passed": true,
+          "summary": "exact_keyword_frequency_dataset_observed"
+        },
+        {
+          "name": "public_artifact_linked",
+          "passed": true,
+          "summary": "public_artifact_link_observed"
+        }
+      ],
+      "judge": "not_evaluated",
+      "judge_summary": "judge_not_requested",
+      "judge_reason_codes": [],
+      "rounds": 8,
+      "observed_subject_tokens": 45251,
+      "judge_tokens": null,
+      "failed_tools": []
+    }
+  ]
+}

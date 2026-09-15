@@ -1,40 +1,48 @@
 # Xenix Native
 
-Xenix Native is a desktop machine-learning workbench for non-technical business users. Product scope and vocabulary are owned by [`docs/10-prd/`](docs/10-prd/README.md).
+A desktop machine-learning workbench for non-technical business users. Product scope and vocabulary belong to [PRD](docs/10-prd/README.md).
 
 ## Repository Map
 
-- `src/xenix/ui/`: PySide6 Qt Widgets UI
-- `src/xenix/services/`: service and orchestration boundaries
-- `src/xenix/services/storage/`: SQLite models, repositories, migrations, and storage layout
-- `src/xenix/services/ml/`: native ML execution, registry, and adapters
-- `tests/`: automated verification
-- `scripts/`: development, diagnostics, translation, and packaging helpers
-- `docs/`: durable project knowledge
-- `tasks/`: task packets
-- `ml/`: legacy model scripts; leave intact unless a task explicitly targets them
+- `src/xenix/ui/`: PySide6 Qt Widgets desktop
+- `src/xenix/services/`: orchestration; `agent/` and `llm/` own conversation boundaries, `storage/` owns persistence, `ml/` owns native ML execution
+- `tests/`: verification; `scripts/`: development and packaging tools
+- `docs/`: durable knowledge; `tasks/`: volatile task packets
+- `ml/`: legacy scripts; modify only when explicitly in scope
 
 ## Knowledge Owners
 
-- Product what and why: `docs/10-prd/*`
-- Cross-unit technical contracts, when admitted: `docs/20-prd-tdd/*`
-- Unit design and local seam guidance, when admitted: `docs/30-unit-tdd/*`
-- Runtime, packaging, migration, observability, and recovery truth, when admitted: `docs/40-deployment/*`
-- Contributor workflow and testing policy: `CONTRIBUTING.md`
-- Nearer `AGENTS.md` files are additive for their subtree.
-- `tasks/` are task packets, they are volatile.
+- Product what and why: [PRD](docs/10-prd/README.md)
+- Cross-unit contracts: [Product TDD](docs/20-prd-tdd/README.md)
+- Internal design and implementation rationale: [Unit TDD](docs/30-unit-tdd/README.md)
+- Runtime, packaging, migration, and recovery: [Deployment](docs/40-deployment/README.md)
+- Contributor workflow and verification policy: [CONTRIBUTING.md](CONTRIBUTING.md)
+
+Read the relevant owner and applicable subtree `AGENTS.md`; load further guidance when the task needs it. Local instructions apply only within their scope. Keep mechanically enforceable facts in source/configuration and detailed design in its owner, rather than copying either into instructions.
 
 ## Development Workflow
 
-- Runtime and tooling: Python `3.14.2`, PDM, PySide6/Qt Widgets, pytest, and PyInstaller.
-- Install/run: `pdm install`, then `pdm run dev`.
-- Verify the full manifest topology with `pdm run test`; use `pdm run pytest --direct <pytest selectors/options>` for a focused single-process run. Also run `pdm run check` and `pdm run smoke`; package with `pdm run package` and verify with `pdm run smoke-package`. Use these PDM entries instead of bare `pytest` so repository setup and isolated temp paths apply.
-- Diagnostics: `pdm run diagnostic-bundle`; use GammaRay when available for widget hierarchy, properties, geometry, visibility, and events.
-- Windows runtime home: `%LOCALAPPDATA%\Xenix` (normally `%USERPROFILE%\AppData\Local\Xenix`), overridden by `XENIX_APP_HOME`.
-- Primary debug files: `state\xenix.db`, `logs\xenix.log`, `config\agent_settings.json`, and `config\ml_workers.json` under the runtime home.
-- Detailed packaging, runtime-state, observability, migration, and recovery procedures: [`docs/40-deployment/`](docs/40-deployment/README.md).
+- Python `3.14.2`, PDM `2.26.6`, PySide6/Qt Widgets.
+- Install: `pdm sync --clean -G :all`, then `pdm run prepare`. Run: `pdm run dev`.
+- Focused verification: `pdm run pytest --direct <selectors>`; broad verification: `pdm run test` and `pdm run check`. Startup/runtime changes also use `pdm run smoke --isolated`. Packaging gates and verification selection are in CONTRIBUTING.
+- Diagnostics: `pdm run diagnostic-bundle`. Runtime defaults to `%LOCALAPPDATA%\Xenix`, overridden by `XENIX_APP_HOME`; inspect `state/xenix.db`, `logs/xenix.log`, and `config/` only within the authorized task.
 
-## Execution Rules
+## Collaboration
 
-- Commit only after an explicit user command; include only the approved task scope by default.
-- High-risk storage, runtime, packaging, Agent Harness, ML lifecycle, and Chatbot changes start with the nearest local instructions plus the owner above.
+Diagnosis authorizes investigation; implementation requires an authorized target. Preserve unrelated changes. Commit only on explicit request. Scale planning and verification to the task; ordinary work does not require sub-agents or a task packet.
+
+Write documentation for Agents, with each paragraph or list item on one semantic line.
+
+<!-- svc:begin -->
+## SVC
+
+Use `svc --help` or `svc <command> --help`.
+
+- `svc status`: inspect project state
+- `svc lookup`: read SVC guidance
+- `svc task init`: create a task packet
+- `svc task grow`: inspect packet shape without changing files
+- `svc dev`: manage declared development targets
+
+If `AGENTS.local.md` exists, read it after this file. It is ignored local guidance; shared rules belong here.
+<!-- svc:end -->

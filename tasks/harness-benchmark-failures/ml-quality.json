@@ -1,0 +1,109 @@
+[
+  {
+    "scenario": "automatic_groups",
+    "policy": {
+      "policy_key": "classification.group_hash_holdout.v1",
+      "evaluation_kind": "classification",
+      "primary_metric_name": "f1_weighted",
+      "primary_metric_direction": "max",
+      "tie_breaker_metrics": [
+        "accuracy",
+        "precision_weighted",
+        "recall_weighted"
+      ],
+      "split_strategy": "group_hash_holdout.v1",
+      "test_size": 0.2,
+      "cv_folds": 5,
+      "random_state": 42
+    },
+    "statuses": [
+      "succeeded",
+      "succeeded"
+    ],
+    "split": {
+      "schema_version": 1,
+      "policy_key": "classification.group_hash_holdout.v1",
+      "requested_strategy": "group_hash_holdout.v1",
+      "realized_strategy": "group_hash_holdout.v1",
+      "source_dataset_snapshot_digest": "4403981367d56a1347c4fc5daac76431ffb5b18059b1e9acd9dfcf3ea6c8a5cb",
+      "eligible_row_count": 90,
+      "train_row_count": 72,
+      "holdout_row_count": 18,
+      "eligible_group_count": 90,
+      "train_group_count": 72,
+      "holdout_group_count": 18,
+      "train_membership_digest": "1bd0762e679a3a394bb29a097e999aaef71879a257b0000d3284c3794f63e3d6",
+      "holdout_membership_digest": "535ba1d83d9c53681bf737f0089653e0024f2235f2ee7ee81a56a5b5a2beb28e",
+      "group_overlap_count": 0,
+      "random_state": 42,
+      "evaluation_scope": "holdout"
+    },
+    "apply_status": "succeeded",
+    "apply_row_count": 30,
+    "new_batch_accuracy": 0.9333333333333333
+  },
+  {
+    "scenario": "business_groups",
+    "policy": {
+      "policy_key": "classification.group_hash_holdout.v1",
+      "evaluation_kind": "classification",
+      "primary_metric_name": "f1_weighted",
+      "primary_metric_direction": "max",
+      "tie_breaker_metrics": [
+        "accuracy",
+        "precision_weighted",
+        "recall_weighted"
+      ],
+      "split_strategy": "group_hash_holdout.v1",
+      "test_size": 0.2,
+      "cv_folds": 5,
+      "random_state": 42
+    },
+    "statuses": [
+      "succeeded",
+      "succeeded"
+    ],
+    "split": {
+      "schema_version": 1,
+      "policy_key": "classification.group_hash_holdout.v1",
+      "requested_strategy": "group_hash_holdout.v1",
+      "realized_strategy": "group_hash_holdout.v1",
+      "source_dataset_snapshot_digest": "4403981367d56a1347c4fc5daac76431ffb5b18059b1e9acd9dfcf3ea6c8a5cb",
+      "eligible_row_count": 90,
+      "train_row_count": 72,
+      "holdout_row_count": 18,
+      "eligible_group_count": 15,
+      "train_group_count": 12,
+      "holdout_group_count": 3,
+      "train_membership_digest": "d088d2deb7df8b34baa156e61308f5946c3d8629e637fead31f84c6a47981f94",
+      "holdout_membership_digest": "4d50041a7765612a1f1c4a9fc5be7778c5af547be915b475461ae50b00d5c5ba",
+      "group_overlap_count": 0,
+      "random_state": 42,
+      "evaluation_scope": "holdout"
+    },
+    "apply_status": "succeeded",
+    "apply_row_count": 30,
+    "new_batch_accuracy": 0.9333333333333333
+  },
+  {
+    "scenario": "empty_vocabulary",
+    "policy": {
+      "policy_key": "classification.group_hash_holdout.v1",
+      "evaluation_kind": "classification",
+      "primary_metric_name": "f1_weighted",
+      "primary_metric_direction": "max",
+      "tie_breaker_metrics": [
+        "accuracy",
+        "precision_weighted",
+        "recall_weighted"
+      ],
+      "split_strategy": "group_hash_holdout.v1",
+      "test_size": 0.2,
+      "cv_folds": 5,
+      "random_state": 42
+    },
+    "training_wait_error": "ML task '2f38962124c24679a28f40af5262aae6' finished with status 'failed'. Text classification requires at least four non-empty labeled rows.",
+    "stored_error": "Text classification requires at least four non-empty labeled rows.",
+    "task_wait_error": "ML task '2f38962124c24679a28f40af5262aae6' finished with status 'failed'. Text classification requires at least four non-empty labeled rows."
+  }
+]

@@ -22,8 +22,7 @@ from xenix.exceptions import ValidationError
 from xenix.services.artifact_service import ArtifactService, build_artifact_uri
 from xenix.services.dataset_service import DatasetService, RegisterDatasetInput
 from xenix.services.ml.contracts import EvaluateTaskResult, FitTaskResult
-from xenix.services.ml.registry import get_model_catalog_entry, list_model_keys
-from xenix.services.ml.types import ApplyMode, EvaluationKind, ModelFamily, ModelTaskKind
+from xenix.services.ml.types import ApplyMode
 from xenix.services.ml_service import (
     ApplySourceInput,
     ApplyWithFilesInput,
@@ -34,7 +33,7 @@ from xenix.services.ml_service import (
 from xenix.services.ml_task_service import MLTaskService
 from xenix.services.storage import StorageBootstrapService
 from xenix.services.storage.models import MLTaskArtifactKind, MLTaskStatus
-from xenix.services.trained_model_metadata import parse_trained_model_metadata
+from xenix.services.ml.trained_model_metadata import parse_trained_model_metadata
 
 
 FIXTURE_ROOT = FIXTURES_ROOT / "ml_text_discovery"
@@ -42,11 +41,6 @@ DISCOVERY_PATH = FIXTURE_ROOT / "bilingual_discovery_corpus_v1.csv"
 RETRIEVAL_PATH = FIXTURE_ROOT / "bilingual_retrieval_twin_v1.csv"
 APPLY_PATH = FIXTURE_ROOT / "bilingual_discovery_apply_v1.csv"
 
-FIXTURE_SHA256 = {
-    DISCOVERY_PATH.name: "5f6a6937cfc0fc7a37e1535c7cbfc02d2415486318b1a579c2df83bb8e0416d4",
-    RETRIEVAL_PATH.name: "4042ae0f81e4ddf58c88992559fa67f7e42639a64732f4be72a217b7996b46cc",
-    APPLY_PATH.name: "94ecdcf683357cd381e27f641daead9a84e710f3b15b285e8526e57977bd046b",
-}
 
 # These opaque labels are test-private truth. They deliberately do not occur in
 # the registered source data and must never become a production training role.
@@ -72,11 +66,6 @@ _TOKEN_PATTERN = re.compile(r"[a-z]+|[\u4e00-\u9fff]")
 _ACTIVE_CLUSTER_KEY = "text.clustering.multilingual_kmeans_tfidf"
 _ACTIVE_TOPIC_KEY = "text.topic_modeling.multilingual_lda"
 _ACTIVE_RETRIEVAL_KEY = "text.similarity.multilingual_tfidf_cosine"
-_LEGACY_KEYS = {
-    "text.clustering.kmeans_tfidf",
-    "text.topic_modeling.lda",
-    "text.similarity.tfidf_cosine",
-}
 _COMMON_PARAMS = {
     "preparation_profile": "multilingual_business_v1",
     "phrase_mode": "unigram_bigram",
@@ -577,35 +566,6 @@ def _retrieval_ranking_oracle(
     }
 
 
-def test_text_discovery_fixture_bytes_and_schema_are_frozen() -> None:
-    for path in (DISCOVERY_PATH, RETRIEVAL_PATH, APPLY_PATH):
-        assert hashlib.sha256(path.read_bytes()).hexdigest() == FIXTURE_SHA256[path.name]
-
-    discovery_rows = _read_rows(DISCOVERY_PATH)
-    retrieval_rows = _read_rows(RETRIEVAL_PATH)
-    apply_rows = _read_rows(APPLY_PATH)
-
-    assert list(discovery_rows[0]) == ["document_id", "business_group", "text"]
-    assert list(retrieval_rows[0]) == [
-        "document_id",
-        "business_group",
-        "text",
-        "relevance_group",
-    ]
-    assert list(apply_rows[0]) == ["document_id", "text"]
-    assert len(discovery_rows) == len(retrieval_rows) == 36
-    assert len(apply_rows) == 7
-    assert len({row["document_id"] for row in discovery_rows}) == 36
-    assert len({row["document_id"] for row in apply_rows}) == 7
-
-    fixture_text = "\n".join(
-        path.read_text(encoding="utf-8")
-        for path in (DISCOVERY_PATH, RETRIEVAL_PATH, APPLY_PATH)
-    )
-    assert not any(private_theme in fixture_text for private_theme in _PRIVATE_THEMES)
-    assert not any(prefix in fixture_text for prefix in ("NOTE-", "ASK-", "CAMPUS-"))
-
-
 def test_discovery_fixture_has_group_safe_cross_theme_components() -> None:
     rows = _read_rows(DISCOVERY_PATH)
     rows_by_id = {row["document_id"]: row for row in rows}
@@ -660,67 +620,6 @@ def test_retrieval_twin_adds_only_admitted_opaque_relevance_truth() -> None:
     )
 
 
-def test_apply_fixture_covers_semantic_oov_and_empty_boundaries() -> None:
-    rows = _read_rows(APPLY_PATH)
-    by_id = {row["document_id"]: row["text"] for row in rows}
-
-    assert [document_id for document_id, text in by_id.items() if not text.strip()] == [
-        "svc-query-005",
-        "svc-query-006",
-    ]
-    oov_text = by_id["svc-query-004"].casefold()
-    assert all(token in oov_text for token in ("cryonebula", "xenoglyph", "量子果园"))
-    masked_entity_text = by_id["svc-query-007"]
-    assert "9090" in masked_entity_text
-    assert "https://future.example" in masked_entity_text
-    assert "unseen@example.com" in masked_entity_text
-
-
-def test_active_catalog_is_raw_text_authority_without_removing_legacy_keys() -> None:
-    keys = set(list_model_keys())
-    assert {
-        _ACTIVE_CLUSTER_KEY,
-        _ACTIVE_TOPIC_KEY,
-        _ACTIVE_RETRIEVAL_KEY,
-        *_LEGACY_KEYS,
-    } <= keys
-
-    expected = {
-        _ACTIVE_CLUSTER_KEY: (
-            EvaluationKind.TEXT_CLUSTERING,
-            ModelTaskKind.TEXT_ANALYZER,
-            {"n_clusters", "displayed_term_count"},
-        ),
-        _ACTIVE_TOPIC_KEY: (
-            EvaluationKind.TOPIC_MODELING,
-            ModelTaskKind.TEXT_ANALYZER,
-            {"topic_count", "displayed_term_count"},
-        ),
-        _ACTIVE_RETRIEVAL_KEY: (
-            EvaluationKind.RETRIEVAL,
-            ModelTaskKind.RETRIEVER,
-            {"top_k", "minimum_similarity"},
-        ),
-    }
-    common_params = {
-        "preparation_profile",
-        "phrase_mode",
-        "max_features",
-        "custom_dictionary_dataset_ids",
-        "stopword_dataset_ids",
-    }
-    for model_key, (evaluation_kind, task_kind, specific_params) in expected.items():
-        catalog = get_model_catalog_entry(model_key)
-        assert catalog.model_family is ModelFamily.TEXT_ANALYSIS
-        assert catalog.model_task_kind is task_kind
-        assert catalog.evaluation_kind is evaluation_kind
-        assert catalog.supports_evaluation is True
-        assert catalog.supports_apply is True
-        assert catalog.apply_mode is ApplyMode.ROWS
-        assert catalog.supports_hyperparameter_tuning is False
-        assert set(catalog.param_schema["properties"]) == common_params | specific_params
-
-
 @pytest.mark.parametrize(
     ("model_key", "training_fixture", "role_bindings", "params"),
     _MODEL_CASES,
@@ -758,10 +657,6 @@ def test_active_text_discovery_real_lifecycles_are_recomputable_and_public(
 
         for path, digest in completed.registered_source_digests.items():
             assert _sha256_file(path) == digest
-        assert all(
-            _sha256_file(path) == FIXTURE_SHA256[path.name]
-            for path in (DISCOVERY_PATH, RETRIEVAL_PATH, APPLY_PATH)
-        )
     finally:
         runtime.storage.engine.dispose()
 

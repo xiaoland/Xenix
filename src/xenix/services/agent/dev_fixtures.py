@@ -2,8 +2,16 @@
 
 from __future__ import annotations
 
+from pydantic import BaseModel, ConfigDict
+
+from ...exceptions import ValidationError
+from ..llm import ProviderResponse, ProviderToolCall
+from ..llm.tool_protocol import AgentTool, ToolSuccess
 from .harness_service import AgentHarnessService, SubmitUserTurnInput
-from ..llm import AgentToolSpec, ProviderResponse, ProviderToolCall
+
+
+class EmptyToolInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
 
 
 MESSAGE_RENDERING_FIXTURE_TITLE = "Message rendering fixture"
@@ -36,11 +44,14 @@ def ensure_mock_conversation_history(harness: AgentHarnessService) -> None:
         registry = harness._conversation_service.tool_registry  # noqa: SLF001 - explicit fixture-only seam
         try:
             registry.get("fixture.noop")
-        except Exception:
-            registry.register(
-                AgentToolSpec(name="fixture.noop", provider_name="fixture_noop", description="fixture"),
-                lambda _arguments, _context: {"fixture": True},
-            )
+        except ValidationError:
+            registry.register(AgentTool(
+                name="fixture.noop",
+                provider_name="fixture_noop",
+                description="fixture",
+                input_model=EmptyToolInput,
+                implementation=lambda _arguments, _context: ToolSuccess({"fixture": True}),
+            ))
         harness.set_provider(_FixtureProvider())
         harness.submit_user_turn(
             SubmitUserTurnInput(text="Render a fixture conversation", client_submission_id="fixture-submission")

@@ -7,7 +7,10 @@ from ..knowledge_service import (
     KnowledgeService,
 )
 from ..llm import ToolFailure, ToolSuccess
-from ..llm.tooling import AgentTool, ToolExecutionContext
+from ..llm.tool_protocol import (
+    AgentTool,
+    ToolExecutionContext,
+)
 from .tool_inputs import KnowledgeLookupInput
 
 KNOWLEDGE_LOOKUP_TOOL_NAME = "knowledge.lookup"
@@ -35,11 +38,6 @@ def knowledge_lookup_tool(service: KnowledgeService) -> AgentTool[KnowledgeLooku
                 repair_hints=tuple(exc.repair_hints),
                 retryable=bool(exc.retryable),
             )
-        except Exception:
-            return ToolFailure(
-                code="knowledge_lookup_failed",
-                message="Knowledge lookup could not be completed.",
-            )
 
         return ToolSuccess(
             value={
@@ -52,10 +50,8 @@ def knowledge_lookup_tool(service: KnowledgeService) -> AgentTool[KnowledgeLooku
         name=KNOWLEDGE_LOOKUP_TOOL_NAME,
         provider_name="knowledge_lookup",
         description=(
-            "Search the user's Knowledge Library for business rules, definitions, "
-            "assumptions, and experience relevant to the current data task. Ask in "
-            "business language; choose a retrieval mode only when useful, and use "
-            "returned source excerpts as guidance alongside computed data evidence."
+            "Search the user's Knowledge Library for business rules, definitions and experience; "
+            "returns relevant source excerpts."
         ),
         input_model=KnowledgeLookupInput,
         implementation=lookup,

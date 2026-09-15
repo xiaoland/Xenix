@@ -1,0 +1,18 @@
+[
+  {
+    "implementation": "baseline_pipe",
+    "requested_bytes": 2097152,
+    "status": "timed_out",
+    "returned_bytes": null,
+    "seconds": 3.102726899960544,
+    "failure_kind": "process_wall_time_exceeded"
+  },
+  {
+    "implementation": "result_file",
+    "requested_bytes": 2097152,
+    "status": "completed",
+    "returned_bytes": 2097152,
+    "seconds": 0.11731950001558289,
+    "failure_kind": null
+  }
+]

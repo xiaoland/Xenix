@@ -1,0 +1,113 @@
+{
+  "observations": [
+    {
+      "accepted": false,
+      "case_id": "business.routing.v1.standard",
+      "evaluation": "characterization",
+      "gate_eligible": false,
+      "observations": [
+        {
+          "budget_reason": "subject_usage_unreported",
+          "failure_kind": "subject_usage_unreported",
+          "judge_status": "blocked",
+          "outcome": "unscored",
+          "provenance": {
+            "case_definition_sha256": "35744EC52709E4BF5D0B14C1BE957256E32C38D1113B494285E9427A16D066AE",
+            "harness_variant": "baseline",
+            "repository_commit": "3c378f7fe39b85de489e145a2dee9c0fc26ba6e4",
+            "repository_dirty": true,
+            "runtime_sha256": "F19EFE0ADCD131B0751A62920C9D0EA9F3B9848C5FD4A1DD13A92CD552F03541"
+          },
+          "reason": "accounting_stopped_execution",
+          "reported_subject_tokens": 254625,
+          "run_id": "author-edited-subject_usage_unreported",
+          "run_status": "budget_exceeded",
+          "sampling_rounds": 12,
+          "subject_tokens_complete": false,
+          "turn_seconds": 134.22177780000493
+        }
+      ],
+      "policy_id": "agent-harness-report-policy-v3",
+      "qualified": true,
+      "reason_codes": [],
+      "report_kind": "xenix.agent_harness.policy_decision",
+      "run_ids": [
+        "author-edited-subject_usage_unreported"
+      ],
+      "schema_version": 2,
+      "summary": {
+        "attempt_count": 1,
+        "effective_subject_tokens_per_pass": null,
+        "median_reported_subject_tokens": null,
+        "median_sampling_rounds": 12.0,
+        "median_turn_seconds": 134.22177780000493,
+        "observed_subject_tokens": 254625,
+        "outcome_counts": {
+          "fail": 0,
+          "partial": 0,
+          "pass": 0,
+          "unscored": 1
+        },
+        "pass_rate": null,
+        "scored_count": 0,
+        "subject_token_coverage": 0.0,
+        "total_subject_tokens": null
+      }
+    },
+    {
+      "accepted": false,
+      "case_id": "business.routing.v1.standard",
+      "evaluation": "characterization",
+      "gate_eligible": false,
+      "observations": [
+        {
+          "budget_reason": "interrupted_provider_usage_unavailable",
+          "failure_kind": "process_wall_time_exceeded",
+          "judge_status": "blocked",
+          "outcome": "fail",
+          "provenance": {
+            "case_definition_sha256": "35744EC52709E4BF5D0B14C1BE957256E32C38D1113B494285E9427A16D066AE",
+            "harness_variant": "baseline",
+            "repository_commit": "3c378f7fe39b85de489e145a2dee9c0fc26ba6e4",
+            "repository_dirty": true,
+            "runtime_sha256": "F19EFE0ADCD131B0751A62920C9D0EA9F3B9848C5FD4A1DD13A92CD552F03541"
+          },
+          "reason": "budget_exceeded",
+          "reported_subject_tokens": 254625,
+          "run_id": "author-edited-process_wall_time_exceeded",
+          "run_status": "budget_exceeded",
+          "sampling_rounds": 12,
+          "subject_tokens_complete": false,
+          "turn_seconds": 134.22177780000493
+        }
+      ],
+      "policy_id": "agent-harness-report-policy-v3",
+      "qualified": true,
+      "reason_codes": [],
+      "report_kind": "xenix.agent_harness.policy_decision",
+      "run_ids": [
+        "author-edited-process_wall_time_exceeded"
+      ],
+      "schema_version": 2,
+      "summary": {
+        "attempt_count": 1,
+        "effective_subject_tokens_per_pass": null,
+        "median_reported_subject_tokens": null,
+        "median_sampling_rounds": 12.0,
+        "median_turn_seconds": 134.22177780000493,
+        "observed_subject_tokens": 254625,
+        "outcome_counts": {
+          "fail": 1,
+          "partial": 0,
+          "pass": 0,
+          "unscored": 0
+        },
+        "pass_rate": 0.0,
+        "scored_count": 1,
+        "subject_token_coverage": 0.0,
+        "total_subject_tokens": null
+      }
+    }
+  ],
+  "purpose": "Manual counterfactual report projections: missing accounting caused stop versus actual timeout with missing accounting. Not Subject runs."
+}

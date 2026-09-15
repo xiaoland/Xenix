@@ -10,15 +10,16 @@ import pytest
 
 
 def _has_basetemp_argument(args: list[str]) -> bool:
-    return any(
-        arg == "--basetemp" or arg.startswith("--basetemp=")
-        for arg in args
-    )
+    return any(arg == "--basetemp" or arg.startswith("--basetemp=") for arg in args)
 
 
 def _default_basetemp() -> Path:
-    run_id = f"{time.strftime('%Y%m%d-%H%M%S')}-{os.getpid()}"
-    return Path(tempfile.gettempdir()) / "xenix-native-pytest-runs" / run_id
+    root = Path(tempfile.gettempdir()) / "xenix-native-pytest-runs"
+    root.mkdir(parents=True, exist_ok=True)
+    prefix = f"{time.strftime('%Y%m%d-%H%M%S')}-{os.getpid()}-"
+    # Benchmark tooling can call pytest.main more than once in the same process.
+    # Reserve a fresh directory so a later run cannot clear an earlier run's evidence.
+    return Path(tempfile.mkdtemp(prefix=prefix, dir=root))
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -27,7 +28,6 @@ def main(argv: list[str] | None = None) -> int:
         args.remove("--direct")
     if not _has_basetemp_argument(args):
         basetemp = _default_basetemp()
-        basetemp.parent.mkdir(parents=True, exist_ok=True)
         args.append(f"--basetemp={basetemp}")
     return pytest.main(args)
 

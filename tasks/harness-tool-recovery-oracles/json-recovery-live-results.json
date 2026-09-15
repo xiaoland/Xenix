@@ -1,0 +1,159 @@
+{
+  "report": "build/agent-harness-json-recovery/ml.recommendation_ranking_v1-deepseek-deepseek-v4-flash-4de993c888ff437c8553e9fa3f0b7704.json",
+  "sha256": "8077fd77d19dd32deeb2a8d9c3e2dd20ff0fb74819306d3a234b13818df5a533",
+  "run_status": "completed",
+  "failure_kind": null,
+  "semantic": {
+    "checks": [
+      {
+        "name": "exact_private_top_k",
+        "passed": false,
+        "summary": "linked_rankings_missing_or_incorrect"
+      },
+      {
+        "name": "public_ranking_evaluation",
+        "passed": true,
+        "summary": "linked_candidate_baseline_evaluation_observed"
+      }
+    ],
+    "passed": false,
+    "verdict": "fail"
+  },
+  "integrity": {
+    "checks": [
+      {
+        "name": "canonical_completion",
+        "passed": true,
+        "summary": "canonical_completion_observed"
+      },
+      {
+        "name": "source_unchanged",
+        "passed": true,
+        "summary": "sources_unchanged"
+      }
+    ],
+    "passed": true
+  },
+  "judge": {
+    "verdict": "not_evaluated",
+    "summary": "semantic_prerequisite_failed"
+  },
+  "subject_metrics": {
+    "assessment_seconds": 0.054411099990829825,
+    "derived_dataset_count": 5,
+    "message_counts": {
+      "assistant": 15,
+      "tool_call": 30,
+      "tool_result": 30,
+      "user": 1
+    },
+    "provider_retry_count": 0,
+    "sampling_round_count": 15,
+    "terminal_shape": null,
+    "token_usage": {
+      "cached_input_tokens": 261888,
+      "input_tokens": 288281,
+      "output_tokens": 32556,
+      "total_tokens": 320837
+    },
+    "tool_call_counts_by_name": {
+      "agent.skill.activate": 1,
+      "agent.skill.read_reference": 1,
+      "agent.tools.activate": 1,
+      "analysis.graph": 5,
+      "analysis.profile": 2,
+      "data.feature.select": 1,
+      "data.query": 11,
+      "data.transform": 3,
+      "knowledge.lookup": 2,
+      "model.apply": 1,
+      "model.metadata": 1,
+      "model.train": 1
+    },
+    "tool_result_counts_by_status": {
+      "failed": 1,
+      "succeeded": 29
+    },
+    "turn_seconds": 174.19331080000848,
+    "usage_reported_primary_response_count": 15
+  },
+  "failed_tools": [
+    {
+      "arguments": {
+        "dataset_id": 102,
+        "spec": {
+          "data": {
+            "values": []
+          },
+          "encoding": {
+            "color": {
+              "field": "co_like_rate_with_alpha",
+              "legend": null,
+              "scale": {
+                "domain": [
+                  0,
+                  1
+                ],
+                "range": [
+                  "#c0c7d1",
+                  "#1f6feb"
+                ]
+              },
+              "type": "quantitative"
+            },
+            "tooltip": [
+              {
+                "field": "candidate_module"
+              },
+              {
+                "field": "co_raters"
+              },
+              {
+                "field": "co_like_rate_with_alpha"
+              }
+            ],
+            "x": {
+              "field": "co_like_rate_with_alpha",
+              "scale": {
+                "domain": [
+                  0,
+                  1
+                ]
+              },
+              "title": "Co-like rate with ALPHA",
+              "type": "quantitative"
+            },
+            "y": {
+              "field": "candidate_module",
+              "sort": "-x",
+              "title": null,
+              "type": "nominal"
+            }
+          },
+          "height": 180,
+          "mark": {
+            "type": "bar"
+          },
+          "title": {
+            "subtitle": "Share of ALPHA-likers (4+) who also rated the candidate 4+; 0.00 = the learners who liked ALPHA never liked it",
+            "text": "LEARNER-101: candidates vs the liked reference module ALPHA"
+          },
+          "width": 420
+        }
+      },
+      "delivery": {
+        "serialized_bytes": 258
+      },
+      "failure": {
+        "code": "tool_validation_failed",
+        "message": "analysis.graph spec.data conflicts with the selected Dataset. Omit data or use {\"name\":\"data\"} to reference that Dataset. Inline values and other sources are not substituted for it.",
+        "type": "tool_failure"
+      },
+      "name": "analysis.graph",
+      "provider_call_id": "call_01_5RAihNNj8mm1S8FWEHau6116",
+      "status": "failed"
+    }
+  ],
+  "json_parse_failures_observed": 0,
+  "evidence_limit": "Fresh uninjected run completed, but no malformed JSON was generated. Recovery itself is established by the offline full-path probes and the separate paid synthetic-history protocol check. Exact-ranking oracle still fails; this is not a benchmark pass."
+}

@@ -1,0 +1,1562 @@
+[
+  {
+    "variant": "confirmation",
+    "trace_run": "1bfb10996370452398e38d9ce83a22e1",
+    "trace_round": 5,
+    "run_name": "ticket-routing-unigram",
+    "params": {
+      "class_weight": "balanced",
+      "max_features": 5000,
+      "phrase_mode": "unigram"
+    },
+    "holdout": {
+      "accuracy": 0.7777777777777778,
+      "balanced_accuracy": 0.7777777777777778,
+      "precision_macro": 0.7738095238095237,
+      "precision_weighted": 0.7738095238095237,
+      "recall_macro": 0.7777777777777778,
+      "recall_weighted": 0.7777777777777778,
+      "f1_macro": 0.7641025641025642,
+      "f1_weighted": 0.764102564102564,
+      "log_loss": 0.8000091309575426,
+      "roc_auc": 0.9722222222222222,
+      "pr_auc": 0.9452380952380951
+    },
+    "confusion": [
+      [
+        6,
+        0,
+        0
+      ],
+      [
+        0,
+        5,
+        1
+      ],
+      [
+        1,
+        2,
+        3
+      ]
+    ],
+    "baseline_accuracy": 0.3333333333333333,
+    "split": {
+      "realized_strategy": "group_hash_holdout.v2",
+      "train_row_count": 72,
+      "holdout_row_count": 18,
+      "eligible_group_count": 15,
+      "group_overlap_count": 0
+    },
+    "applied": {
+      "history": {
+        "count": 90,
+        "accuracy": 1.0,
+        "wrong_ticket_ids": []
+      },
+      "new_batch": {
+        "count": 30,
+        "accuracy": 0.9333333333333333,
+        "wrong_ticket_ids": [
+          "T-01CA1F80",
+          "T-D00705F3"
+        ]
+      }
+    },
+    "tool_result_bytes": 13449,
+    "tool_result_top_level_bytes": {
+      "dataset_id": 34,
+      "task_ids": 72,
+      "trained_model_ids": 36,
+      "results": 12866,
+      "artifacts": 360
+    },
+    "tool_return_artifact_kinds": [
+      "model",
+      "evaluation_report"
+    ],
+    "fit_and_eval_payload_keys": [
+      [
+        "task_id",
+        "evaluation_kind",
+        "evaluation_policy",
+        "error_summary",
+        "model_key",
+        "params",
+        "model_artifact_path",
+        "final_model_artifact_path",
+        "holdout_artifact_path",
+        "export_artifact_path",
+        "report_artifact_path",
+        "split_facts",
+        "preparation_facts",
+        "training_scopes",
+        "forecast_split_facts",
+        "forecast_preparation_facts",
+        "recommendation_split_facts",
+        "recommendation_preparation_facts",
+        "text_preparation_facts",
+        "text_preparation_specification",
+        "text_leakage_facts",
+        "text_vectorization_facts",
+        "text_clustering_evaluation",
+        "text_topic_evaluation",
+        "text_retrieval_evaluation",
+        "result_summary",
+        "trained_model_id",
+        "canonical_model_artifact_path",
+        "evaluation_model_artifact_path"
+      ],
+      [
+        "task_id",
+        "evaluation_kind",
+        "evaluation_policy",
+        "error_summary",
+        "trained_model_id",
+        "model_key",
+        "evaluation",
+        "baseline_evaluation",
+        "comparison",
+        "split_facts",
+        "preparation_facts",
+        "forecast_evaluation",
+        "clustering_evaluation",
+        "recommendation_evaluation",
+        "text_classification_evaluation",
+        "text_clustering_evaluation",
+        "text_topic_evaluation",
+        "text_retrieval_evaluation"
+      ]
+    ]
+  },
+  {
+    "variant": "confirmation",
+    "trace_run": "1bfb10996370452398e38d9ce83a22e1",
+    "trace_round": 5,
+    "run_name": "ticket-routing-bigram",
+    "params": {
+      "class_weight": "balanced",
+      "max_features": 5000,
+      "phrase_mode": "unigram_bigram"
+    },
+    "holdout": {
+      "accuracy": 0.7777777777777778,
+      "balanced_accuracy": 0.7777777777777778,
+      "precision_macro": 0.7738095238095237,
+      "precision_weighted": 0.7738095238095237,
+      "recall_macro": 0.7777777777777778,
+      "recall_weighted": 0.7777777777777778,
+      "f1_macro": 0.7641025641025642,
+      "f1_weighted": 0.764102564102564,
+      "log_loss": 0.8611213456677104,
+      "roc_auc": 0.9814814814814814,
+      "pr_auc": 0.959126984126984
+    },
+    "confusion": [
+      [
+        6,
+        0,
+        0
+      ],
+      [
+        0,
+        5,
+        1
+      ],
+      [
+        1,
+        2,
+        3
+      ]
+    ],
+    "baseline_accuracy": 0.3333333333333333,
+    "split": {
+      "realized_strategy": "group_hash_holdout.v2",
+      "train_row_count": 72,
+      "holdout_row_count": 18,
+      "eligible_group_count": 15,
+      "group_overlap_count": 0
+    },
+    "applied": {
+      "history": {
+        "count": 90,
+        "accuracy": 1.0,
+        "wrong_ticket_ids": []
+      },
+      "new_batch": {
+        "count": 30,
+        "accuracy": 0.9,
+        "wrong_ticket_ids": [
+          "T-01CA1F80",
+          "T-D00705F3",
+          "T-DA3BF390"
+        ]
+      }
+    },
+    "tool_result_bytes": 13469,
+    "tool_result_top_level_bytes": {
+      "dataset_id": 34,
+      "task_ids": 72,
+      "trained_model_ids": 36,
+      "results": 12886,
+      "artifacts": 360
+    },
+    "tool_return_artifact_kinds": [
+      "model",
+      "evaluation_report"
+    ],
+    "fit_and_eval_payload_keys": [
+      [
+        "task_id",
+        "evaluation_kind",
+        "evaluation_policy",
+        "error_summary",
+        "model_key",
+        "params",
+        "model_artifact_path",
+        "final_model_artifact_path",
+        "holdout_artifact_path",
+        "export_artifact_path",
+        "report_artifact_path",
+        "split_facts",
+        "preparation_facts",
+        "training_scopes",
+        "forecast_split_facts",
+        "forecast_preparation_facts",
+        "recommendation_split_facts",
+        "recommendation_preparation_facts",
+        "text_preparation_facts",
+        "text_preparation_specification",
+        "text_leakage_facts",
+        "text_vectorization_facts",
+        "text_clustering_evaluation",
+        "text_topic_evaluation",
+        "text_retrieval_evaluation",
+        "result_summary",
+        "trained_model_id",
+        "canonical_model_artifact_path",
+        "evaluation_model_artifact_path"
+      ],
+      [
+        "task_id",
+        "evaluation_kind",
+        "evaluation_policy",
+        "error_summary",
+        "trained_model_id",
+        "model_key",
+        "evaluation",
+        "baseline_evaluation",
+        "comparison",
+        "split_facts",
+        "preparation_facts",
+        "forecast_evaluation",
+        "clustering_evaluation",
+        "recommendation_evaluation",
+        "text_classification_evaluation",
+        "text_clustering_evaluation",
+        "text_topic_evaluation",
+        "text_retrieval_evaluation"
+      ]
+    ]
+  },
+  {
+    "variant": "confirmation",
+    "trace_run": "1bfb10996370452398e38d9ce83a22e1",
+    "trace_round": 7,
+    "run_name": "ticket-routing-unigram-cwnone",
+    "params": {
+      "class_weight": "none",
+      "max_features": 5000,
+      "phrase_mode": "unigram"
+    },
+    "holdout": {
+      "accuracy": 0.7777777777777778,
+      "balanced_accuracy": 0.7777777777777778,
+      "precision_macro": 0.7738095238095237,
+      "precision_weighted": 0.7738095238095237,
+      "recall_macro": 0.7777777777777778,
+      "recall_weighted": 0.7777777777777778,
+      "f1_macro": 0.7641025641025642,
+      "f1_weighted": 0.764102564102564,
+      "log_loss": 0.8000091309575426,
+      "roc_auc": 0.9722222222222222,
+      "pr_auc": 0.9452380952380951
+    },
+    "confusion": [
+      [
+        6,
+        0,
+        0
+      ],
+      [
+        0,
+        5,
+        1
+      ],
+      [
+        1,
+        2,
+        3
+      ]
+    ],
+    "baseline_accuracy": 0.3333333333333333,
+    "split": {
+      "realized_strategy": "group_hash_holdout.v2",
+      "train_row_count": 72,
+      "holdout_row_count": 18,
+      "eligible_group_count": 15,
+      "group_overlap_count": 0
+    },
+    "applied": {
+      "history": {
+        "count": 90,
+        "accuracy": 1.0,
+        "wrong_ticket_ids": []
+      },
+      "new_batch": {
+        "count": 30,
+        "accuracy": 0.9333333333333333,
+        "wrong_ticket_ids": [
+          "T-01CA1F80",
+          "T-D00705F3"
+        ]
+      }
+    },
+    "tool_result_bytes": 13445,
+    "tool_result_top_level_bytes": {
+      "dataset_id": 34,
+      "task_ids": 72,
+      "trained_model_ids": 36,
+      "results": 12862,
+      "artifacts": 360
+    },
+    "tool_return_artifact_kinds": [
+      "model",
+      "evaluation_report"
+    ],
+    "fit_and_eval_payload_keys": [
+      [
+        "task_id",
+        "evaluation_kind",
+        "evaluation_policy",
+        "error_summary",
+        "model_key",
+        "params",
+        "model_artifact_path",
+        "final_model_artifact_path",
+        "holdout_artifact_path",
+        "export_artifact_path",
+        "report_artifact_path",
+        "split_facts",
+        "preparation_facts",
+        "training_scopes",
+        "forecast_split_facts",
+        "forecast_preparation_facts",
+        "recommendation_split_facts",
+        "recommendation_preparation_facts",
+        "text_preparation_facts",
+        "text_preparation_specification",
+        "text_leakage_facts",
+        "text_vectorization_facts",
+        "text_clustering_evaluation",
+        "text_topic_evaluation",
+        "text_retrieval_evaluation",
+        "result_summary",
+        "trained_model_id",
+        "canonical_model_artifact_path",
+        "evaluation_model_artifact_path"
+      ],
+      [
+        "task_id",
+        "evaluation_kind",
+        "evaluation_policy",
+        "error_summary",
+        "trained_model_id",
+        "model_key",
+        "evaluation",
+        "baseline_evaluation",
+        "comparison",
+        "split_facts",
+        "preparation_facts",
+        "forecast_evaluation",
+        "clustering_evaluation",
+        "recommendation_evaluation",
+        "text_classification_evaluation",
+        "text_clustering_evaluation",
+        "text_topic_evaluation",
+        "text_retrieval_evaluation"
+      ]
+    ]
+  },
+  {
+    "variant": "confirmation",
+    "trace_run": "1bfb10996370452398e38d9ce83a22e1",
+    "trace_round": 7,
+    "run_name": "ticket-routing-unigram-mindf2",
+    "params": {
+      "class_weight": "balanced",
+      "max_features": 5000,
+      "minimum_document_frequency": 2,
+      "phrase_mode": "unigram"
+    },
+    "holdout": {
+      "accuracy": 0.9444444444444444,
+      "balanced_accuracy": 0.9444444444444445,
+      "precision_macro": 0.9523809523809524,
+      "precision_weighted": 0.9523809523809523,
+      "recall_macro": 0.9444444444444445,
+      "recall_weighted": 0.9444444444444444,
+      "f1_macro": 0.9440559440559442,
+      "f1_weighted": 0.9440559440559441,
+      "log_loss": 0.6779266231124979,
+      "roc_auc": 0.9722222222222222,
+      "pr_auc": 0.9452380952380951
+    },
+    "confusion": [
+      [
+        6,
+        0,
+        0
+      ],
+      [
+        0,
+        5,
+        1
+      ],
+      [
+        0,
+        0,
+        6
+      ]
+    ],
+    "baseline_accuracy": 0.3333333333333333,
+    "split": {
+      "realized_strategy": "group_hash_holdout.v2",
+      "train_row_count": 72,
+      "holdout_row_count": 18,
+      "eligible_group_count": 15,
+      "group_overlap_count": 0
+    },
+    "applied": {
+      "history": {
+        "count": 90,
+        "accuracy": 1.0,
+        "wrong_ticket_ids": []
+      },
+      "new_batch": {
+        "count": 30,
+        "accuracy": 0.8666666666666667,
+        "wrong_ticket_ids": [
+          "T-01CA1F80",
+          "T-B943C179",
+          "T-D00705F3",
+          "T-F7F8AD2D"
+        ]
+      }
+    },
+    "tool_result_bytes": 13432,
+    "tool_result_top_level_bytes": {
+      "dataset_id": 34,
+      "task_ids": 72,
+      "trained_model_ids": 36,
+      "results": 12849,
+      "artifacts": 360
+    },
+    "tool_return_artifact_kinds": [
+      "model",
+      "evaluation_report"
+    ],
+    "fit_and_eval_payload_keys": [
+      [
+        "task_id",
+        "evaluation_kind",
+        "evaluation_policy",
+        "error_summary",
+        "model_key",
+        "params",
+        "model_artifact_path",
+        "final_model_artifact_path",
+        "holdout_artifact_path",
+        "export_artifact_path",
+        "report_artifact_path",
+        "split_facts",
+        "preparation_facts",
+        "training_scopes",
+        "forecast_split_facts",
+        "forecast_preparation_facts",
+        "recommendation_split_facts",
+        "recommendation_preparation_facts",
+        "text_preparation_facts",
+        "text_preparation_specification",
+        "text_leakage_facts",
+        "text_vectorization_facts",
+        "text_clustering_evaluation",
+        "text_topic_evaluation",
+        "text_retrieval_evaluation",
+        "result_summary",
+        "trained_model_id",
+        "canonical_model_artifact_path",
+        "evaluation_model_artifact_path"
+      ],
+      [
+        "task_id",
+        "evaluation_kind",
+        "evaluation_policy",
+        "error_summary",
+        "trained_model_id",
+        "model_key",
+        "evaluation",
+        "baseline_evaluation",
+        "comparison",
+        "split_facts",
+        "preparation_facts",
+        "forecast_evaluation",
+        "clustering_evaluation",
+        "recommendation_evaluation",
+        "text_classification_evaluation",
+        "text_clustering_evaluation",
+        "text_topic_evaluation",
+        "text_retrieval_evaluation"
+      ]
+    ]
+  },
+  {
+    "variant": "confirmation",
+    "trace_run": "1bfb10996370452398e38d9ce83a22e1",
+    "trace_round": 8,
+    "run_name": "ticket-routing-bigram-mindf2",
+    "params": {
+      "class_weight": "balanced",
+      "max_features": 5000,
+      "minimum_document_frequency": 2,
+      "phrase_mode": "unigram_bigram"
+    },
+    "holdout": {
+      "accuracy": 0.9444444444444444,
+      "balanced_accuracy": 0.9444444444444445,
+      "precision_macro": 0.9523809523809524,
+      "precision_weighted": 0.9523809523809523,
+      "recall_macro": 0.9444444444444445,
+      "recall_weighted": 0.9444444444444444,
+      "f1_macro": 0.9440559440559442,
+      "f1_weighted": 0.9440559440559441,
+      "log_loss": 0.6818569728892053,
+      "roc_auc": 0.9722222222222222,
+      "pr_auc": 0.9452380952380951
+    },
+    "confusion": [
+      [
+        6,
+        0,
+        0
+      ],
+      [
+        0,
+        5,
+        1
+      ],
+      [
+        0,
+        0,
+        6
+      ]
+    ],
+    "baseline_accuracy": 0.3333333333333333,
+    "split": {
+      "realized_strategy": "group_hash_holdout.v2",
+      "train_row_count": 72,
+      "holdout_row_count": 18,
+      "eligible_group_count": 15,
+      "group_overlap_count": 0
+    },
+    "applied": {
+      "history": {
+        "count": 90,
+        "accuracy": 1.0,
+        "wrong_ticket_ids": []
+      },
+      "new_batch": {
+        "count": 30,
+        "accuracy": 0.8666666666666667,
+        "wrong_ticket_ids": [
+          "T-01CA1F80",
+          "T-B943C179",
+          "T-D00705F3",
+          "T-F7F8AD2D"
+        ]
+      }
+    },
+    "tool_result_bytes": 13453,
+    "tool_result_top_level_bytes": {
+      "dataset_id": 34,
+      "task_ids": 72,
+      "trained_model_ids": 36,
+      "results": 12870,
+      "artifacts": 360
+    },
+    "tool_return_artifact_kinds": [
+      "model",
+      "evaluation_report"
+    ],
+    "fit_and_eval_payload_keys": [
+      [
+        "task_id",
+        "evaluation_kind",
+        "evaluation_policy",
+        "error_summary",
+        "model_key",
+        "params",
+        "model_artifact_path",
+        "final_model_artifact_path",
+        "holdout_artifact_path",
+        "export_artifact_path",
+        "report_artifact_path",
+        "split_facts",
+        "preparation_facts",
+        "training_scopes",
+        "forecast_split_facts",
+        "forecast_preparation_facts",
+        "recommendation_split_facts",
+        "recommendation_preparation_facts",
+        "text_preparation_facts",
+        "text_preparation_specification",
+        "text_leakage_facts",
+        "text_vectorization_facts",
+        "text_clustering_evaluation",
+        "text_topic_evaluation",
+        "text_retrieval_evaluation",
+        "result_summary",
+        "trained_model_id",
+        "canonical_model_artifact_path",
+        "evaluation_model_artifact_path"
+      ],
+      [
+        "task_id",
+        "evaluation_kind",
+        "evaluation_policy",
+        "error_summary",
+        "trained_model_id",
+        "model_key",
+        "evaluation",
+        "baseline_evaluation",
+        "comparison",
+        "split_facts",
+        "preparation_facts",
+        "forecast_evaluation",
+        "clustering_evaluation",
+        "recommendation_evaluation",
+        "text_classification_evaluation",
+        "text_clustering_evaluation",
+        "text_topic_evaluation",
+        "text_retrieval_evaluation"
+      ]
+    ]
+  },
+  {
+    "variant": "confirmation",
+    "trace_run": "1bfb10996370452398e38d9ce83a22e1",
+    "trace_round": 8,
+    "run_name": "ticket-routing-unigram-mindf3",
+    "params": {
+      "class_weight": "balanced",
+      "max_features": 5000,
+      "minimum_document_frequency": 3,
+      "phrase_mode": "unigram"
+    },
+    "holdout": {
+      "accuracy": 0.6666666666666666,
+      "balanced_accuracy": 0.6666666666666666,
+      "precision_macro": 0.7929292929292929,
+      "precision_weighted": 0.7929292929292929,
+      "recall_macro": 0.6666666666666666,
+      "recall_weighted": 0.6666666666666666,
+      "f1_macro": 0.6083099906629319,
+      "f1_weighted": 0.6083099906629319,
+      "log_loss": 0.7586458486464521,
+      "roc_auc": 0.8657407407407407,
+      "pr_auc": 0.7853535353535354
+    },
+    "confusion": [
+      [
+        5,
+        0,
+        1
+      ],
+      [
+        1,
+        1,
+        4
+      ],
+      [
+        0,
+        0,
+        6
+      ]
+    ],
+    "baseline_accuracy": 0.3333333333333333,
+    "split": {
+      "realized_strategy": "group_hash_holdout.v2",
+      "train_row_count": 72,
+      "holdout_row_count": 18,
+      "eligible_group_count": 15,
+      "group_overlap_count": 0
+    },
+    "applied": {
+      "history": {
+        "count": 90,
+        "accuracy": 0.9666666666666667,
+        "wrong_ticket_ids": [
+          "T-022665D2",
+          "T-C0E54D75",
+          "T-AFFED53F"
+        ]
+      },
+      "new_batch": {
+        "count": 30,
+        "accuracy": 0.8666666666666667,
+        "wrong_ticket_ids": [
+          "T-01CA1F80",
+          "T-324AC726",
+          "T-B943C179",
+          "T-D00705F3"
+        ]
+      }
+    },
+    "tool_result_bytes": 13478,
+    "tool_result_top_level_bytes": {
+      "dataset_id": 34,
+      "task_ids": 72,
+      "trained_model_ids": 36,
+      "results": 12895,
+      "artifacts": 360
+    },
+    "tool_return_artifact_kinds": [
+      "model",
+      "evaluation_report"
+    ],
+    "fit_and_eval_payload_keys": [
+      [
+        "task_id",
+        "evaluation_kind",
+        "evaluation_policy",
+        "error_summary",
+        "model_key",
+        "params",
+        "model_artifact_path",
+        "final_model_artifact_path",
+        "holdout_artifact_path",
+        "export_artifact_path",
+        "report_artifact_path",
+        "split_facts",
+        "preparation_facts",
+        "training_scopes",
+        "forecast_split_facts",
+        "forecast_preparation_facts",
+        "recommendation_split_facts",
+        "recommendation_preparation_facts",
+        "text_preparation_facts",
+        "text_preparation_specification",
+        "text_leakage_facts",
+        "text_vectorization_facts",
+        "text_clustering_evaluation",
+        "text_topic_evaluation",
+        "text_retrieval_evaluation",
+        "result_summary",
+        "trained_model_id",
+        "canonical_model_artifact_path",
+        "evaluation_model_artifact_path"
+      ],
+      [
+        "task_id",
+        "evaluation_kind",
+        "evaluation_policy",
+        "error_summary",
+        "trained_model_id",
+        "model_key",
+        "evaluation",
+        "baseline_evaluation",
+        "comparison",
+        "split_facts",
+        "preparation_facts",
+        "forecast_evaluation",
+        "clustering_evaluation",
+        "recommendation_evaluation",
+        "text_classification_evaluation",
+        "text_clustering_evaluation",
+        "text_topic_evaluation",
+        "text_retrieval_evaluation"
+      ]
+    ]
+  },
+  {
+    "variant": "standard",
+    "trace_run": "eda04287e17742d8b51f180d1155917d",
+    "trace_round": 8,
+    "run_name": "queue_router_unigram",
+    "params": {},
+    "holdout": {
+      "accuracy": 0.7777777777777778,
+      "balanced_accuracy": 0.7777777777777778,
+      "precision_macro": 0.7738095238095237,
+      "precision_weighted": 0.7738095238095237,
+      "recall_macro": 0.7777777777777778,
+      "recall_weighted": 0.7777777777777778,
+      "f1_macro": 0.7641025641025642,
+      "f1_weighted": 0.764102564102564,
+      "log_loss": 0.8000091309575426,
+      "roc_auc": 0.9722222222222222,
+      "pr_auc": 0.9452380952380951
+    },
+    "confusion": [
+      [
+        6,
+        0,
+        0
+      ],
+      [
+        0,
+        5,
+        1
+      ],
+      [
+        1,
+        2,
+        3
+      ]
+    ],
+    "baseline_accuracy": 0.3333333333333333,
+    "split": {
+      "realized_strategy": "group_hash_holdout.v2",
+      "train_row_count": 72,
+      "holdout_row_count": 18,
+      "eligible_group_count": 15,
+      "group_overlap_count": 0
+    },
+    "applied": {
+      "history": {
+        "count": 90,
+        "accuracy": 1.0,
+        "wrong_ticket_ids": []
+      },
+      "new_batch": {
+        "count": 30,
+        "accuracy": 0.9333333333333333,
+        "wrong_ticket_ids": [
+          "T-60CF1C49",
+          "T-ADB30E47"
+        ]
+      }
+    },
+    "tool_result_bytes": 13449,
+    "tool_result_top_level_bytes": {
+      "dataset_id": 34,
+      "task_ids": 72,
+      "trained_model_ids": 36,
+      "results": 12866,
+      "artifacts": 360
+    },
+    "tool_return_artifact_kinds": [
+      "model",
+      "evaluation_report"
+    ],
+    "fit_and_eval_payload_keys": [
+      [
+        "task_id",
+        "evaluation_kind",
+        "evaluation_policy",
+        "error_summary",
+        "model_key",
+        "params",
+        "model_artifact_path",
+        "final_model_artifact_path",
+        "holdout_artifact_path",
+        "export_artifact_path",
+        "report_artifact_path",
+        "split_facts",
+        "preparation_facts",
+        "training_scopes",
+        "forecast_split_facts",
+        "forecast_preparation_facts",
+        "recommendation_split_facts",
+        "recommendation_preparation_facts",
+        "text_preparation_facts",
+        "text_preparation_specification",
+        "text_leakage_facts",
+        "text_vectorization_facts",
+        "text_clustering_evaluation",
+        "text_topic_evaluation",
+        "text_retrieval_evaluation",
+        "result_summary",
+        "trained_model_id",
+        "canonical_model_artifact_path",
+        "evaluation_model_artifact_path"
+      ],
+      [
+        "task_id",
+        "evaluation_kind",
+        "evaluation_policy",
+        "error_summary",
+        "trained_model_id",
+        "model_key",
+        "evaluation",
+        "baseline_evaluation",
+        "comparison",
+        "split_facts",
+        "preparation_facts",
+        "forecast_evaluation",
+        "clustering_evaluation",
+        "recommendation_evaluation",
+        "text_classification_evaluation",
+        "text_clustering_evaluation",
+        "text_topic_evaluation",
+        "text_retrieval_evaluation"
+      ]
+    ]
+  },
+  {
+    "variant": "standard",
+    "trace_run": "eda04287e17742d8b51f180d1155917d",
+    "trace_round": 8,
+    "run_name": "queue_router_bigram",
+    "params": {
+      "class_weight": "balanced",
+      "max_features": 5000,
+      "minimum_document_frequency": 1,
+      "phrase_mode": "unigram_bigram"
+    },
+    "holdout": {
+      "accuracy": 0.7777777777777778,
+      "balanced_accuracy": 0.7777777777777778,
+      "precision_macro": 0.7738095238095237,
+      "precision_weighted": 0.7738095238095237,
+      "recall_macro": 0.7777777777777778,
+      "recall_weighted": 0.7777777777777778,
+      "f1_macro": 0.7641025641025642,
+      "f1_weighted": 0.764102564102564,
+      "log_loss": 0.8611213456677104,
+      "roc_auc": 0.9814814814814814,
+      "pr_auc": 0.959126984126984
+    },
+    "confusion": [
+      [
+        6,
+        0,
+        0
+      ],
+      [
+        0,
+        5,
+        1
+      ],
+      [
+        1,
+        2,
+        3
+      ]
+    ],
+    "baseline_accuracy": 0.3333333333333333,
+    "split": {
+      "realized_strategy": "group_hash_holdout.v2",
+      "train_row_count": 72,
+      "holdout_row_count": 18,
+      "eligible_group_count": 15,
+      "group_overlap_count": 0
+    },
+    "applied": {
+      "history": {
+        "count": 90,
+        "accuracy": 1.0,
+        "wrong_ticket_ids": []
+      },
+      "new_batch": {
+        "count": 30,
+        "accuracy": 0.9333333333333333,
+        "wrong_ticket_ids": [
+          "T-60CF1C49",
+          "T-ADB30E47"
+        ]
+      }
+    },
+    "tool_result_bytes": 13469,
+    "tool_result_top_level_bytes": {
+      "dataset_id": 34,
+      "task_ids": 72,
+      "trained_model_ids": 36,
+      "results": 12886,
+      "artifacts": 360
+    },
+    "tool_return_artifact_kinds": [
+      "model",
+      "evaluation_report"
+    ],
+    "fit_and_eval_payload_keys": [
+      [
+        "task_id",
+        "evaluation_kind",
+        "evaluation_policy",
+        "error_summary",
+        "model_key",
+        "params",
+        "model_artifact_path",
+        "final_model_artifact_path",
+        "holdout_artifact_path",
+        "export_artifact_path",
+        "report_artifact_path",
+        "split_facts",
+        "preparation_facts",
+        "training_scopes",
+        "forecast_split_facts",
+        "forecast_preparation_facts",
+        "recommendation_split_facts",
+        "recommendation_preparation_facts",
+        "text_preparation_facts",
+        "text_preparation_specification",
+        "text_leakage_facts",
+        "text_vectorization_facts",
+        "text_clustering_evaluation",
+        "text_topic_evaluation",
+        "text_retrieval_evaluation",
+        "result_summary",
+        "trained_model_id",
+        "canonical_model_artifact_path",
+        "evaluation_model_artifact_path"
+      ],
+      [
+        "task_id",
+        "evaluation_kind",
+        "evaluation_policy",
+        "error_summary",
+        "trained_model_id",
+        "model_key",
+        "evaluation",
+        "baseline_evaluation",
+        "comparison",
+        "split_facts",
+        "preparation_facts",
+        "forecast_evaluation",
+        "clustering_evaluation",
+        "recommendation_evaluation",
+        "text_classification_evaluation",
+        "text_clustering_evaluation",
+        "text_topic_evaluation",
+        "text_retrieval_evaluation"
+      ]
+    ]
+  },
+  {
+    "variant": "standard",
+    "trace_run": "eda04287e17742d8b51f180d1155917d",
+    "trace_round": 9,
+    "run_name": "queue_router_bigram_mindf2",
+    "params": {
+      "minimum_document_frequency": 2,
+      "phrase_mode": "unigram_bigram"
+    },
+    "holdout": {
+      "accuracy": 0.9444444444444444,
+      "balanced_accuracy": 0.9444444444444445,
+      "precision_macro": 0.9523809523809524,
+      "precision_weighted": 0.9523809523809523,
+      "recall_macro": 0.9444444444444445,
+      "recall_weighted": 0.9444444444444444,
+      "f1_macro": 0.9440559440559442,
+      "f1_weighted": 0.9440559440559441,
+      "log_loss": 0.6818569728892053,
+      "roc_auc": 0.9722222222222222,
+      "pr_auc": 0.9452380952380951
+    },
+    "confusion": [
+      [
+        6,
+        0,
+        0
+      ],
+      [
+        0,
+        5,
+        1
+      ],
+      [
+        0,
+        0,
+        6
+      ]
+    ],
+    "baseline_accuracy": 0.3333333333333333,
+    "split": {
+      "realized_strategy": "group_hash_holdout.v2",
+      "train_row_count": 72,
+      "holdout_row_count": 18,
+      "eligible_group_count": 15,
+      "group_overlap_count": 0
+    },
+    "applied": {
+      "history": {
+        "count": 90,
+        "accuracy": 1.0,
+        "wrong_ticket_ids": []
+      },
+      "new_batch": {
+        "count": 30,
+        "accuracy": 0.9333333333333333,
+        "wrong_ticket_ids": [
+          "T-60CF1C49",
+          "T-ADB30E47"
+        ]
+      }
+    },
+    "tool_result_bytes": 13453,
+    "tool_result_top_level_bytes": {
+      "dataset_id": 34,
+      "task_ids": 72,
+      "trained_model_ids": 36,
+      "results": 12870,
+      "artifacts": 360
+    },
+    "tool_return_artifact_kinds": [
+      "model",
+      "evaluation_report"
+    ],
+    "fit_and_eval_payload_keys": [
+      [
+        "task_id",
+        "evaluation_kind",
+        "evaluation_policy",
+        "error_summary",
+        "model_key",
+        "params",
+        "model_artifact_path",
+        "final_model_artifact_path",
+        "holdout_artifact_path",
+        "export_artifact_path",
+        "report_artifact_path",
+        "split_facts",
+        "preparation_facts",
+        "training_scopes",
+        "forecast_split_facts",
+        "forecast_preparation_facts",
+        "recommendation_split_facts",
+        "recommendation_preparation_facts",
+        "text_preparation_facts",
+        "text_preparation_specification",
+        "text_leakage_facts",
+        "text_vectorization_facts",
+        "text_clustering_evaluation",
+        "text_topic_evaluation",
+        "text_retrieval_evaluation",
+        "result_summary",
+        "trained_model_id",
+        "canonical_model_artifact_path",
+        "evaluation_model_artifact_path"
+      ],
+      [
+        "task_id",
+        "evaluation_kind",
+        "evaluation_policy",
+        "error_summary",
+        "trained_model_id",
+        "model_key",
+        "evaluation",
+        "baseline_evaluation",
+        "comparison",
+        "split_facts",
+        "preparation_facts",
+        "forecast_evaluation",
+        "clustering_evaluation",
+        "recommendation_evaluation",
+        "text_classification_evaluation",
+        "text_clustering_evaluation",
+        "text_topic_evaluation",
+        "text_retrieval_evaluation"
+      ]
+    ]
+  },
+  {
+    "variant": "standard",
+    "trace_run": "eda04287e17742d8b51f180d1155917d",
+    "trace_round": 9,
+    "run_name": "queue_router_bigram_noweight",
+    "params": {
+      "class_weight": "none",
+      "max_features": 20000,
+      "phrase_mode": "unigram_bigram"
+    },
+    "holdout": {
+      "accuracy": 0.7777777777777778,
+      "balanced_accuracy": 0.7777777777777778,
+      "precision_macro": 0.7738095238095237,
+      "precision_weighted": 0.7738095238095237,
+      "recall_macro": 0.7777777777777778,
+      "recall_weighted": 0.7777777777777778,
+      "f1_macro": 0.7641025641025642,
+      "f1_weighted": 0.764102564102564,
+      "log_loss": 0.8611213456677104,
+      "roc_auc": 0.9814814814814814,
+      "pr_auc": 0.959126984126984
+    },
+    "confusion": [
+      [
+        6,
+        0,
+        0
+      ],
+      [
+        0,
+        5,
+        1
+      ],
+      [
+        1,
+        2,
+        3
+      ]
+    ],
+    "baseline_accuracy": 0.3333333333333333,
+    "split": {
+      "realized_strategy": "group_hash_holdout.v2",
+      "train_row_count": 72,
+      "holdout_row_count": 18,
+      "eligible_group_count": 15,
+      "group_overlap_count": 0
+    },
+    "applied": {
+      "history": {
+        "count": 90,
+        "accuracy": 1.0,
+        "wrong_ticket_ids": []
+      },
+      "new_batch": {
+        "count": 30,
+        "accuracy": 0.9333333333333333,
+        "wrong_ticket_ids": [
+          "T-60CF1C49",
+          "T-ADB30E47"
+        ]
+      }
+    },
+    "tool_result_bytes": 13466,
+    "tool_result_top_level_bytes": {
+      "dataset_id": 34,
+      "task_ids": 72,
+      "trained_model_ids": 36,
+      "results": 12883,
+      "artifacts": 360
+    },
+    "tool_return_artifact_kinds": [
+      "model",
+      "evaluation_report"
+    ],
+    "fit_and_eval_payload_keys": [
+      [
+        "task_id",
+        "evaluation_kind",
+        "evaluation_policy",
+        "error_summary",
+        "model_key",
+        "params",
+        "model_artifact_path",
+        "final_model_artifact_path",
+        "holdout_artifact_path",
+        "export_artifact_path",
+        "report_artifact_path",
+        "split_facts",
+        "preparation_facts",
+        "training_scopes",
+        "forecast_split_facts",
+        "forecast_preparation_facts",
+        "recommendation_split_facts",
+        "recommendation_preparation_facts",
+        "text_preparation_facts",
+        "text_preparation_specification",
+        "text_leakage_facts",
+        "text_vectorization_facts",
+        "text_clustering_evaluation",
+        "text_topic_evaluation",
+        "text_retrieval_evaluation",
+        "result_summary",
+        "trained_model_id",
+        "canonical_model_artifact_path",
+        "evaluation_model_artifact_path"
+      ],
+      [
+        "task_id",
+        "evaluation_kind",
+        "evaluation_policy",
+        "error_summary",
+        "trained_model_id",
+        "model_key",
+        "evaluation",
+        "baseline_evaluation",
+        "comparison",
+        "split_facts",
+        "preparation_facts",
+        "forecast_evaluation",
+        "clustering_evaluation",
+        "recommendation_evaluation",
+        "text_classification_evaluation",
+        "text_clustering_evaluation",
+        "text_topic_evaluation",
+        "text_retrieval_evaluation"
+      ]
+    ]
+  },
+  {
+    "variant": "standard",
+    "trace_run": "eda04287e17742d8b51f180d1155917d",
+    "trace_round": 10,
+    "run_name": "queue_router_unigram_mindf2",
+    "params": {
+      "minimum_document_frequency": 2,
+      "phrase_mode": "unigram"
+    },
+    "holdout": {
+      "accuracy": 0.9444444444444444,
+      "balanced_accuracy": 0.9444444444444445,
+      "precision_macro": 0.9523809523809524,
+      "precision_weighted": 0.9523809523809523,
+      "recall_macro": 0.9444444444444445,
+      "recall_weighted": 0.9444444444444444,
+      "f1_macro": 0.9440559440559442,
+      "f1_weighted": 0.9440559440559441,
+      "log_loss": 0.6779266231124979,
+      "roc_auc": 0.9722222222222222,
+      "pr_auc": 0.9452380952380951
+    },
+    "confusion": [
+      [
+        6,
+        0,
+        0
+      ],
+      [
+        0,
+        5,
+        1
+      ],
+      [
+        0,
+        0,
+        6
+      ]
+    ],
+    "baseline_accuracy": 0.3333333333333333,
+    "split": {
+      "realized_strategy": "group_hash_holdout.v2",
+      "train_row_count": 72,
+      "holdout_row_count": 18,
+      "eligible_group_count": 15,
+      "group_overlap_count": 0
+    },
+    "applied": {
+      "history": {
+        "count": 90,
+        "accuracy": 1.0,
+        "wrong_ticket_ids": []
+      },
+      "new_batch": {
+        "count": 30,
+        "accuracy": 0.9333333333333333,
+        "wrong_ticket_ids": [
+          "T-60CF1C49",
+          "T-ADB30E47"
+        ]
+      }
+    },
+    "tool_result_bytes": 13432,
+    "tool_result_top_level_bytes": {
+      "dataset_id": 34,
+      "task_ids": 72,
+      "trained_model_ids": 36,
+      "results": 12849,
+      "artifacts": 360
+    },
+    "tool_return_artifact_kinds": [
+      "model",
+      "evaluation_report"
+    ],
+    "fit_and_eval_payload_keys": [
+      [
+        "task_id",
+        "evaluation_kind",
+        "evaluation_policy",
+        "error_summary",
+        "model_key",
+        "params",
+        "model_artifact_path",
+        "final_model_artifact_path",
+        "holdout_artifact_path",
+        "export_artifact_path",
+        "report_artifact_path",
+        "split_facts",
+        "preparation_facts",
+        "training_scopes",
+        "forecast_split_facts",
+        "forecast_preparation_facts",
+        "recommendation_split_facts",
+        "recommendation_preparation_facts",
+        "text_preparation_facts",
+        "text_preparation_specification",
+        "text_leakage_facts",
+        "text_vectorization_facts",
+        "text_clustering_evaluation",
+        "text_topic_evaluation",
+        "text_retrieval_evaluation",
+        "result_summary",
+        "trained_model_id",
+        "canonical_model_artifact_path",
+        "evaluation_model_artifact_path"
+      ],
+      [
+        "task_id",
+        "evaluation_kind",
+        "evaluation_policy",
+        "error_summary",
+        "trained_model_id",
+        "model_key",
+        "evaluation",
+        "baseline_evaluation",
+        "comparison",
+        "split_facts",
+        "preparation_facts",
+        "forecast_evaluation",
+        "clustering_evaluation",
+        "recommendation_evaluation",
+        "text_classification_evaluation",
+        "text_clustering_evaluation",
+        "text_topic_evaluation",
+        "text_retrieval_evaluation"
+      ]
+    ]
+  },
+  {
+    "variant": "standard",
+    "trace_run": "eda04287e17742d8b51f180d1155917d",
+    "trace_round": 10,
+    "run_name": "queue_router_bigram_mindf3",
+    "params": {
+      "minimum_document_frequency": 3,
+      "phrase_mode": "unigram_bigram"
+    },
+    "holdout": {
+      "accuracy": 0.7222222222222222,
+      "balanced_accuracy": 0.7222222222222223,
+      "precision_macro": 0.8484848484848485,
+      "precision_weighted": 0.8484848484848485,
+      "recall_macro": 0.7222222222222223,
+      "recall_weighted": 0.7222222222222222,
+      "f1_macro": 0.7049910873440286,
+      "f1_weighted": 0.7049910873440284,
+      "log_loss": 0.7583173970548827,
+      "roc_auc": 0.8657407407407407,
+      "pr_auc": 0.7853535353535354
+    },
+    "confusion": [
+      [
+        5,
+        0,
+        1
+      ],
+      [
+        0,
+        2,
+        4
+      ],
+      [
+        0,
+        0,
+        6
+      ]
+    ],
+    "baseline_accuracy": 0.3333333333333333,
+    "split": {
+      "realized_strategy": "group_hash_holdout.v2",
+      "train_row_count": 72,
+      "holdout_row_count": 18,
+      "eligible_group_count": 15,
+      "group_overlap_count": 0
+    },
+    "applied": {
+      "history": {
+        "count": 90,
+        "accuracy": 0.9666666666666667,
+        "wrong_ticket_ids": [
+          "T-022665D2",
+          "T-C0E54D75",
+          "T-AFFED53F"
+        ]
+      },
+      "new_batch": {
+        "count": 30,
+        "accuracy": 0.9333333333333333,
+        "wrong_ticket_ids": [
+          "T-60CF1C49",
+          "T-ADB30E47"
+        ]
+      }
+    },
+    "tool_result_bytes": 13468,
+    "tool_result_top_level_bytes": {
+      "dataset_id": 34,
+      "task_ids": 72,
+      "trained_model_ids": 36,
+      "results": 12885,
+      "artifacts": 360
+    },
+    "tool_return_artifact_kinds": [
+      "model",
+      "evaluation_report"
+    ],
+    "fit_and_eval_payload_keys": [
+      [
+        "task_id",
+        "evaluation_kind",
+        "evaluation_policy",
+        "error_summary",
+        "model_key",
+        "params",
+        "model_artifact_path",
+        "final_model_artifact_path",
+        "holdout_artifact_path",
+        "export_artifact_path",
+        "report_artifact_path",
+        "split_facts",
+        "preparation_facts",
+        "training_scopes",
+        "forecast_split_facts",
+        "forecast_preparation_facts",
+        "recommendation_split_facts",
+        "recommendation_preparation_facts",
+        "text_preparation_facts",
+        "text_preparation_specification",
+        "text_leakage_facts",
+        "text_vectorization_facts",
+        "text_clustering_evaluation",
+        "text_topic_evaluation",
+        "text_retrieval_evaluation",
+        "result_summary",
+        "trained_model_id",
+        "canonical_model_artifact_path",
+        "evaluation_model_artifact_path"
+      ],
+      [
+        "task_id",
+        "evaluation_kind",
+        "evaluation_policy",
+        "error_summary",
+        "trained_model_id",
+        "model_key",
+        "evaluation",
+        "baseline_evaluation",
+        "comparison",
+        "split_facts",
+        "preparation_facts",
+        "forecast_evaluation",
+        "clustering_evaluation",
+        "recommendation_evaluation",
+        "text_classification_evaluation",
+        "text_clustering_evaluation",
+        "text_topic_evaluation",
+        "text_retrieval_evaluation"
+      ]
+    ]
+  }
+]

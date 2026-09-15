@@ -1,0 +1,11 @@
+[
+  {
+    "at": "2026-09-14T05:42:09.026Z",
+    "command": [
+      "C:\\Program Files\\PowerShell\\7\\pwsh.exe",
+      "-Command",
+      "@'\nimport json,tempfile,time,sqlite3\nfrom pathlib import Path\nfor p in Path(tempfile.gettempdir()).glob('xenix-agent-benchmark-parent-*'):\n if p.stat().st_mtime<time.time()-1800:continue\n for q in p.glob('*.trace.jsonl'):\n  es=[json.loads(s) for s in q.read_text().splitlines()]\n  if not es or es[-1]['name']=='benchmark.cell.close':continue\n  op=next(e['attributes'] for e in es if e['name']=='benchmark.cell.open')\n  path=Path(op['runtime_home'])/'state/xenix.db'\n  print('trace age sec',round(time.time()-q.stat().st_mtime),'last event',es[-1]['name'],'offset',es[-1]['started_offset_seconds'])\n  if path.exists():\n   with sqlite3.connect(path.as_uri()+'?mode=ro',uri=True) as con:\n    for row in con.execute('select sequence_index,kind,tool_id,result_status,substr(text,1,180) from conversation_message order by sequence_index desc limit 5'):\n     print(row)\n'@ | .venv/Scripts/python.exe -"
+    ],
+    "output": "trace age sec 284 last event benchmark.subject.usage offset 16.842059899994638\r\n(17, 'pending_llm_sampling', None, None, None)\r\n(16, 'tool_result', None, 'failed', None)\r\n(15, 'tool_call', 'data.query', None, None)\r\n(14, 'assistant', None, None, None)\r\n(13, 'tool_result', None, 'succeeded', None)\r\n"
+  }
+]

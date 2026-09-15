@@ -16,6 +16,8 @@ from PySide6.QtWidgets import QMessageBox, QWidget
 from ..settings.contracts import SettingsTab
 
 if TYPE_CHECKING:
+    from ..dataset_audit_dialog import DatasetAuditDialog
+    from ..job_center import JobCenterDialog
     from ..knowledge_workspace import KnowledgeWorkspaceDialog
     from ..settings_dialog import SettingsDialog
     from ..software_update import SoftwareUpdateController
@@ -26,7 +28,9 @@ SettingsWindowFactory: TypeAlias = Callable[[QWidget], "SettingsDialog"]
 KnowledgeWindowFactory: TypeAlias = Callable[
     [QWidget, Callable[[], None]], "KnowledgeWorkspaceDialog"
 ]
-DetailWindowFactory: TypeAlias = Callable[[QWidget, list[str]], "ToolCallDetailView"]
+DetailWindowFactory: TypeAlias = Callable[[QWidget, list[int]], "ToolCallDetailView"]
+JobCenterWindowFactory: TypeAlias = Callable[[QWidget], "JobCenterDialog"]
+DatasetAuditWindowFactory: TypeAlias = Callable[[QWidget, int], "DatasetAuditDialog"]
 
 
 class AuxiliaryWindowCoordinator(QObject):
@@ -45,6 +49,8 @@ class AuxiliaryWindowCoordinator(QObject):
         settings_factory: SettingsWindowFactory,
         knowledge_factory: KnowledgeWindowFactory | None,
         detail_factory: DetailWindowFactory,
+        job_center_factory: JobCenterWindowFactory | None = None,
+        dataset_audit_factory: DatasetAuditWindowFactory | None = None,
         update_controller: SoftwareUpdateController | None = None,
     ) -> None:
         super().__init__(parent)
@@ -52,9 +58,13 @@ class AuxiliaryWindowCoordinator(QObject):
         self._settings_factory = settings_factory
         self._knowledge_factory = knowledge_factory
         self._detail_factory = detail_factory
+        self._job_center_factory = job_center_factory
+        self._dataset_audit_factory = dataset_audit_factory
         self._update_controller = update_controller
         self._settings_dialog: SettingsDialog | None = None
         self._knowledge_dialog: KnowledgeWorkspaceDialog | None = None
+        self._job_center_dialog: JobCenterDialog | None = None
+        self._dataset_audit_dialog: DatasetAuditDialog | None = None
         self._detail_views: list[ToolCallDetailView] = []
         self._shutdown = False
         self._auto_check_timer = QTimer(self)
@@ -95,7 +105,24 @@ class AuxiliaryWindowCoordinator(QObject):
             dialog.destroyed.connect(self._forget_knowledge_dialog)
         self._show_and_activate(dialog)
 
-    def show_tool_call_detail(self, *, task_ids: list[str]) -> None:
+    def show_jobs(self) -> None:
+        if self._shutdown:
+            return
+        if self._job_center_factory is None:
+            QMessageBox.warning(
+                self._owner,
+                QCoreApplication.translate("MainWindow", "Jobs"),
+                QCoreApplication.translate("MainWindow", "Job services are not available."),
+            )
+            return
+        dialog = self._job_center_dialog
+        if dialog is None:
+            dialog = self._job_center_factory(self._owner)
+            self._job_center_dialog = dialog
+            dialog.destroyed.connect(self._forget_job_center_dialog)
+        self._show_and_activate(dialog)
+
+    def show_tool_call_detail(self, *, task_ids: list[int]) -> None:
         if self._shutdown or not task_ids:
             return
         view = self._detail_factory(self._owner, task_ids)
@@ -105,11 +132,45 @@ class AuxiliaryWindowCoordinator(QObject):
         self._detail_views.append(view)
         self._show_and_activate(view)
 
+    def show_dataset_audit(self, *, thread_id: int | None) -> None:
+        if self._shutdown:
+            return
+        if not thread_id:
+            QMessageBox.information(
+                self._owner,
+                QCoreApplication.translate("MainWindow", "Datasets"),
+                QCoreApplication.translate(
+                    "MainWindow", "Open a conversation to inspect its datasets."
+                ),
+            )
+            return
+        if self._dataset_audit_factory is None:
+            QMessageBox.warning(
+                self._owner,
+                QCoreApplication.translate("MainWindow", "Datasets"),
+                QCoreApplication.translate(
+                    "MainWindow", "Dataset audit services are not available."
+                ),
+            )
+            return
+        dialog = self._dataset_audit_dialog
+        if dialog is None:
+            dialog = self._dataset_audit_factory(self._owner, thread_id)
+            self._dataset_audit_dialog = dialog
+            dialog.destroyed.connect(self._forget_dataset_audit_dialog)
+        else:
+            dialog.set_thread_id(thread_id)
+        self._show_and_activate(dialog)
+
     def retranslate_ui(self) -> None:
         if self._settings_dialog is not None:
             self._settings_dialog.retranslate_ui()
         if self._knowledge_dialog is not None:
             self._knowledge_dialog.retranslate_ui()
+        if self._job_center_dialog is not None:
+            self._job_center_dialog.retranslate_ui()
+        if self._dataset_audit_dialog is not None:
+            self._dataset_audit_dialog.retranslate_ui()
         if self._update_controller is not None:
             self._update_controller.retranslate_ui()
 
@@ -124,6 +185,10 @@ class AuxiliaryWindowCoordinator(QObject):
             self._settings_dialog.shutdown()
         if self._knowledge_dialog is not None:
             self._knowledge_dialog.shutdown()
+        if self._job_center_dialog is not None:
+            self._job_center_dialog.shutdown()
+        if self._dataset_audit_dialog is not None:
+            self._dataset_audit_dialog.close()
         for view in tuple(self._detail_views):
             view.close()
             view.deleteLater()
@@ -168,3 +233,9 @@ class AuxiliaryWindowCoordinator(QObject):
 
     def _forget_knowledge_dialog(self, _object: object = None) -> None:
         self._knowledge_dialog = None
+
+    def _forget_job_center_dialog(self, _object: object = None) -> None:
+        self._job_center_dialog = None
+
+    def _forget_dataset_audit_dialog(self, _object: object = None) -> None:
+        self._dataset_audit_dialog = None

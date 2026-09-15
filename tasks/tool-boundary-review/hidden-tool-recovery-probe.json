@@ -1,0 +1,50 @@
+{
+  "advertised": [
+    "probe.visible"
+  ],
+  "invoked_counts": [
+    1,
+    2
+  ],
+  "results": [
+    {
+      "status": "succeeded",
+      "value": {
+        "count": 1
+      }
+    },
+    {
+      "status": "failed",
+      "value": {
+        "type": "tool_failure",
+        "code": "llm_tool_not_registered",
+        "message": "Tool 'probe_missing' is not registered."
+      }
+    },
+    {
+      "status": "failed",
+      "value": {
+        "type": "tool_failure",
+        "code": "llm_tool_arguments_invalid",
+        "message": "Tool arguments do not match the registered input model.",
+        "details": {
+          "schema_keyword": "schema",
+          "validation_errors": [
+            {
+              "field": "count",
+              "message": "Input should be a valid integer, unable to parse string as an integer"
+            }
+          ]
+        },
+        "retryable": false
+      }
+    },
+    {
+      "status": "succeeded",
+      "value": {
+        "count": 2
+      }
+    }
+  ],
+  "evidence_limit": "Scripted provider through production registry, Harness, Conversation and isolated SQLite."
+}

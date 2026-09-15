@@ -1,0 +1,74 @@
+{
+  "case_id": "business.routing.v1.confirmation",
+  "required_accuracy": 0.9,
+  "tables": [
+    {
+      "uri": "artifact://194",
+      "prediction_column": "suggested_queue",
+      "rows": 30,
+      "correct": 26,
+      "accuracy": 0.8666666666666667,
+      "errors": [
+        {
+          "ticket_id": "T-01CA1F80",
+          "prediction": "发票",
+          "expected": "退换货"
+        },
+        {
+          "ticket_id": "T-B943C179",
+          "prediction": "退换货",
+          "expected": "物流"
+        },
+        {
+          "ticket_id": "T-D00705F3",
+          "prediction": "发票",
+          "expected": "物流"
+        },
+        {
+          "ticket_id": "T-F7F8AD2D",
+          "prediction": "发票",
+          "expected": "退换货"
+        }
+      ],
+      "all_candidate_projections": [
+        "PredictionMatch(accuracy=1.0, prediction_column='channel', label_mapping={'微信': '退换货', '电话': '发票', '邮件': '物流'})",
+        "PredictionMatch(accuracy=0.8666666666666667, prediction_column='suggested_queue', label_mapping={'发票': '发票', '物流': '物流', '退换货': '退换货'})",
+        "PredictionMatch(accuracy=0.5, prediction_column='routing_action', label_mapping={'Auto-route': '发票', 'Review': '物流'})"
+      ]
+    },
+    {
+      "uri": "artifact://180",
+      "prediction_column": "prediction",
+      "rows": 30,
+      "correct": 26,
+      "accuracy": 0.8666666666666667,
+      "errors": [
+        {
+          "ticket_id": "T-01CA1F80",
+          "prediction": "发票",
+          "expected": "退换货"
+        },
+        {
+          "ticket_id": "T-B943C179",
+          "prediction": "退换货",
+          "expected": "物流"
+        },
+        {
+          "ticket_id": "T-D00705F3",
+          "prediction": "发票",
+          "expected": "物流"
+        },
+        {
+          "ticket_id": "T-F7F8AD2D",
+          "prediction": "发票",
+          "expected": "退换货"
+        }
+      ],
+      "all_candidate_projections": [
+        "PredictionMatch(accuracy=1.0, prediction_column='channel', label_mapping={'微信': '退换货', '电话': '发票', '邮件': '物流'})",
+        "PredictionMatch(accuracy=0.8666666666666667, prediction_column='prediction', label_mapping={'发票': '发票', '物流': '物流', '退换货': '退换货'})"
+      ]
+    }
+  ],
+  "judge_verdict": "fail"
+}

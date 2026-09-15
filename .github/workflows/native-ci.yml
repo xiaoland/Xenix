@@ -18,8 +18,10 @@ jobs:
         with:
           python-version: "3.14.2"
       - run: python -m pip install pdm==2.26.6
-      - name: Install locked dependencies
-        run: pdm install --frozen-lockfile -G :all
+      - name: Synchronize locked environment
+        run: pdm sync --clean -G :all
+      - name: Prepare generated runtime resources
+        run: pdm run prepare
       - name: Run static checks and preflights
         run: pdm run check
       - name: Run high-value acceptance portfolio
@@ -33,7 +35,7 @@ jobs:
         run: pdm run ui-native-smoke
       - name: Build UI artifact index
         if: always()
-        run: python -m scripts.ui_lab.artifact_index --root ui-artifacts
+        run: pdm run ui-artifacts-index
       - name: Preserve test report
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

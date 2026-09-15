@@ -18,32 +18,32 @@ from .contracts import ScenarioContext, ScenarioHandle, ready_immediately
 class _SyntheticHistory:
     def __init__(self) -> None:
         self._threads = [
-            HistoryThreadSummary("thread:synthetic:001", "Quarterly sales overview"),
-            HistoryThreadSummary("thread:synthetic:002", None),
-            HistoryThreadSummary("thread:synthetic:003", "Regional demand forecast"),
+            HistoryThreadSummary(1, "Quarterly sales overview"),
+            HistoryThreadSummary(2, None),
+            HistoryThreadSummary(3, "Regional demand forecast"),
         ]
 
     def list_threads(self) -> Sequence[HistoryThreadSummary]:
         return tuple(self._threads)
 
-    def rename_thread(self, thread_id: str, title: str | None) -> HistoryThreadSummary:
+    def rename_thread(self, thread_id: int, title: str | None) -> HistoryThreadSummary:
         summary = HistoryThreadSummary(thread_id, title)
         self._threads = [summary if row.id == thread_id else row for row in self._threads]
         return summary
 
-    def delete_thread(self, thread_id: str) -> None:
+    def delete_thread(self, thread_id: int) -> None:
         self._threads = [row for row in self._threads if row.id != thread_id]
 
     def has_title_provider(self) -> bool:
         return True
 
-    def generate_thread_title(self, thread_id: str) -> str:
+    def generate_thread_title(self, thread_id: int) -> str:
         return "Synthetic thread title"
 
 
 def build_history_populated(_context: ScenarioContext) -> ScenarioHandle:
     panel = HistoryPanel(_SyntheticHistory(), is_thread_running=lambda _thread_id: False)
-    panel.refresh("thread:synthetic:001")
+    panel.refresh(1)
     return ScenarioHandle(panel, ready_immediately, panel.shutdown)
 
 

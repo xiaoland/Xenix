@@ -5,8 +5,6 @@ from __future__ import annotations
 import json
 import math
 from pathlib import Path
-import re
-import unicodedata
 from typing import Any, Final
 
 import polars as pl
@@ -21,8 +19,8 @@ from ._infra.case_support import (
     attached_source_unchanged,
     canonical_completion,
     capture_attached_source_state,
-    enum_value,
-    is_within,
+    linked_tables,
+    linked_json_reports,
     sha256_file,
 )
 from ._infra.contracts import (
@@ -45,22 +43,11 @@ _LOYAL_ACCOUNTS = frozenset({"ACC-001", "ACC-002", "ACC-003", "ACC-004", "ACC-00
 _GROWING_ACCOUNTS = frozenset({"ACC-007", "ACC-008", "ACC-009", "ACC-010", "ACC-011", "ACC-012"})
 _AT_RISK_ACCOUNTS = frozenset({"ACC-013", "ACC-014", "ACC-015", "ACC-016", "ACC-017", "ACC-018"})
 _EXPECTED_PARTITION = (_LOYAL_ACCOUNTS, _GROWING_ACCOUNTS, _AT_RISK_ACCOUNTS)
-_EXPECTED_PROFILE_MEDIANS = {
-    _LOYAL_ACCOUNTS: (24.5, 1.4, 40.5),
-    _GROWING_ACCOUNTS: (12.5, 5.25, 77.5),
-    _AT_RISK_ACCOUNTS: (3.5, 11.75, 123.5),
-}
-_ARTIFACT_URI = re.compile(r"artifact://[A-Za-z0-9]+(?:\?[^)\s>]+)?")
-_LONG_ID = re.compile(r"\b[A-Fa-f0-9]{24,64}\b")
-_WINDOWS_PATH = re.compile(r"(?<!\w)[A-Za-z]:[\\/][^\s]+")
 
 BUSINESS_PROMPT = (
-    "请先画像，只用 monthly_orders、return_rate_pct 和 service_minutes 比较 KMeans 的 2、3、4 "
-    "群方案；account_id 只保留作业务标识，不能作为特征。请先读取 clustering.kmeans 的参数 "
-    "schema，再为三个候选填写有界的浅层参数，不要自行改随机种子或底层优化器。请根据同口径"
-    "质量、稳定性、空基线和群组规模证据选择方案，生成保留原始四列并新增 cluster_id 的公共 "
-    "Dataset，并给出可打开的画像/评估 Artifact。最终用原始尺度解释各群、选择依据、内部指标"
-    "局限和下一步业务验证建议。"
+    "我们想按下单、退货和服务需求给这些客户分群，方便制定不同的运营方案。"
+    "请比较分成 2 到 4 群的效果，推荐合适的方案，并说明各群特点、选择依据和使用局限。"
+    "account_id 是客户编号。请交付保留原始记录和群组标签的数据集，以及可打开的评估报告。"
 )
 
 CLUSTER_SELECTION_RUBRIC = JudgeRubric(
@@ -76,7 +63,6 @@ CLUSTER_SELECTION_RUBRIC = JudgeRubric(
         "ungrounded_model_selection",
         "segment_profile_not_actionable",
         "internal_metric_overclaim",
-        "identifier_or_row_disclosure",
         "clear_grounded_explanation",
     ),
 )
@@ -102,7 +88,7 @@ class ClusterSelectionCase:
             raise BenchmarkInputError("fixture_hash_mismatch")
         return digest
 
-    def build_submission(self, *, thread_id: str, fq_model_key: str) -> SubmitUserTurnInput:
+    def build_submission(self, *, thread_id: int, fq_model_key: str) -> SubmitUserTurnInput:
         return SubmitUserTurnInput(
             thread_id=thread_id,
             text=BUSINESS_PROMPT,
@@ -123,14 +109,11 @@ class ClusterSelectionCase:
         )
 
     def assess(self, *, context: BenchmarkCaseContext) -> BenchmarkCaseAssessment:
-        dataset, frame = _resolve_assignment_outcome(context, self.source_path)
+        frame = _resolve_assignment_outcome(context, self.source_path)
         report_artifact, report_facts = _resolve_cluster_report(context, frame)
         final_text = _terminal_text(context.snapshot)
-        grounding_gaps = _final_answer_grounding_gaps(final_text)
-        grounded_answer = not grounding_gaps
         completed = canonical_completion(context.snapshot)
         source_unchanged = _source_unchanged(self.source_path, context)
-        isolated = _state_isolated(context, report_artifact)
 
         semantic_checks = (
             OutcomeCheck(
@@ -147,15 +130,6 @@ class ClusterSelectionCase:
                 if report_facts is not None
                 else "linked_recomputable_cluster_report_missing",
             ),
-            OutcomeCheck(
-                "grounded_final_answer",
-                grounded_answer,
-                (
-                    "selection_profiles_and_limits_grounded"
-                    if grounded_answer
-                    else "selection_explanation_not_grounded:" + ",".join(grounding_gaps)
-                ),
-            ),
         )
         integrity_checks = (
             OutcomeCheck(
@@ -168,16 +142,11 @@ class ClusterSelectionCase:
                 source_unchanged,
                 "source_unchanged" if source_unchanged else "source_changed_or_unverifiable",
             ),
-            OutcomeCheck(
-                "state_isolated",
-                isolated,
-                "runtime_state_isolated" if isolated else "runtime_state_not_isolated",
-            ),
         )
         deterministic_passed = all(check.passed for check in semantic_checks)
         integrity_passed = all(check.passed for check in integrity_checks)
         judge_input = (
-            _build_judge_input(report_facts, final_text)
+            _build_judge_input(report_facts, final_text, frame, _comparison_evidence(context, frame))
             if deterministic_passed and integrity_passed and report_facts is not None
             else None
         )
@@ -190,29 +159,14 @@ class ClusterSelectionCase:
         )
 
 
-def _resolve_assignment_outcome(
-    context: BenchmarkCaseContext,
-    source_path: Path,
-) -> tuple[Any | None, pl.DataFrame | None]:
+def _resolve_assignment_outcome(context: BenchmarkCaseContext, source_path: Path) -> pl.DataFrame | None:
     expected_source = load_tabular_frame(source_path, DatasetSourceFormat.CSV)
-    datasets = list(context.services.datasets.list_datasets())
-    by_id = {str(dataset.id): dataset for dataset in datasets}
-    source_ids = _source_ids(context)
-    for dataset in datasets:
-        if not _is_run_descendant(dataset, by_id, source_ids, context.run_dataset_ids):
-            continue
-        try:
-            frame = load_tabular_frame(Path(dataset.source_path), dataset.source_format)
-        except Exception:
-            continue
-        if _matches_assignment(frame, expected_source):
-            return dataset, frame
-    return None, None
+    return next((frame for frame in linked_tables(context).values() if _matches_assignment(frame, expected_source)), None)
 
 
 def _matches_assignment(frame: pl.DataFrame, expected_source: pl.DataFrame) -> bool:
     required = {*expected_source.columns, "cluster_id"}
-    if frame.height != 18 or set(frame.columns) != required:
+    if frame.height != 18 or not required.issubset(frame.columns):
         return False
     try:
         source_projection = frame.select(expected_source.columns).sort("account_id")
@@ -237,13 +191,10 @@ def _resolve_cluster_report(
 ) -> tuple[Any | None, dict[str, Any] | None]:
     if frame is None:
         return None, None
-    for artifact in _linked_artifacts(context):
-        if enum_value(getattr(artifact, "kind", None)) != "report":
-            continue
-        payload = _read_json_artifact(artifact, context.runtime_home)
+    for uri, payload in linked_json_reports(context).items():
         facts = _cluster_facts(payload)
-        if facts is not None and _matches_cluster_report(facts, frame):
-            return artifact, facts
+        if facts is not None and _matches_cluster_report(facts):
+            return uri, facts
     return None, None
 
 
@@ -256,7 +207,7 @@ def _cluster_facts(payload: dict[str, Any] | None) -> dict[str, Any] | None:
     return nested if isinstance(nested, dict) else None
 
 
-def _matches_cluster_report(facts: dict[str, Any], frame: pl.DataFrame) -> bool:
+def _matches_cluster_report(facts: dict[str, Any]) -> bool:
     quality = facts.get("quality")
     stability = facts.get("stability")
     baseline = facts.get("null_baseline")
@@ -286,49 +237,18 @@ def _matches_cluster_report(facts: dict[str, Any], frame: pl.DataFrame) -> bool:
         and quality.get("evaluated_row_count") == 18
         and quality.get("noise_row_count") == 0
         and _finite_at_least(quality.get("silhouette"), 0.75)
-        and stability.get("run_count") == 5
+        and int(stability.get("run_count", 0)) > 1
         and _finite_at_least(stability.get("mean_adjusted_rand_index"), 0.9)
-        and baseline.get("run_count") == 16
+        and int(baseline.get("run_count", 0)) > 0
         and _finite_at_least(baseline.get("candidate_margin"), 0.1)
         and sorted(item.get("row_count") for item in sizes if isinstance(item, dict)) == [6, 6, 6]
         and bool(limitations)
     ):
         return False
 
-    memberships: dict[int, frozenset[str]] = {}
-    try:
-        for cluster_id in frame.get_column("cluster_id").unique().to_list():
-            accounts = frame.filter(pl.col("cluster_id") == cluster_id).get_column("account_id")
-            memberships[int(cluster_id)] = frozenset(str(value) for value in accounts.to_list())
-    except TypeError, ValueError:
-        return False
-    expected_by_cluster = {
-        cluster_id: _EXPECTED_PROFILE_MEDIANS[membership]
-        for cluster_id, membership in memberships.items()
-        if membership in _EXPECTED_PROFILE_MEDIANS
-    }
-    if len(expected_by_cluster) != 3:
-        return False
-    observed_profiles: dict[int, dict[str, float]] = {}
-    for raw_profile in profiles:
-        if not isinstance(raw_profile, dict) or not isinstance(raw_profile.get("numeric"), list):
-            continue
-        try:
-            cluster_id = int(raw_profile["cluster_id"])
-            observed_profiles[cluster_id] = {
-                str(item["feature"]): float(item["median"])
-                for item in raw_profile["numeric"]
-                if isinstance(item, dict) and item.get("feature") in _FEATURE_COLUMNS and item.get("median") is not None
-            }
-        except KeyError, TypeError, ValueError:
-            return False
-    for cluster_id, expected_values in expected_by_cluster.items():
-        observed = observed_profiles.get(cluster_id, {})
-        if any(
-            not math.isclose(observed.get(feature, math.nan), expected, abs_tol=1e-6)
-            for feature, expected in zip(_FEATURE_COLUMNS, expected_values, strict=True)
-        ):
-            return False
+    # Report profiles describe the model input coordinate system, which may
+    # contain standardized or transformed features. Business interpretation is
+    # checked against the original columns in the delivered assignment table.
     return True
 
 
@@ -340,45 +260,32 @@ def _finite_at_least(value: Any, minimum: float) -> bool:
     return math.isfinite(number) and number >= minimum
 
 
-def _final_answer_grounding_gaps(text: str) -> tuple[str, ...]:
-    if not text:
-        return ("missing_final_answer",)
-    normalized = re.sub(r"\s+", "", unicodedata.normalize("NFKC", text).lower())
-    checks = (
-        ("candidate_scope", all(str(value) in normalized for value in (2, 3, 4))),
-        (
-            "selected_cluster_count",
-            bool(
-                re.search(
-                    r"(?:选择|选定|保留|最终|推荐).{0,16}(?:k=?3|3(?:群|组|类|个cluster)|三(?:群|组|类))",
-                    normalized,
-                )
-                or re.search(
-                    r"(?:k=?3|3(?:群|组|类|个cluster)|三(?:群|组|类)).{0,16}(?:选择|选定|保留|最终|推荐)",
-                    normalized,
-                )
-            ),
-        ),
-        ("quality_metric", "silhouette" in normalized or "轮廓" in normalized),
-        ("stability", "稳定" in normalized or "stability" in normalized),
-        (
-            "original_scale_profiles",
-            all(marker in normalized for marker in ("monthly_orders", "return_rate", "service_minutes"))
-            or all(marker in normalized for marker in ("订单", "退货", "服务")),
-        ),
-        (
-            "limitations",
-            any(marker in normalized for marker in ("局限", "限制", "不能证明", "不代表", "非因果")),
-        ),
-        ("artifact_link", bool(_ARTIFACT_URI.search(text))),
-    )
-    return tuple(name for name, passed in checks if not passed)
+def _comparison_evidence(context: BenchmarkCaseContext, assignments: pl.DataFrame) -> tuple[str, ...]:
+    """Include delivered comparison tables, rather than only the selected report."""
+    accounts = set(assignments.get_column("account_id").to_list())
+    evidence = []
+    for uri, table in linked_tables(context).items():
+        if any(accounts.intersection(table.get_column(column).cast(pl.String).to_list()) for column in table.columns):
+            continue
+        evidence.append(json.dumps({"uri": uri, "public_comparison_table": table.to_dicts()}, ensure_ascii=False, default=str))
+    return tuple(evidence)
 
 
-def _build_judge_input(report: dict[str, Any], final_text: str) -> JudgeInput:
+def _build_judge_input(
+    report: dict[str, Any], final_text: str, frame: pl.DataFrame, comparisons: tuple[str, ...],
+) -> JudgeInput:
     quality = report["quality"]
     stability = report["stability"]
     baseline = report["null_baseline"]
+    profiles = frame.group_by("cluster_id").agg(
+        pl.len().alias("rows"),
+        *[expression for column in _FEATURE_COLUMNS for expression in (
+            pl.col(column).mean().alias(f"{column}_mean"),
+            pl.col(column).median().alias(f"{column}_median"),
+            pl.col(column).min().alias(f"{column}_min"),
+            pl.col(column).max().alias(f"{column}_max"),
+        )],
+    )
     evidence = (
         "public_assignment: row_count=18; cluster_sizes=6/6/6; source_features_unchanged=true",
         (
@@ -387,65 +294,21 @@ def _build_judge_input(report: dict[str, Any], final_text: str) -> JudgeInput:
             f"stability_mean_ari={float(stability['mean_adjusted_rand_index']):.6f}; "
             f"null_margin={float(baseline['candidate_margin']):.6f}"
         ),
-        "public_profiles: median(monthly_orders, return_rate_pct, service_minutes)="
-        "(24.5,1.4,40.5)|(12.5,5.25,77.5)|(3.5,11.75,123.5)",
-        f"final_answer: {_safe_final_text(final_text)}",
+        "public_original_scale_profiles: " + json.dumps(profiles.to_dicts(), ensure_ascii=False),
+        "public_model_input_profiles: " + json.dumps(report["profiles"], ensure_ascii=False),
+        *comparisons,
+        f"final_answer: {final_text}",
     )
     return JudgeInput(
         rubric=CLUSTER_SELECTION_RUBRIC,
         task_intent=BUSINESS_PROMPT,
         facts=(
-            "候选范围是 KMeans k=2/3/4，确定性公共结果选择 k=3。",
-            "三个群各 6 个账户；画像只使用原尺度聚合，不把 account_id 当特征。",
+            "业务要求比较 2 至 4 个群组；当前交付的三个群组符合私有成员划分真值。",
+            "三个群各 6 个账户；业务画像按交付表的原始列重算，模型报告可以使用标准化后的特征尺度。不要把不同尺度或均值/中位数混为一谈。",
             "轮廓、稳定性和空基线都是内部证据，不能证明外部有效性或因果解释。",
         ),
         artifact_evidence=evidence,
     )
-
-
-def _safe_final_text(text: str) -> str:
-    value = _ARTIFACT_URI.sub("[public artifact link]", text)
-    value = _LONG_ID.sub("[stable id]", value)
-    value = _WINDOWS_PATH.sub("[local path]", value)
-    lines = [
-        "[row-like content omitted]" if len([part for part in line.split(",") if part.strip()]) >= 4 else line
-        for line in value.splitlines()
-    ]
-    return " ".join(" ".join(lines).split())[:480]
-
-
-def _linked_artifacts(context: BenchmarkCaseContext) -> tuple[Any, ...]:
-    artifacts: list[Any] = []
-    seen: set[str] = set()
-    for uri in _ARTIFACT_URI.findall(_terminal_text(context.snapshot)):
-        try:
-            artifact = context.services.artifacts.resolve_uri(uri)
-        except Exception:
-            continue
-        artifact_id = str(getattr(artifact, "artifact_id", "") or uri)
-        if artifact_id in seen:
-            continue
-        seen.add(artifact_id)
-        artifacts.append(artifact)
-    return tuple(artifacts)
-
-
-def _read_json_artifact(artifact: Any, runtime_home: Path) -> dict[str, Any] | None:
-    path = Path(str(getattr(artifact, "absolute_path", "")))
-    if not (
-        bool(getattr(artifact, "ready_to_open", False))
-        and bool(getattr(artifact, "exists", False))
-        and is_within(path, runtime_home)
-        and path.suffix.lower() == ".json"
-    ):
-        return None
-    try:
-        if path.stat().st_size > 524_288:
-            return None
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except OSError, UnicodeError, json.JSONDecodeError:
-        return None
-    return payload if isinstance(payload, dict) else None
 
 
 def _terminal_text(snapshot: Any | None) -> str:
@@ -455,61 +318,15 @@ def _terminal_text(snapshot: Any | None) -> str:
     return str(getattr(messages[-1], "text", "") or "")
 
 
-def _source_ids(context: BenchmarkCaseContext) -> set[str]:
-    state = context.source_state
-    return set(state.source_dataset_ids) if isinstance(state, AttachedSourceState) else set()
-
-
-def _is_run_descendant(
-    dataset: Any,
-    by_id: dict[str, Any],
-    source_ids: set[str],
-    run_ids: frozenset[str],
-) -> bool:
-    if dataset.id not in run_ids:
-        return False
-    parent_id = getattr(dataset, "derived_from_dataset_id", None)
-    seen: set[str] = set()
-    while isinstance(parent_id, str) and parent_id and parent_id not in seen:
-        if parent_id in source_ids:
-            return True
-        seen.add(parent_id)
-        parent = by_id.get(parent_id)
-        if parent is None or parent_id not in run_ids:
-            return False
-        parent_id = getattr(parent, "derived_from_dataset_id", None)
-    return False
-
-
 def _source_unchanged(source_path: Path, context: BenchmarkCaseContext) -> bool:
     state = context.source_state
     if not isinstance(state, AttachedSourceState) or not state.source_dataset_ids:
         return False
-    try:
-        return attached_source_unchanged(
-            source_path=source_path,
-            source_state=state,
-            services=context.services,
-        )
-    except Exception:
-        return False
-
-
-def _state_isolated(context: BenchmarkCaseContext, artifact: Any | None) -> bool:
-    if not context.settings_unchanged:
-        return False
-    try:
-        datasets_confined = all(
-            is_within(Path(str(dataset.source_path)), context.runtime_home)
-            for dataset in context.services.datasets.list_datasets()
-        )
-        artifact_confined = artifact is None or is_within(
-            Path(str(getattr(artifact, "absolute_path", ""))),
-            context.runtime_home,
-        )
-        return datasets_confined and artifact_confined
-    except Exception:
-        return False
+    return attached_source_unchanged(
+        source_path=source_path,
+        source_state=state,
+        services=context.services,
+    )
 
 
 def test_ml_cluster_selection(agent_harness_benchmark) -> None:

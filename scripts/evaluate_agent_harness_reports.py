@@ -31,9 +31,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
     try:
-        calibrations = tuple(
-            load_calibration_report(path) for path in getattr(args, "calibration", ())
-        )
+        calibrations = tuple(load_calibration_report(path) for path in getattr(args, "calibration", ()))
         if args.command == "characterize":
             decision = evaluate_characterization(load_agent_reports(args.reports))
             payload = decision.to_payload()
@@ -64,23 +62,29 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Evaluate privacy-bounded Agent Harness JSON reports.",
+        description="Evaluate Agent Harness outcomes and compare measurements.",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     characterize = subparsers.add_parser(
         "characterize",
-        help="Qualify exactly one headless v5 measurement without creating a gate.",
+        help="Describe all attempts in one same-mode task cohort, including failures.",
     )
     characterize.add_argument("reports", nargs="+", type=Path)
     characterize.add_argument("--output", type=Path)
 
     formal = subparsers.add_parser(
         "formal",
-        help="Gate exactly three headless and one headed v5 Agent reports.",
+        help="Gate exactly three headless and one headed Agent reports.",
     )
     formal.add_argument("reports", nargs="+", type=Path)
-    formal.add_argument("--calibration", action="append", default=[], type=Path)
+    formal.add_argument(
+        "--calibration",
+        action="append",
+        default=[],
+        type=Path,
+        help="Optional Judge calibration reports; supplied reports must match the series.",
+    )
     formal.add_argument("--output", type=Path)
 
     compare = subparsers.add_parser(
@@ -89,7 +93,13 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     compare.add_argument("--baseline", nargs="+", required=True, type=Path)
     compare.add_argument("--candidate", nargs="+", required=True, type=Path)
-    compare.add_argument("--calibration", action="append", default=[], type=Path)
+    compare.add_argument(
+        "--calibration",
+        action="append",
+        default=[],
+        type=Path,
+        help="Optional Judge calibration reports; supplied reports must match both cohorts.",
+    )
     compare.add_argument("--output", type=Path)
     return parser
 

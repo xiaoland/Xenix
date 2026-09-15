@@ -1,0 +1,184 @@
+{
+  "baseline_commit": "f077816",
+  "unit": "Unicode characters, not tokens",
+  "tools": {
+    "result.page": {
+      "definition_chars": 598,
+      "description_chars": 205,
+      "schema_chars": 309,
+      "parameter_description_chars": 59,
+      "bounds_chars": 51,
+      "top_level_parameters": 3
+    },
+    "data.integrate": {
+      "definition_chars": 353,
+      "description_chars": 61,
+      "schema_chars": 205,
+      "parameter_description_chars": 0,
+      "bounds_chars": 34,
+      "top_level_parameters": 2
+    },
+    "analysis.profile": {
+      "definition_chars": 766,
+      "description_chars": 96,
+      "schema_chars": 581,
+      "parameter_description_chars": 206,
+      "bounds_chars": 96,
+      "top_level_parameters": 4
+    },
+    "analysis.graph": {
+      "definition_chars": 1950,
+      "description_chars": 128,
+      "schema_chars": 1735,
+      "parameter_description_chars": 910,
+      "bounds_chars": 159,
+      "top_level_parameters": 3
+    },
+    "data.clean": {
+      "definition_chars": 906,
+      "description_chars": 186,
+      "schema_chars": 637,
+      "parameter_description_chars": 248,
+      "bounds_chars": 35,
+      "top_level_parameters": 3
+    },
+    "data.clean.metadata": {
+      "definition_chars": 396,
+      "description_chars": 76,
+      "schema_chars": 228,
+      "parameter_description_chars": 0,
+      "bounds_chars": 14,
+      "top_level_parameters": 1
+    },
+    "data.tokenize": {
+      "definition_chars": 1800,
+      "description_chars": 131,
+      "schema_chars": 1583,
+      "parameter_description_chars": 673,
+      "bounds_chars": 141,
+      "top_level_parameters": 11
+    },
+    "data.query": {
+      "definition_chars": 1177,
+      "description_chars": 125,
+      "schema_chars": 969,
+      "parameter_description_chars": 412,
+      "bounds_chars": 109,
+      "top_level_parameters": 5
+    },
+    "data.transform": {
+      "definition_chars": 1369,
+      "description_chars": 126,
+      "schema_chars": 1156,
+      "parameter_description_chars": 591,
+      "bounds_chars": 100,
+      "top_level_parameters": 6
+    },
+    "data.feature.select": {
+      "definition_chars": 1008,
+      "description_chars": 67,
+      "schema_chars": 849,
+      "parameter_description_chars": 347,
+      "bounds_chars": 75,
+      "top_level_parameters": 3
+    },
+    "model.metadata": {
+      "definition_chars": 817,
+      "description_chars": 90,
+      "schema_chars": 640,
+      "parameter_description_chars": 264,
+      "bounds_chars": 14,
+      "top_level_parameters": 4
+    },
+    "model.train": {
+      "definition_chars": 881,
+      "description_chars": 125,
+      "schema_chars": 672,
+      "parameter_description_chars": 297,
+      "bounds_chars": 48,
+      "top_level_parameters": 4
+    },
+    "model.hyper_train": {
+      "definition_chars": 706,
+      "description_chars": 120,
+      "schema_chars": 496,
+      "parameter_description_chars": 163,
+      "bounds_chars": 21,
+      "top_level_parameters": 3
+    },
+    "model.apply": {
+      "definition_chars": 1096,
+      "description_chars": 148,
+      "schema_chars": 864,
+      "parameter_description_chars": 278,
+      "bounds_chars": 59,
+      "top_level_parameters": 4
+    },
+    "model.task.query": {
+      "definition_chars": 707,
+      "description_chars": 128,
+      "schema_chars": 490,
+      "parameter_description_chars": 199,
+      "bounds_chars": 48,
+      "top_level_parameters": 3
+    },
+    "model.task.stop": {
+      "definition_chars": 345,
+      "description_chars": 30,
+      "schema_chars": 227,
+      "parameter_description_chars": 39,
+      "bounds_chars": 48,
+      "top_level_parameters": 1
+    },
+    "knowledge.lookup": {
+      "definition_chars": 602,
+      "description_chars": 117,
+      "schema_chars": 396,
+      "parameter_description_chars": 170,
+      "bounds_chars": 30,
+      "top_level_parameters": 2
+    },
+    "agent.skill.activate": {
+      "definition_chars": 431,
+      "description_chars": 91,
+      "schema_chars": 247,
+      "parameter_description_chars": 47,
+      "bounds_chars": 14,
+      "top_level_parameters": 1
+    },
+    "agent.skill.read_reference": {
+      "definition_chars": 516,
+      "description_chars": 55,
+      "schema_chars": 362,
+      "parameter_description_chars": 104,
+      "bounds_chars": 28,
+      "top_level_parameters": 2
+    },
+    "agent.skill.read_asset": {
+      "definition_chars": 495,
+      "description_chars": 65,
+      "schema_chars": 335,
+      "parameter_description_chars": 104,
+      "bounds_chars": 28,
+      "top_level_parameters": 2
+    }
+  },
+  "scopes": {
+    "analysis+preprocessing": {
+      "tools": 14,
+      "full_chars": 12382,
+      "without_parameter_descriptions_chars": 8511,
+      "parameter_description_reduction_percent": 31.3,
+      "without_bounds_chars": 11468,
+      "bounds_reduction_percent": 7.4
+    },
+    "all-active": {
+      "tools": 19,
+      "full_chars": 16594,
+      "without_parameter_descriptions_chars": 11522,
+      "parameter_description_reduction_percent": 30.6,
+      "without_bounds_chars": 15490,
+      "bounds_reduction_percent": 6.7
+    }
+  }
+}

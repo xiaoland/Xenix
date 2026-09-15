@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from PyInstaller.utils.hooks import collect_all, collect_data_files, collect_dynamic_libs
+from PyInstaller.utils.hooks import copy_metadata, collect_all, collect_data_files, collect_dynamic_libs
 
 
 project_root = Path.cwd()
@@ -22,6 +22,7 @@ knowledge_binaries = []
 knowledge_datas = []
 knowledge_hiddenimports = []
 for package_name in (
+    "anydoc",
     "docling",
     "docling_core",
     "docling_ibm_models",
@@ -36,6 +37,8 @@ for package_name in (
     knowledge_datas += package_datas
     knowledge_binaries += package_binaries
     knowledge_hiddenimports += package_hiddenimports
+
+knowledge_datas += copy_metadata("firecrawl-anydoc")
 
 
 def collect_xenix_worker_source():
@@ -68,9 +71,7 @@ a = Analysis(
     hiddenimports=[
         "xenix._generated_release_config",
         "xenix.services.agent.chatbot_events",
-        "xenix.services.agent.completion_guard",
         "xenix.services.agent.harness_service",
-        "xenix.services.agent.lazy_tools",
         "xenix.services.agent.providers",
         "xenix.services.agent.settings",
         "xenix.services.agent.skill_catalog",
@@ -80,9 +81,11 @@ a = Analysis(
         "xenix.services.data_cleaning",
         "xenix.services.data_transform",
         "xenix.services.dataset_service",
-        "xenix.services.lazy_ml_service",
         "xenix.services.lazy_services",
         "xenix.services.llm",
+        "xenix.services.llm.tool_protocol",
+        "xenix.services.llm.tool_schema",
+        "xenix.services.llm.tool_registry",
         "xenix.services.ml.worker_settings",
         "xenix.services.ml_service",
         "xenix.services.ml_task_service",
@@ -94,7 +97,6 @@ a = Analysis(
         "xenix.services.knowledge_import_worker",
         "xenix.services.knowledge_index_service",
         "xenix.services.knowledge_formats",
-        "xenix.services.knowledge_projection",
         "xenix.services.knowledge_task_query",
         "xenix.services.knowledge_workspace_service",
         "xenix.services.knowledge_packaged_smoke",
@@ -119,7 +121,7 @@ a = Analysis(
         "_polars_runtime_32",
         "_polars_runtime_32._polars_runtime",
     ] + knowledge_hiddenimports,
-    hookspath=[],
+    hookspath=[str(scripts_root / "pyinstaller_hooks")],
     hooksconfig={},
     runtime_hooks=[],
     excludes=[],

@@ -1,0 +1,426 @@
+{
+  "baseline_commit": "4abe48c",
+  "measurement": {
+    "unit": "Unicode characters, not tokens",
+    "method": "Production AgentSkillCatalog, AgentToolRegistry and portable LLM Tool schemas; compact JSON function envelopes; default system prompt in en_US; one activation result per active skill.",
+    "excludes": [
+      "user messages and datasets",
+      "ordinary Tool results",
+      "other conversation history",
+      "provider-specific envelope overhead"
+    ],
+    "services": "Unused domain services mocked only for schema registration. Native chart probe uses real Dataset, Artifact, graph and SQLite services."
+  },
+  "scopes": {
+    "inactive": {
+      "baseline": {
+        "tool_count": 3,
+        "system_chars": 1992,
+        "catalog_chars": 3317,
+        "activation_chars": 0,
+        "tool_definition_chars": 2215,
+        "instruction_chars": 7524
+      },
+      "candidate": {
+        "tool_count": 3,
+        "system_chars": 946,
+        "catalog_chars": 575,
+        "activation_chars": 0,
+        "tool_definition_chars": 1635,
+        "instruction_chars": 3156
+      },
+      "reduction_percent": 58.1
+    },
+    "xenix-data-analysis": {
+      "baseline": {
+        "tool_count": 9,
+        "system_chars": 1992,
+        "catalog_chars": 3316,
+        "activation_chars": 3809,
+        "tool_definition_chars": 13028,
+        "instruction_chars": 22145
+      },
+      "candidate": {
+        "tool_count": 9,
+        "system_chars": 946,
+        "catalog_chars": 481,
+        "activation_chars": 1070,
+        "tool_definition_chars": 7914,
+        "instruction_chars": 10411
+      },
+      "reduction_percent": 53.0
+    },
+    "xenix-data-preprocessing": {
+      "baseline": {
+        "tool_count": 13,
+        "system_chars": 1992,
+        "catalog_chars": 3316,
+        "activation_chars": 4597,
+        "tool_definition_chars": 15237,
+        "instruction_chars": 25142
+      },
+      "candidate": {
+        "tool_count": 13,
+        "system_chars": 946,
+        "catalog_chars": 460,
+        "activation_chars": 1050,
+        "tool_definition_chars": 10431,
+        "instruction_chars": 12887
+      },
+      "reduction_percent": 48.7
+    },
+    "xenix-data-modeling": {
+      "baseline": {
+        "tool_count": 15,
+        "system_chars": 1992,
+        "catalog_chars": 3316,
+        "activation_chars": 5730,
+        "tool_definition_chars": 19456,
+        "instruction_chars": 30494
+      },
+      "candidate": {
+        "tool_count": 15,
+        "system_chars": 946,
+        "catalog_chars": 430,
+        "activation_chars": 1216,
+        "tool_definition_chars": 13135,
+        "instruction_chars": 15727
+      },
+      "reduction_percent": 48.4
+    },
+    "xenix-data-analysis+xenix-data-preprocessing": {
+      "baseline": {
+        "tool_count": 14,
+        "system_chars": 1992,
+        "catalog_chars": 3315,
+        "activation_chars": 8406,
+        "tool_definition_chars": 19475,
+        "instruction_chars": 33188
+      },
+      "candidate": {
+        "tool_count": 14,
+        "system_chars": 946,
+        "catalog_chars": 372,
+        "activation_chars": 2120,
+        "tool_definition_chars": 12382,
+        "instruction_chars": 15820
+      },
+      "reduction_percent": 52.3
+    },
+    "xenix-data-analysis+xenix-data-modeling+xenix-data-preprocessing": {
+      "baseline": {
+        "tool_count": 19,
+        "system_chars": 1992,
+        "catalog_chars": 3314,
+        "activation_chars": 14136,
+        "tool_definition_chars": 24555,
+        "instruction_chars": 43997
+      },
+      "candidate": {
+        "tool_count": 19,
+        "system_chars": 946,
+        "catalog_chars": 81,
+        "activation_chars": 3336,
+        "tool_definition_chars": 16594,
+        "instruction_chars": 20957
+      },
+      "reduction_percent": 52.4
+    }
+  },
+  "skills": {
+    "baseline": {
+      "xenix-data-analysis": {
+        "description_chars": 666,
+        "body_chars": 1800,
+        "activation_chars": 3809
+      },
+      "xenix-data-modeling": {
+        "description_chars": 988,
+        "body_chars": 3121,
+        "activation_chars": 5730
+      },
+      "xenix-data-preprocessing": {
+        "description_chars": 716,
+        "body_chars": 2759,
+        "activation_chars": 4597
+      }
+    },
+    "candidate": {
+      "xenix-data-analysis": {
+        "description_chars": 85,
+        "body_chars": 614,
+        "activation_chars": 1070
+      },
+      "xenix-data-modeling": {
+        "description_chars": 136,
+        "body_chars": 814,
+        "activation_chars": 1216
+      },
+      "xenix-data-preprocessing": {
+        "description_chars": 106,
+        "body_chars": 870,
+        "activation_chars": 1050
+      }
+    }
+  },
+  "tools": {
+    "baseline": {
+      "result.page": {
+        "definition_chars": 598,
+        "description_chars": 205,
+        "schema_chars": 309
+      },
+      "data.integrate": {
+        "definition_chars": 365,
+        "description_chars": 73,
+        "schema_chars": 205
+      },
+      "analysis.profile": {
+        "definition_chars": 1149,
+        "description_chars": 362,
+        "schema_chars": 698
+      },
+      "analysis.graph": {
+        "definition_chars": 4237,
+        "description_chars": 321,
+        "schema_chars": 3829
+      },
+      "data.clean": {
+        "definition_chars": 1828,
+        "description_chars": 742,
+        "schema_chars": 1003
+      },
+      "data.clean.metadata": {
+        "definition_chars": 440,
+        "description_chars": 120,
+        "schema_chars": 228
+      },
+      "data.tokenize": {
+        "definition_chars": 2462,
+        "description_chars": 480,
+        "schema_chars": 1896
+      },
+      "data.query": {
+        "definition_chars": 1900,
+        "description_chars": 546,
+        "schema_chars": 1271
+      },
+      "data.transform": {
+        "definition_chars": 2238,
+        "description_chars": 595,
+        "schema_chars": 1556
+      },
+      "data.feature.select": {
+        "definition_chars": 1347,
+        "description_chars": 215,
+        "schema_chars": 1040
+      },
+      "model.metadata": {
+        "definition_chars": 1168,
+        "description_chars": 190,
+        "schema_chars": 891
+      },
+      "model.train": {
+        "definition_chars": 1269,
+        "description_chars": 188,
+        "schema_chars": 997
+      },
+      "model.hyper_train": {
+        "definition_chars": 746,
+        "description_chars": 142,
+        "schema_chars": 514
+      },
+      "model.apply": {
+        "definition_chars": 1031,
+        "description_chars": 237,
+        "schema_chars": 710
+      },
+      "model.task.query": {
+        "definition_chars": 861,
+        "description_chars": 164,
+        "schema_chars": 608
+      },
+      "model.task.stop": {
+        "definition_chars": 543,
+        "description_chars": 200,
+        "schema_chars": 255
+      },
+      "knowledge.lookup": {
+        "definition_chars": 1077,
+        "description_chars": 278,
+        "schema_chars": 710
+      },
+      "agent.skill.activate": {
+        "definition_chars": 536,
+        "description_chars": 184,
+        "schema_chars": 259
+      },
+      "agent.skill.read_reference": {
+        "definition_chars": 661,
+        "description_chars": 142,
+        "schema_chars": 420
+      },
+      "agent.skill.read_asset": {
+        "definition_chars": 622,
+        "description_chars": 134,
+        "schema_chars": 393
+      }
+    },
+    "candidate": {
+      "result.page": {
+        "definition_chars": 598,
+        "description_chars": 205,
+        "schema_chars": 309
+      },
+      "data.integrate": {
+        "definition_chars": 353,
+        "description_chars": 61,
+        "schema_chars": 205
+      },
+      "analysis.profile": {
+        "definition_chars": 766,
+        "description_chars": 96,
+        "schema_chars": 581
+      },
+      "analysis.graph": {
+        "definition_chars": 1950,
+        "description_chars": 128,
+        "schema_chars": 1735
+      },
+      "data.clean": {
+        "definition_chars": 906,
+        "description_chars": 186,
+        "schema_chars": 637
+      },
+      "data.clean.metadata": {
+        "definition_chars": 396,
+        "description_chars": 76,
+        "schema_chars": 228
+      },
+      "data.tokenize": {
+        "definition_chars": 1800,
+        "description_chars": 131,
+        "schema_chars": 1583
+      },
+      "data.query": {
+        "definition_chars": 1177,
+        "description_chars": 125,
+        "schema_chars": 969
+      },
+      "data.transform": {
+        "definition_chars": 1369,
+        "description_chars": 126,
+        "schema_chars": 1156
+      },
+      "data.feature.select": {
+        "definition_chars": 1008,
+        "description_chars": 67,
+        "schema_chars": 849
+      },
+      "model.metadata": {
+        "definition_chars": 817,
+        "description_chars": 90,
+        "schema_chars": 640
+      },
+      "model.train": {
+        "definition_chars": 881,
+        "description_chars": 125,
+        "schema_chars": 672
+      },
+      "model.hyper_train": {
+        "definition_chars": 706,
+        "description_chars": 120,
+        "schema_chars": 496
+      },
+      "model.apply": {
+        "definition_chars": 1096,
+        "description_chars": 148,
+        "schema_chars": 864
+      },
+      "model.task.query": {
+        "definition_chars": 707,
+        "description_chars": 128,
+        "schema_chars": 490
+      },
+      "model.task.stop": {
+        "definition_chars": 345,
+        "description_chars": 30,
+        "schema_chars": 227
+      },
+      "knowledge.lookup": {
+        "definition_chars": 602,
+        "description_chars": 117,
+        "schema_chars": 396
+      },
+      "agent.skill.activate": {
+        "definition_chars": 431,
+        "description_chars": 91,
+        "schema_chars": 247
+      },
+      "agent.skill.read_reference": {
+        "definition_chars": 516,
+        "description_chars": 55,
+        "schema_chars": 362
+      },
+      "agent.skill.read_asset": {
+        "definition_chars": 495,
+        "description_chars": 65,
+        "schema_chars": 335
+      }
+    }
+  },
+  "optional_preprocessing_reference": {
+    "baseline_chars": 6380,
+    "candidate_chars": 3191
+  },
+  "manual_probe": {
+    "schema_changes_excluding_descriptions": {
+      "analysis.graph": [
+        "spec"
+      ]
+    },
+    "charts": [
+      {
+        "mode": "layer",
+        "artifact_id": 7,
+        "bytes": 11684,
+        "expected_labels_present": [
+          "East",
+          "West",
+          "North"
+        ],
+        "renderer": "vl-convert-python"
+      },
+      {
+        "mode": "facet",
+        "artifact_id": 8,
+        "bytes": 12568,
+        "expected_labels_present": [
+          "East",
+          "West",
+          "North"
+        ],
+        "renderer": "vl-convert-python"
+      },
+      {
+        "mode": "wordcloud",
+        "artifact_id": 9,
+        "bytes": 3211,
+        "expected_labels_present": [
+          "term0",
+          "term24"
+        ],
+        "renderer": "wordcloud"
+      }
+    ],
+    "resources_read": 21
+  },
+  "verification": {
+    "existing_focused_tests": 28,
+    "pdm_check": "passed",
+    "catalog_check": "passed",
+    "benchmark_cases_collected": 24,
+    "live_benchmark": "not run in this batch",
+    "tests_added": 0
+  }
+}

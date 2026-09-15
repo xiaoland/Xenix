@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import hashlib
 import json
 import os
@@ -8,9 +9,8 @@ import re
 import subprocess
 import sys
 import tomllib
+from collections.abc import Mapping
 from pathlib import Path
-
-from PyInstaller.__main__ import run as pyinstaller_run
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SRC_ROOT = PROJECT_ROOT / "src"
@@ -63,6 +63,36 @@ def _resolve_build_commit(project_root: Path) -> str:
             "Run packaging from a git checkout or set XENIX_BUILD_COMMIT."
         ) from exc
     return _validate_build_commit(result.stdout)
+
+
+def _resolve_build_epoch(project_root: Path) -> str:
+    epoch = os.environ.get("SOURCE_DATE_EPOCH", "").strip()
+    if epoch:
+        return epoch
+    try:
+        result = subprocess.run(
+            ["git", "show", "-s", "--format=%ct", "HEAD"],
+            check=True,
+            cwd=project_root,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+    except (OSError, subprocess.CalledProcessError) as exc:
+        raise RuntimeError(
+            "Unable to resolve a deterministic build timestamp. "
+            "Run packaging from a git checkout or set SOURCE_DATE_EPOCH."
+        ) from exc
+    value = result.stdout.strip()
+    if not value.isdigit():
+        raise RuntimeError(f"Resolved build timestamp is not a Unix epoch: {value!r}.")
+    return value
+
+
+def _normalize_mtimes(directory: Path, epoch: int) -> None:
+    for path in directory.rglob("*"):
+        if path.is_file():
+            os.utime(path, (epoch, epoch))
 
 
 def _resolve_app_version(project_root: Path) -> str:
@@ -215,7 +245,76 @@ def _generate_agent_skill_catalog(project_root: Path) -> None:
     )
 
 
+def _pyinstaller_environment(
+    environment: Mapping[str, str],
+    *,
+    python_executable: Path,
+    python_prefix: Path,
+    python_base_prefix: Path,
+    platform: str,
+) -> dict[str, str]:
+    child_environment = dict(environment)
+    if platform != "win32":
+        return child_environment
+
+    windows_root = Path(
+        child_environment.get("SystemRoot")
+        or child_environment.get("WINDIR")
+        or r"C:\Windows"
+    )
+    candidates = (
+        python_executable.parent,
+        python_prefix,
+        python_prefix / "DLLs",
+        python_prefix / "Library" / "bin",
+        python_base_prefix,
+        python_base_prefix / "DLLs",
+        python_base_prefix / "Library" / "bin",
+        windows_root / "System32",
+        windows_root,
+    )
+    owned_directories: list[str] = []
+    seen: set[str] = set()
+    for candidate in candidates:
+        if not candidate.is_dir():
+            continue
+        value = str(candidate.resolve())
+        key = os.path.normcase(value)
+        if key in seen:
+            continue
+        seen.add(key)
+        owned_directories.append(value)
+    child_environment["PATH"] = os.pathsep.join(owned_directories)
+    return child_environment
+
+
+def _run_pyinstaller(project_root: Path, *, dist_dir: Path | None = None) -> None:
+    environment = _pyinstaller_environment(
+        os.environ,
+        python_executable=Path(sys.executable),
+        python_prefix=Path(sys.prefix),
+        python_base_prefix=Path(sys.base_prefix),
+        platform=sys.platform,
+    )
+    command = [sys.executable, "-m", "PyInstaller", "--clean", "--noconfirm"]
+    if dist_dir is not None:
+        command.extend(["--distpath", str(dist_dir.resolve())])
+    command.append(str(project_root / "xenix.spec"))
+    subprocess.run(
+        command,
+        check=True,
+        cwd=project_root,
+        env=environment,
+    )
+
+
 def main() -> int:
+    parser = argparse.ArgumentParser(description="Build the Windows bundle from the locked project environment.")
+    parser.add_argument(
+        "--dist-dir", type=Path,
+        help="Output root containing xenix/. Use a separate root when a previous bundle is running.",
+    )
+    args = parser.parse_args()
     project_root = Path(__file__).resolve().parents[1]
     subprocess.run(
         [sys.executable, str(project_root / "scripts" / "compile_translations.py")],
@@ -249,13 +348,10 @@ def main() -> int:
             print(f"Embedding startup trial lock: {release_config.trial_lock_days} day(s)")
         else:
             print("Embedding startup trial lock: disabled")
-        pyinstaller_run(
-            [
-                "--clean",
-                "--noconfirm",
-                str(project_root / "xenix.spec"),
-            ]
-        )
+        epoch = int(_resolve_build_epoch(project_root))
+        os.environ.setdefault("SOURCE_DATE_EPOCH", str(epoch))
+        _normalize_mtimes(project_root / "src", epoch)
+        _run_pyinstaller(project_root, dist_dir=args.dist_dir)
     finally:
         _remove_generated_knowledge_ocr_catalog(project_root)
         _remove_generated_build_info(project_root)

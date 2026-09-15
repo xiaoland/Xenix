@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import threading
 import weakref
 from collections.abc import Callable, Sequence
@@ -34,24 +35,24 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True)
 class HistoryThreadSummary:
-    id: str
+    id: int
     title: str | None
 
 
 class HistoryPort(Protocol):
     def list_threads(self) -> Sequence[HistoryThreadSummary]: ...
 
-    def rename_thread(self, thread_id: str, title: str | None) -> HistoryThreadSummary: ...
+    def rename_thread(self, thread_id: int, title: str | None) -> HistoryThreadSummary: ...
 
-    def delete_thread(self, thread_id: str) -> None: ...
+    def delete_thread(self, thread_id: int) -> None: ...
 
     def has_title_provider(self) -> bool: ...
 
-    def generate_thread_title(self, thread_id: str) -> str: ...
+    def generate_thread_title(self, thread_id: int) -> str: ...
 
 
 TitleExecutor = Callable[
-    [str, Callable[[str], None], Callable[[Exception], None]], None
+    [int, Callable[[str], None], Callable[[Exception], None]], None
 ]
 
 
@@ -64,25 +65,25 @@ class HarnessHistoryAdapter:
     def list_threads(self) -> Sequence[HistoryThreadSummary]:
         return tuple(
             HistoryThreadSummary(id=thread.id, title=thread.title)
-            for thread in self._service.list_threads()  # type: ignore[no-untyped-call]
+            for thread in self._service.list_threads()
         )
 
-    def rename_thread(self, thread_id: str, title: str | None) -> HistoryThreadSummary:
+    def rename_thread(self, thread_id: int, title: str | None) -> HistoryThreadSummary:
         snapshot = self._service.rename_thread(thread_id, title)
         return HistoryThreadSummary(id=snapshot.thread.id, title=snapshot.thread.title)
 
-    def delete_thread(self, thread_id: str) -> None:
+    def delete_thread(self, thread_id: int) -> None:
         self._service.delete_thread(thread_id)
 
     def has_title_provider(self) -> bool:
         return self._service.has_thread_title_provider()
 
-    def generate_thread_title(self, thread_id: str) -> str:
+    def generate_thread_title(self, thread_id: int) -> str:
         return self._service.generate_thread_title(thread_id)
 
 
 class _HistoryThreadRow(QWidget):
-    def __init__(self, thread_id: str, title: str, parent: QWidget | None = None) -> None:
+    def __init__(self, thread_id: int, title: str, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._label = QLabel(title, self)
         self._label.setWordWrap(False)
@@ -93,7 +94,7 @@ class _HistoryThreadRow(QWidget):
         identify_repeated_item(
             self,
             role="main.history.thread-item",
-            item_reference=thread_id,
+            item_reference=str(thread_id),
         )
         self.setMinimumHeight(24)
 
@@ -102,9 +103,9 @@ class _HistoryThreadRow(QWidget):
 
 
 class HistoryPanel(QFrame):
-    thread_open_requested = Signal(str)
+    thread_open_requested = Signal(object)
     new_thread_requested = Signal()
-    thread_deleted = Signal(str)
+    thread_deleted = Signal(object)
     _title_succeeded = Signal(int, str, str)
     _title_failed = Signal(int, str, str)
 
@@ -112,7 +113,7 @@ class HistoryPanel(QFrame):
         self,
         port: HistoryPort,
         *,
-        is_thread_running: Callable[[str], bool],
+        is_thread_running: Callable[[int], bool],
         title_executor: TitleExecutor | None = None,
         parent: QWidget | None = None,
     ) -> None:
@@ -120,11 +121,11 @@ class HistoryPanel(QFrame):
         self._port = port
         self._is_thread_running = is_thread_running
         self._title_executor = title_executor or self._run_title_in_thread
-        self._threads: dict[str, HistoryThreadSummary] = {}
-        self._selected_thread_id: str | None = None
+        self._threads: dict[int, HistoryThreadSummary] = {}
+        self._selected_thread_id: int | None = None
         self._shutdown = False
         self._generation = 0
-        self._active_title: tuple[int, str] | None = None
+        self._active_title: tuple[int, int] | None = None
         self._title_progress: QProgressDialog | None = None
 
         self.setObjectName("historySidebar")
@@ -164,14 +165,14 @@ class HistoryPanel(QFrame):
         self._title_failed.connect(self._fail_title)
 
     @property
-    def selected_thread_id(self) -> str | None:
+    def selected_thread_id(self) -> int | None:
         return self._selected_thread_id
 
     @property
-    def first_thread_id(self) -> str | None:
+    def first_thread_id(self) -> int | None:
         return next(iter(self._threads), None)
 
-    def refresh(self, selected_thread_id: str | None = None) -> None:
+    def refresh(self, selected_thread_id: int | None = None) -> None:
         if self._shutdown:
             return
         requested = selected_thread_id if selected_thread_id is not None else self._selected_thread_id
@@ -195,7 +196,7 @@ class HistoryPanel(QFrame):
         if self._selected_thread_id is not None:
             self._select_item(self._selected_thread_id)
 
-    def open_thread(self, thread_id: str) -> None:
+    def open_thread(self, thread_id: int) -> None:
         if self._shutdown or thread_id not in self._threads:
             return
         self._selected_thread_id = thread_id
@@ -261,11 +262,11 @@ class HistoryPanel(QFrame):
         elif chosen is generate:
             self._start_title(thread_id)
         elif chosen is copy_id:
-            QApplication.clipboard().setText(thread_id)
+            QApplication.clipboard().setText(str(thread_id))
         elif chosen is delete:
             self._delete(thread_id)
 
-    def _rename(self, thread_id: str) -> None:
+    def _rename(self, thread_id: int) -> None:
         if self._shutdown:
             return
         summary = self._threads.get(thread_id)
@@ -281,6 +282,7 @@ class HistoryPanel(QFrame):
         try:
             renamed = self._port.rename_thread(thread_id, title.strip() or None)
         except Exception as exc:
+            logging.getLogger(__name__).exception("UI operation failed: %s", exc)
             QMessageBox.warning(
                 self,
                 QCoreApplication.translate("MainWindow", "Rename Thread"),
@@ -289,7 +291,7 @@ class HistoryPanel(QFrame):
             return
         self.refresh(renamed.id)
 
-    def _delete(self, thread_id: str) -> None:
+    def _delete(self, thread_id: int) -> None:
         if self._shutdown:
             return
         if thread_id not in self._threads:
@@ -316,6 +318,7 @@ class HistoryPanel(QFrame):
         try:
             self._port.delete_thread(thread_id)
         except Exception as exc:
+            logging.getLogger(__name__).exception("UI operation failed: %s", exc)
             QMessageBox.warning(
                 self,
                 QCoreApplication.translate("MainWindow", "Delete Thread"),
@@ -329,7 +332,7 @@ class HistoryPanel(QFrame):
         self.refresh(None if was_selected else self._selected_thread_id)
         self.thread_deleted.emit(thread_id)
 
-    def _start_title(self, thread_id: str) -> None:
+    def _start_title(self, thread_id: int) -> None:
         if self._shutdown or thread_id not in self._threads or self._active_title is not None:
             return
         if not self._port.has_title_provider():
@@ -367,6 +370,7 @@ class HistoryPanel(QFrame):
         try:
             self._title_executor(thread_id, succeeded, failed)
         except Exception as exc:
+            logging.getLogger(__name__).exception("UI operation failed: %s", exc)
             self._close_title_progress()
             self._active_title = None
             QMessageBox.warning(
@@ -374,7 +378,7 @@ class HistoryPanel(QFrame):
             )
 
     def _run_title_in_thread(
-        self, thread_id: str, succeeded: Callable[[str], None], failed: Callable[[Exception], None]
+        self, thread_id: int, succeeded: Callable[[str], None], failed: Callable[[Exception], None]
     ) -> None:
         def run() -> None:
             try:
@@ -383,7 +387,7 @@ class HistoryPanel(QFrame):
                 failed(exc)
         threading.Thread(target=run, name="xenix-thread-title-generation", daemon=True).start()
 
-    def _finish_title(self, generation: int, thread_id: str, proposal: str) -> None:
+    def _finish_title(self, generation: int, thread_id: int, proposal: str) -> None:
         if not self._accept_title_result(generation, thread_id):
             return
         self._close_title_progress()
@@ -401,13 +405,14 @@ class HistoryPanel(QFrame):
         try:
             renamed = self._port.rename_thread(thread_id, title.strip() or None)
         except Exception as exc:
+            logging.getLogger(__name__).exception("UI operation failed: %s", exc)
             QMessageBox.warning(
                 self, QCoreApplication.translate("MainWindow", "Generate Thread Title"), str(exc)
             )
             return
         self.refresh(renamed.id)
 
-    def _fail_title(self, generation: int, thread_id: str, message: str) -> None:
+    def _fail_title(self, generation: int, thread_id: int, message: str) -> None:
         if not self._accept_title_result(generation, thread_id):
             return
         self._close_title_progress()
@@ -416,7 +421,7 @@ class HistoryPanel(QFrame):
             self, QCoreApplication.translate("MainWindow", "Generate Thread Title"), message
         )
 
-    def _accept_title_result(self, generation: int, thread_id: str) -> bool:
+    def _accept_title_result(self, generation: int, thread_id: int) -> bool:
         return not self._shutdown and self._active_title == (generation, thread_id) and thread_id in self._threads
 
     def _invalidate_title(self) -> None:
@@ -445,7 +450,7 @@ class HistoryPanel(QFrame):
         dialog.close()
         dialog.deleteLater()
 
-    def _select_item(self, thread_id: str) -> None:
+    def _select_item(self, thread_id: int) -> None:
         for index in range(self._list.count()):
             item = self._list.item(index)
             if self._thread_id(item) == thread_id:
@@ -453,8 +458,8 @@ class HistoryPanel(QFrame):
                 return
 
     @staticmethod
-    def _thread_id(item: QListWidgetItem | None) -> str | None:
+    def _thread_id(item: QListWidgetItem | None) -> int | None:
         if item is None:
             return None
         value = item.data(Qt.ItemDataRole.UserRole)
-        return value if isinstance(value, str) else None
+        return value if isinstance(value, int) else None

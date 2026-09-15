@@ -1,0 +1,1653 @@
+{
+  "recorded_date": "2026-09-13",
+  "note": "Development characterization. Fixtures and scoring changed during implementation; these are not comparable repetitions or a formal acceptance cohort. Reassessments preserve original Subject evidence and are not new Subject runs.",
+  "subject_cell_count": 10,
+  "reported_subject_tokens_total": 1587225,
+  "cells": [
+    {
+      "report": "build/agent-harness-business-standard-r4/business.campaign.v1.standard-deepseek-deepseek-v4-flash-bc2fd52bba71417988b1f576ca4c31ce.json",
+      "run_id": "bc2fd52bba71417988b1f576ca4c31ce",
+      "case_id": "business.campaign.v1.standard",
+      "subject_model": "deepseek/deepseek-v4-flash",
+      "schema_version": 6,
+      "fixture_sha256": "EEBDBAEA356667FC28F90E44445545C4A4938C7DD7463CE88216693E054349AC",
+      "rubric_sha256": "336F0DC5519A2AA2735593D247FC55711D78F74E3B09E4AE1263EC49BE7CB5DC",
+      "run_status": "completed",
+      "failure_kind": null,
+      "integrity": true,
+      "semantic": {
+        "checks": [
+          {
+            "name": "turn_1.answer_completed",
+            "passed": true,
+            "summary": "terminal_assistant_answer"
+          },
+          {
+            "name": "turn_1.deliveries_accessible",
+            "passed": true,
+            "summary": "linked_artifacts_readable"
+          },
+          {
+            "name": "turn_1.eligible_list_delivered",
+            "passed": true,
+            "summary": "expected_customer_ids=['C01', 'C03', 'C06', 'C08', 'C11', 'C15', 'C16', 'C19', 'C23', 'C27', 'C31']"
+          }
+        ],
+        "passed": true,
+        "verdict": "pass"
+      },
+      "judge": {
+        "independence": "independent",
+        "metrics": {
+          "elapsed_seconds": 43.87276360002579,
+          "provider_retry_count": 0,
+          "token_usage": {
+            "cached_input_tokens": 256,
+            "input_tokens": 3628,
+            "output_tokens": 3617,
+            "total_tokens": 7245
+          }
+        },
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "reason_codes": [],
+        "required": true,
+        "rubric_id": "business.campaign_eligibility.explanation.v1",
+        "rubric_sha256": "336F0DC5519A2AA2735593D247FC55711D78F74E3B09E4AE1263EC49BE7CB5DC",
+        "scores": {
+          "effective_rule": 2,
+          "exceptions_explained": 2
+        },
+        "status": "completed",
+        "summary": "judge_completed",
+        "verdict": "pass"
+      },
+      "reported_subject_tokens": 61445,
+      "rounds": 6,
+      "subject_seconds": 25.51455820002593,
+      "planned_turn_count": 1,
+      "turns": [
+        {
+          "index": 1,
+          "run_status": "completed",
+          "failure_kind": null,
+          "subject_metrics": {
+            "assessment_seconds": null,
+            "derived_dataset_count": 1,
+            "message_counts": {
+              "assistant": 6,
+              "tool_call": 7,
+              "tool_result": 7,
+              "user": 1
+            },
+            "provider_retry_count": 0,
+            "sampling_round_count": 6,
+            "terminal_shape": null,
+            "token_usage": {
+              "cached_input_tokens": 47360,
+              "input_tokens": 56224,
+              "output_tokens": 5221,
+              "total_tokens": 61445
+            },
+            "tool_call_counts_by_name": {
+              "agent.skill.activate": 1,
+              "analysis.profile": 1,
+              "data.query": 3,
+              "data.transform": 1,
+              "knowledge.lookup": 1
+            },
+            "tool_result_counts_by_status": {
+              "failed": 1,
+              "succeeded": 6
+            },
+            "turn_seconds": 25.51455820002593,
+            "usage_reported_primary_response_count": 6
+          },
+          "semantic_checks": [
+            {
+              "name": "answer_completed",
+              "passed": true,
+              "summary": "terminal_assistant_answer"
+            },
+            {
+              "name": "deliveries_accessible",
+              "passed": true,
+              "summary": "linked_artifacts_readable"
+            },
+            {
+              "name": "eligible_list_delivered",
+              "passed": true,
+              "summary": "expected_customer_ids=['C01', 'C03', 'C06', 'C08', 'C11', 'C15', 'C16', 'C19', 'C23', 'C27', 'C31']"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "report": "build/agent-harness-business-standard-r4/business.revenue.v1.standard-deepseek-deepseek-v4-flash-062740e43a794b76a90f312b0694d746.json",
+      "run_id": "062740e43a794b76a90f312b0694d746",
+      "case_id": "business.revenue.v1.standard",
+      "subject_model": "deepseek/deepseek-v4-flash",
+      "schema_version": 6,
+      "fixture_sha256": "9D911226220259991BF70DF5136435F078D6E666E4CE8E0A21AEF378EE85293B",
+      "rubric_sha256": "00F92EC610386B33C4E3D14A673794855108CC80C928494B05C3AE9CEEC620C5",
+      "run_status": "completed",
+      "failure_kind": null,
+      "integrity": true,
+      "semantic": {
+        "checks": [
+          {
+            "name": "turn_1.answer_completed",
+            "passed": true,
+            "summary": "terminal_assistant_answer"
+          },
+          {
+            "name": "turn_1.deliveries_accessible",
+            "passed": true,
+            "summary": "linked_artifacts_readable"
+          },
+          {
+            "name": "turn_1.net_receipts_delivered",
+            "passed": true,
+            "summary": "expected_yuan={'东区': 40750.0, '西区': 32900.0, '北区': 22000.0, '南区': -1200.0}"
+          },
+          {
+            "name": "turn_2.answer_completed",
+            "passed": true,
+            "summary": "terminal_assistant_answer"
+          },
+          {
+            "name": "turn_2.deliveries_accessible",
+            "passed": true,
+            "summary": "linked_artifacts_readable"
+          },
+          {
+            "name": "turn_2.net_receipts_delivered",
+            "passed": true,
+            "summary": "expected_yuan={'东区': 29750.0, '西区': 32900.0, '北区': 22000.0, '南区': -900.0}"
+          }
+        ],
+        "passed": true,
+        "verdict": "pass"
+      },
+      "judge": {
+        "independence": "independent",
+        "metrics": {
+          "elapsed_seconds": 21.87896510004066,
+          "provider_retry_count": 0,
+          "token_usage": {
+            "cached_input_tokens": 256,
+            "input_tokens": 3973,
+            "output_tokens": 1996,
+            "total_tokens": 5969
+          }
+        },
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "reason_codes": [
+          "grounded_delivery"
+        ],
+        "required": true,
+        "rubric_id": "business.revenue_revision.explanation.v1",
+        "rubric_sha256": "00F92EC610386B33C4E3D14A673794855108CC80C928494B05C3AE9CEEC620C5",
+        "scores": {
+          "month_close_grounding": 2,
+          "revision_explanation": 2
+        },
+        "status": "completed",
+        "summary": "judge_completed",
+        "verdict": "pass"
+      },
+      "reported_subject_tokens": 86896,
+      "rounds": 7,
+      "subject_seconds": 46.99950360000366,
+      "planned_turn_count": 2,
+      "turns": [
+        {
+          "index": 1,
+          "run_status": "completed",
+          "failure_kind": null,
+          "subject_metrics": {
+            "assessment_seconds": null,
+            "derived_dataset_count": 1,
+            "message_counts": {
+              "assistant": 4,
+              "tool_call": 6,
+              "tool_result": 6,
+              "user": 1
+            },
+            "provider_retry_count": 0,
+            "sampling_round_count": 4,
+            "terminal_shape": null,
+            "token_usage": {
+              "cached_input_tokens": 22400,
+              "input_tokens": 30956,
+              "output_tokens": 5890,
+              "total_tokens": 36846
+            },
+            "tool_call_counts_by_name": {
+              "agent.skill.activate": 1,
+              "data.query": 3,
+              "data.transform": 1,
+              "knowledge.lookup": 1
+            },
+            "tool_result_counts_by_status": {
+              "succeeded": 6
+            },
+            "turn_seconds": 28.29616819997318,
+            "usage_reported_primary_response_count": 4
+          },
+          "semantic_checks": [
+            {
+              "name": "answer_completed",
+              "passed": true,
+              "summary": "terminal_assistant_answer"
+            },
+            {
+              "name": "deliveries_accessible",
+              "passed": true,
+              "summary": "linked_artifacts_readable"
+            },
+            {
+              "name": "net_receipts_delivered",
+              "passed": true,
+              "summary": "expected_yuan={'东区': 40750.0, '西区': 32900.0, '北区': 22000.0, '南区': -1200.0}"
+            }
+          ]
+        },
+        {
+          "index": 2,
+          "run_status": "completed",
+          "failure_kind": null,
+          "subject_metrics": {
+            "assessment_seconds": null,
+            "derived_dataset_count": 1,
+            "message_counts": {
+              "assistant": 3,
+              "tool_call": 2,
+              "tool_result": 2,
+              "user": 1
+            },
+            "provider_retry_count": 0,
+            "sampling_round_count": 3,
+            "terminal_shape": null,
+            "token_usage": {
+              "cached_input_tokens": 45568,
+              "input_tokens": 46441,
+              "output_tokens": 3609,
+              "total_tokens": 50050
+            },
+            "tool_call_counts_by_name": {
+              "data.query": 1,
+              "data.transform": 1
+            },
+            "tool_result_counts_by_status": {
+              "succeeded": 2
+            },
+            "turn_seconds": 18.703335400030483,
+            "usage_reported_primary_response_count": 3
+          },
+          "semantic_checks": [
+            {
+              "name": "answer_completed",
+              "passed": true,
+              "summary": "terminal_assistant_answer"
+            },
+            {
+              "name": "deliveries_accessible",
+              "passed": true,
+              "summary": "linked_artifacts_readable"
+            },
+            {
+              "name": "net_receipts_delivered",
+              "passed": true,
+              "summary": "expected_yuan={'东区': 29750.0, '西区': 32900.0, '北区': 22000.0, '南区': -900.0}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "report": "build/agent-harness-business-standard-r4/business.routing.v1.standard-deepseek-deepseek-v4-flash-ee678d7b26c74d9c868cee66ee277ee3.json",
+      "run_id": "ee678d7b26c74d9c868cee66ee277ee3",
+      "case_id": "business.routing.v1.standard",
+      "subject_model": "deepseek/deepseek-v4-flash",
+      "schema_version": 6,
+      "fixture_sha256": "034802039AAAAC88F975BDF464E3540BB262718BD0C1C325C1C2486D81EF2934",
+      "rubric_sha256": "911B8342194D2EF60D1A17EFFDFEC6828F678C65329BA3D60CE25F6C55810A56",
+      "run_status": "budget_exceeded",
+      "failure_kind": "sampling_round_limit_exceeded",
+      "integrity": false,
+      "semantic": {
+        "checks": [
+          {
+            "name": "turn_1.answer_completed",
+            "passed": true,
+            "summary": "terminal_assistant_answer"
+          },
+          {
+            "name": "turn_1.deliveries_accessible",
+            "passed": true,
+            "summary": "linked_artifacts_readable"
+          },
+          {
+            "name": "turn_1.reusable_analyzer_saved",
+            "passed": true,
+            "summary": "saved_model_ids=['ff5b1885c3dd4356864c9f5f6b4f4e4e']"
+          },
+          {
+            "name": "turn_2.answer_completed",
+            "passed": false,
+            "summary": "terminal_assistant_answer"
+          },
+          {
+            "name": "turn_2.deliveries_accessible",
+            "passed": true,
+            "summary": "linked_artifacts_readable"
+          },
+          {
+            "name": "turn_2.complete_batch_quality",
+            "passed": false,
+            "summary": "accuracy=None; required=0.9"
+          },
+          {
+            "name": "turn_2.saved_analyzer_reused",
+            "passed": false,
+            "summary": "delivered_predictions_reference_same_persisted_model_and_bytes"
+          }
+        ],
+        "passed": false,
+        "verdict": "not_evaluated"
+      },
+      "judge": {
+        "independence": "independent",
+        "metrics": {
+          "elapsed_seconds": null,
+          "provider_retry_count": 0,
+          "token_usage": null
+        },
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "reason_codes": [],
+        "required": true,
+        "rubric_id": "business.routing_reuse.explanation.v1",
+        "rubric_sha256": "911B8342194D2EF60D1A17EFFDFEC6828F678C65329BA3D60CE25F6C55810A56",
+        "scores": {},
+        "status": "blocked",
+        "summary": "subject_run_not_completed",
+        "verdict": "not_evaluated"
+      },
+      "reported_subject_tokens": 248799,
+      "rounds": 12,
+      "subject_seconds": 79.82615229999647,
+      "planned_turn_count": 2,
+      "turns": [
+        {
+          "index": 1,
+          "run_status": "completed",
+          "failure_kind": null,
+          "subject_metrics": {
+            "assessment_seconds": null,
+            "derived_dataset_count": 2,
+            "message_counts": {
+              "assistant": 11,
+              "tool_call": 18,
+              "tool_result": 18,
+              "user": 1
+            },
+            "provider_retry_count": 0,
+            "sampling_round_count": 11,
+            "terminal_shape": null,
+            "token_usage": {
+              "cached_input_tokens": 187264,
+              "input_tokens": 207433,
+              "output_tokens": 8087,
+              "total_tokens": 215520
+            },
+            "tool_call_counts_by_name": {
+              "agent.skill.activate": 1,
+              "agent.skill.read_reference": 1,
+              "analysis.graph": 1,
+              "analysis.profile": 1,
+              "data.feature.select": 1,
+              "data.query": 7,
+              "data.transform": 1,
+              "knowledge.lookup": 1,
+              "model.apply": 1,
+              "model.metadata": 1,
+              "model.train": 2
+            },
+            "tool_result_counts_by_status": {
+              "succeeded": 18
+            },
+            "turn_seconds": 78.2924323999905,
+            "usage_reported_primary_response_count": 11
+          },
+          "semantic_checks": [
+            {
+              "name": "answer_completed",
+              "passed": true,
+              "summary": "terminal_assistant_answer"
+            },
+            {
+              "name": "deliveries_accessible",
+              "passed": true,
+              "summary": "linked_artifacts_readable"
+            },
+            {
+              "name": "reusable_analyzer_saved",
+              "passed": true,
+              "summary": "saved_model_ids=['ff5b1885c3dd4356864c9f5f6b4f4e4e']"
+            }
+          ]
+        },
+        {
+          "index": 2,
+          "run_status": "budget_exceeded",
+          "failure_kind": "sampling_round_limit_exceeded",
+          "subject_metrics": {
+            "assessment_seconds": null,
+            "derived_dataset_count": 0,
+            "message_counts": {
+              "assistant": 1,
+              "tool_call": 2,
+              "tool_result": 2,
+              "user": 1
+            },
+            "provider_retry_count": 0,
+            "sampling_round_count": 1,
+            "terminal_shape": null,
+            "token_usage": {
+              "cached_input_tokens": 0,
+              "input_tokens": 0,
+              "output_tokens": 0,
+              "total_tokens": 0
+            },
+            "tool_call_counts_by_name": {
+              "analysis.profile": 1,
+              "data.query": 1
+            },
+            "tool_result_counts_by_status": {
+              "succeeded": 2
+            },
+            "turn_seconds": 1.5337199000059627,
+            "usage_reported_primary_response_count": 0
+          },
+          "semantic_checks": [
+            {
+              "name": "answer_completed",
+              "passed": false,
+              "summary": "terminal_assistant_answer"
+            },
+            {
+              "name": "deliveries_accessible",
+              "passed": true,
+              "summary": "linked_artifacts_readable"
+            },
+            {
+              "name": "complete_batch_quality",
+              "passed": false,
+              "summary": "accuracy=None; required=0.9"
+            },
+            {
+              "name": "saved_analyzer_reused",
+              "passed": false,
+              "summary": "delivered_predictions_reference_same_persisted_model_and_bytes"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "report": "build/agent-harness-business-confirmation/business.campaign.v1.confirmation-deepseek-deepseek-v4-flash-817b507d101747e0826fd5b805bbcf02.json",
+      "run_id": "817b507d101747e0826fd5b805bbcf02",
+      "case_id": "business.campaign.v1.confirmation",
+      "subject_model": "deepseek/deepseek-v4-flash",
+      "schema_version": 6,
+      "fixture_sha256": "19F7EBF58EBBAAAA2E7A6EBC1473CA2F84DBDA9D4C4027B0A76C16CDC8310D88",
+      "rubric_sha256": "336F0DC5519A2AA2735593D247FC55711D78F74E3B09E4AE1263EC49BE7CB5DC",
+      "run_status": "completed",
+      "failure_kind": null,
+      "integrity": true,
+      "semantic": {
+        "checks": [
+          {
+            "name": "turn_1.answer_completed",
+            "passed": true,
+            "summary": "terminal_assistant_answer"
+          },
+          {
+            "name": "turn_1.deliveries_accessible",
+            "passed": true,
+            "summary": "linked_artifacts_readable"
+          },
+          {
+            "name": "turn_1.eligible_list_delivered",
+            "passed": false,
+            "summary": "expected_customer_ids=['C03', 'C04', 'C06', 'C07', 'C08', 'C16', 'C17', 'C18', 'C20', 'C23', 'C28', 'C29']"
+          }
+        ],
+        "passed": false,
+        "verdict": "fail"
+      },
+      "judge": {
+        "independence": "independent",
+        "metrics": {
+          "elapsed_seconds": null,
+          "provider_retry_count": 0,
+          "token_usage": null
+        },
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "reason_codes": [],
+        "required": true,
+        "rubric_id": "business.campaign_eligibility.explanation.v1",
+        "rubric_sha256": "336F0DC5519A2AA2735593D247FC55711D78F74E3B09E4AE1263EC49BE7CB5DC",
+        "scores": {},
+        "status": "blocked",
+        "summary": "semantic_prerequisite_failed",
+        "verdict": "not_evaluated"
+      },
+      "reported_subject_tokens": 45292,
+      "rounds": 5,
+      "subject_seconds": 27.41910130000906,
+      "planned_turn_count": 1,
+      "turns": [
+        {
+          "index": 1,
+          "run_status": "completed",
+          "failure_kind": null,
+          "subject_metrics": {
+            "assessment_seconds": null,
+            "derived_dataset_count": 1,
+            "message_counts": {
+              "assistant": 5,
+              "tool_call": 7,
+              "tool_result": 7,
+              "user": 1
+            },
+            "provider_retry_count": 0,
+            "sampling_round_count": 5,
+            "terminal_shape": null,
+            "token_usage": {
+              "cached_input_tokens": 34816,
+              "input_tokens": 40087,
+              "output_tokens": 5205,
+              "total_tokens": 45292
+            },
+            "tool_call_counts_by_name": {
+              "agent.skill.activate": 1,
+              "analysis.profile": 1,
+              "data.query": 3,
+              "data.transform": 1,
+              "knowledge.lookup": 1
+            },
+            "tool_result_counts_by_status": {
+              "succeeded": 7
+            },
+            "turn_seconds": 27.41910130000906,
+            "usage_reported_primary_response_count": 5
+          },
+          "semantic_checks": [
+            {
+              "name": "answer_completed",
+              "passed": true,
+              "summary": "terminal_assistant_answer"
+            },
+            {
+              "name": "deliveries_accessible",
+              "passed": true,
+              "summary": "linked_artifacts_readable"
+            },
+            {
+              "name": "eligible_list_delivered",
+              "passed": false,
+              "summary": "expected_customer_ids=['C03', 'C04', 'C06', 'C07', 'C08', 'C16', 'C17', 'C18', 'C20', 'C23', 'C28', 'C29']"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "report": "build/agent-harness-business-confirmation/business.revenue.v1.confirmation-deepseek-deepseek-v4-flash-66f6f9ecc29f466995ee090e5b8190a9.json",
+      "run_id": "66f6f9ecc29f466995ee090e5b8190a9",
+      "case_id": "business.revenue.v1.confirmation",
+      "subject_model": "deepseek/deepseek-v4-flash",
+      "schema_version": 6,
+      "fixture_sha256": "2BAC9A388C8FCB204F921E36C7ACA1EE56F92C158A0DF6878C61C4A278C58699",
+      "rubric_sha256": "00F92EC610386B33C4E3D14A673794855108CC80C928494B05C3AE9CEEC620C5",
+      "run_status": "completed",
+      "failure_kind": null,
+      "integrity": true,
+      "semantic": {
+        "checks": [
+          {
+            "name": "turn_1.answer_completed",
+            "passed": true,
+            "summary": "terminal_assistant_answer"
+          },
+          {
+            "name": "turn_1.deliveries_accessible",
+            "passed": true,
+            "summary": "linked_artifacts_readable"
+          },
+          {
+            "name": "turn_1.net_receipts_delivered",
+            "passed": true,
+            "summary": "expected_yuan={'东区': 40750.0, '西区': 32900.0, '北区': 22000.0, '南区': -1200.0}"
+          },
+          {
+            "name": "turn_2.answer_completed",
+            "passed": true,
+            "summary": "terminal_assistant_answer"
+          },
+          {
+            "name": "turn_2.deliveries_accessible",
+            "passed": true,
+            "summary": "linked_artifacts_readable"
+          },
+          {
+            "name": "turn_2.net_receipts_delivered",
+            "passed": true,
+            "summary": "expected_yuan={'东区': 40350.0, '西区': 22900.0, '北区': 22000.0, '南区': 0.0}"
+          }
+        ],
+        "passed": true,
+        "verdict": "pass"
+      },
+      "judge": {
+        "independence": "independent",
+        "metrics": {
+          "elapsed_seconds": 185.1117420999799,
+          "provider_retry_count": 0,
+          "token_usage": {
+            "cached_input_tokens": 256,
+            "input_tokens": 3782,
+            "output_tokens": 16669,
+            "total_tokens": 20451
+          }
+        },
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "reason_codes": [
+          "ambiguous_delivery",
+          "incorrect_business_claim"
+        ],
+        "required": true,
+        "rubric_id": "business.revenue_revision.explanation.v1",
+        "rubric_sha256": "00F92EC610386B33C4E3D14A673794855108CC80C928494B05C3AE9CEEC620C5",
+        "scores": {
+          "month_close_grounding": 1,
+          "revision_explanation": 1
+        },
+        "status": "completed",
+        "summary": "judge_completed",
+        "verdict": "partial"
+      },
+      "reported_subject_tokens": 80830,
+      "rounds": 7,
+      "subject_seconds": 43.086974299978465,
+      "planned_turn_count": 2,
+      "turns": [
+        {
+          "index": 1,
+          "run_status": "completed",
+          "failure_kind": null,
+          "subject_metrics": {
+            "assessment_seconds": null,
+            "derived_dataset_count": 1,
+            "message_counts": {
+              "assistant": 4,
+              "tool_call": 5,
+              "tool_result": 5,
+              "user": 1
+            },
+            "provider_retry_count": 0,
+            "sampling_round_count": 4,
+            "terminal_shape": null,
+            "token_usage": {
+              "cached_input_tokens": 25600,
+              "input_tokens": 29218,
+              "output_tokens": 4662,
+              "total_tokens": 33880
+            },
+            "tool_call_counts_by_name": {
+              "agent.skill.activate": 1,
+              "data.query": 3,
+              "data.transform": 1
+            },
+            "tool_result_counts_by_status": {
+              "succeeded": 5
+            },
+            "turn_seconds": 22.72891189996153,
+            "usage_reported_primary_response_count": 4
+          },
+          "semantic_checks": [
+            {
+              "name": "answer_completed",
+              "passed": true,
+              "summary": "terminal_assistant_answer"
+            },
+            {
+              "name": "deliveries_accessible",
+              "passed": true,
+              "summary": "linked_artifacts_readable"
+            },
+            {
+              "name": "net_receipts_delivered",
+              "passed": true,
+              "summary": "expected_yuan={'东区': 40750.0, '西区': 32900.0, '北区': 22000.0, '南区': -1200.0}"
+            }
+          ]
+        },
+        {
+          "index": 2,
+          "run_status": "completed",
+          "failure_kind": null,
+          "subject_metrics": {
+            "assessment_seconds": null,
+            "derived_dataset_count": 1,
+            "message_counts": {
+              "assistant": 3,
+              "tool_call": 2,
+              "tool_result": 2,
+              "user": 1
+            },
+            "provider_retry_count": 0,
+            "sampling_round_count": 3,
+            "terminal_shape": null,
+            "token_usage": {
+              "cached_input_tokens": 41984,
+              "input_tokens": 42964,
+              "output_tokens": 3986,
+              "total_tokens": 46950
+            },
+            "tool_call_counts_by_name": {
+              "data.query": 1,
+              "data.transform": 1
+            },
+            "tool_result_counts_by_status": {
+              "succeeded": 2
+            },
+            "turn_seconds": 20.358062400016934,
+            "usage_reported_primary_response_count": 3
+          },
+          "semantic_checks": [
+            {
+              "name": "answer_completed",
+              "passed": true,
+              "summary": "terminal_assistant_answer"
+            },
+            {
+              "name": "deliveries_accessible",
+              "passed": true,
+              "summary": "linked_artifacts_readable"
+            },
+            {
+              "name": "net_receipts_delivered",
+              "passed": true,
+              "summary": "expected_yuan={'东区': 40350.0, '西区': 22900.0, '北区': 22000.0, '南区': 0.0}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "report": "build/agent-harness-business-confirmation/business.routing.v1.confirmation-deepseek-deepseek-v4-flash-ab16b65b247d423a8d2532ad4903777d.json",
+      "run_id": "ab16b65b247d423a8d2532ad4903777d",
+      "case_id": "business.routing.v1.confirmation",
+      "subject_model": "deepseek/deepseek-v4-flash",
+      "schema_version": 6,
+      "fixture_sha256": "F9D2C840E27704445E65987C533593EB21D6E43DADB7E4724CB8B48D5FD0AA03",
+      "rubric_sha256": "911B8342194D2EF60D1A17EFFDFEC6828F678C65329BA3D60CE25F6C55810A56",
+      "run_status": "budget_exceeded",
+      "failure_kind": "sampling_round_limit_exceeded",
+      "integrity": false,
+      "semantic": {
+        "checks": [
+          {
+            "name": "turn_1.answer_completed",
+            "passed": false,
+            "summary": "terminal_assistant_answer"
+          },
+          {
+            "name": "turn_1.deliveries_accessible",
+            "passed": true,
+            "summary": "linked_artifacts_readable"
+          },
+          {
+            "name": "turn_1.reusable_analyzer_saved",
+            "passed": false,
+            "summary": "saved_model_ids=[]"
+          },
+          {
+            "name": "turn_2.answer_completed",
+            "passed": false,
+            "summary": "terminal_assistant_answer"
+          },
+          {
+            "name": "turn_2.deliveries_accessible",
+            "passed": false,
+            "summary": "linked_artifacts_readable"
+          },
+          {
+            "name": "turn_2.complete_batch_quality",
+            "passed": false,
+            "summary": "accuracy=None; required=0.9"
+          },
+          {
+            "name": "turn_2.saved_analyzer_reused",
+            "passed": false,
+            "summary": "delivered_predictions_reference_same_persisted_model"
+          }
+        ],
+        "passed": false,
+        "verdict": "not_evaluated"
+      },
+      "judge": {
+        "independence": "independent",
+        "metrics": {
+          "elapsed_seconds": null,
+          "provider_retry_count": 0,
+          "token_usage": null
+        },
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "reason_codes": [],
+        "required": true,
+        "rubric_id": "business.routing_reuse.explanation.v1",
+        "rubric_sha256": "911B8342194D2EF60D1A17EFFDFEC6828F678C65329BA3D60CE25F6C55810A56",
+        "scores": {},
+        "status": "blocked",
+        "summary": "subject_run_not_completed",
+        "verdict": "not_evaluated"
+      },
+      "reported_subject_tokens": 335289,
+      "rounds": 12,
+      "subject_seconds": 78.96796470001573,
+      "planned_turn_count": 2,
+      "turns": [
+        {
+          "index": 1,
+          "run_status": "budget_exceeded",
+          "failure_kind": "sampling_round_limit_exceeded",
+          "subject_metrics": {
+            "assessment_seconds": null,
+            "derived_dataset_count": 0,
+            "message_counts": {
+              "assistant": 12,
+              "tool_call": 22,
+              "tool_result": 22,
+              "user": 1
+            },
+            "provider_retry_count": 0,
+            "sampling_round_count": 12,
+            "terminal_shape": null,
+            "token_usage": null,
+            "tool_call_counts_by_name": {
+              "agent.skill.activate": 1,
+              "agent.skill.read_reference": 1,
+              "analysis.profile": 1,
+              "data.feature.select": 3,
+              "data.query": 5,
+              "knowledge.lookup": 2,
+              "model.metadata": 2,
+              "model.task.query": 2,
+              "model.train": 5
+            },
+            "tool_result_counts_by_status": {
+              "failed": 5,
+              "succeeded": 17
+            },
+            "turn_seconds": 78.96796470001573,
+            "usage_reported_primary_response_count": null
+          },
+          "semantic_checks": [
+            {
+              "name": "answer_completed",
+              "passed": false,
+              "summary": "terminal_assistant_answer"
+            },
+            {
+              "name": "deliveries_accessible",
+              "passed": true,
+              "summary": "linked_artifacts_readable"
+            },
+            {
+              "name": "reusable_analyzer_saved",
+              "passed": false,
+              "summary": "saved_model_ids=[]"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "report": "build/agent-harness-business-routing-pro/business.routing.v1.standard-deepseek-deepseek-v4-pro-28567a05b14f4db298587fbbe01828b2.json",
+      "run_id": "28567a05b14f4db298587fbbe01828b2",
+      "case_id": "business.routing.v1.standard",
+      "subject_model": "deepseek/deepseek-v4-pro",
+      "schema_version": 6,
+      "fixture_sha256": "013B73670B66F5CADCC37A2671E76B8244145176A38C9C09A5668A7BD0A8732F",
+      "rubric_sha256": "911B8342194D2EF60D1A17EFFDFEC6828F678C65329BA3D60CE25F6C55810A56",
+      "run_status": "budget_exceeded",
+      "failure_kind": "sampling_round_limit_exceeded",
+      "integrity": false,
+      "semantic": {
+        "checks": [
+          {
+            "name": "turn_1.answer_completed",
+            "passed": true,
+            "summary": "terminal_assistant_answer"
+          },
+          {
+            "name": "turn_1.deliveries_accessible",
+            "passed": true,
+            "summary": "linked_artifacts_readable"
+          },
+          {
+            "name": "turn_1.reusable_analyzer_saved",
+            "passed": true,
+            "summary": "saved_model_ids=['caa3c3953885441da25db70e7b650ae3']"
+          },
+          {
+            "name": "turn_2.answer_completed",
+            "passed": false,
+            "summary": "terminal_assistant_answer"
+          },
+          {
+            "name": "turn_2.deliveries_accessible",
+            "passed": true,
+            "summary": "linked_artifacts_readable"
+          },
+          {
+            "name": "turn_2.complete_batch_quality",
+            "passed": false,
+            "summary": "accuracy=None; required=0.9"
+          },
+          {
+            "name": "turn_2.saved_analyzer_reused",
+            "passed": false,
+            "summary": "delivered_predictions_reference_same_persisted_model"
+          }
+        ],
+        "passed": false,
+        "verdict": "not_evaluated"
+      },
+      "judge": {
+        "independence": "same_model",
+        "metrics": {
+          "elapsed_seconds": null,
+          "provider_retry_count": 0,
+          "token_usage": null
+        },
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "reason_codes": [],
+        "required": true,
+        "rubric_id": "business.routing_reuse.explanation.v1",
+        "rubric_sha256": "911B8342194D2EF60D1A17EFFDFEC6828F678C65329BA3D60CE25F6C55810A56",
+        "scores": {},
+        "status": "blocked",
+        "summary": "subject_run_not_completed",
+        "verdict": "not_evaluated"
+      },
+      "reported_subject_tokens": 264304,
+      "rounds": 12,
+      "subject_seconds": 210.12341719999677,
+      "planned_turn_count": 2,
+      "turns": [
+        {
+          "index": 1,
+          "run_status": "completed",
+          "failure_kind": null,
+          "subject_metrics": {
+            "assessment_seconds": null,
+            "derived_dataset_count": 1,
+            "message_counts": {
+              "assistant": 12,
+              "tool_call": 18,
+              "tool_result": 18,
+              "user": 1
+            },
+            "provider_retry_count": 0,
+            "sampling_round_count": 12,
+            "terminal_shape": null,
+            "token_usage": {
+              "cached_input_tokens": 216320,
+              "input_tokens": 247311,
+              "output_tokens": 16993,
+              "total_tokens": 264304
+            },
+            "tool_call_counts_by_name": {
+              "agent.skill.activate": 1,
+              "agent.skill.read_reference": 1,
+              "analysis.profile": 1,
+              "data.feature.select": 1,
+              "data.query": 8,
+              "knowledge.lookup": 1,
+              "model.apply": 1,
+              "model.metadata": 2,
+              "model.train": 2
+            },
+            "tool_result_counts_by_status": {
+              "succeeded": 18
+            },
+            "turn_seconds": 210.0628226000117,
+            "usage_reported_primary_response_count": 12
+          },
+          "semantic_checks": [
+            {
+              "name": "answer_completed",
+              "passed": true,
+              "summary": "terminal_assistant_answer"
+            },
+            {
+              "name": "deliveries_accessible",
+              "passed": true,
+              "summary": "linked_artifacts_readable"
+            },
+            {
+              "name": "reusable_analyzer_saved",
+              "passed": true,
+              "summary": "saved_model_ids=['caa3c3953885441da25db70e7b650ae3']"
+            }
+          ]
+        },
+        {
+          "index": 2,
+          "run_status": "budget_exceeded",
+          "failure_kind": "sampling_round_limit_exceeded",
+          "subject_metrics": {
+            "assessment_seconds": null,
+            "derived_dataset_count": 0,
+            "message_counts": {
+              "user": 1
+            },
+            "provider_retry_count": 0,
+            "sampling_round_count": 0,
+            "terminal_shape": null,
+            "token_usage": {
+              "cached_input_tokens": 0,
+              "input_tokens": 0,
+              "output_tokens": 0,
+              "total_tokens": 0
+            },
+            "tool_call_counts_by_name": {},
+            "tool_result_counts_by_status": {},
+            "turn_seconds": 0.0605945999850519,
+            "usage_reported_primary_response_count": 0
+          },
+          "semantic_checks": [
+            {
+              "name": "answer_completed",
+              "passed": false,
+              "summary": "terminal_assistant_answer"
+            },
+            {
+              "name": "deliveries_accessible",
+              "passed": true,
+              "summary": "linked_artifacts_readable"
+            },
+            {
+              "name": "complete_batch_quality",
+              "passed": false,
+              "summary": "accuracy=None; required=0.9"
+            },
+            {
+              "name": "saved_analyzer_reused",
+              "passed": false,
+              "summary": "delivered_predictions_reference_same_persisted_model"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "report": "build/agent-harness-business-final/business.campaign.v1.standard-deepseek-deepseek-v4-flash-774b8851d6fa48089b3448e45cc9f938.json",
+      "run_id": "774b8851d6fa48089b3448e45cc9f938",
+      "case_id": "business.campaign.v1.standard",
+      "subject_model": "deepseek/deepseek-v4-flash",
+      "schema_version": 6,
+      "fixture_sha256": "DDF4B77B17E20F18327824EDA549E2DEEE5FF2DFEBA7005C3F446B7160124733",
+      "rubric_sha256": "8A6B83AD1C3AEC7C2EFAB2E62351A7A90BB3D9DDBA28C5BFD64517443B2F6FDA",
+      "run_status": "completed",
+      "failure_kind": null,
+      "integrity": true,
+      "semantic": {
+        "checks": [
+          {
+            "name": "turn_1.answer_completed",
+            "passed": true,
+            "summary": "terminal_assistant_answer"
+          },
+          {
+            "name": "turn_1.deliveries_accessible",
+            "passed": true,
+            "summary": "linked_artifacts_readable"
+          },
+          {
+            "name": "turn_1.eligible_list_delivered",
+            "passed": true,
+            "summary": "expected_customer_ids=['C01', 'C03', 'C06', 'C08', 'C11', 'C15', 'C16', 'C19', 'C23', 'C27', 'C31']"
+          }
+        ],
+        "passed": true,
+        "verdict": "pass"
+      },
+      "judge": {
+        "independence": "independent",
+        "metrics": {
+          "elapsed_seconds": 16.10518840001896,
+          "provider_retry_count": 0,
+          "token_usage": {
+            "cached_input_tokens": 512,
+            "input_tokens": 5759,
+            "output_tokens": 1385,
+            "total_tokens": 7144
+          }
+        },
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "reason_codes": [
+          "grounded_delivery"
+        ],
+        "required": true,
+        "rubric_id": "business.campaign_eligibility.explanation.v1",
+        "rubric_sha256": "8A6B83AD1C3AEC7C2EFAB2E62351A7A90BB3D9DDBA28C5BFD64517443B2F6FDA",
+        "scores": {
+          "effective_rule": 2,
+          "exceptions_explained": 2
+        },
+        "status": "completed",
+        "summary": "judge_completed",
+        "verdict": "pass"
+      },
+      "reported_subject_tokens": 69634,
+      "rounds": 6,
+      "subject_seconds": 41.57074039999861,
+      "planned_turn_count": 1,
+      "turns": [
+        {
+          "index": 1,
+          "run_status": "completed",
+          "failure_kind": null,
+          "subject_metrics": {
+            "assessment_seconds": null,
+            "derived_dataset_count": 1,
+            "message_counts": {
+              "assistant": 6,
+              "tool_call": 10,
+              "tool_result": 10,
+              "user": 1
+            },
+            "provider_retry_count": 0,
+            "sampling_round_count": 6,
+            "terminal_shape": null,
+            "token_usage": {
+              "cached_input_tokens": 54656,
+              "input_tokens": 61208,
+              "output_tokens": 8426,
+              "total_tokens": 69634
+            },
+            "tool_call_counts_by_name": {
+              "agent.skill.activate": 1,
+              "analysis.profile": 1,
+              "data.query": 3,
+              "data.transform": 1,
+              "knowledge.lookup": 4
+            },
+            "tool_result_counts_by_status": {
+              "succeeded": 10
+            },
+            "turn_seconds": 41.57074039999861,
+            "usage_reported_primary_response_count": 6
+          },
+          "semantic_checks": [
+            {
+              "name": "answer_completed",
+              "passed": true,
+              "summary": "terminal_assistant_answer"
+            },
+            {
+              "name": "deliveries_accessible",
+              "passed": true,
+              "summary": "linked_artifacts_readable"
+            },
+            {
+              "name": "eligible_list_delivered",
+              "passed": true,
+              "summary": "expected_customer_ids=['C01', 'C03', 'C06', 'C08', 'C11', 'C15', 'C16', 'C19', 'C23', 'C27', 'C31']"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "report": "build/agent-harness-business-final/business.revenue.v1.standard-deepseek-deepseek-v4-flash-032f5ebc5681499dbf48bf02111615c4.json",
+      "run_id": "032f5ebc5681499dbf48bf02111615c4",
+      "case_id": "business.revenue.v1.standard",
+      "subject_model": "deepseek/deepseek-v4-flash",
+      "schema_version": 6,
+      "fixture_sha256": "E281B883A03A0DDABD96E1EBF908AECCDFBBAB5FE36C8C9EC212D6F669ADDA70",
+      "rubric_sha256": "00F92EC610386B33C4E3D14A673794855108CC80C928494B05C3AE9CEEC620C5",
+      "run_status": "completed",
+      "failure_kind": null,
+      "integrity": true,
+      "semantic": {
+        "checks": [
+          {
+            "name": "turn_1.answer_completed",
+            "passed": true,
+            "summary": "terminal_assistant_answer"
+          },
+          {
+            "name": "turn_1.deliveries_accessible",
+            "passed": true,
+            "summary": "linked_artifacts_readable"
+          },
+          {
+            "name": "turn_1.net_receipts_delivered",
+            "passed": false,
+            "summary": "expected_yuan={'东区': 40750.0, '西区': 32900.0, '北区': 22000.0, '南区': -1200.0}"
+          },
+          {
+            "name": "turn_2.answer_completed",
+            "passed": true,
+            "summary": "terminal_assistant_answer"
+          },
+          {
+            "name": "turn_2.deliveries_accessible",
+            "passed": true,
+            "summary": "linked_artifacts_readable"
+          },
+          {
+            "name": "turn_2.net_receipts_delivered",
+            "passed": true,
+            "summary": "expected_yuan={'东区': 29750.0, '西区': 32900.0, '北区': 22000.0, '南区': -900.0}"
+          }
+        ],
+        "passed": false,
+        "verdict": "fail"
+      },
+      "judge": {
+        "independence": "independent",
+        "metrics": {
+          "elapsed_seconds": null,
+          "provider_retry_count": 0,
+          "token_usage": null
+        },
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "reason_codes": [],
+        "required": true,
+        "rubric_id": "business.revenue_revision.explanation.v1",
+        "rubric_sha256": "00F92EC610386B33C4E3D14A673794855108CC80C928494B05C3AE9CEEC620C5",
+        "scores": {},
+        "status": "blocked",
+        "summary": "semantic_prerequisite_failed",
+        "verdict": "not_evaluated"
+      },
+      "reported_subject_tokens": 178546,
+      "rounds": 9,
+      "subject_seconds": 90.24088970001321,
+      "planned_turn_count": 2,
+      "turns": [
+        {
+          "index": 1,
+          "run_status": "completed",
+          "failure_kind": null,
+          "subject_metrics": {
+            "assessment_seconds": null,
+            "derived_dataset_count": 2,
+            "message_counts": {
+              "assistant": 5,
+              "tool_call": 9,
+              "tool_result": 9,
+              "user": 1
+            },
+            "provider_retry_count": 0,
+            "sampling_round_count": 5,
+            "terminal_shape": null,
+            "token_usage": {
+              "cached_input_tokens": 48256,
+              "input_tokens": 59489,
+              "output_tokens": 10165,
+              "total_tokens": 69654
+            },
+            "tool_call_counts_by_name": {
+              "agent.skill.activate": 2,
+              "analysis.graph": 1,
+              "data.query": 3,
+              "data.transform": 2,
+              "knowledge.lookup": 1
+            },
+            "tool_result_counts_by_status": {
+              "succeeded": 9
+            },
+            "turn_seconds": 48.779056300001685,
+            "usage_reported_primary_response_count": 5
+          },
+          "semantic_checks": [
+            {
+              "name": "answer_completed",
+              "passed": true,
+              "summary": "terminal_assistant_answer"
+            },
+            {
+              "name": "deliveries_accessible",
+              "passed": true,
+              "summary": "linked_artifacts_readable"
+            },
+            {
+              "name": "net_receipts_delivered",
+              "passed": false,
+              "summary": "expected_yuan={'东区': 40750.0, '西区': 32900.0, '北区': 22000.0, '南区': -1200.0}"
+            }
+          ]
+        },
+        {
+          "index": 2,
+          "run_status": "completed",
+          "failure_kind": null,
+          "subject_metrics": {
+            "assessment_seconds": null,
+            "derived_dataset_count": 3,
+            "message_counts": {
+              "assistant": 4,
+              "tool_call": 5,
+              "tool_result": 5,
+              "user": 1
+            },
+            "provider_retry_count": 0,
+            "sampling_round_count": 4,
+            "terminal_shape": null,
+            "token_usage": {
+              "cached_input_tokens": 98560,
+              "input_tokens": 101401,
+              "output_tokens": 7491,
+              "total_tokens": 108892
+            },
+            "tool_call_counts_by_name": {
+              "analysis.graph": 1,
+              "data.query": 1,
+              "data.transform": 3
+            },
+            "tool_result_counts_by_status": {
+              "succeeded": 5
+            },
+            "turn_seconds": 41.46183340001153,
+            "usage_reported_primary_response_count": 4
+          },
+          "semantic_checks": [
+            {
+              "name": "answer_completed",
+              "passed": true,
+              "summary": "terminal_assistant_answer"
+            },
+            {
+              "name": "deliveries_accessible",
+              "passed": true,
+              "summary": "linked_artifacts_readable"
+            },
+            {
+              "name": "net_receipts_delivered",
+              "passed": true,
+              "summary": "expected_yuan={'东区': 29750.0, '西区': 32900.0, '北区': 22000.0, '南区': -900.0}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "report": "build/agent-harness-business-final/business.routing.v1.standard-deepseek-deepseek-v4-flash-3606366b03dc45e397d1119fa895fb0c.json",
+      "run_id": "3606366b03dc45e397d1119fa895fb0c",
+      "case_id": "business.routing.v1.standard",
+      "subject_model": "deepseek/deepseek-v4-flash",
+      "schema_version": 6,
+      "fixture_sha256": "52FFEC11EDA483EB18AB85C0A3C9812ECDBA8045AE85A54A157BAC86DB8B4B3A",
+      "rubric_sha256": "A813A96D29847CB305A36AB2EE5F3F67032B064D8322EFE11D5B58F609B02289",
+      "run_status": "budget_exceeded",
+      "failure_kind": "sampling_round_limit_exceeded",
+      "integrity": false,
+      "semantic": {
+        "checks": [
+          {
+            "name": "turn_1.answer_completed",
+            "passed": false,
+            "summary": "terminal_assistant_answer"
+          },
+          {
+            "name": "turn_1.deliveries_accessible",
+            "passed": true,
+            "summary": "linked_artifacts_readable"
+          },
+          {
+            "name": "turn_1.reusable_analyzer_saved",
+            "passed": false,
+            "summary": "saved_model_ids=[]"
+          },
+          {
+            "name": "turn_2.answer_completed",
+            "passed": false,
+            "summary": "terminal_assistant_answer"
+          },
+          {
+            "name": "turn_2.deliveries_accessible",
+            "passed": false,
+            "summary": "linked_artifacts_readable"
+          },
+          {
+            "name": "turn_2.complete_batch_quality",
+            "passed": false,
+            "summary": "accuracy=None; required=0.9"
+          },
+          {
+            "name": "turn_2.saved_analyzer_reused",
+            "passed": false,
+            "summary": "delivered_predictions_reference_same_persisted_model"
+          }
+        ],
+        "passed": false,
+        "verdict": "not_evaluated"
+      },
+      "judge": {
+        "independence": "independent",
+        "metrics": {
+          "elapsed_seconds": null,
+          "provider_retry_count": 0,
+          "token_usage": null
+        },
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "reason_codes": [],
+        "required": true,
+        "rubric_id": "business.routing_reuse.explanation.v1",
+        "rubric_sha256": "A813A96D29847CB305A36AB2EE5F3F67032B064D8322EFE11D5B58F609B02289",
+        "scores": {},
+        "status": "blocked",
+        "summary": "subject_run_not_completed",
+        "verdict": "not_evaluated"
+      },
+      "reported_subject_tokens": 216190,
+      "rounds": 12,
+      "subject_seconds": 94.85039770003641,
+      "planned_turn_count": 2,
+      "turns": [
+        {
+          "index": 1,
+          "run_status": "budget_exceeded",
+          "failure_kind": "sampling_round_limit_exceeded",
+          "subject_metrics": {
+            "assessment_seconds": null,
+            "derived_dataset_count": 1,
+            "message_counts": {
+              "assistant": 12,
+              "tool_call": 25,
+              "tool_result": 25,
+              "user": 1
+            },
+            "provider_retry_count": 0,
+            "sampling_round_count": 12,
+            "terminal_shape": null,
+            "token_usage": {
+              "cached_input_tokens": 181248,
+              "input_tokens": 208219,
+              "output_tokens": 7971,
+              "total_tokens": 216190
+            },
+            "tool_call_counts_by_name": {
+              "agent.skill.activate": 1,
+              "agent.skill.read_reference": 1,
+              "analysis.profile": 1,
+              "data.feature.select": 1,
+              "data.query": 14,
+              "knowledge.lookup": 1,
+              "model.apply": 1,
+              "model.metadata": 1,
+              "model.train": 4
+            },
+            "tool_result_counts_by_status": {
+              "failed": 1,
+              "succeeded": 24
+            },
+            "turn_seconds": 94.85039770003641,
+            "usage_reported_primary_response_count": 12
+          },
+          "semantic_checks": [
+            {
+              "name": "answer_completed",
+              "passed": false,
+              "summary": "terminal_assistant_answer"
+            },
+            {
+              "name": "deliveries_accessible",
+              "passed": true,
+              "summary": "linked_artifacts_readable"
+            },
+            {
+              "name": "reusable_analyzer_saved",
+              "passed": false,
+              "summary": "saved_model_ids=[]"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "delivery_reassessments": [
+    {
+      "report_kind": "xenix.agent_harness.delivery_reassessment",
+      "source_run_id": "817b507d101747e0826fd5b805bbcf02",
+      "source_report": "build/agent-harness-business-confirmation/business.campaign.v1.confirmation-deepseek-deepseek-v4-flash-817b507d101747e0826fd5b805bbcf02.json",
+      "original_fixture_sha256": "19F7EBF58EBBAAAA2E7A6EBC1473CA2F84DBDA9D4C4027B0A76C16CDC8310D88",
+      "case_id": "business.campaign.v1.confirmation",
+      "new_subject_calls": 0,
+      "semantic_checks": [
+        {
+          "name": "turn_1.answer_completed",
+          "passed": true,
+          "summary": "terminal_assistant_answer"
+        },
+        {
+          "name": "turn_1.deliveries_accessible",
+          "passed": true,
+          "summary": "linked_artifacts_readable"
+        },
+        {
+          "name": "turn_1.eligible_list_delivered",
+          "passed": true,
+          "summary": "expected_customer_ids=['C03', 'C04', 'C06', 'C07', 'C08', 'C16', 'C17', 'C18', 'C20', 'C23', 'C28', 'C29']"
+        }
+      ],
+      "judge": {
+        "required": true,
+        "rubric_id": "business.campaign_eligibility.explanation.v1",
+        "rubric_sha256": "8A6B83AD1C3AEC7C2EFAB2E62351A7A90BB3D9DDBA28C5BFD64517443B2F6FDA",
+        "status": "completed",
+        "verdict": "pass",
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "independence": "independent",
+        "scores": {
+          "effective_rule": 2,
+          "exceptions_explained": 2
+        },
+        "reason_codes": [
+          "grounded_delivery"
+        ],
+        "summary": "judge_completed",
+        "metrics": {
+          "elapsed_seconds": 16.67519410001114,
+          "token_usage": {
+            "input_tokens": 5147,
+            "cached_input_tokens": 256,
+            "output_tokens": 1572,
+            "total_tokens": 6719
+          },
+          "provider_retry_count": 0
+        }
+      },
+      "note": "Current oracle applied to preserved delivery; original live report remains unchanged. This is evaluator correction, not Subject improvement.",
+      "report": "build/agent-harness-business-reassessments/campaign-confirmation.json"
+    },
+    {
+      "report_kind": "xenix.agent_harness.delivery_reassessment",
+      "source_run_id": "032f5ebc5681499dbf48bf02111615c4",
+      "source_report": "build/agent-harness-business-final/business.revenue.v1.standard-deepseek-deepseek-v4-flash-032f5ebc5681499dbf48bf02111615c4.json",
+      "original_fixture_sha256": "E281B883A03A0DDABD96E1EBF908AECCDFBBAB5FE36C8C9EC212D6F669ADDA70",
+      "case_id": "business.revenue.v1.standard",
+      "new_subject_calls": 0,
+      "semantic_checks": [
+        {
+          "name": "turn_1.answer_completed",
+          "passed": true,
+          "summary": "terminal_assistant_answer"
+        },
+        {
+          "name": "turn_1.deliveries_accessible",
+          "passed": true,
+          "summary": "linked_artifacts_readable"
+        },
+        {
+          "name": "turn_1.net_receipts_delivered",
+          "passed": true,
+          "summary": "expected_yuan={'东区': 40750.0, '西区': 32900.0, '北区': 22000.0, '南区': -1200.0}"
+        },
+        {
+          "name": "turn_2.answer_completed",
+          "passed": true,
+          "summary": "terminal_assistant_answer"
+        },
+        {
+          "name": "turn_2.deliveries_accessible",
+          "passed": true,
+          "summary": "linked_artifacts_readable"
+        },
+        {
+          "name": "turn_2.net_receipts_delivered",
+          "passed": true,
+          "summary": "expected_yuan={'东区': 29750.0, '西区': 32900.0, '北区': 22000.0, '南区': -900.0}"
+        }
+      ],
+      "judge": {
+        "required": true,
+        "rubric_id": "business.revenue_revision.explanation.v1",
+        "rubric_sha256": "7E35E7ACB8224926F89DD4BC4830A0EC4B0B3798ED0424964DFE4E9BBB636C20",
+        "status": "completed",
+        "verdict": "pass",
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "independence": "independent",
+        "scores": {
+          "month_close_grounding": 2,
+          "revision_explanation": 2
+        },
+        "reason_codes": [
+          "grounded_delivery"
+        ],
+        "summary": "judge_completed",
+        "metrics": {
+          "elapsed_seconds": 14.684242099989206,
+          "token_usage": {
+            "input_tokens": 11035,
+            "cached_input_tokens": 256,
+            "output_tokens": 1328,
+            "total_tokens": 12363
+          },
+          "provider_retry_count": 0
+        }
+      },
+      "note": "Current oracle applied to preserved delivery; original live report remains unchanged. This is evaluator correction, not Subject improvement.",
+      "report": "build/agent-harness-business-reassessments/revenue-standard.json"
+    }
+  ]
+}

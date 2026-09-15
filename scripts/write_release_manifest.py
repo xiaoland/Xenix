@@ -94,10 +94,10 @@ def main() -> int:
     run_attempt = _optional_positive_int("GITHUB_RUN_ATTEMPT")
     if os.environ.get("XENIX_PUBLIC_RELEASE_BUILD") == "1":
         expected_tag = f"v{project['version']}"
-        if tag != expected_tag or promotion_pr is None or repository is None:
+        if tag != expected_tag or repository is None:
             raise RuntimeError(
-                "Public release manifest requires the exact release tag, "
-                "promotion PR, and GitHub repository identity."
+                "Public release manifest requires the exact release tag "
+                "and GitHub repository identity."
             )
         if run_id is None or run_attempt is None:
             raise RuntimeError(

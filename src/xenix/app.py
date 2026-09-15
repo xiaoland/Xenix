@@ -8,32 +8,32 @@ from collections.abc import Callable
 from datetime import datetime
 from importlib import import_module
 from pathlib import Path
-from types import SimpleNamespace
 from typing import TYPE_CHECKING, Literal
 
 from PySide6.QtCore import QCoreApplication, QElapsedTimer, QEventLoop, QThread, QUrl
 from PySide6.QtGui import QDesktopServices, QIcon
-from PySide6.QtWidgets import QApplication, QMessageBox, QWidget
+from PySide6.QtWidgets import QApplication, QMessageBox
 
+from .application_lifetime import ApplicationLifetime
 from .application_services import ApplicationServices
-from .config import APP_NAME, APP_ORGANIZATION, ensure_app_dirs, get_app_paths
+from .config import APP_NAME, APP_ORGANIZATION, AppPaths, ensure_app_dirs, get_app_paths
 from .exceptions import StorageBootstrapError, install_exception_hooks
 from .i18n import TranslationManager
 from .logging import setup_logging, shutdown_logging
 from .observability import (
-    LLM_USAGE_JOURNAL_FILE_NAME,
-    LocalLLMUsageObservability,
     flush_observability,
     record_counter,
     setup_observability,
     start_span,
 )
 from .resources import package_resource_path
+from .smoke_checks import run_smoke_checks
 from .trial_lock import TrialLockCheck, check_trial_lock, trial_purchase_url
 from .ui.startup_splash import StartupSplash, StartupStage
 
 if TYPE_CHECKING:
     from .ui.main_window import MainWindow
+    from .services.storage.bootstrap import StorageContext
 
 LOGGER = logging.getLogger("xenix.bootstrap")
 STARTUP_SPLASH_HOLD_MS = 2200
@@ -41,9 +41,7 @@ STARTUP_TIMING_ENV = "XENIX_STARTUP_TIMING"
 _STARTUP_TIMING_T0 = time.perf_counter()
 StorageRecoveryAction = Literal["quarantine", "open", "exit"]
 
-# This is an advertisement policy, not a second tool registry.  The LLM
-# boundary remains the authority for registered definitions and validates the
-# frozen scope before accepting or invoking any provider Tool Call.
+
 class TrialLockStartupExit(Exception):
     pass
 
@@ -143,9 +141,7 @@ def _prompt_storage_recovery(
 ) -> StorageRecoveryAction:
     message_box = QMessageBox()
     message_box.setIcon(QMessageBox.Critical)
-    message_box.setWindowTitle(
-        QCoreApplication.translate("XenixStartup", "Local database recovery")
-    )
+    message_box.setWindowTitle(QCoreApplication.translate("XenixStartup", "Local database recovery"))
     message_box.setText(
         QCoreApplication.translate(
             "XenixStartup",
@@ -194,9 +190,7 @@ def _prompt_trial_lock(check: TrialLockCheck) -> None:
     purchase_url = trial_purchase_url()
     message_box = QMessageBox()
     message_box.setIcon(QMessageBox.Warning)
-    message_box.setWindowTitle(
-        QCoreApplication.translate("XenixStartup", "Xenix test build locked")
-    )
+    message_box.setWindowTitle(QCoreApplication.translate("XenixStartup", "Xenix test build locked"))
     message_box.setText(
         QCoreApplication.translate(
             "XenixStartup",
@@ -241,11 +235,13 @@ def _prompt_trial_lock(check: TrialLockCheck) -> None:
 def _recover_storage_bootstrap(
     *,
     app: QApplication,
-    runtime: SimpleNamespace,
-    paths,
+    paths: AppPaths,
     initial_error: StorageBootstrapError,
-):
-    db_path = runtime.database_path(paths)
+) -> StorageContext:
+    from .services.storage import StorageBootstrapService
+    from .services.storage.layout import database_path
+
+    db_path = database_path(paths)
     error: StorageBootstrapError = initial_error
     while db_path.exists():
         action = _prompt_storage_recovery(db_path=db_path, exc=error)
@@ -263,7 +259,7 @@ def _recover_storage_bootstrap(
             quarantined_path,
         )
         try:
-            return runtime.StorageBootstrapService().initialize(paths)
+            return StorageBootstrapService().initialize(paths)
         except StorageBootstrapError as exc:
             error = exc
             LOGGER.exception("Storage bootstrap retry failed after database quarantine")
@@ -271,135 +267,49 @@ def _recover_storage_bootstrap(
     raise error
 
 
-def _load_runtime_imports(
-    *,
-    module_loaded: Callable[[], None] | None = None,
-) -> SimpleNamespace:
+def _load_runtime_imports(*, module_loaded: Callable[[], None] | None = None) -> None:
+    """Warm heavy imports on the Qt application thread at visible progress boundaries."""
     runtime_start = time.perf_counter()
-
-    def load_module(module_name: str):
+    for module_name in (
+        "xenix.services.agent.composition",
+        "xenix.services.embedding_service",
+        "xenix.services.job_service",
+        "xenix.services.knowledge_import_service",
+        "xenix.services.knowledge_derivation_service",
+        "xenix.services.knowledge_document_lifecycle_service",
+        "xenix.services.knowledge_index_service",
+        "xenix.services.knowledge_workspace_service",
+        "xenix.services.paddle_ocr_service",
+        "xenix.services.llm",
+        "xenix.services.ml.worker_settings",
+        "xenix.services.storage",
+    ):
         module_start = time.perf_counter()
-        module = import_module(module_name)
+        import_module(module_name)
         _emit_startup_timing("runtime_import.module", module_start, module=module_name)
         if module_loaded is not None:
             module_loaded()
-        return module
-
-    agent_harness = load_module("xenix.services.agent.harness_service")
-    agent_composition = load_module("xenix.services.agent.composition")
-    agent_skill_catalog = load_module("xenix.services.agent.skill_catalog")
-    lazy_tools = load_module("xenix.services.agent.lazy_tools")
-    artifact_service = load_module("xenix.services.artifact_service")
-    dataset_export_service = load_module("xenix.services.dataset_export_service")
-    embedding_service = load_module("xenix.services.embedding_service")
-    link_router = load_module("xenix.services.link_router")
-    knowledge_import = load_module("xenix.services.knowledge_import_service")
-    knowledge_derivation = load_module("xenix.services.knowledge_derivation_service")
-    knowledge_document_lifecycle = load_module(
-        "xenix.services.knowledge_document_lifecycle_service"
-    )
-    knowledge_index = load_module("xenix.services.knowledge_index_service")
-    knowledge_task_query = load_module("xenix.services.knowledge_task_query")
-    knowledge_workspace = load_module("xenix.services.knowledge_workspace_service")
-    paddle_ocr = load_module("xenix.services.paddle_ocr_service")
-    lazy_ml_service = load_module("xenix.services.lazy_ml_service")
-    lazy_services = load_module("xenix.services.lazy_services")
-    llm = load_module("xenix.services.llm")
-    worker_settings = load_module("xenix.services.ml.worker_settings")
-    storage = load_module("xenix.services.storage")
-    storage_layout = load_module("xenix.services.storage.layout")
     _emit_startup_timing("runtime_import.total", runtime_start)
-
-    return SimpleNamespace(
-        AgentHarnessService=agent_harness.AgentHarnessService,
-        build_headless_agent_services=agent_composition.build_headless_agent_services,
-        AgentSkillCatalog=agent_skill_catalog.AgentSkillCatalog,
-        AgentToolRegistry=lazy_tools.LazyAgentToolRegistry,
-        ArtifactService=artifact_service.ArtifactService,
-        LLMConversationService=llm.LLMConversationService,
-        LLMToolRegistry=llm.AgentToolRegistry,
-        DatasetExportService=dataset_export_service.DatasetExportService,
-        EmbeddingSettingsService=embedding_service.EmbeddingSettingsService,
-        LazyServiceProxy=lazy_services.LazyServiceProxy,
-        LinkRouter=link_router.LinkRouter,
-        KnowledgeImportService=knowledge_import.KnowledgeImportService,
-        KnowledgeDerivationService=knowledge_derivation.KnowledgeDerivationService,
-        KnowledgeDocumentLifecycleService=(
-            knowledge_document_lifecycle.KnowledgeDocumentLifecycleService
-        ),
-        KnowledgeIndexService=knowledge_index.KnowledgeIndexService,
-        KnowledgeTaskQueryService=knowledge_task_query.KnowledgeTaskQueryService,
-        KnowledgeWorkspaceService=knowledge_workspace.KnowledgeWorkspaceService,
-        PaddleOcrDeploymentService=paddle_ocr.PaddleOcrDeploymentService,
-        PaddleOcrService=paddle_ocr.PaddleOcrService,
-        LLMService=llm.LLMService,
-        LLMSettingsService=llm.LLMSettingsService,
-        MLService=lazy_ml_service.LazyMLService,
-        MLWorkerSettingsService=worker_settings.MLWorkerSettingsService,
-        StorageBootstrapService=storage.StorageBootstrapService,
-        database_path=storage_layout.database_path,
-    )
-
-
-def _register_agent_skill_tools(
-    registry,
-    catalog,
-    *,
-    activated_skill_names_provider: Callable[[str], set[str]] | None = None,
-) -> None:
-    """Compatibility forwarding for historical desktop/test imports."""
-
-    from .services.agent.composition import register_agent_skill_tools
-
-    register_agent_skill_tools(
-        registry,
-        catalog,
-        activated_skill_names_provider=activated_skill_names_provider,
-    )
-
-
-def _agent_skill_activated_skill_names(snapshot) -> set[str]:
-    """Compatibility forwarding for historical desktop/test imports."""
-
-    from .services.agent.composition import agent_skill_activated_skill_names
-
-    return agent_skill_activated_skill_names(snapshot)
-
-
-def _agent_skill_context_messages(catalog, snapshot) -> list:
-    """Compatibility forwarding for historical desktop/test imports."""
-
-    from .services.agent.composition import agent_skill_context_messages
-
-    return agent_skill_context_messages(catalog, snapshot)
-
-
-def _agent_skill_tool_scope_names(snapshot) -> tuple[str, ...] | None:
-    """Compatibility forwarding for historical desktop/test imports."""
-
-    from .services.agent.composition import agent_skill_tool_scope_names
-
-    return agent_skill_tool_scope_names(snapshot)
 
 
 def _load_runtime_imports_with_events(
     app: QApplication,
     splash: StartupSplash | None,
-) -> SimpleNamespace:
+) -> None:
     if splash is None:
         load_start = time.perf_counter()
-        runtime = _load_runtime_imports()
+        _load_runtime_imports()
         _emit_startup_timing("runtime_import.no_splash_wait", load_start)
-        return runtime
+        return
 
     load_start = time.perf_counter()
+
     def process_module_boundary() -> None:
         app.processEvents(QEventLoop.ProcessEventsFlag.AllEvents, 50)
 
-    result = _load_runtime_imports(module_loaded=process_module_boundary)
+    _load_runtime_imports(module_loaded=process_module_boundary)
     app.processEvents()
     _emit_startup_timing("runtime_import.splash_wait", load_start)
-    return result
 
 
 def build_main_window(
@@ -435,8 +345,7 @@ def build_main_window(
 
     startup_scope = None
     startup_span_active = False
-    logging_initialized = False
-    runtime_shutdown: Callable[[], None] | None = None
+    lifetime = ApplicationLifetime()
     try:
         _update_startup_stage(app, splash, StartupStage.PREPARING_APP_DATA)
         step_start = time.perf_counter()
@@ -462,17 +371,18 @@ def build_main_window(
 
         _update_startup_stage(app, splash, StartupStage.LOADING_RUNTIME)
         step_start = time.perf_counter()
-        runtime = _load_runtime_imports_with_events(app, splash)
+        _load_runtime_imports_with_events(app, splash)
         _emit_startup_timing("load_runtime_imports", step_start)
         step_start = time.perf_counter()
-        from .ui.main_window import MainWindow
-        _emit_startup_timing("import_main_window", step_start)
+        from .services.storage import StorageBootstrapService
+        from .services.storage.layout import database_path
 
         _update_startup_stage(app, splash, StartupStage.INITIALIZING_LOGGING)
         step_start = time.perf_counter()
         log_path = setup_logging(paths)
-        logging_initialized = True
+        lifetime.add_cleanup("logging", shutdown_logging)
         observability = setup_observability(paths)
+        lifetime.add_cleanup("observability", flush_observability)
         startup_scope = start_span("app.startup")
         startup_scope.__enter__()
         startup_span_active = True
@@ -498,7 +408,8 @@ def build_main_window(
         try:
             step_start = time.perf_counter()
             with start_span("storage.bootstrap"):
-                context = runtime.StorageBootstrapService().initialize(paths)
+                context = StorageBootstrapService().initialize(paths)
+                lifetime.add_cleanup("database", context.engine.dispose)
                 record_counter(
                     "xenix.storage.bootstrap.count",
                     attributes={
@@ -512,180 +423,42 @@ def build_main_window(
                 "xenix.storage.bootstrap.count",
                 attributes={"status": "failed", "error.type": exc.__class__.__name__},
             )
-            if not show or not runtime.database_path(paths).exists():
+            if not show or not database_path(paths).exists():
                 raise
             _close_startup_splash(app, splash)
             splash = None
             context = _recover_storage_bootstrap(
                 app=app,
-                runtime=runtime,
                 paths=paths,
                 initial_error=exc,
             )
+            lifetime.add_cleanup("database", context.engine.dispose)
 
-        knowledge_import_service = None
-        knowledge_derivation_service = None
-        knowledge_index_service = None
-        runtime_shutdown_started = False
         runtime_shutdown_connected = False
 
         def shutdown_runtime() -> None:
-            nonlocal runtime_shutdown_connected, runtime_shutdown_started
-            if runtime_shutdown_started:
-                return
-            runtime_shutdown_started = True
+            nonlocal runtime_shutdown_connected
             if runtime_shutdown_connected:
                 app.aboutToQuit.disconnect(shutdown_runtime)
                 runtime_shutdown_connected = False
-            if knowledge_import_service is not None:
-                knowledge_import_service.shutdown()
-            if knowledge_derivation_service is not None:
-                knowledge_derivation_service.shutdown()
-            if knowledge_index_service is not None:
-                knowledge_index_service.shutdown()
-            context.engine.dispose()
-            flush_observability()
-            shutdown_logging()
-
-        runtime_shutdown = shutdown_runtime
+            lifetime.close()
 
         _update_startup_stage(app, splash, StartupStage.LOADING_WORKBENCH)
         step_start = time.perf_counter()
-        ml_worker_settings_service = runtime.MLWorkerSettingsService(paths)
-        llm_settings_service = runtime.LLMSettingsService(paths)
-        embedding_settings_service = runtime.EmbeddingSettingsService(paths)
-        llm_service = runtime.LLMService(llm_settings_service)
-        agent_services = runtime.build_headless_agent_services(
+        from .application_composition import build_workbench_window
+
+        window = build_workbench_window(
             paths=paths,
-            session_factory=context.session_factory,
-            llm=llm_service,
-            embedding_settings_service=embedding_settings_service,
-            ml_worker_settings=ml_worker_settings_service,
-            usage_observability=LocalLLMUsageObservability(
-                paths.logs / LLM_USAGE_JOURNAL_FILE_NAME
-            ),
+            context=context,
+            translation_manager=translation_manager,
+            log_path=log_path,
+            lifetime=lifetime,
+            on_services_ready=on_services_ready,
         )
-        link_router = runtime.LinkRouter(
-            artifact_service=agent_services.artifacts,
-        )
-        from .services.update_service import UpdateService
-
-        update_service = UpdateService(paths, runtime.database_path(paths))
-        paddle_ocr_deployment = runtime.PaddleOcrDeploymentService(paths)
-        knowledge_index_service = runtime.KnowledgeIndexService(
-            session_factory=context.session_factory,
-            semantic_service=agent_services.knowledge_semantic,
-            embedding_service=agent_services.embedding,
-            embedding_settings_source=embedding_settings_service,
-        )
-        knowledge_derivation_service = runtime.KnowledgeDerivationService(
-            paths=paths,
-            session_factory=context.session_factory,
-            retrieval_ready_notifier=knowledge_index_service.notify_corpus_changed,
-        )
-        knowledge_import_service = runtime.KnowledgeImportService(
-            paths=paths,
-            session_factory=context.session_factory,
-            artifact_service=agent_services.artifacts,
-            canonical_ready_notifier=knowledge_derivation_service.enqueue_generation,
-            corpus_changed_notifier=knowledge_index_service.notify_corpus_changed,
-        )
-        knowledge_document_lifecycle_service = (
-            runtime.KnowledgeDocumentLifecycleService(
-                session_factory=context.session_factory,
-                index_service=knowledge_index_service,
-            )
-        )
-        knowledge_task_query_service = runtime.KnowledgeTaskQueryService(
-            context.session_factory
-        )
-        knowledge_workspace_service = runtime.KnowledgeWorkspaceService(
-            knowledge_service=agent_services.knowledge,
-            task_query=knowledge_task_query_service,
-            index_service=knowledge_index_service,
-            ocr_deployment=paddle_ocr_deployment,
-        )
-        _emit_startup_timing("services.construct", step_start)
-
-        step_start = time.perf_counter()
-        from .ui.conversation.execution import ThreadedSubmissionExecutor
-        from .ui.history import HarnessHistoryAdapter
-        from .ui.knowledge_workspace import KnowledgeWorkspaceDialog
-        from .ui.settings_dialog import SettingsDialog
-        from .ui.software_update import SoftwareUpdateController
-        from .ui.tool_call_detail_view import ToolCallDetailView
-        from .ui.windows.auxiliary import AuxiliaryWindowCoordinator
-
-        def create_settings(owner: QWidget) -> SettingsDialog:
-            return SettingsDialog(
-                paths=paths,
-                log_path=log_path,
-                db_path=runtime.database_path(paths),
-                translation_manager=translation_manager,
-                llm_service=llm_service,
-                llm_settings_service=llm_settings_service,
-                embedding_settings_service=embedding_settings_service,
-                ml_worker_settings_service=ml_worker_settings_service,
-                update_service=update_service,
-                paddle_ocr_deployment=paddle_ocr_deployment,
-                knowledge_index_service=knowledge_index_service,
-                parent=owner,
-            )
-
-        def create_knowledge(
-            owner: QWidget, open_settings: Callable[[], None]
-        ) -> KnowledgeWorkspaceDialog:
-            return KnowledgeWorkspaceDialog(
-                import_service=knowledge_import_service,
-                derivation_service=knowledge_derivation_service,
-                knowledge_service=agent_services.knowledge,
-                knowledge_index_service=knowledge_index_service,
-                ocr_deployment=paddle_ocr_deployment,
-                task_query_service=knowledge_task_query_service,
-                workspace_service=knowledge_workspace_service,
-                document_lifecycle_service=knowledge_document_lifecycle_service,
-                open_knowledge_settings=open_settings,
-                parent=owner,
-            )
-
-        def create_auxiliary(owner: QWidget) -> AuxiliaryWindowCoordinator:
-            return AuxiliaryWindowCoordinator(
-                owner,
-                settings_factory=create_settings,
-                knowledge_factory=create_knowledge,
-                detail_factory=lambda parent, task_ids: ToolCallDetailView(
-                    ml_service=agent_services.ml, task_ids=task_ids, parent=parent,
-                ),
-                update_controller=(
-                    SoftwareUpdateController(owner, update_service)
-                    if update_service is not None else None
-                ),
-            )
-
-        window = MainWindow(
-            current_locale=translation_manager.current_locale,
-            agent_harness_service=agent_services.harness,
-            conversation_executor=ThreadedSubmissionExecutor(
-                agent_services.harness.submit_user_turn_stream
-            ),
-            llm_service=llm_service,
-            artifact_service=agent_services.artifacts,
-            link_router=link_router,
-            history_port=HarnessHistoryAdapter(agent_services.harness),
-            auxiliary_factory=create_auxiliary,
-        )
-        _emit_startup_timing("main_window.construct", step_start)
+        _emit_startup_timing("workbench.construct", step_start)
         app.aboutToQuit.connect(shutdown_runtime)
         runtime_shutdown_connected = True
         window.closing.connect(shutdown_runtime)
-        if on_services_ready is not None:
-            on_services_ready(ApplicationServices(
-                agent=agent_services,
-                knowledge_import=knowledge_import_service,
-                knowledge_derivation=knowledge_derivation_service,
-                knowledge_index=knowledge_index_service,
-                knowledge_tasks=knowledge_task_query_service,
-            ))
 
         _update_startup_stage(app, splash, StartupStage.READY)
         _hold_startup_splash(app, splash, splash_hold_ms)
@@ -709,150 +482,9 @@ def build_main_window(
         if startup_span_active and startup_scope is not None:
             startup_scope.__exit__(*sys.exc_info())
             startup_span_active = False
-        if runtime_shutdown is None:
-            flush_observability()
-            if logging_initialized:
-                shutdown_logging()
-        else:
-            runtime_shutdown()
+        lifetime.close()
         _close_startup_splash(app, splash)
         raise
-
-
-def _run_smoke_checks(paths) -> None:
-    import pandas as pd
-    from polars._cpu_check import get_runtime_repr
-
-    from .services.analysis_graph import AnalysisGraphService, GraphDatasetInput
-    from .services.data_transform import (
-        DataQueryInput,
-        DataQueryTransformService,
-        DatasetSqlBinding,
-    )
-    from .services.dataset_inspection import detect_source_format
-    from .services.ml.models.regression import XGBoostRegressionService
-    from .services.tabular import load_tabular_frame
-
-    if get_runtime_repr() != "rtcompat":
-        raise RuntimeError("Polars packaged runtime smoke expected rtcompat runtime.")
-
-    duckdb_smoke_path = paths.temp / "duckdb-smoke.parquet"
-    pd.DataFrame({"value": [1, 2]}).to_parquet(duckdb_smoke_path)
-    result = DataQueryTransformService(paths).query(
-        DataQueryInput(
-            bindings=[
-                DatasetSqlBinding(
-                    alias="input",
-                    dataset_id="smoke-dataset",
-                    source_path=str(duckdb_smoke_path.resolve()),
-                )
-            ],
-            sql="SELECT SUM(value) AS total FROM input",
-            limit=1,
-        )
-    )
-    if not result.rows or result.rows[0].get("total") != 3:
-        raise RuntimeError("DuckDB smoke query failed.")
-
-    tabular_csv_smoke_path = paths.temp / "tabular-smoke.csv"
-    tabular_csv_smoke_path.write_text("label,value\nA,1\nB,2\n", encoding="utf-8")
-    csv_frame = load_tabular_frame(
-        tabular_csv_smoke_path,
-        detect_source_format(tabular_csv_smoke_path),
-    )
-    if csv_frame.height != 2 or csv_frame.width != 2:
-        raise RuntimeError("Polars CSV smoke read failed.")
-
-    tabular_xlsx_smoke_path = paths.temp / "tabular-smoke.xlsx"
-    pd.DataFrame([{"label": "A", "value": 1}, {"label": "B", "value": 2}]).to_excel(
-        tabular_xlsx_smoke_path,
-        index=False,
-    )
-    xlsx_frame = load_tabular_frame(
-        tabular_xlsx_smoke_path,
-        detect_source_format(tabular_xlsx_smoke_path),
-    )
-    if xlsx_frame.height != 2 or xlsx_frame.width != 2:
-        raise RuntimeError("Polars Excel smoke read failed.")
-
-    graph_smoke_path = paths.temp / "graph-smoke.csv"
-    graph_smoke_path.write_text("label,value\nA,1\nB,2\n", encoding="utf-8")
-    graph_result = AnalysisGraphService(paths).graph_dataset(
-        GraphDatasetInput(
-            source_path=str(graph_smoke_path.resolve()),
-            dataset_name="Graph smoke",
-            spec={
-                "width": 300,
-                "height": 180,
-                "title": "Graph smoke",
-                "mark": "bar",
-                "encoding": {
-                    "x": {"field": "label", "type": "nominal"},
-                    "y": {"field": "value", "type": "quantitative"},
-                    "color": {"value": "#4c78a8"},
-                },
-            },
-        )
-    )
-    graph_output = Path(graph_result.output_path)
-    if not graph_output.is_file() or not graph_output.read_text(encoding="utf-8").lstrip().startswith("<svg"):
-        raise RuntimeError("Vega-Lite graph smoke render failed.")
-
-    wordcloud_smoke_path = paths.temp / "graph-wordcloud-smoke.csv"
-    wordcloud_smoke_path.write_text(
-        "word,count\nsales,40\nmargin,28\nnorth,22\n",
-        encoding="utf-8",
-    )
-    wordcloud_result = AnalysisGraphService(paths).graph_dataset(
-        GraphDatasetInput(
-            source_path=str(wordcloud_smoke_path.resolve()),
-            dataset_name="Graph wordcloud smoke",
-            wordcloud_spec={
-                "title": "Graph wordcloud smoke",
-                "width": 360,
-                "height": 220,
-            },
-        )
-    )
-    wordcloud_svg = Path(wordcloud_result.output_path).read_text(encoding="utf-8")
-    if "<title>sales: 40</title>" not in wordcloud_svg or "Graph wordcloud smoke" not in wordcloud_svg:
-        raise RuntimeError("Wordcloud smoke render failed.")
-
-    xgboost_estimator = XGBoostRegressionService._build_estimator(
-        n_estimators=2,
-        max_depth=1,
-        learning_rate=0.5,
-    )
-    xgboost_estimator.fit([[0.0], [1.0], [2.0], [3.0]], [0.0, 1.0, 2.0, 3.0])
-    xgboost_prediction = xgboost_estimator.predict([[1.5]])
-    if len(xgboost_prediction) != 1:
-        raise RuntimeError("XGBoost packaged runtime smoke fit failed.")
-
-    from .services.forecast_packaged_smoke import run_forecasting_packaged_smoke
-
-    run_forecasting_packaged_smoke()
-
-    from .services.recommendation_packaged_smoke import (
-        run_recommendation_packaged_smoke,
-    )
-
-    run_recommendation_packaged_smoke()
-
-    from .services.text_classification_packaged_smoke import (
-        run_text_classification_packaged_smoke,
-    )
-
-    run_text_classification_packaged_smoke()
-
-    from .services.text_discovery_packaged_smoke import (
-        run_text_discovery_packaged_smoke,
-    )
-
-    run_text_discovery_packaged_smoke()
-
-    from .services.knowledge_packaged_smoke import run_knowledge_packaged_smoke
-
-    run_knowledge_packaged_smoke(paths)
 
 
 def run(*, smoke_test: bool = False) -> int:
@@ -881,7 +513,7 @@ def run(*, smoke_test: bool = False) -> int:
 
     if smoke_test:
         try:
-            _run_smoke_checks(ensure_app_dirs(get_app_paths()))
+            run_smoke_checks(ensure_app_dirs(get_app_paths()))
             window.show()
             app.processEvents()
             window.close()

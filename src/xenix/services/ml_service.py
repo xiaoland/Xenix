@@ -1,22 +1,24 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 import difflib
 import hashlib
 import json
-from pathlib import Path
-from typing import Any
+import time
 import unicodedata
+from collections.abc import Callable
+from dataclasses import dataclass
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 from pydantic import Field, model_validator
 from sqlalchemy.orm import sessionmaker
 from sqlmodel import SQLModel
 
 from ..config import AppPaths
-from ..exceptions import DatasetSourceMissingError, ValidationError
+from ..exceptions import DatasetSourceMissingError, ValidationError, report_exception
+from .data_tokenization_contracts import StagedTextResourceInput, TextPreparationInput, TextProcessingOptions
 from .dataset_inspection import InspectDatasetInput
 from .dataset_service import DatasetService, MaterializeManualApplyCsvInput
-from .data_tokenization_contracts import StagedTextResourceInput, TextPreparationInput
 from .ml.contracts import (
     ApplyInputFile,
     ApplyModelPayload,
@@ -38,20 +40,25 @@ from .ml.contracts import (
 )
 from .ml.evaluation import get_default_policy
 from .ml.registry import get_model_catalog_entry, get_model_service, list_model_catalog
+from .ml.trained_model_metadata import parse_trained_model_metadata, with_evaluation, with_evaluation_task
 from .ml.types import ApplyMode, ColumnRoleBinding, ColumnRoleKind, ModelFamily, ModelRoleSchema
 from .ml_task_service import CancelMLTaskInput, CreateMLTaskInput, MLTaskService
+from .storage.identity import reserve_ids
 from .storage.models import (
     DatasetColumnBindingRow,
     DatasetRow,
+    JobDomain,
     MLTaskArtifactRow,
     MLTaskRow,
     MLTaskStatus,
     MLTaskType,
     TrainedModelRow,
 )
-from .storage.repositories import DatasetColumnBindingRepository, MLTaskRepository, TrainedModelRepository
-from .trained_model_metadata import parse_trained_model_metadata, with_evaluation, with_evaluation_task
+from .storage.repositories import DatasetColumnBindingRepository, TrainedModelRepository
 from .tabular import resolve_tabular_column_index, resolve_tabular_schema
+
+if TYPE_CHECKING:
+    from .job_scheduler import JobScheduler
 
 _COLUMN_NAME_NORMALIZATION_TRANSLATION = str.maketrans(
     {
@@ -78,20 +85,20 @@ _MAX_EXACT_TEXT_RETRIEVAL_ROWS = 2_000
 
 
 class CreateColumnBindingInput(SQLModel):
-    dataset_id: str
+    dataset_id: int
     role_bindings: list[dict[str, Any]] = Field(default_factory=list)
     model_key: str | None = None
 
 
 class FitWithEvaluateInput(SQLModel):
-    binding_id: str
+    binding_id: int
     run_name: str | None = None
     model_key: str
     params: dict[str, Any] = Field(default_factory=dict)
 
 
 class TuneWithEvaluateInput(SQLModel):
-    binding_id: str
+    binding_id: int
     run_name: str | None = None
     model_key: str
     param_grid: dict[str, list[Any]] = Field(default_factory=dict)
@@ -103,7 +110,7 @@ class BulkTuningSelection(SQLModel):
 
 
 class BulkTuneWithEvaluateInput(SQLModel):
-    binding_id: str
+    binding_id: int
     run_name: str | None = None
     selections: list[BulkTuningSelection] = Field(default_factory=list)
 
@@ -115,12 +122,12 @@ class InlineApplyRowsInput(SQLModel):
 
 class ApplySourceInput(SQLModel):
     source_path: str
-    dataset_id: str | None = None
-    artifact_id: str | None = None
+    dataset_id: int | None = None
+    artifact_id: int | None = None
 
 
 class ApplyWithFilesInput(SQLModel):
-    trained_model_id: str
+    trained_model_id: int
     input_files: list[str] = Field(default_factory=list)
     input_sources: list[ApplySourceInput] = Field(default_factory=list)
     input_rows: InlineApplyRowsInput | None = None
@@ -151,15 +158,31 @@ class MLService:
         session_factory: sessionmaker,
         dataset_service: DatasetService,
         ml_task_service: MLTaskService,
+        scheduler: "JobScheduler | None" = None,
     ) -> None:
         self._paths = paths
         self._session_factory = session_factory
         self._dataset_service = dataset_service
         self._ml_task_service = ml_task_service
+        self._scheduler = scheduler or self._build_default_scheduler()
         self._trained_models = TrainedModelRepository()
-        self._ml_tasks = MLTaskRepository()
         self._column_bindings = DatasetColumnBindingRepository()
         self._ml_task_service.register_completion_listener(self._handle_task_completion)
+
+    def _build_default_scheduler(self) -> "JobScheduler":
+        from .job_scheduler import JobScheduler
+        from .ml_job_handler import MLJobHandler
+
+        scheduler = JobScheduler(
+            self._session_factory,
+            [MLJobHandler(self._ml_task_service)],
+        )
+        scheduler.start()
+        return scheduler
+
+    def _submit_ml_task(self, task: MLTaskRow) -> None:
+        self._ml_task_service.prepare_ml_task(task.id)
+        self._scheduler.enqueue(JobDomain.ML, task.task_type.value, task.id)
 
     def list_models(self) -> list[Any]:
         return list_model_catalog()
@@ -168,7 +191,7 @@ class MLService:
         return get_model_catalog_entry(model_key)
 
     def create_column_binding(self, input_data: CreateColumnBindingInput) -> DatasetColumnBindingRow:
-        dataset_id = input_data.dataset_id.strip()
+        dataset_id = input_data.dataset_id
         if not dataset_id:
             raise ValidationError("Column binding requires a dataset.")
 
@@ -215,9 +238,9 @@ class MLService:
             session.refresh(row)
             return row
 
-    def get_column_binding(self, binding_id: str) -> DatasetColumnBindingRow:
+    def get_column_binding(self, binding_id: int) -> DatasetColumnBindingRow:
         with self._session_factory() as session:
-            row = self._column_bindings.get(session, binding_id.strip())
+            row = self._column_bindings.get(session, binding_id)
             if row is None:
                 raise ValidationError("The selected column binding is invalid.")
             session.expunge(row)
@@ -233,7 +256,7 @@ class MLService:
             raise ValidationError(str(exc)) from exc
 
         request = FitTaskRequest(
-            task_id="",
+            task_id=reserve_ids(self._session_factory)[0],
             project_id=context.project_id,
             dataset_id=context.dataset.id,
             dataset_source_path=context.dataset.source_path,
@@ -287,7 +310,7 @@ class MLService:
             raise ValidationError(str(exc)) from exc
 
         request = HyperparameterTuningTaskRequest(
-            task_id="",
+            task_id=reserve_ids(self._session_factory)[0],
             project_id=context.project_id,
             dataset_id=context.dataset.id,
             dataset_source_path=context.dataset.source_path,
@@ -328,35 +351,160 @@ class MLService:
             )
         return tasks
 
-    def get_task_details(self, ml_task_id: str) -> MLTaskDetails:
+    def get_task_details(self, ml_task_id: int) -> MLTaskDetails:
         task = self._ml_task_service.get_ml_task(ml_task_id)
         artifacts = self._ml_task_service.list_ml_task_artifacts(ml_task_id)
         logs = self._ml_task_service.read_task_logs(ml_task_id)
         return MLTaskDetails(task=task, artifacts=artifacts, logs=logs)
 
-    def cancel_task(self, ml_task_id: str) -> MLTaskRow:
+    def cancel_task(self, ml_task_id: int) -> MLTaskRow:
         return self._ml_task_service.cancel_ml_task(CancelMLTaskInput(ml_task_id=ml_task_id))
 
-    def list_dataset_tasks(self, dataset_id: str) -> list[MLTaskRow]:
+    def list_dataset_tasks(self, dataset_id: int) -> list[MLTaskRow]:
         return self._ml_task_service.list_dataset_ml_tasks(dataset_id)
 
-    def list_dataset_trained_models(self, dataset_id: str) -> list[TrainedModelRow]:
+    def list_dataset_trained_models(self, dataset_id: int) -> list[TrainedModelRow]:
         with self._session_factory() as session:
             return self._trained_models.list_by_dataset(session, dataset_id)
 
-    def get_trained_model(self, trained_model_id: str) -> TrainedModelRow | None:
+    def get_trained_model(self, trained_model_id: int) -> TrainedModelRow | None:
         with self._session_factory() as session:
             trained_model = self._trained_models.get(session, trained_model_id)
             if trained_model is not None:
                 session.expunge(trained_model)
             return trained_model
 
-    def get_trained_model_by_ml_task(self, ml_task_id: str) -> TrainedModelRow | None:
+    def get_trained_model_by_ml_task(self, ml_task_id: int) -> TrainedModelRow | None:
         with self._session_factory() as session:
             trained_model = self._trained_models.get_by_ml_task(session, ml_task_id)
             if trained_model is not None:
                 session.expunge(trained_model)
             return trained_model
+
+    def wait_for_task(
+        self,
+        task_id: int,
+        *,
+        cancel_requested: Callable[[], bool],
+        timeout_seconds: float,
+    ) -> MLTaskRow | None:
+        """Poll one ML task until it settles or the timeout elapses.
+
+        A non-successful terminal status raises; a timeout returns None so the
+        caller can choose an async receipt instead of blocking the turn.
+        """
+        deadline = time.time() + timeout_seconds
+        while time.time() < deadline:
+            if cancel_requested():
+                try:
+                    self.cancel_task(task_id)
+                except Exception as exc:
+                    report_exception(exc)
+                    pass
+                raise ValidationError("Agent run was cancelled.")
+            task = self.get_task_details(task_id).task
+            if task.status in {MLTaskStatus.SUCCEEDED, MLTaskStatus.FAILED, MLTaskStatus.CANCELLED}:
+                if task.status is not MLTaskStatus.SUCCEEDED:
+                    raise _unsuccessful_task_error(task)
+                return task
+            time.sleep(0.1)
+        return None
+
+    def wait_for_training_models(
+        self,
+        root_task_ids: list[int],
+        *,
+        cancel_requested: Callable[[], bool],
+        timeout_seconds: float,
+    ) -> tuple[list[MLTaskRow], list[TrainedModelRow]] | None:
+        """Poll a training run and its required follow-up evaluation to completion."""
+        deadline = time.time() + timeout_seconds
+        while time.time() < deadline:
+            root_tasks = [self.get_task_details(task_id).task for task_id in root_task_ids]
+            trained_models = self.trained_models_for_root_tasks(root_task_ids)
+            related_tasks = self.related_training_tasks(root_tasks, trained_models)
+            if cancel_requested():
+                for task_id in ([task.id for task in related_tasks] or root_task_ids):
+                    try:
+                        self.cancel_task(task_id)
+                    except Exception as exc:
+                        report_exception(exc)
+                        continue
+                raise ValidationError("Agent run was cancelled.")
+
+            failed = [
+                task
+                for task in related_tasks
+                if task.status in {MLTaskStatus.FAILED, MLTaskStatus.CANCELLED}
+            ]
+            if failed:
+                raise _unsuccessful_task_error(failed[0])
+
+            root_tasks_succeeded = all(task.status is MLTaskStatus.SUCCEEDED for task in root_tasks)
+            if root_tasks_succeeded and len(trained_models) == len(root_task_ids):
+                if not self._training_follow_up_pending(root_tasks, trained_models):
+                    return related_tasks, trained_models
+
+            time.sleep(0.1)
+        return None
+
+    def _training_follow_up_pending(
+        self,
+        root_tasks: list[MLTaskRow],
+        trained_models: list[TrainedModelRow],
+    ) -> bool:
+        models_by_root_task = {model.ml_task_id: model for model in trained_models}
+        for root_task in root_tasks:
+            model = models_by_root_task.get(root_task.id)
+            if model is None:
+                return True
+            if self.training_task_requires_follow_up_evaluation(root_task):
+                evaluation_task_id = self.evaluation_task_id_for_model(model)
+                if not evaluation_task_id:
+                    return True
+                evaluation_task = self.get_task_details(evaluation_task_id).task
+                if evaluation_task.status is not MLTaskStatus.SUCCEEDED:
+                    return True
+        return False
+
+    def trained_models_for_root_tasks(self, root_task_ids: list[int]) -> list[TrainedModelRow]:
+        models_by_task_id: dict[int, TrainedModelRow] = {}
+        for task_id in root_task_ids:
+            model = self.get_trained_model_by_ml_task(task_id)
+            if model is not None:
+                models_by_task_id[task_id] = model
+        return [models_by_task_id[task_id] for task_id in root_task_ids if task_id in models_by_task_id]
+
+    def related_training_tasks(
+        self,
+        root_tasks: list[MLTaskRow],
+        trained_models: list[TrainedModelRow],
+    ) -> list[MLTaskRow]:
+        tasks: list[MLTaskRow] = []
+        seen_task_ids: set[int] = set()
+        for task in root_tasks:
+            tasks.append(task)
+            seen_task_ids.add(task.id)
+        for model in trained_models:
+            evaluation_task_id = self.evaluation_task_id_for_model(model)
+            if not evaluation_task_id or evaluation_task_id in seen_task_ids:
+                continue
+            task = self.get_task_details(evaluation_task_id).task
+            tasks.append(task)
+            seen_task_ids.add(task.id)
+        return tasks
+
+    @staticmethod
+    def evaluation_task_id_for_model(model: TrainedModelRow) -> int | None:
+        task_id = model.metadata_payload.get("evaluation_ml_task_id")
+        if isinstance(task_id, int):
+            return task_id
+        return None
+
+    @staticmethod
+    def training_task_requires_follow_up_evaluation(task: MLTaskRow) -> bool:
+        continuation = task.request_payload.get("continuation_plan")
+        return isinstance(continuation, dict) and continuation.get("next_operation") == "evaluate"
 
     def apply(self, input_data: ApplyWithFilesInput) -> MLTaskRow:
         apply_context = self._build_apply_context(input_data)
@@ -381,7 +529,7 @@ class MLService:
             else []
         )
         request = ApplyTaskRequest(
-            task_id="",
+            task_id=reserve_ids(self._session_factory)[0],
             project_id=apply_context.project_id,
             dataset_id=apply_context.dataset.id,
             dataset_source_path=apply_context.dataset.source_path,
@@ -415,14 +563,14 @@ class MLService:
         evaluation_model_path = result_payload.get("evaluation_model_artifact_path") or canonical_model_path
         holdout_artifact_path = result_payload.get("holdout_artifact_path")
         model_key = result_payload.get("model_key")
-        if not all(
+        if not isinstance(trained_model_id, int) or not all(
             isinstance(value, str) and value
-            for value in (trained_model_id, evaluation_model_path, holdout_artifact_path, model_key)
+            for value in (evaluation_model_path, holdout_artifact_path, model_key)
         ):
-            return
+            raise ValidationError("Training result is missing the references required for evaluation.")
 
         evaluate_request = EvaluateTaskRequest(
-            task_id="",
+            task_id=reserve_ids(self._session_factory)[0],
             project_id=request_payload["project_id"],
             dataset_id=request_payload["dataset_id"],
             dataset_source_path=request_payload["dataset_source_path"],
@@ -440,14 +588,14 @@ class MLService:
         )
         created = self._create_task_from_request(MLTaskType.EVALUATE, evaluate_request)
         self._attach_evaluation_task_to_trained_model(trained_model_id, created.id)
-        self._ml_task_service.submit_ml_task(created.id)
+        self._submit_ml_task(created)
 
     def _update_evaluated_trained_model(self, task: MLTaskRow) -> None:
         result_payload = task.result_payload or {}
         request_payload = task.request_payload
         with self._session_factory() as session:
             evaluated_model_id = request_payload.get("evaluate_model", {}).get("trained_model_id")
-            if not isinstance(evaluated_model_id, str):
+            if not isinstance(evaluated_model_id, int):
                 return
             new_metrics = EvaluateTaskResult.model_validate(result_payload).evaluation
             if new_metrics is not None:
@@ -486,8 +634,9 @@ class MLService:
             ),
             evaluation_policy=get_default_policy(
                 catalog.evaluation_kind,
+                model_key=model_key,
                 summary_metric_name=catalog.summary_metric_name,
-                group_aware=any(
+                group_aware=get_model_service(model_key).uses_automatic_groups or any(
                     role_binding.role == "group" and role_binding.columns
                     for role_binding in binding.role_bindings
                 ),
@@ -537,6 +686,7 @@ class MLService:
             {
                 "tokenizer_profile": params.get("preparation_profile"),
                 "phrase_mode": params.get("phrase_mode"),
+                **{name: params[name] for name in TextProcessingOptions.model_fields if name in params},
                 "custom_dictionary_resources": [
                     self._stage_text_resource(context, dataset_id)
                     for dataset_id in custom_ids
@@ -549,22 +699,21 @@ class MLService:
         )
 
     @staticmethod
-    def _text_resource_dataset_ids(value: Any, *, field_name: str) -> list[str]:
+    def _text_resource_dataset_ids(value: Any, *, field_name: str) -> list[int]:
         if value is None:
             return []
         if not isinstance(value, list) or any(
-            not isinstance(item, str) or not item.strip() for item in value
+            type(item) is not int or item < 1 for item in value
         ):
             raise ValidationError(f"{field_name} must contain registered Dataset ids.")
-        normalized = [item.strip() for item in value]
-        if len(normalized) != len(set(normalized)):
+        if len(value) != len(set(value)):
             raise ValidationError(f"{field_name} cannot contain duplicate Dataset ids.")
-        return normalized
+        return value
 
     def _stage_text_resource(
         self,
         context: "_TrainingContext",
-        dataset_id: str,
+        dataset_id: int,
     ) -> StagedTextResourceInput:
         dataset = self._dataset_service.get_dataset(dataset_id)
         if dataset.project_id != context.project_id:
@@ -598,7 +747,7 @@ class MLService:
         request: FitTaskRequest | HyperparameterTuningTaskRequest,
     ) -> MLTaskRow:
         created = self._create_task_from_request(task_type, request)
-        self._ml_task_service.submit_ml_task(created.id)
+        self._submit_ml_task(created)
         return created
 
     def _create_task_from_request(
@@ -610,27 +759,20 @@ class MLService:
     ) -> MLTaskRow:
         created = self._ml_task_service.create_ml_task(
             CreateMLTaskInput(
+                id=request.task_id,
                 project_id=request.project_id,
                 dataset_id=request.dataset_id,
                 task_type=task_type,
-                request_payload={},
+                request_payload=request.model_dump(mode="json"),
             )
         )
-        request.task_id = created.id
-        with self._session_factory() as session:
-            row = self._ml_tasks.get(session, created.id)
-            if row is None:
-                raise ValidationError("Unable to persist the ML task request.")
-            row.request_payload = request.model_dump(mode="json")
-            session.add(row)
-            session.commit()
-            session.refresh(row)
-            if auto_submit:
-                self._ml_task_service.submit_ml_task(created.id)
-            return row
+        if auto_submit:
+            self._submit_ml_task(created)
+        return created
+
 
     def _build_apply_context(self, input_data: ApplyWithFilesInput) -> "_ApplyContext":
-        trained_model_id = input_data.trained_model_id.strip()
+        trained_model_id = input_data.trained_model_id
         if not trained_model_id:
             raise ValidationError("Apply requires a trained model.")
 
@@ -676,7 +818,7 @@ class MLService:
 
     def _resolve_apply_model(
         self,
-        trained_model_id: str,
+        trained_model_id: int,
     ) -> TrainedModelRow:
         with self._session_factory() as session:
             trained_model = self._trained_models.get(session, trained_model_id)
@@ -687,8 +829,8 @@ class MLService:
             session.expunge(trained_model)
             return trained_model
 
-    def _resolve_column_binding(self, binding_id: str, *, model_key: str) -> "_ResolvedColumnBinding":
-        normalized_binding_id = binding_id.strip()
+    def _resolve_column_binding(self, binding_id: int, *, model_key: str) -> "_ResolvedColumnBinding":
+        normalized_binding_id = binding_id
         if not normalized_binding_id:
             raise ValidationError("Training requires a column binding.")
         with self._session_factory() as session:
@@ -720,7 +862,7 @@ class MLService:
                 "The stored Dataset identity is invalid. Re-create the column binding before training."
             ) from exc
         current_snapshot = self._build_dataset_snapshot(dataset, inspection)
-        if stored_snapshot != current_snapshot:
+        if stored_snapshot.model_dump(exclude={"sampling_fingerprint"}) != current_snapshot.model_dump(exclude={"sampling_fingerprint"}):
             raise ValidationError(
                 "The Dataset contents changed after its column roles were bound. Re-create the column binding "
                 "to review roles against the current data."
@@ -1074,10 +1216,10 @@ class MLService:
     def _update_trained_model_metadata_with_evaluation(
         self,
         session: Any,
-        trained_model_id: str,
+        trained_model_id: int,
         evaluation: CandidateMetrics,
         *,
-        evaluation_ml_task_id: str | None = None,
+        evaluation_ml_task_id: int | None = None,
     ) -> None:
         trained_model = self._trained_models.get(session, trained_model_id)
         if trained_model is None:
@@ -1098,8 +1240,8 @@ class MLService:
 
     def _attach_evaluation_task_to_trained_model(
         self,
-        trained_model_id: str,
-        evaluation_ml_task_id: str,
+        trained_model_id: int,
+        evaluation_ml_task_id: int,
     ) -> None:
         with self._session_factory() as session:
             trained_model = self._trained_models.get(session, trained_model_id)
@@ -1119,7 +1261,7 @@ class MLService:
 
 @dataclass(frozen=True)
 class _TrainingContext:
-    project_id: str
+    project_id: int
     dataset: Any
     run_name: str
     catalog: Any
@@ -1142,11 +1284,18 @@ class _ResolvedColumnBinding:
 
 @dataclass(frozen=True)
 class _ApplyContext:
-    project_id: str
+    project_id: int
     dataset: Any
     feature_columns: list[str]
     trained_model: TrainedModelRow
     apply_mode: ApplyMode
+
+
+def _unsuccessful_task_error(task: MLTaskRow) -> ValidationError:
+    message = f"ML task '{task.id}' finished with status '{task.status.value}'."
+    if task.error_summary:
+        message = f"{message} {task.error_summary}"
+    return ValidationError(message)
 
 
 def _now() -> Any:

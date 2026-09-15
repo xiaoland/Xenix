@@ -1,0 +1,448 @@
+{
+  "report_kind": "xenix.agent_harness.cell",
+  "schema_version": 6,
+  "case_id": "offline-two-request-task",
+  "run_id": "offline-headed-two-turns",
+  "provider_model": "offline/model",
+  "execution_mode": "headed",
+  "run_status": "budget_exceeded",
+  "semantic": {
+    "verdict": "pass",
+    "passed": true,
+    "checks": [
+      {
+        "name": "answer",
+        "passed": true,
+        "summary": "answer captured"
+      },
+      {
+        "name": "answer",
+        "passed": true,
+        "summary": "answer captured"
+      }
+    ]
+  },
+  "integrity": {
+    "passed": false,
+    "checks": [
+      {
+        "name": "state",
+        "passed": true,
+        "summary": "same thread"
+      },
+      {
+        "name": "headed_main_window_visible",
+        "passed": true,
+        "summary": "real_main_window_shown"
+      },
+      {
+        "name": "headed_source_files_dropped",
+        "passed": true,
+        "summary": "real_composer_file_drop_accepted"
+      },
+      {
+        "name": "headed_terminal_assistant_rendered",
+        "passed": true,
+        "summary": "terminal_assistant_visible_in_chat"
+      },
+      {
+        "name": "headed_source_files_dropped",
+        "passed": true,
+        "summary": "real_composer_file_drop_accepted"
+      },
+      {
+        "name": "headed_terminal_assistant_rendered",
+        "passed": true,
+        "summary": "terminal_assistant_visible_in_chat"
+      },
+      {
+        "name": "headed_main_window_closed",
+        "passed": true,
+        "summary": "window_and_runtime_shutdown_completed"
+      },
+      {
+        "name": "headed_runtime_database_readable",
+        "passed": true,
+        "summary": "sqlite_integrity_check_ok"
+      }
+    ]
+  },
+  "judge": {
+    "required": false,
+    "rubric_id": null,
+    "rubric_sha256": null,
+    "status": "not_requested",
+    "verdict": "not_evaluated",
+    "provider_model": null,
+    "independence": "not_applicable",
+    "scores": {},
+    "reason_codes": [],
+    "summary": "judge_not_requested",
+    "metrics": {
+      "elapsed_seconds": null,
+      "token_usage": null,
+      "provider_retry_count": 0
+    }
+  },
+  "subject_metrics": {
+    "turn_seconds": 0.08972759998869151,
+    "assessment_seconds": null,
+    "sampling_round_count": 2,
+    "usage_reported_primary_response_count": null,
+    "token_usage": null,
+    "message_counts": {
+      "assistant": 1,
+      "user": 1
+    },
+    "tool_call_counts_by_name": {},
+    "tool_result_counts_by_status": {},
+    "provider_retry_count": 0,
+    "derived_dataset_count": 0,
+    "terminal_shape": null
+  },
+  "budget": {
+    "status": "unverifiable",
+    "policy": {
+      "policy_id": "agent-harness-budget-v1",
+      "max_sampling_rounds": 12,
+      "max_wall_seconds": 900.0,
+      "max_reported_subject_tokens": 500000,
+      "max_reported_invocation_subject_tokens": 4000000,
+      "max_provider_attempts": 2,
+      "token_enforcement": "response_boundary"
+    },
+    "sampling_rounds_admitted": 2,
+    "provider_attempts_dispatched": 1,
+    "reported_subject_tokens": 15,
+    "invocation_reported_subject_tokens": 0,
+    "exhaustion_reason": "interrupted_provider_usage_unavailable"
+  },
+  "identity": {
+    "fixture_sha256": null,
+    "settings_sha256": null,
+    "embedding_settings_sha256": null,
+    "judge_settings_sha256": null,
+    "repository_commit": null,
+    "repository_dirty": null,
+    "effective_settings_sha256": null,
+    "harness_variant": "baseline",
+    "invocation_id": null,
+    "case_definition_sha256": null,
+    "runtime_sha256": null
+  },
+  "failure_kind": "process_wall_time_exceeded",
+  "planned_turn_count": 2,
+  "turns": [
+    {
+      "index": 1,
+      "run_status": "completed",
+      "failure_kind": null,
+      "subject_metrics": {
+        "turn_seconds": 0.08972759998869151,
+        "assessment_seconds": null,
+        "sampling_round_count": 1,
+        "usage_reported_primary_response_count": 1,
+        "token_usage": {
+          "input_tokens": 10,
+          "cached_input_tokens": 0,
+          "output_tokens": 5,
+          "total_tokens": 15
+        },
+        "message_counts": {
+          "assistant": 1,
+          "user": 1
+        },
+        "tool_call_counts_by_name": {},
+        "tool_result_counts_by_status": {},
+        "provider_retry_count": 0,
+        "derived_dataset_count": 0,
+        "terminal_shape": null
+      },
+      "semantic_checks": [],
+      "delivery_evidence": [],
+      "request_text": "Remember the first delivery.",
+      "attachment_names": [
+        "initial.csv"
+      ]
+    },
+    {
+      "index": 2,
+      "run_status": "budget_exceeded",
+      "failure_kind": "process_wall_time_exceeded",
+      "subject_metrics": {
+        "turn_seconds": null,
+        "assessment_seconds": null,
+        "sampling_round_count": 1,
+        "usage_reported_primary_response_count": null,
+        "token_usage": null,
+        "message_counts": {},
+        "tool_call_counts_by_name": {},
+        "tool_result_counts_by_status": {},
+        "provider_retry_count": 0,
+        "derived_dataset_count": 0,
+        "terminal_shape": null
+      },
+      "semantic_checks": [],
+      "delivery_evidence": [],
+      "request_text": null,
+      "attachment_names": []
+    }
+  ],
+  "trace": {
+    "trace_id": "offline-headed-two-turns",
+    "events": [
+      {
+        "name": "benchmark.cell.open",
+        "span_id": "172843ea71e54c7c",
+        "parent_span_id": null,
+        "started_offset_seconds": 0.002098000026308,
+        "duration_seconds": 2.848048099956941,
+        "status": "ok",
+        "attributes": {
+          "execution_mode": "headed",
+          "provider_model": "offline/model",
+          "runtime_home": "C:\\Users\\yyh\\AppData\\Local\\Temp\\tmpwecdtn_1\\cell-36au6if2\\runtime"
+        },
+        "exception": null
+      },
+      {
+        "name": "benchmark.case.prepare",
+        "span_id": "dcf6bd384fa14c31",
+        "parent_span_id": null,
+        "started_offset_seconds": 2.8507592999958433,
+        "duration_seconds": 0.02559169998858124,
+        "status": "ok",
+        "attributes": {
+          "case_id": "offline-two-request-task",
+          "gen_ai.conversation.id": "8c95a57a61e54676babb10cbf0e527d4"
+        },
+        "exception": null
+      },
+      {
+        "name": "benchmark.turn.start",
+        "span_id": "3268686e6c0c4dd2",
+        "parent_span_id": null,
+        "started_offset_seconds": 2.877076599979773,
+        "duration_seconds": 1.600012183189392e-06,
+        "status": "ok",
+        "attributes": {
+          "user_turn": 1,
+          "planned_turn_count": 2
+        },
+        "exception": null
+      },
+      {
+        "name": "benchmark.subject.sampling_started",
+        "span_id": "e6edda2c8cdf46dc",
+        "parent_span_id": "3bea7903b46544c4",
+        "started_offset_seconds": 2.937869100016542,
+        "duration_seconds": 2.2299995180219412e-05,
+        "status": "ok",
+        "attributes": {
+          "budget": {
+            "status": "within_limits",
+            "policy": {
+              "policy_id": "agent-harness-budget-v1",
+              "max_sampling_rounds": 12,
+              "max_wall_seconds": 900.0,
+              "max_reported_subject_tokens": 500000,
+              "max_reported_invocation_subject_tokens": 4000000,
+              "max_provider_attempts": 2,
+              "token_enforcement": "response_boundary"
+            },
+            "sampling_rounds_admitted": 1,
+            "provider_attempts_dispatched": 0,
+            "reported_subject_tokens": 0,
+            "invocation_reported_subject_tokens": 0,
+            "exhaustion_reason": null
+          }
+        },
+        "exception": null
+      },
+      {
+        "name": "benchmark.subject.usage",
+        "span_id": "4699d5fd13cd4cbc",
+        "parent_span_id": "3bea7903b46544c4",
+        "started_offset_seconds": 2.938320500019472,
+        "duration_seconds": 6.299989763647318e-06,
+        "status": "ok",
+        "attributes": {
+          "budget": {
+            "status": "within_limits",
+            "policy": {
+              "policy_id": "agent-harness-budget-v1",
+              "max_sampling_rounds": 12,
+              "max_wall_seconds": 900.0,
+              "max_reported_subject_tokens": 500000,
+              "max_reported_invocation_subject_tokens": 4000000,
+              "max_provider_attempts": 2,
+              "token_enforcement": "response_boundary"
+            },
+            "sampling_rounds_admitted": 1,
+            "provider_attempts_dispatched": 1,
+            "reported_subject_tokens": 15,
+            "invocation_reported_subject_tokens": 0,
+            "exhaustion_reason": null
+          }
+        },
+        "exception": null
+      },
+      {
+        "name": "benchmark.subject.execute",
+        "span_id": "3bea7903b46544c4",
+        "parent_span_id": null,
+        "started_offset_seconds": 2.877345199987758,
+        "duration_seconds": 0.08945760002825409,
+        "status": "ok",
+        "attributes": {
+          "user_turn": 1,
+          "gen_ai.operation.name": "invoke_agent",
+          "gen_ai.request.model": "offline/model",
+          "gen_ai.conversation.id": "8c95a57a61e54676babb10cbf0e527d4",
+          "provider_retry_count": 0,
+          "final_snapshot_seen": true,
+          "run_status": "completed",
+          "failure_kind": null,
+          "final_text": "First delivery"
+        },
+        "exception": null
+      },
+      {
+        "name": "benchmark.turn.capture",
+        "span_id": "739ea1a4898a40e3",
+        "parent_span_id": null,
+        "started_offset_seconds": 2.9691773999948055,
+        "duration_seconds": 0.0003638000343926251,
+        "status": "ok",
+        "attributes": {
+          "user_turn": 1
+        },
+        "exception": null
+      },
+      {
+        "name": "benchmark.turn.checkpoint",
+        "span_id": "648e88d39deb4566",
+        "parent_span_id": null,
+        "started_offset_seconds": 2.9705484000151046,
+        "duration_seconds": 2.889998722821474e-05,
+        "status": "ok",
+        "attributes": {
+          "user_turn": 1,
+          "result": {
+            "index": 1,
+            "run_status": "completed",
+            "failure_kind": null,
+            "subject_metrics": {
+              "turn_seconds": 0.08972759998869151,
+              "assessment_seconds": null,
+              "sampling_round_count": 1,
+              "usage_reported_primary_response_count": 1,
+              "token_usage": {
+                "input_tokens": 10,
+                "cached_input_tokens": 0,
+                "output_tokens": 5,
+                "total_tokens": 15
+              },
+              "message_counts": {
+                "assistant": 1,
+                "user": 1
+              },
+              "tool_call_counts_by_name": {},
+              "tool_result_counts_by_status": {},
+              "provider_retry_count": 0,
+              "derived_dataset_count": 0,
+              "terminal_shape": null
+            },
+            "semantic_checks": [],
+            "delivery_evidence": [],
+            "request_text": "Remember the first delivery.",
+            "attachment_names": [
+              "initial.csv"
+            ]
+          },
+          "cumulative_metrics": {
+            "turn_seconds": 0.08972759998869151,
+            "assessment_seconds": null,
+            "sampling_round_count": 1,
+            "usage_reported_primary_response_count": 1,
+            "token_usage": {
+              "input_tokens": 10,
+              "cached_input_tokens": 0,
+              "output_tokens": 5,
+              "total_tokens": 15
+            },
+            "message_counts": {
+              "assistant": 1,
+              "user": 1
+            },
+            "tool_call_counts_by_name": {},
+            "tool_result_counts_by_status": {},
+            "provider_retry_count": 0,
+            "derived_dataset_count": 0,
+            "terminal_shape": null
+          },
+          "budget": {
+            "status": "within_limits",
+            "policy": {
+              "policy_id": "agent-harness-budget-v1",
+              "max_sampling_rounds": 12,
+              "max_wall_seconds": 900.0,
+              "max_reported_subject_tokens": 500000,
+              "max_reported_invocation_subject_tokens": 4000000,
+              "max_provider_attempts": 2,
+              "token_enforcement": "response_boundary"
+            },
+            "sampling_rounds_admitted": 1,
+            "provider_attempts_dispatched": 1,
+            "reported_subject_tokens": 15,
+            "invocation_reported_subject_tokens": 0,
+            "exhaustion_reason": null
+          },
+          "planned_turn_count": 2
+        },
+        "exception": null
+      },
+      {
+        "name": "benchmark.turn.start",
+        "span_id": "9fbfd0c3bc784587",
+        "parent_span_id": null,
+        "started_offset_seconds": 2.9709661999950185,
+        "duration_seconds": 1.400010660290718e-06,
+        "status": "ok",
+        "attributes": {
+          "user_turn": 2,
+          "planned_turn_count": 2
+        },
+        "exception": null
+      },
+      {
+        "name": "benchmark.subject.sampling_started",
+        "span_id": "d5dc81b2f3fb40e4",
+        "parent_span_id": "f1d3b9558a4540a9",
+        "started_offset_seconds": 3.011351699999068,
+        "duration_seconds": 8.800008799880743e-06,
+        "status": "ok",
+        "attributes": {
+          "budget": {
+            "status": "within_limits",
+            "policy": {
+              "policy_id": "agent-harness-budget-v1",
+              "max_sampling_rounds": 12,
+              "max_wall_seconds": 900.0,
+              "max_reported_subject_tokens": 500000,
+              "max_reported_invocation_subject_tokens": 4000000,
+              "max_provider_attempts": 2,
+              "token_enforcement": "response_boundary"
+            },
+            "sampling_rounds_admitted": 2,
+            "provider_attempts_dispatched": 1,
+            "reported_subject_tokens": 15,
+            "invocation_reported_subject_tokens": 0,
+            "exhaustion_reason": null
+          }
+        },
+        "exception": null
+      }
+    ]
+  }
+}

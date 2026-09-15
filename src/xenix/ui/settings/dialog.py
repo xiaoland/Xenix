@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 from PySide6.QtCore import QEvent, Signal
@@ -20,6 +21,7 @@ from PySide6.QtWidgets import (
 )
 
 from ...config import AppPaths
+from ...exceptions import report_exception
 from ...i18n import TranslationManager
 from ...services.embedding_service import EmbeddingSettingsService
 from ...services.knowledge_index_service import (
@@ -267,6 +269,7 @@ class SettingsDialog(QDialog):
             if self._about_dialog is not None:
                 self._about_dialog.retranslate_ui()
         except Exception as exc:
+            logging.getLogger(__name__).exception("UI operation failed: %s", exc)
             self._reload_language_options()
             QMessageBox.critical(
                 self,
@@ -310,6 +313,7 @@ class SettingsDialog(QDialog):
             llm_settings = self._provider_editor.current_settings()
             embedding_settings = self._embedding_settings.current_settings()
         except Exception as exc:
+            logging.getLogger(__name__).exception("UI operation failed: %s", exc)
             QMessageBox.warning(self, self.tr("Settings"), str(exc))
             return
         try:
@@ -320,12 +324,8 @@ class SettingsDialog(QDialog):
                     embedding_settings,
                 )
             )
-        except Exception:
-            QMessageBox.warning(
-                self,
-                self.tr("Knowledge Indexes"),
-                self.tr("Knowledge index status is unavailable"),
-            )
+        except Exception as exc:
+            report_exception(exc)
             return
         if confirmation_required:
             rebuild_choice = self._confirm_embedding_compatibility_change()
@@ -335,6 +335,7 @@ class SettingsDialog(QDialog):
             self._llm_settings_service.save(llm_settings)
             self._embedding_settings_service.save(embedding_settings)
         except Exception as exc:
+            logging.getLogger(__name__).exception("UI operation failed: %s", exc)
             QMessageBox.warning(self, self.tr("Settings"), str(exc))
             return
         self._embedding_settings.load_settings(embedding_settings)
@@ -346,15 +347,8 @@ class SettingsDialog(QDialog):
                     (KnowledgeIndexKind.TEXT_VECTOR,),
                     trigger="settings_change",
                 )
-            except Exception:
-                QMessageBox.warning(
-                    self,
-                    self.tr("Knowledge Indexes"),
-                    self.tr(
-                        "Embedding settings were saved, but the vector rebuild "
-                        "could not be queued."
-                    ),
-                )
+            except Exception as exc:
+                report_exception(exc)
         self._index_status.refresh()
 
     def _confirm_embedding_compatibility_change(self) -> str:

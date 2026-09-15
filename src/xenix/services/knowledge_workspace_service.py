@@ -18,7 +18,7 @@ class KnowledgeWorkspaceDocumentsState(StrEnum):
 
 @dataclass(frozen=True)
 class KnowledgeWorkspaceDocument:
-    document_id: str
+    document_id: int
     title: str
     source_format: str
     content_state: str
@@ -81,17 +81,10 @@ class KnowledgeWorkspaceService:
         *,
         library_id: str = "global",
     ) -> KnowledgeWorkspaceDocuments:
-        try:
-            summaries = tuple(
-                self._knowledge.list_documents(library_id=library_id)
-                if self._knowledge is not None
-                else ()
-            )
-        except Exception:
-            return KnowledgeWorkspaceDocuments(
-                state=KnowledgeWorkspaceDocumentsState.UNAVAILABLE,
-                items=(),
-            )
+        summaries = tuple(
+            self._knowledge.list_documents(library_id=library_id)
+            if self._knowledge is not None else ()
+        )
         documents = tuple(_workspace_document(summary) for summary in summaries)
         return KnowledgeWorkspaceDocuments(
             state=(
@@ -107,30 +100,14 @@ class KnowledgeWorkspaceService:
         *,
         library_id: str = "global",
     ) -> KnowledgeWorkspaceStatus:
-        try:
-            tasks = self._tasks.summary(library_id=library_id)
-        except Exception:
-            tasks = KnowledgeTaskSummary(0, 0, 0)
-        try:
-            if self._ocr is None:
-                ocr = PaddleOcrStatus(PaddleOcrState.NOT_INSTALLED, "service_unavailable")
-            else:
-                status_reader = getattr(self._ocr, "status_snapshot", None)
-                if status_reader is None:
-                    status_reader = self._ocr.status
-                ocr = status_reader()
-                if ocr.state is PaddleOcrState.CHECKING:
-                    ocr = self._ocr.verify_active()
-        except Exception:
-            ocr = PaddleOcrStatus(PaddleOcrState.REPAIR_REQUIRED, "status_unavailable")
-        try:
-            indexes = (
-                self._indexes.status(library_id=library_id)
-                if self._indexes is not None
-                else None
-            )
-        except Exception:
-            indexes = None
+        tasks = self._tasks.summary(library_id=library_id)
+        if self._ocr is None:
+            ocr = PaddleOcrStatus(PaddleOcrState.NOT_INSTALLED, "service_unavailable")
+        else:
+            ocr = self._ocr.status_snapshot()
+            if ocr.state is PaddleOcrState.CHECKING:
+                ocr = self._ocr.verify_active()
+        indexes = self._indexes.status(library_id=library_id) if self._indexes else None
         return KnowledgeWorkspaceStatus(
             tasks=tasks,
             ocr=ocr,

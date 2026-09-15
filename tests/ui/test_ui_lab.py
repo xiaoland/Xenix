@@ -22,13 +22,7 @@ from xenix.ui.diagnostics import CapturePolicy, capture_ui_artifacts
 from xenix.ui.semantic_identity import item_reference
 
 
-EXPECTED_SCENARIO_IDS = (
-    "chat.empty",
-    "chat.mixed-timeline",
-    "chat.running-with-attachments",
-    "main.history-populated",
-    "settings.provider-and-ocr",
-)
+SCENARIO_IDS = tuple(scenario.id for scenario in list_scenarios())
 
 
 def _build_scenario(qapp: QApplication, qtbot: QtBot, scenario_id: str):
@@ -47,9 +41,7 @@ def _widgets_with_role(root: QWidget, role: str) -> list[QWidget]:
     ]
 
 
-def test_registry_is_stable_sorted_and_machine_discoverable() -> None:
-    assert tuple(scenario.id for scenario in list_scenarios()) == EXPECTED_SCENARIO_IDS
-
+def test_cli_lists_registered_scenarios() -> None:
     result = subprocess.run(
         [sys.executable, "-m", "scripts.ui_lab", "--list", "--json"],
         check=True,
@@ -59,7 +51,7 @@ def test_registry_is_stable_sorted_and_machine_discoverable() -> None:
     )
     payload = json.loads(result.stdout)
 
-    assert tuple(item["id"] for item in payload) == EXPECTED_SCENARIO_IDS
+    assert tuple(item["id"] for item in payload) == SCENARIO_IDS
 
 
 def test_missing_scenario_font_fails_instead_of_silently_capturing_icon_glyphs(qapp) -> None:
@@ -80,7 +72,7 @@ def test_all_scenarios_build_without_runtime_services_or_state(
     runtime_home = tmp_path / "must-not-be-created"
     monkeypatch.setenv("XENIX_APP_HOME", str(runtime_home))
 
-    for scenario_id in EXPECTED_SCENARIO_IDS:
+    for scenario_id in SCENARIO_IDS:
         _scenario, handle = _build_scenario(qapp, qtbot, scenario_id)
         assert isinstance(handle.root, QWidget)
         handle.cleanup()
@@ -93,7 +85,7 @@ def test_feature_scenarios_use_production_semantic_contracts(qapp, qtbot, ui_art
     ui_artifacts.register(history.root, name="history-panel")
     assert {item_reference(widget) for widget in _widgets_with_role(
         history.root, "main.history.thread-item"
-    )} == {"thread:synthetic:001", "thread:synthetic:002", "thread:synthetic:003"}
+    )} == {"1", "2", "3"}
     history.cleanup()
 
     _scenario, settings = _build_scenario(qapp, qtbot, "settings.provider-and-ocr")

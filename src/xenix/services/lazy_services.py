@@ -1,36 +1,37 @@
 from __future__ import annotations
 
 import threading
-from importlib import import_module
-from typing import Any
+from collections.abc import Callable
+from typing import Any, cast
 
 
-class LazyServiceProxy:
-    def __init__(
-        self,
-        module_name: str,
-        class_name: str,
-        *service_args: Any,
-        **service_kwargs: Any,
-    ) -> None:
-        self._module_name = module_name
-        self._class_name = class_name
-        self._service_args = service_args
-        self._service_kwargs = service_kwargs
-        self._service = None
+def lazy_service[T](factory: Callable[[], T]) -> T:
+    """Defer a service's construction until its first attribute access.
+
+    Factories keep constructor references and arguments visible to refactoring
+    tools and type checking. Use only for ordinary service method/property
+    access; the proxy does not forward Python special methods or identity tests.
+    Failed construction is not cached and may be retried on the next access.
+    """
+    return cast(T, _LazyService(factory))
+
+
+class _LazyService[T]:
+    def __init__(self, factory: Callable[[], T]) -> None:
+        self._factory = factory
+        self._service: T | None = None
         self._lock = threading.Lock()
 
     def __getattr__(self, name: str) -> Any:
         return getattr(self._resolve(), name)
 
-    def _resolve(self):
+    def _resolve(self) -> T:
         service = self._service
         if service is not None:
             return service
         with self._lock:
             service = self._service
             if service is None:
-                service_class = getattr(import_module(self._module_name), self._class_name)
-                service = service_class(*self._service_args, **self._service_kwargs)
+                service = self._factory()
                 self._service = service
             return service

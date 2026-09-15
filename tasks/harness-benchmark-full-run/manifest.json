@@ -1,0 +1,77 @@
+{
+  "campaign": "agent-harness-full-81fb9bb",
+  "repository_commit": "81fb9bbc682c92b68346a139f7e011f4b72a45ee",
+  "execution_mode": "headless",
+  "repetitions": 1,
+  "formal_acceptance": false,
+  "configuration_files": {
+    "subject": {
+      "path": ".runtime/dev/config/agent_settings.json",
+      "sha256": "9bd35670d0d0ad156b5f4b148a530992988da094a0f68365d796eca83c6149b6",
+      "default_fq_model_key": "deepseek/deepseek-v4-flash"
+    },
+    "judge": {
+      "path": ".runtime/dev/config/judge_settings.json",
+      "sha256": "86a3403ecb36e19c283750df3e07a5984af12994769207e46981d0162835a507",
+      "default_fq_model_key": "deepseek/deepseek-v4-pro"
+    },
+    "embedding": {
+      "path": ".runtime/dev/config/embedding_settings.json",
+      "sha256": "84855e3eadb8f092bbe6e6e87d5ecad071f1981359295fba2826aec4630f0397",
+      "default_fq_model_key": null
+    }
+  },
+  "external_source": {
+    "path": "tests/.mock-data/4月堂食销售数据.xlsx",
+    "bytes": 116459191
+  },
+  "planned_cells": 28,
+  "batches": [
+    {
+      "name": "business",
+      "variant": "standard",
+      "nodes": [
+        "tests/e2e/agent_harness/test_business_campaign_eligibility.py::test_business_campaign_eligibility",
+        "tests/e2e/agent_harness/test_business_campaign_eligibility.py::test_campaign_contrast[spending_threshold]",
+        "tests/e2e/agent_harness/test_business_campaign_eligibility.py::test_campaign_contrast[contact_interval]",
+        "tests/e2e/agent_harness/test_business_restock_decision.py::test_business_restock_decision",
+        "tests/e2e/agent_harness/test_business_restock_decision.py::test_restock_contrast[budget_tight]",
+        "tests/e2e/agent_harness/test_business_restock_decision.py::test_restock_contrast[arrival_earlier]",
+        "tests/e2e/agent_harness/test_business_restock_decision.py::test_restock_contrast[margin_lower]",
+        "tests/e2e/agent_harness/test_business_restock_decision.py::test_restock_contrast[margin_higher]",
+        "tests/e2e/agent_harness/test_business_restock_decision.py::test_restock_contrast[no_purchase]",
+        "tests/e2e/agent_harness/test_business_revenue_revision.py::test_business_revenue_revision",
+        "tests/e2e/agent_harness/test_business_routing_reuse.py::test_business_routing_reuse"
+      ]
+    },
+    {
+      "name": "legacy",
+      "variant": "standard",
+      "nodes": [
+        "tests/e2e/agent_harness/test_cleaning_april.py::test_cleaning_april",
+        "tests/e2e/agent_harness/test_ml_cleaning.py::test_ml_cleaning",
+        "tests/e2e/agent_harness/test_ml_cluster_selection.py::test_ml_cluster_selection",
+        "tests/e2e/agent_harness/test_ml_clustering.py::test_ml_clustering",
+        "tests/e2e/agent_harness/test_ml_forecast_validation.py::test_ml_forecast_validation",
+        "tests/e2e/agent_harness/test_ml_forecasting.py::test_ml_forecasting",
+        "tests/e2e/agent_harness/test_ml_recommendation.py::test_ml_recommendation",
+        "tests/e2e/agent_harness/test_ml_recommendation_ranking.py::test_ml_recommendation_ranking",
+        "tests/e2e/agent_harness/test_ml_text_grouped_classification.py::test_ml_text_grouped_classification",
+        "tests/e2e/agent_harness/test_ml_text_insight.py::test_ml_text_insight",
+        "tests/e2e/agent_harness/test_ml_text_topic_discovery.py::test_ml_text_topic_discovery",
+        "tests/e2e/agent_harness/test_rainy_season_restock.py::test_rainy_season_restock",
+        "tests/e2e/agent_harness/test_revenue_by_region_chart.py::test_revenue_by_region_chart"
+      ]
+    },
+    {
+      "name": "confirmation",
+      "variant": "confirmation",
+      "nodes": [
+        "tests/e2e/agent_harness/test_business_campaign_eligibility.py::test_business_campaign_eligibility",
+        "tests/e2e/agent_harness/test_business_restock_decision.py::test_business_restock_decision",
+        "tests/e2e/agent_harness/test_business_revenue_revision.py::test_business_revenue_revision",
+        "tests/e2e/agent_harness/test_business_routing_reuse.py::test_business_routing_reuse"
+      ]
+    }
+  ]
+}

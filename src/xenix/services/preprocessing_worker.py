@@ -9,7 +9,7 @@ from typing import Any, Protocol
 from uuid import uuid4
 
 from ..config import AppPaths
-from ..exceptions import ValidationError
+from ..exceptions import ValidationError, report_exception
 
 
 class PreprocessingWorkerRunner(Protocol):
@@ -36,6 +36,9 @@ class LocalPreprocessingWorkerRunner:
             encoding="utf-8",
         )
 
+        # spawn (not fork) so this path is identical on Windows and inside frozen
+        # PyInstaller builds; the child re-imports this module and must reach
+        # run_preprocessing_worker_task as a module-level entrypoint.
         context = get_context("spawn")
         process = context.Process(target=run_preprocessing_worker_task, args=(str(task_dir),))
         process.start()
@@ -44,9 +47,7 @@ class LocalPreprocessingWorkerRunner:
 
         try:
             if not result_path.exists():
-                raise RuntimeError(
-                    f"Preprocessing worker exited without a result file. Exit code: {process.exitcode}."
-                )
+                raise RuntimeError(f"Preprocessing worker exited without a result file. Exit code: {process.exitcode}.")
             result = json.loads(result_path.read_text(encoding="utf-8"))
             if result.get("ok") is True:
                 worker_result = result.get("result")
@@ -105,18 +106,17 @@ def execute_preprocessing_worker_operation(
         from .data_transform import DataQueryTransformService, DataTransformInput
 
         input_data = DataTransformInput.model_validate(payload.get("input"))
-        result = DataQueryTransformService(paths, worker_runner=InlinePreprocessingWorkerRunner())._transform_in_process(
-            input_data
-        )
+        result = DataQueryTransformService(
+            paths, worker_runner=InlinePreprocessingWorkerRunner()
+        )._transform_in_process(input_data)
         return result.model_dump(mode="json")
 
     if operation == "data.clean":
-        from .data_cleaning import CleanDatasetInput, DataCleaningService
+        from .cleaning.contracts import CleanDatasetInput
+        from .cleaning.engine import clean_dataset
 
         input_data = CleanDatasetInput.model_validate(payload.get("input"))
-        result = DataCleaningService(paths, worker_runner=InlinePreprocessingWorkerRunner())._clean_dataset_in_process(
-            input_data
-        )
+        result = clean_dataset(input_data, paths)
         return result.model_dump(mode="json")
 
     if operation == "data.register_generated_dataset":
@@ -129,7 +129,11 @@ def _register_generated_dataset(payload: dict[str, Any], paths: AppPaths) -> dic
     from .artifact_service import ArtifactService
     from .dataset_export_service import DatasetExportService
     from .dataset_inspection import InspectDatasetInput
-    from .dataset_service import DatasetService, RegisterDatasetInput
+    from .dataset_service import (
+        DatasetDerivationInput,
+        DatasetService,
+        RegisterDatasetInput,
+    )
     from .storage import StorageBootstrapService
 
     output_path = Path(str(payload.get("output_path") or "")).expanduser()
@@ -148,26 +152,29 @@ def _register_generated_dataset(payload: dict[str, Any], paths: AppPaths) -> dic
         artifact_service=artifact_service,
     )
 
-    inspection = dataset_service.inspect_source_file(
-        InspectDatasetInput(source_path=str(output_path.resolve()))
-    )
+    inspection = dataset_service.inspect_source_file(InspectDatasetInput(source_path=str(output_path.resolve())))
     inspection_payload = inspection.model_dump(mode="json", exclude={"source_path"})
     dataset = dataset_service.register_dataset(
         RegisterDatasetInput(
             source_path=str(output_path.resolve()),
             name=name,
             derived_from_dataset_id=payload.get("derived_from_dataset_id"),
+            derivation=DatasetDerivationInput.model_validate(payload.get("derivation")),
         )
     )
     try:
         export_artifact = dataset_export_service.materialize_dataset_export_artifact(
             dataset.id,
-            metadata_payload=payload.get("metadata_payload") if isinstance(payload.get("metadata_payload"), dict) else None,
+            metadata_payload=payload.get("metadata_payload")
+            if isinstance(payload.get("metadata_payload"), dict)
+            else None,
         )
-    except Exception:
+    except Exception as exc:
+        report_exception(exc)
         try:
             dataset_service.discard_unreferenced_dataset(dataset.id)
-        except Exception:
+        except Exception as exc:
+            report_exception(exc)
             pass
         raise
 
@@ -222,6 +229,8 @@ def _worker_exception(result: dict[str, Any]) -> Exception:
             retryable=result.get("retryable") if isinstance(result.get("retryable"), bool) else None,
         )
     details = result.get("traceback")
+    error = RuntimeError(message)
     if isinstance(details, str) and details.strip():
-        return RuntimeError(f"{message}\n{details}")
-    return RuntimeError(message)
+        # Preserve the child stack in diagnostics without repeating it in ToolResult text.
+        error.add_note(details)
+    return error

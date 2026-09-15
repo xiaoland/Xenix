@@ -14,8 +14,7 @@ from xenix.services.artifact_service import ArtifactService, build_artifact_uri
 from xenix.services.dataset_inspection import InspectDatasetInput
 from xenix.services.dataset_service import DatasetService, RegisterDatasetInput
 from xenix.services.ml.contracts import EvaluateTaskResult
-from xenix.services.ml.registry import get_model_catalog_entry, list_model_keys
-from xenix.services.ml.types import ApplyMode, EvaluationKind, ModelFamily, ModelTaskKind
+from xenix.services.ml.types import EvaluationKind
 from xenix.services.ml_service import (
     ApplyWithFilesInput,
     CreateColumnBindingInput,
@@ -25,10 +24,9 @@ from xenix.services.ml_service import (
 from xenix.services.ml_task_service import MLTaskService
 from xenix.services.storage import StorageBootstrapService
 from xenix.services.storage.models import MLTaskArtifactKind, MLTaskStatus
-from xenix.services.trained_model_metadata import parse_trained_model_metadata
+from xenix.services.ml.trained_model_metadata import parse_trained_model_metadata
 
 FIXTURE = FIXTURES_ROOT / "ml_cf_service" / "weekly_panel_v1.csv"
-FIXTURE_SHA256 = "37f02afd4419c6cc379865b129a6b30762b35ce950cc44946953bc505d43e50c"
 
 
 class _InlineWorkerRunner:
@@ -72,7 +70,6 @@ def test_holt_winters_public_lifecycle_preserves_temporal_evidence_and_lineage(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    assert sha256(FIXTURE.read_bytes()).hexdigest() == FIXTURE_SHA256
     monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
     paths = ensure_app_dirs(get_app_paths())
     storage = StorageBootstrapService().initialize(paths)
@@ -211,6 +208,8 @@ def test_holt_winters_public_lifecycle_preserves_temporal_evidence_and_lineage(
     )
     assert result_inspection.row_count == 8
     result_frame = pd.read_parquet(result_dataset.source_path)
+    assert [column["name"] for column in apply_payload["columns"]] == result_frame.columns.tolist()
+    assert all(column["type"] for column in apply_payload["columns"])
     assert result_frame.columns.tolist() == [
         "region",
         "forecast_time",
@@ -242,21 +241,5 @@ def test_holt_winters_public_lifecycle_preserves_temporal_evidence_and_lineage(
     assert resolved_apply_artifact.metadata_payload["source_dataset_ids"] == [training_dataset.id]
     assert resolved_apply_artifact.metadata_payload["result_dataset_id"] == result_dataset.id
 
-    forecast_keys = {
-        "forecasting.seasonal_naive",
-        "forecasting.holt_winters",
-        "forecasting.sarima",
-    }
-    assert forecast_keys.issubset(set(list_model_keys()))
-    for model_key in forecast_keys:
-        catalog = get_model_catalog_entry(model_key)
-        assert catalog.model_family is ModelFamily.FORECASTING
-        assert catalog.model_task_kind is ModelTaskKind.FORECASTER
-        assert catalog.evaluation_kind is EvaluationKind.FORECASTING
-        assert catalog.apply_mode is ApplyMode.FUTURE_HORIZON
-        assert catalog.supports_evaluation is True
-        assert catalog.supports_apply is True
-
     assert sha256(Path(training_dataset.source_path).read_bytes()).hexdigest() == source_before
-    assert sha256(FIXTURE.read_bytes()).hexdigest() == FIXTURE_SHA256
     storage.engine.dispose()

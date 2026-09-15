@@ -1,112 +1,53 @@
-# LLM Conversation / Agent Harness Unit Design
+# Unit Design
+
+Local design routes: [Application composition, cleanup, and error reporting](application-composition.md), [Persistent object identity](persistent-identity.md), [Data cleaning](data-cleaning.md), [Agent Tool boundaries](agent-tools.md), [Text classification](text-classification.md), and [Agent benchmark](agent-harness-benchmark.md). The remainder of this page owns LLM Conversation / Agent Harness seams.
 
 ## Admission
 
-The [LLM conversation boundary](../20-prd-tdd/llm-conversation-boundary.md)
-is the sole cross-unit authority for topology, ownership, and primary
-sequences. This document records only local seams that are expensive to
-reconstruct while changing the LLM Conversation / Harness implementation; it
-does not restate or supersede that contract.
+The [LLM conversation boundary](../20-prd-tdd/llm-conversation-boundary.md) is the sole cross-unit authority for topology, ownership, and primary sequences. This document records only local seams that are expensive to reconstruct while changing the LLM Conversation / Harness implementation; it does not restate or supersede that contract.
 
-Exact records, event shapes, Tool schemas, fields, registries, and method
-signatures remain source and test truth. UI rendering contracts remain in typed
-Chatbot events, UI code, and integration tests.
+Exact records, event shapes, Tool schemas, fields, registries, and method signatures remain source and test truth. UI rendering contracts remain in typed Chatbot events, UI code, and integration tests.
 
 ## Local Seams
 
-- **UI feature ownership:** MainWindow owns conversation navigation/rendering,
-  not Settings/Knowledge service composition. The auxiliary-window coordinator
-  receives feature factories from the application and shuts update/dialog work
-  down before application services. History receives summaries and action ports;
-  opening a thread remains a shell command. Provider editing owns an in-memory
-  draft, while SettingsDialog owns persistence; OCR owns its own generation and
-  shutdown. Runtime/benchmark observers obtain application service handles from
-  the composition callback, never through widget storage or service fields.
-- **UI turn presentation:** A pure UI-local controller gates callbacks by the
-  active submission generation, tracks append acknowledgement, and admits the
-  final snapshot after Stop. It does not own canonical Message state. The
-  injected execution adapter carries the originating generation on failures as
-  well as events; selecting a Thread or closing the window invalidates old UI
-  work. A closed gate suppresses UI delivery, not service I/O already in flight.
-  Before append, a failure preserves Composer input; after append it reloads the
-  canonical snapshot and never restores that input for resend.
-- **Submission:** Harness validates UI input, coordinates source import through
-  DatasetService, then asks `LLMConversationService` to append the User
-  Message. Dataset blocks are canonical context; source attachments are
-  presentation-only data derived later from Dataset provenance.
-- **Sampling and Stop:** Harness owns the live loop and converts LLM
-  Conversation live notifications into Thinking/activity/connection Events.
-  User-facing Stop routes a `thread_id` pause command to
-  `LLMConversationService`; Harness does not own its pause state. Its
-  pending-Message cancellation maps are internal callback aids, cleared on
-  finalization, abandonment, or cleanup; they are never another execution-state
-  store or the meaning of Stop.
-- **Pending completion:** LLMConversationService keeps private pending-exchange
-  staging and performs Tool invocation/finalization. A Tool's direct returned
-  value is the canonical ToolResult value: tabular Tools return XTT before the
-  boundary receives it, and a typed ToolFailure remains that same value.
-  Production Tool input is admitted through the Tool's strict Pydantic model;
-  its provider schema is derived through the LLM-owned portable projector and
-  is not a second schema authority.
-  Harness must consume the resulting snapshot and decide only whether the new
-  final frontier needs the next sample.
-- **Projection:** First run the pure structural snapshot projection. Then, and
-  only then, enrich Dataset blocks through DatasetService's read-only source
-  presentation resolver. A failed resolver is a soft omission, not a Thread
-  open failure. The Chatbot renderer determines displayability: reasoning-only
-  Assistant events allocate no Bubble. The derived source-attachment
-  presentation is neither a canonical block nor provider context; its
-  originating DatasetBlock remains both.
-- **Deletion and usage:** Route deletion through the LLM Conversation service
-  so its writer gate and repository dependency order remain intact. Project
-  usage only from LLM Conversation's observability-derived overview after the
-  matching terminal Assistant event.
+- **UI feature ownership:** `MainWindow` owns shell layout and top-level navigation; `ChatWorkspace` owns conversation coordination and `ThreadDetailView` owns rendering. The shell does not own Settings, Knowledge, Jobs, Dataset Audit, or Tool-detail service composition. The auxiliary-window coordinator receives feature factories from the application and shuts update/dialog work down before application services. History receives summaries and action ports; opening a thread remains a shell command. Provider editing owns an in-memory draft, while SettingsDialog owns persistence; OCR owns its own generation and shutdown. Runtime/benchmark observers obtain application service handles from the composition callback, never through widget storage or service fields.
+- **UI turn presentation:** A pure UI-local controller gates callbacks by the active submission generation, tracks append acknowledgement, and admits the final snapshot after Stop. It does not own canonical Message state. The injected execution adapter carries the originating generation on failures as well as events; selecting a Thread or closing the window invalidates old UI work. A closed gate suppresses UI delivery, not service I/O already in flight. Before append, a failure preserves Composer input; after append it reloads the canonical snapshot and never restores that input for resend.
+- **UI operation feedback:** Expected failures from link activation, attachment preparation, model selection, or other non-Harness UI commands use an auto-dismissing non-modal notification. A terminal Harness submission failure uses the same notification surface until dismissal, the next submission, or Thread selection; connection retries and Tool failures remain visible in the conversation UI. Internal exceptions follow [application error reporting](application-composition.md#error-reporting).
+- **Submission:** Harness validates UI input, coordinates source import through DatasetService, then asks `LLMConversationService` to append the User Message. Dataset blocks are canonical context; source attachments are presentation-only data derived later from Dataset provenance.
+- **Agent instructions:** The default system prompt owns general behavior, interface language and delivery/link conventions; Skill bodies own domain judgment; Tool descriptions own inputs, effects and returned values. Put each rule where the caller needs it, without duplicating capability catalogs or prescribing a universal sequence. A Thread retains its saved system prompt and original ToolResults; changing defaults does not rewrite history or require a migration.
+- **Tool descriptions:** Names, types, enums and schema defaults carry self-evident parameter information. Descriptions supply what those cannot express: units and index coordinates, source identity, cross-field meaning, execution effects and runtime defaults such as automatic chart styling. References hold longer examples. Simplification should remove repetition while preserving these distinctions; deleting every description is an ablation, not the production policy.
+- **SQL sources:** Query and transform use one explicit alias-to-Dataset mapping for both single-source and multi-source SQL. This removes the hidden default table name and competing input forms; the data Tool resolves the mapping into the SQL service's existing bindings. Derived Dataset lineage retains every source and alias, while the optional Agent explanation remains separate from executable parameters.
+- **Skill discovery:** Each request lists loaded Skill names and concise descriptions of unread Skills. `agent.skill.activate` reads guidance and one resource index without activating business Tools; maintenance metadata stays in the local catalog. References and templates are readable by Skill name and path without first reading guidance. Resource readers do not query Conversation history; successful guidance reads only affect the context projection.
+- **Tool discovery:** A separate system-message directory is derived from registered Tool names and descriptions, without a Skill-to-Tool mapping. `agent.tools.activate` accepts a batch mixing exact names and namespaces; each selector includes the same-named Tool and all dot-separated descendants, so `data.clean` includes both `data.clean` and `data.clean.metadata`, while `data` includes all `data.*` Tools. Overlapping selections are deduplicated and the result lists the expanded Tool names. Definitions appear on subsequent requests without loading Skill content. Knowledge lookup, Skill readers, Tool activation and result paging are available from the start; business Tools remain on demand. Successful activation calls determine visibility across history reloads, with their selectors expanded against the current registry independently of Skill reads. Old Skill activation records still identify loaded guidance but do not activate Tools. The LLM registry remains the schema and execution authority; no additional persistence or dispatcher is introduced.
+- **Chart grammar:** The graph Tool accepts a Vega-Lite JSON object rather than maintaining a partial copy of the external grammar. The Tool owns argument shape and graph-mode selection; the graph service owns Dataset injection, field resolution and rendering. The selected Dataset is bound as the named source `data`, inherited by views without a source declaration; explicit references to that same name are supported. Conflicting inline or named sources produce a source error before field checks, rather than being silently deleted or replaced. Source checks visit view and lookup nodes, leaving literal data and user metadata intact. Xenix's own word-cloud configuration remains typed. Tool descriptions document the data boundary, while references hold chart examples.
+- **Sampling and Stop:** Harness owns the live loop and converts LLM Conversation live notifications into Thinking/activity/connection Events. User-facing Stop routes a `thread_id` pause command to `LLMConversationService`; Harness does not own its pause state. Its pending-Message cancellation maps are internal callback aids, cleared on finalization, abandonment, or cleanup; they are never another execution-state store or the meaning of Stop.
+- **Pending completion:** LLMConversationService keeps private pending-exchange staging and performs Tool invocation/finalization. A Tool's direct returned value is the canonical ToolResult value: tabular Tools return XTT before the boundary receives it, and a typed ToolFailure remains that same value. Production Tool input is admitted through the Tool's strict Pydantic model; its provider schema is derived through the LLM-owned portable projector and is not a second schema authority. Harness must consume the resulting snapshot and decide only whether the new final frontier needs the next sample.
+- **Tool identity and recovery:** Provider responses retain wire names even when their definitions were not advertised. Conversation stages exact alias resolution against the whole Registry, preserving the original name for provider replay; the Registry invokes by canonical identity and validates typed arguments. Schema activation only controls subsequent request context. Unknown names and argument decoding failures reach the ordinary failed ToolResult boundary, so their calls and usage remain observable and the Agent can repair them. InvalidToolArguments carries the received text and its ToolFailure until invocation; persistence stores the text in ToolCall content with a null decoded payload, and both provider replay and Tool details read that text. Streaming accumulates wire arguments and shares the complete-response parser. Invalid response envelopes and missing call identities remain Provider errors.
+- **Worker error feedback:** Preprocessing worker failures retain the original error message for Tool feedback and the child traceback as an exception note for logs and diagnostic presentation. Internal Python frames must not be concatenated into the message sent back to the Agent; domain error details and repair hints remain available.
+- **Model feedback:** Training and tuning Tools associate each retained candidate with its parameters, evaluation/baseline metrics, split and training scope, domain evidence and public model/report links. The Agent-facing projection merges repeated FIT/EVALUATE facts, omits absent model domains and mechanical storage identities, and preserves metric values, labels and limitations. Persisted ML results remain complete. Task queries return result summaries and related evaluations by default; explicit diagnostic details and logs remain available without making another query a prerequisite for delivery.
+- **Projection:** First run the pure structural snapshot projection. Then, and only then, enrich Dataset blocks through DatasetService's read-only source presentation resolver and enrich Tool events with persisted Dataset derivation evidence resolved by ToolCall identity. Derivation projection must not inspect ToolResult content. A failed source resolver may omit the enrichment while preserving the Thread view, but its internal exception is reported through the application error boundary. The Chatbot renderer determines displayability: reasoning-only Assistant events allocate no Bubble. The derived source-attachment presentation is neither a canonical block nor provider context; its originating DatasetBlock remains both.
+- **Deletion and usage:** Route deletion through the LLM Conversation service so its writer gate and repository dependency order remain intact. Project usage only from LLM Conversation's observability-derived overview after the matching terminal Assistant event.
 
 ## Current Non-assumptions
 
-There is no durable completion-guard, step-budget pause/resume, Turn, Run, or
-cross-process pause recovery. The implemented runtime-only Thread pause blocks
-later provider admission, not Tool cancellation. Once an admitted Tool exchange
-has begun, it may converge its complete atomic result set; Harness then stops
-at that ToolResult frontier. After it, only a new explicit UserMessage clears
-pause; no stale-frontier replay occurs. Do not use legacy configuration or UI
-remnants as a lifecycle contract.
+There is no durable completion-guard, step-budget pause/resume, Turn, Run, or cross-process pause recovery. The implemented runtime-only Thread pause blocks later provider admission, not Tool cancellation. Once an admitted Tool exchange has begun, it may converge its complete atomic result set; Harness then stops at that ToolResult frontier. After it, only a new explicit UserMessage clears pause; no stale-frontier replay occurs. Do not use legacy configuration or UI remnants as a lifecycle contract.
 
 ## Change Guidance
 
-Preserve the public command/snapshot seam. A new provider, Tool, stream path,
-pause path, or source presentation must still converge on the canonical snapshot
-specified by Product TDD. It must not make Chatbot UI infer protocol state from
-storage or derive a second ToolResult from a raw Tool payload.
+Preserve the public command/snapshot seam. A new provider, Tool, stream path, pause path, or source presentation must still converge on the canonical snapshot specified by Product TDD. It must not make Chatbot UI infer protocol state from storage or derive a second ToolResult from a raw Tool payload.
 
-Read the nearest `src/xenix/services/agent/AGENTS.md` before changing this
-loop. Source and tests decide exact method/field behavior; this document only
-guards local ownership and sequence traps.
+Read the nearest `src/xenix/services/agent/AGENTS.md` before changing this loop. Source and tests decide exact method/field behavior; this document only guards local ownership and sequence traps.
 
 ## Verification
 
-- Harness coordination and direct ToolResult/XTT continuity:
-  `tests/agent/test_agent_harness_first_slice.py`.
-- Agent skill scope and AgentTool projection:
-  `tests/agent/test_agent_skill_tool_scope.py`,
-  `tests/agent/test_agent_ml_tool_projection.py`,
-  `tests/agent/test_agent_ml_clustering_projection.py`,
-  `tests/agent/test_agent_ml_forecast_projection.py`,
-  `tests/agent/test_agent_ml_recommendation_projection.py`,
-  `tests/agent/test_agent_ml_text_classification_projection.py`,
-  `tests/agent/test_agent_ml_text_discovery_projection.py`, and
-  `tests/agent/test_agent_data_cleaning_guidance.py`.
-- Knowledge retrieval and the lookup Tool:
-  `tests/knowledge/test_knowledge_retrieval.py` and
-  `tests/knowledge/test_knowledge_lookup_tool.py`.
-- Canonical storage, migration, and bootstrap:
-  `tests/storage/test_migrations.py`,
-  `tests/storage/test_storage_bootstrap.py`, and
-  `tests/storage/test_storage_artifacts.py`.
+- Harness coordination and direct ToolResult/XTT continuity: `tests/agent/test_agent_harness_first_slice.py`.
+- Independent Skill reading and Tool activation: `tests/agent/test_agent_harness_first_slice.py`.
+- ToolResult paging: `tests/llm/test_tool_result_pagination.py`.
+- Conversation shell, callback gating, and Dataset audit presentation: `tests/ui/test_main_window_conversation.py`, `tests/ui/test_auxiliary_windows.py`, `tests/ui/test_chatbot_contract.py`, and `tests/ui_models/`.
+- Knowledge retrieval and the lookup Tool: `tests/knowledge/test_knowledge_retrieval.py` and `tests/knowledge/test_knowledge_lookup_tool.py`.
+- Canonical storage, migration, and bootstrap: `tests/storage/test_migrations.py`, `tests/storage/test_storage_bootstrap.py`, and `tests/storage/test_storage_artifacts.py`.
 - End-to-end Agent behavior (live, paid): `tests/e2e/agent_harness/`.
 
 ## Agent Harness Benchmark
 
-[Agent Harness Benchmark](agent-harness-benchmark.md) records the local
-evaluation boundary for real-provider benchmark cases, semantic judging,
-integrity, measurements, and the offline/live policy.
+[Agent Harness Benchmark](agent-harness-benchmark.md) records the local evaluation boundary for real-provider benchmark cases, semantic judging, integrity, measurements, and the offline/live policy.

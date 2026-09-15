@@ -1,0 +1,71 @@
+{
+  "source_sha256": {
+    "src/xenix/services/llm/tool_protocol.py": "03500631cd1980afd1769ffad7ea8afb2455695d3be8cb734605f059e8dc5a36",
+    "src/xenix/services/llm/tool_schema.py": "70ad0364a2053cd3037d41b13ac2a39b5227d843ec27437f61c6e02df9f15896",
+    "src/xenix/services/llm/tool_registry.py": "e1a292e7035427eb377f134d7db5f155152a382dd1cc9fd400a78ccff51637c7",
+    "src/xenix/services/llm/__init__.py": "9a8cdf6038823d6c57d7f27b03cc69fa8ed5e8a60e0cddb384df8d9bfd52ddcc",
+    "src/xenix/services/llm/conversation.py": "ff4f1fc4931f8ab27f673edcc87c10d949055ba4d6cc31c256d7de783183c77b",
+    "src/xenix/services/llm/providers.py": "04b9e1b8d1638c13317d2171caf39af6acca61f94576322f8bb70a932af6220f",
+    "src/xenix/services/agent/tools.py": "d5d8424018be6aa0a770e4a60156dd87be754c7c9440aab1c4a463b558d42c32",
+    "src/xenix/services/agent/skill_catalog.py": "471ee6dde5f3d7cf10deb5c9aab79c7ed60af151f742d3b3482f66c7b50e9c0f",
+    "src/xenix/services/agent/composition.py": "7c6145b6d6cf5bbc588fb6100e7093fd05ebfa2db72d209bc84966b4cf484af9",
+    "src/xenix/services/agent/harness_service.py": "6f25c3ded7922052567bc594a2032024d8bfa886797a48f9ef9aa13436218e5e",
+    "xenix.spec": "ca78c9921374a6acdc7dd33de069639a888b1ab1945e67fa43177e3a0d4dfa90",
+    "pyproject.toml": "229020d52eed4f48d29ef67f23259a20daf970ec68d0d7ffb7a4b49f7dc50a8a",
+    "pdm.lock": "a95488a592415905ba951b85895f95d605f4ab550a6f8fd032fb4bb9cce8b371"
+  },
+  "focused_tests": {
+    "command": "pdm run pytest --direct tests/agent tests/llm tests/ml/test_analysis_profile.py tests/ml/test_ml_foundation_profile_cleaning.py tests/knowledge/test_knowledge_lookup_tool.py -q",
+    "passed": 25
+  },
+  "full_offline_tests": {
+    "command": "pdm run test",
+    "passed": 303,
+    "warnings": 324,
+    "seconds": 177.65,
+    "log": "build/tool-boundary-full-tests.log"
+  },
+  "static_checks": {
+    "command": "pdm run check",
+    "result": "passed",
+    "log": "build/tool-boundary-check.log"
+  },
+  "isolated_source_smoke": {
+    "command": "pdm run smoke --isolated",
+    "exit_code": 0,
+    "log": "build/tool-boundary-smoke.log"
+  },
+  "benchmark_collection": {
+    "command": "pdm run benchmark-agent-harness -- --collect-only -q",
+    "collected": 4,
+    "log": "build/tool-boundary-benchmark-collection.log"
+  },
+  "manual_argument_recovery_variants": 14,
+  "tests_added": 0,
+  "dependency_version_changes": {
+    "types-jsonschema": "removed"
+  },
+  "package": {
+    "command": "pdm run package --dist-dir dist/tool-boundary-review",
+    "result": "passed",
+    "log": "build/tool-boundary-package.log",
+    "collected_modules": {
+      "xenix.services.llm.tool_protocol": "PYMODULE",
+      "xenix.services.llm.tool_schema": "PYMODULE",
+      "xenix.services.llm.tool_registry": "PYMODULE",
+      "xenix.services.llm.conversation": "PYMODULE",
+      "xenix.services.llm.messages": "PYMODULE",
+      "xenix.services.llm.providers": "PYMODULE"
+    },
+    "executable": "F:\\CODING\\Project\\Xenix_native\\dist\\tool-boundary-review\\xenix\\xenix.exe",
+    "embedded_identity": "1.4.0 / d7bbe8dcd1789a582ec43cbb25e9034523a294ed plus uncommitted worktree"
+  },
+  "evidence_limit": "Offline verification, source and packaged smoke passed. No new live LLM benchmark was run; no commits were made.",
+  "packaged_smoke": {
+    "command": "pdm run smoke-package --executable dist/tool-boundary-review/xenix/xenix.exe",
+    "exit_code": 0,
+    "result": "passed",
+    "log": "build/tool-boundary-package-smoke.log"
+  },
+  "manual_visibility_recovery": "Hidden registered alias succeeds; unknown name and invalid input type yield failed ToolResults; corrected call succeeds."
+}

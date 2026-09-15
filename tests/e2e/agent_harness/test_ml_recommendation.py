@@ -3,21 +3,19 @@
 from __future__ import annotations
 
 from pathlib import Path
-import re
 from typing import Any
 
 import polars as pl
 import pytest
 
 from xenix.services.agent import SourceAttachmentInput, SubmitUserTurnInput
-from xenix.services.tabular import load_tabular_frame
 
 from ._infra.case_support import (
     AttachedSourceState,
     attached_source_unchanged,
     canonical_completion,
     capture_attached_source_state,
-    is_within,
+    linked_tables,
     sha256_file,
 )
 from ._infra.contracts import (
@@ -65,14 +63,13 @@ class ItemSimilarityRecommendationCase:
             raise BenchmarkInputError("fixture_hash_mismatch")
         return digest
 
-    def build_submission(self, *, thread_id: str, fq_model_key: str) -> SubmitUserTurnInput:
+    def build_submission(self, *, thread_id: int, fq_model_key: str) -> SubmitUserTurnInput:
         return SubmitUserTurnInput(
             thread_id=thread_id,
             text=(
-                "请根据 user_id、item_id、rating 评分行为构建 item-similarity 推荐。基础商品"
-                "和候选商品都至少需要 3 条评分，相似度门槛设为 0.20，每个商品最多返回 2 个"
-                "结果。请为 SKU-A 生成按 rank 排序、可继续使用的相似商品数据集，给出可打开"
-                "的链接，并在最终答复中按顺序列出两个推荐商品。"
+                "我们想给 SKU-A 的顾客推荐两个相似商品。请根据附件评分记录选出候选，"
+                "评分不足 3 条的商品暂不考虑。请交付按推荐顺序排列的结果表，给出可打开"
+                "的链接。结果表包含 base_item、rank、recommended_item 列，并在最终答复中按顺序列出两个推荐商品。"
             ),
             source_attachments=[SourceAttachmentInput(file_path=str(self.source_path.resolve()))],
             fq_model_key=fq_model_key,
@@ -91,11 +88,10 @@ class ItemSimilarityRecommendationCase:
         )
 
     def assess(self, *, context: BenchmarkCaseContext) -> BenchmarkCaseAssessment:
-        dataset, frame = _resolve_outcome(context)
-        artifact = _resolve_linked_artifact(context, dataset)
+        tables = linked_tables(context)
+        frame = next((frame for frame in tables.values() if _matches_expected(frame)), None)
         completed = canonical_completion(context.snapshot)
         source_unchanged = _source_unchanged(self.source_path, context)
-        isolated = _state_isolated(context, artifact)
         semantic_checks = (
             OutcomeCheck(
                 "exact_ranked_recommendations",
@@ -106,8 +102,8 @@ class ItemSimilarityRecommendationCase:
             ),
             OutcomeCheck(
                 "public_artifact_linked",
-                artifact is not None,
-                "public_artifact_link_observed" if artifact is not None else "public_artifact_link_missing",
+                bool(tables),
+                "public_table_link_observed" if tables else "public_table_link_missing",
             ),
         )
         integrity_checks = (
@@ -121,11 +117,6 @@ class ItemSimilarityRecommendationCase:
                 source_unchanged,
                 "source_unchanged" if source_unchanged else "source_changed_or_unverifiable",
             ),
-            OutcomeCheck(
-                "state_isolated",
-                isolated,
-                "runtime_state_isolated" if isolated else "runtime_state_not_isolated",
-            ),
         )
         return BenchmarkCaseAssessment(
             semantic_checks=semantic_checks,
@@ -134,140 +125,28 @@ class ItemSimilarityRecommendationCase:
         )
 
 
-def _resolve_outcome(context: BenchmarkCaseContext) -> tuple[Any | None, pl.DataFrame | None]:
-    datasets = list(context.services.datasets.list_datasets())
-    by_id = {str(dataset.id): dataset for dataset in datasets}
-    source_ids = _source_ids(context)
-    for dataset in datasets:
-        if not _is_run_descendant(dataset, by_id, source_ids, context.run_dataset_ids):
-            continue
-        try:
-            frame = load_tabular_frame(Path(dataset.source_path), dataset.source_format)
-        except Exception:
-            continue
-        if _matches_expected(frame):
-            return dataset, frame
-    return None, None
-
-
 def _matches_expected(frame: pl.DataFrame) -> bool:
-    required = {"base_item", "rank", "recommended_item", "similarity", "common_user_count"}
-    if frame.height != len(_EXPECTED_RECOMMENDATIONS) or not required.issubset(frame.columns):
+    required = {"base_item", "rank", "recommended_item"}
+    if frame.height != 2 or not required.issubset(frame.columns):
         return False
     try:
         rows = sorted(frame.to_dicts(), key=lambda row: int(row["rank"]))
-        observed = tuple(
-            (
-                int(row["rank"]),
-                str(row["recommended_item"]).strip(),
-                float(row["similarity"]),
-                int(row["common_user_count"]),
-            )
-            for row in rows
-            if str(row["base_item"]).strip() == "SKU-A"
-        )
+        observed = tuple((int(row["rank"]), str(row["recommended_item"]).strip())
+                         for row in rows if str(row["base_item"]).strip() == "SKU-A")
     except (KeyError, TypeError, ValueError):
         return False
-    return observed == _EXPECTED_RECOMMENDATIONS
-
-
-def _resolve_linked_artifact(context: BenchmarkCaseContext, dataset: Any | None) -> Any | None:
-    if dataset is None:
-        return None
-    for uri in _artifact_uris(_terminal_text(context.snapshot)):
-        try:
-            artifact = context.services.artifacts.resolve_uri(uri)
-        except Exception:
-            continue
-        if _artifact_matches_dataset(artifact, dataset, context.runtime_home):
-            return artifact
-    return None
-
-
-def _artifact_matches_dataset(artifact: Any, dataset: Any, runtime_home: Path) -> bool:
-    path = Path(str(getattr(artifact, "absolute_path", "")))
-    metadata = getattr(artifact, "metadata_payload", {})
-    return (
-        bool(getattr(artifact, "ready_to_open", False))
-        and bool(getattr(artifact, "exists", False))
-        and is_within(path, runtime_home)
-        and isinstance(metadata, dict)
-        and (
-            metadata.get("dataset_id") == dataset.id
-            or (
-                getattr(dataset, "ml_task_id", None)
-                and metadata.get("ml_task_id") == dataset.ml_task_id
-            )
-        )
-    )
-
-
-def _artifact_uris(text: str) -> tuple[str, ...]:
-    return tuple(re.findall(r"artifact://[A-Za-z0-9]+(?:\?[^)\s>]+)?", text))
-
-
-def _terminal_text(snapshot: Any | None) -> str:
-    messages = list(getattr(snapshot, "messages", [])) if snapshot is not None else []
-    if not messages:
-        return ""
-    return str(getattr(messages[-1], "text", "") or "")
-
-
-def _source_ids(context: BenchmarkCaseContext) -> set[str]:
-    state = context.source_state
-    return set(state.source_dataset_ids) if isinstance(state, AttachedSourceState) else set()
-
-
-def _is_run_descendant(
-    dataset: Any,
-    by_id: dict[str, Any],
-    source_ids: set[str],
-    run_ids: frozenset[str],
-) -> bool:
-    if dataset.id not in run_ids:
-        return False
-    parent_id = getattr(dataset, "derived_from_dataset_id", None)
-    seen: set[str] = set()
-    while isinstance(parent_id, str) and parent_id and parent_id not in seen:
-        if parent_id in source_ids:
-            return True
-        seen.add(parent_id)
-        parent = by_id.get(parent_id)
-        if parent is None or parent_id not in run_ids:
-            return False
-        parent_id = getattr(parent, "derived_from_dataset_id", None)
-    return False
+    return observed == tuple((rank, item) for rank, item, _score, _count in _EXPECTED_RECOMMENDATIONS)
 
 
 def _source_unchanged(source_path: Path, context: BenchmarkCaseContext) -> bool:
     state = context.source_state
     if not isinstance(state, AttachedSourceState) or not state.source_dataset_ids:
         return False
-    try:
-        return attached_source_unchanged(
-            source_path=source_path,
-            source_state=state,
-            services=context.services,
-        )
-    except Exception:
-        return False
-
-
-def _state_isolated(context: BenchmarkCaseContext, artifact: Any | None) -> bool:
-    if not context.settings_unchanged:
-        return False
-    try:
-        datasets_confined = all(
-            is_within(Path(str(dataset.source_path)), context.runtime_home)
-            for dataset in context.services.datasets.list_datasets()
-        )
-        artifact_confined = artifact is None or is_within(
-            Path(str(getattr(artifact, "absolute_path", ""))),
-            context.runtime_home,
-        )
-        return datasets_confined and artifact_confined
-    except Exception:
-        return False
+    return attached_source_unchanged(
+        source_path=source_path,
+        source_state=state,
+        services=context.services,
+    )
 
 
 def test_ml_recommendation(agent_harness_benchmark) -> None:

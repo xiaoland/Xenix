@@ -1,0 +1,47 @@
+{
+  "input": "20 rows, 10 groups of 2, both labels per group; identical source/schema digests and random_state=42, only Dataset identity changes.",
+  "observations": [
+    {
+      "strategy": "group_hash_holdout.v1",
+      "dataset_id": "same-content-import-a",
+      "holdout_positions": [
+        4,
+        5,
+        14,
+        15
+      ]
+    },
+    {
+      "strategy": "group_hash_holdout.v1",
+      "dataset_id": "same-content-import-b",
+      "holdout_positions": [
+        6,
+        7,
+        10,
+        11
+      ]
+    },
+    {
+      "strategy": "group_hash_holdout.v2",
+      "dataset_id": "same-content-import-a",
+      "holdout_positions": [
+        6,
+        7,
+        12,
+        13
+      ]
+    },
+    {
+      "strategy": "group_hash_holdout.v2",
+      "dataset_id": "same-content-import-b",
+      "holdout_positions": [
+        6,
+        7,
+        12,
+        13
+      ]
+    }
+  ],
+  "legacy_results_preserved": true,
+  "new_results_independent_of_import_identity": true
+}

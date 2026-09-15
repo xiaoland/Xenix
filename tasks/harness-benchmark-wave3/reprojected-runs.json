@@ -1,0 +1,479 @@
+{
+  "cells": [
+    {
+      "phase": "completion_prompt_v2",
+      "projection": {
+        "accepted": false,
+        "case_id": "business.routing.v1.confirmation",
+        "evaluation": "characterization",
+        "gate_eligible": false,
+        "observations": [
+          {
+            "budget_reason": "sampling_round_limit_exceeded",
+            "failure_kind": "sampling_round_limit_exceeded",
+            "judge_status": "blocked",
+            "outcome": "fail",
+            "provenance": {
+              "case_definition_sha256": "35744EC52709E4BF5D0B14C1BE957256E32C38D1113B494285E9427A16D066AE",
+              "harness_variant": "baseline",
+              "repository_commit": "3c378f7fe39b85de489e145a2dee9c0fc26ba6e4",
+              "repository_dirty": true,
+              "runtime_sha256": "F19EFE0ADCD131B0751A62920C9D0EA9F3B9848C5FD4A1DD13A92CD552F03541"
+            },
+            "reason": "budget_exceeded",
+            "reported_subject_tokens": 277445,
+            "run_id": "28ce99b458914e57886ea60ab567a332",
+            "run_status": "budget_exceeded",
+            "sampling_rounds": 12,
+            "subject_tokens_complete": true,
+            "turn_seconds": 113.34752210002625
+          }
+        ],
+        "policy_id": "agent-harness-report-policy-v3",
+        "qualified": true,
+        "reason_codes": [],
+        "report_kind": "xenix.agent_harness.policy_decision",
+        "run_ids": [
+          "28ce99b458914e57886ea60ab567a332"
+        ],
+        "schema_version": 2,
+        "summary": {
+          "attempt_count": 1,
+          "effective_subject_tokens_per_pass": null,
+          "median_reported_subject_tokens": 277445.0,
+          "median_sampling_rounds": 12.0,
+          "median_turn_seconds": 113.34752210002625,
+          "observed_subject_tokens": 277445,
+          "outcome_counts": {
+            "fail": 1,
+            "partial": 0,
+            "pass": 0,
+            "unscored": 0
+          },
+          "pass_rate": 0.0,
+          "scored_count": 1,
+          "subject_token_coverage": 1.0,
+          "total_subject_tokens": 277445
+        }
+      },
+      "sha256": "d9c2b4a19ccd3926a406b907051485fb61e71c5a418c42e301ab9daf8bc544e9",
+      "source": "build\\agent-harness-failures\\completion-confirmation\\business.routing.v1.confirmation-deepseek-deepseek-v4-flash-28ce99b458914e57886ea60ab567a332.json"
+    },
+    {
+      "phase": "completion_prompt_v2",
+      "projection": {
+        "accepted": false,
+        "case_id": "business.routing.v1.standard",
+        "evaluation": "characterization",
+        "gate_eligible": false,
+        "observations": [
+          {
+            "budget_reason": "sampling_round_limit_exceeded",
+            "failure_kind": "sampling_round_limit_exceeded",
+            "judge_status": "blocked",
+            "outcome": "fail",
+            "provenance": {
+              "case_definition_sha256": "35744EC52709E4BF5D0B14C1BE957256E32C38D1113B494285E9427A16D066AE",
+              "harness_variant": "baseline",
+              "repository_commit": "3c378f7fe39b85de489e145a2dee9c0fc26ba6e4",
+              "repository_dirty": true,
+              "runtime_sha256": "F19EFE0ADCD131B0751A62920C9D0EA9F3B9848C5FD4A1DD13A92CD552F03541"
+            },
+            "reason": "budget_exceeded",
+            "reported_subject_tokens": 317951,
+            "run_id": "c8936bfe93244776a2da798ca78f492a",
+            "run_status": "budget_exceeded",
+            "sampling_rounds": 12,
+            "subject_tokens_complete": true,
+            "turn_seconds": 135.14619179995498
+          }
+        ],
+        "policy_id": "agent-harness-report-policy-v3",
+        "qualified": true,
+        "reason_codes": [],
+        "report_kind": "xenix.agent_harness.policy_decision",
+        "run_ids": [
+          "c8936bfe93244776a2da798ca78f492a"
+        ],
+        "schema_version": 2,
+        "summary": {
+          "attempt_count": 1,
+          "effective_subject_tokens_per_pass": null,
+          "median_reported_subject_tokens": 317951.0,
+          "median_sampling_rounds": 12.0,
+          "median_turn_seconds": 135.14619179995498,
+          "observed_subject_tokens": 317951,
+          "outcome_counts": {
+            "fail": 1,
+            "partial": 0,
+            "pass": 0,
+            "unscored": 0
+          },
+          "pass_rate": 0.0,
+          "scored_count": 1,
+          "subject_token_coverage": 1.0,
+          "total_subject_tokens": 317951
+        }
+      },
+      "sha256": "691c8cca19af66a19f16f82062ba7bc4be2fce9d9475b324eb4275c8614dd621",
+      "source": "build\\agent-harness-failures\\completion-standard\\business.routing.v1.standard-deepseek-deepseek-v4-flash-c8936bfe93244776a2da798ca78f492a.json"
+    },
+    {
+      "phase": "service_prompt_v1",
+      "projection": {
+        "accepted": false,
+        "case_id": "business.revenue.v1.confirmation",
+        "evaluation": "characterization",
+        "gate_eligible": false,
+        "observations": [
+          {
+            "budget_reason": null,
+            "failure_kind": null,
+            "judge_status": "completed",
+            "outcome": "pass",
+            "provenance": {
+              "case_definition_sha256": "2D8D0F8633992A1BD0EE9FBEEF5B383572933997C3ADC97C78046156E2CFEFEC",
+              "harness_variant": "baseline",
+              "repository_commit": "3c378f7fe39b85de489e145a2dee9c0fc26ba6e4",
+              "repository_dirty": true,
+              "runtime_sha256": "3B632FC005EC7CD73417FE0F7A94FAEF4C3903205E0AC8CED0E0E2BBF51320B4"
+            },
+            "reason": "judge_verdict",
+            "reported_subject_tokens": 173292,
+            "run_id": "1498d5e6aba04800a425ddfbf4f03bfd",
+            "run_status": "completed",
+            "sampling_rounds": 10,
+            "subject_tokens_complete": true,
+            "turn_seconds": 62.68007429991849
+          }
+        ],
+        "policy_id": "agent-harness-report-policy-v3",
+        "qualified": true,
+        "reason_codes": [],
+        "report_kind": "xenix.agent_harness.policy_decision",
+        "run_ids": [
+          "1498d5e6aba04800a425ddfbf4f03bfd"
+        ],
+        "schema_version": 2,
+        "summary": {
+          "attempt_count": 1,
+          "effective_subject_tokens_per_pass": 173292.0,
+          "median_reported_subject_tokens": 173292.0,
+          "median_sampling_rounds": 10.0,
+          "median_turn_seconds": 62.68007429991849,
+          "observed_subject_tokens": 173292,
+          "outcome_counts": {
+            "fail": 0,
+            "partial": 0,
+            "pass": 1,
+            "unscored": 0
+          },
+          "pass_rate": 1.0,
+          "scored_count": 1,
+          "subject_token_coverage": 1.0,
+          "total_subject_tokens": 173292
+        }
+      },
+      "sha256": "cd3973dd3b2b6e2d6a21a7a132eee4c2d15c37a7e9337636b7b12ee12acff2f2",
+      "source": "build\\agent-harness-failures\\confirmation\\business.revenue.v1.confirmation-deepseek-deepseek-v4-flash-1498d5e6aba04800a425ddfbf4f03bfd.json"
+    },
+    {
+      "phase": "service_prompt_v1",
+      "projection": {
+        "accepted": false,
+        "case_id": "business.routing.v1.confirmation",
+        "evaluation": "characterization",
+        "gate_eligible": false,
+        "observations": [
+          {
+            "budget_reason": "sampling_round_limit_exceeded",
+            "failure_kind": "sampling_round_limit_exceeded",
+            "judge_status": "blocked",
+            "outcome": "fail",
+            "provenance": {
+              "case_definition_sha256": "35744EC52709E4BF5D0B14C1BE957256E32C38D1113B494285E9427A16D066AE",
+              "harness_variant": "baseline",
+              "repository_commit": "3c378f7fe39b85de489e145a2dee9c0fc26ba6e4",
+              "repository_dirty": true,
+              "runtime_sha256": "3B632FC005EC7CD73417FE0F7A94FAEF4C3903205E0AC8CED0E0E2BBF51320B4"
+            },
+            "reason": "budget_exceeded",
+            "reported_subject_tokens": 321125,
+            "run_id": "30541015a5794f0f83aa2ca2a7520d12",
+            "run_status": "budget_exceeded",
+            "sampling_rounds": 12,
+            "subject_tokens_complete": true,
+            "turn_seconds": 128.9591815000167
+          }
+        ],
+        "policy_id": "agent-harness-report-policy-v3",
+        "qualified": true,
+        "reason_codes": [],
+        "report_kind": "xenix.agent_harness.policy_decision",
+        "run_ids": [
+          "30541015a5794f0f83aa2ca2a7520d12"
+        ],
+        "schema_version": 2,
+        "summary": {
+          "attempt_count": 1,
+          "effective_subject_tokens_per_pass": null,
+          "median_reported_subject_tokens": 321125.0,
+          "median_sampling_rounds": 12.0,
+          "median_turn_seconds": 128.9591815000167,
+          "observed_subject_tokens": 321125,
+          "outcome_counts": {
+            "fail": 1,
+            "partial": 0,
+            "pass": 0,
+            "unscored": 0
+          },
+          "pass_rate": 0.0,
+          "scored_count": 1,
+          "subject_token_coverage": 1.0,
+          "total_subject_tokens": 321125
+        }
+      },
+      "sha256": "592bd5e65661feb2d92dcb03ab7685490cfcd0f5357c7d5d0e2fb7a0ba4077a4",
+      "source": "build\\agent-harness-failures\\confirmation\\business.routing.v1.confirmation-deepseek-deepseek-v4-flash-30541015a5794f0f83aa2ca2a7520d12.json"
+    },
+    {
+      "phase": "content_split_v2",
+      "projection": {
+        "accepted": false,
+        "case_id": "business.routing.v1.confirmation",
+        "evaluation": "characterization",
+        "gate_eligible": false,
+        "observations": [
+          {
+            "budget_reason": "sampling_round_limit_exceeded",
+            "failure_kind": "sampling_round_limit_exceeded",
+            "judge_status": "blocked",
+            "outcome": "fail",
+            "provenance": {
+              "case_definition_sha256": "35744EC52709E4BF5D0B14C1BE957256E32C38D1113B494285E9427A16D066AE",
+              "harness_variant": "baseline",
+              "repository_commit": "3c378f7fe39b85de489e145a2dee9c0fc26ba6e4",
+              "repository_dirty": true,
+              "runtime_sha256": "F19EFE0ADCD131B0751A62920C9D0EA9F3B9848C5FD4A1DD13A92CD552F03541"
+            },
+            "reason": "budget_exceeded",
+            "reported_subject_tokens": 366498,
+            "run_id": "1bfb10996370452398e38d9ce83a22e1",
+            "run_status": "budget_exceeded",
+            "sampling_rounds": 12,
+            "subject_tokens_complete": true,
+            "turn_seconds": 157.03288869996322
+          }
+        ],
+        "policy_id": "agent-harness-report-policy-v3",
+        "qualified": true,
+        "reason_codes": [],
+        "report_kind": "xenix.agent_harness.policy_decision",
+        "run_ids": [
+          "1bfb10996370452398e38d9ce83a22e1"
+        ],
+        "schema_version": 2,
+        "summary": {
+          "attempt_count": 1,
+          "effective_subject_tokens_per_pass": null,
+          "median_reported_subject_tokens": 366498.0,
+          "median_sampling_rounds": 12.0,
+          "median_turn_seconds": 157.03288869996322,
+          "observed_subject_tokens": 366498,
+          "outcome_counts": {
+            "fail": 1,
+            "partial": 0,
+            "pass": 0,
+            "unscored": 0
+          },
+          "pass_rate": 0.0,
+          "scored_count": 1,
+          "subject_token_coverage": 1.0,
+          "total_subject_tokens": 366498
+        }
+      },
+      "sha256": "47a01e6829d6622bcf30cc95b66629c0fa33c72a1a449e1688e0e3b84e7578da",
+      "source": "build\\agent-harness-failures\\content-confirmation\\business.routing.v1.confirmation-deepseek-deepseek-v4-flash-1bfb10996370452398e38d9ce83a22e1.json"
+    },
+    {
+      "phase": "content_split_v2",
+      "projection": {
+        "accepted": false,
+        "case_id": "business.routing.v1.standard",
+        "evaluation": "characterization",
+        "gate_eligible": false,
+        "observations": [
+          {
+            "budget_reason": "sampling_round_limit_exceeded",
+            "failure_kind": "sampling_round_limit_exceeded",
+            "judge_status": "blocked",
+            "outcome": "fail",
+            "provenance": {
+              "case_definition_sha256": "35744EC52709E4BF5D0B14C1BE957256E32C38D1113B494285E9427A16D066AE",
+              "harness_variant": "baseline",
+              "repository_commit": "3c378f7fe39b85de489e145a2dee9c0fc26ba6e4",
+              "repository_dirty": true,
+              "runtime_sha256": "F19EFE0ADCD131B0751A62920C9D0EA9F3B9848C5FD4A1DD13A92CD552F03541"
+            },
+            "reason": "budget_exceeded",
+            "reported_subject_tokens": 254625,
+            "run_id": "eda04287e17742d8b51f180d1155917d",
+            "run_status": "budget_exceeded",
+            "sampling_rounds": 12,
+            "subject_tokens_complete": true,
+            "turn_seconds": 134.22177780000493
+          }
+        ],
+        "policy_id": "agent-harness-report-policy-v3",
+        "qualified": true,
+        "reason_codes": [],
+        "report_kind": "xenix.agent_harness.policy_decision",
+        "run_ids": [
+          "eda04287e17742d8b51f180d1155917d"
+        ],
+        "schema_version": 2,
+        "summary": {
+          "attempt_count": 1,
+          "effective_subject_tokens_per_pass": null,
+          "median_reported_subject_tokens": 254625.0,
+          "median_sampling_rounds": 12.0,
+          "median_turn_seconds": 134.22177780000493,
+          "observed_subject_tokens": 254625,
+          "outcome_counts": {
+            "fail": 1,
+            "partial": 0,
+            "pass": 0,
+            "unscored": 0
+          },
+          "pass_rate": 0.0,
+          "scored_count": 1,
+          "subject_token_coverage": 1.0,
+          "total_subject_tokens": 254625
+        }
+      },
+      "sha256": "eec69519aa22093c3541857ff9d0644c46ba0a769d2e23fd17e924c07c1f58f9",
+      "source": "build\\agent-harness-failures\\content-standard\\business.routing.v1.standard-deepseek-deepseek-v4-flash-eda04287e17742d8b51f180d1155917d.json"
+    },
+    {
+      "phase": "service_prompt_v1",
+      "projection": {
+        "accepted": false,
+        "case_id": "business.restock.v1.budget_tight",
+        "evaluation": "characterization",
+        "gate_eligible": false,
+        "observations": [
+          {
+            "budget_reason": null,
+            "failure_kind": null,
+            "judge_status": "completed",
+            "outcome": "pass",
+            "provenance": {
+              "case_definition_sha256": "24CD6031DA1B7B9F9C70F2D77FD0A5DC29CEBC6947DE3E3FABA05D31F2697C2D",
+              "harness_variant": "baseline",
+              "repository_commit": "3c378f7fe39b85de489e145a2dee9c0fc26ba6e4",
+              "repository_dirty": true,
+              "runtime_sha256": "3B632FC005EC7CD73417FE0F7A94FAEF4C3903205E0AC8CED0E0E2BBF51320B4"
+            },
+            "reason": "judge_verdict",
+            "reported_subject_tokens": 53960,
+            "run_id": "d4bd23a934a945ce859dcc33193e9e20",
+            "run_status": "completed",
+            "sampling_rounds": 6,
+            "subject_tokens_complete": true,
+            "turn_seconds": 37.87853779998841
+          }
+        ],
+        "policy_id": "agent-harness-report-policy-v3",
+        "qualified": true,
+        "reason_codes": [],
+        "report_kind": "xenix.agent_harness.policy_decision",
+        "run_ids": [
+          "d4bd23a934a945ce859dcc33193e9e20"
+        ],
+        "schema_version": 2,
+        "summary": {
+          "attempt_count": 1,
+          "effective_subject_tokens_per_pass": 53960.0,
+          "median_reported_subject_tokens": 53960.0,
+          "median_sampling_rounds": 6.0,
+          "median_turn_seconds": 37.87853779998841,
+          "observed_subject_tokens": 53960,
+          "outcome_counts": {
+            "fail": 0,
+            "partial": 0,
+            "pass": 1,
+            "unscored": 0
+          },
+          "pass_rate": 1.0,
+          "scored_count": 1,
+          "subject_token_coverage": 1.0,
+          "total_subject_tokens": 53960
+        }
+      },
+      "sha256": "4d758043c4274c32d5ccd7cd756c802c1ccf112e77a95798ca2a4590111ad52a",
+      "source": "build\\agent-harness-failures\\standard\\business.restock.v1.budget_tight-deepseek-deepseek-v4-flash-d4bd23a934a945ce859dcc33193e9e20.json"
+    },
+    {
+      "phase": "service_prompt_v1",
+      "projection": {
+        "accepted": false,
+        "case_id": "business.routing.v1.standard",
+        "evaluation": "characterization",
+        "gate_eligible": false,
+        "observations": [
+          {
+            "budget_reason": "sampling_round_limit_exceeded",
+            "failure_kind": "sampling_round_limit_exceeded",
+            "judge_status": "blocked",
+            "outcome": "fail",
+            "provenance": {
+              "case_definition_sha256": "35744EC52709E4BF5D0B14C1BE957256E32C38D1113B494285E9427A16D066AE",
+              "harness_variant": "baseline",
+              "repository_commit": "3c378f7fe39b85de489e145a2dee9c0fc26ba6e4",
+              "repository_dirty": true,
+              "runtime_sha256": "3B632FC005EC7CD73417FE0F7A94FAEF4C3903205E0AC8CED0E0E2BBF51320B4"
+            },
+            "reason": "budget_exceeded",
+            "reported_subject_tokens": 310640,
+            "run_id": "b42c66b7c85f4a1a9251081d2b1e7950",
+            "run_status": "budget_exceeded",
+            "sampling_rounds": 12,
+            "subject_tokens_complete": true,
+            "turn_seconds": 91.6657921000151
+          }
+        ],
+        "policy_id": "agent-harness-report-policy-v3",
+        "qualified": true,
+        "reason_codes": [],
+        "report_kind": "xenix.agent_harness.policy_decision",
+        "run_ids": [
+          "b42c66b7c85f4a1a9251081d2b1e7950"
+        ],
+        "schema_version": 2,
+        "summary": {
+          "attempt_count": 1,
+          "effective_subject_tokens_per_pass": null,
+          "median_reported_subject_tokens": 310640.0,
+          "median_sampling_rounds": 12.0,
+          "median_turn_seconds": 91.6657921000151,
+          "observed_subject_tokens": 310640,
+          "outcome_counts": {
+            "fail": 1,
+            "partial": 0,
+            "pass": 0,
+            "unscored": 0
+          },
+          "pass_rate": 0.0,
+          "scored_count": 1,
+          "subject_token_coverage": 1.0,
+          "total_subject_tokens": 310640
+        }
+      },
+      "sha256": "425b8feb58e8142b5b3b55b6b00fe75b2c43fbe7f86f878169fe4200dbc47839",
+      "source": "build\\agent-harness-failures\\standard\\business.routing.v1.standard-deepseek-deepseek-v4-flash-b42c66b7c85f4a1a9251081d2b1e7950.json"
+    }
+  ],
+  "judge_calls": 0,
+  "purpose": "Individual historical projections; do not pool distinct implementation phases.",
+  "subject_calls": 0
+}

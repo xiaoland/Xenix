@@ -60,10 +60,10 @@ class CanonicalBundle:
 
 @dataclass(frozen=True)
 class CanonicalBundleIdentity:
-    document_id: str
-    import_id: str | None
-    canonical_generation_id: str
-    source_artifact_id: str | None
+    document_id: int
+    import_id: int | None
+    canonical_generation_id: int
+    source_artifact_id: int | None
     library_id: str
     source_sha256: str
     source_format: str
@@ -258,7 +258,7 @@ class KnowledgeContentStore:
         self,
         relative_path: str,
         *,
-        import_id: str,
+        import_id: int,
         expected_envelope_sha256: str,
         expected_content_ir_sha256: str,
         expected_identity: CanonicalBundleIdentity,
@@ -309,13 +309,10 @@ class KnowledgeContentStore:
             expected_identity=expected_identity,
         )
 
-    def discard_staged_canonical_bundle(self, import_id: str) -> None:
-        if (
-            len(import_id) != 32
-            or any(character not in "0123456789abcdef" for character in import_id)
-        ):
+    def discard_staged_canonical_bundle(self, import_id: int) -> None:
+        if type(import_id) is not int or import_id < 1:
             return
-        staged = self._root / "tasks" / "imports" / import_id / "canonical"
+        staged = self._root / "tasks" / "imports" / str(import_id) / "canonical"
         self._task_canonical_relative_path(staged)
         shutil.rmtree(staged, ignore_errors=True)
 
@@ -455,8 +452,9 @@ class KnowledgeContentStore:
         if (
             len(parts) != 4
             or parts[:2] != ("tasks", "imports")
-            or len(parts[2]) != 32
-            or any(character not in "0123456789abcdef" for character in parts[2])
+            or not parts[2].isascii()
+            or not parts[2].isdecimal()
+            or parts[2].startswith("0")
             or parts[3] != "canonical"
         ):
             raise ValidationError("Knowledge task output path is invalid.")

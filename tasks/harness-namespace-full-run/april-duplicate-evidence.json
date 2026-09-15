@@ -1,0 +1,24 @@
+{
+  "source": "tests/.mock-data/4月堂食销售数据.xlsx",
+  "business_shape": [
+    486119,
+    50
+  ],
+  "unique_shape": [
+    485789,
+    50
+  ],
+  "duplicate_rows_beyond_first": 330,
+  "preserving_rows": {
+    "all_orders": 87678,
+    "matching_orders": 87355,
+    "affected_orders": 231,
+    "affected_matching_orders": 231
+  },
+  "deduplicating_rows": {
+    "all_orders": 87678,
+    "matching_orders": 87181,
+    "affected_orders": 231,
+    "affected_matching_orders": 57
+  }
+}

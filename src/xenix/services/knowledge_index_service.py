@@ -9,6 +9,7 @@ from collections.abc import Iterable
 from concurrent.futures import Future, ThreadPoolExecutor, wait
 from dataclasses import dataclass
 from enum import StrEnum
+from typing import TYPE_CHECKING
 
 from sqlalchemy.orm import sessionmaker
 
@@ -20,8 +21,11 @@ from .embedding_service import (
     embedding_profile_from_settings,
 )
 from .knowledge_semantic_service import KnowledgeSemanticService
-from .storage.models import KnowledgeIndexTaskRow, utc_now
+from .storage.models import JobDomain, KnowledgeIndexTaskRow, utc_now
 from .storage.repositories.knowledge import KnowledgeRepository
+
+if TYPE_CHECKING:
+    from .job_scheduler import JobScheduler
 
 _STOP = object()
 LOGGER = logging.getLogger(__name__)
@@ -41,14 +45,14 @@ class KnowledgeIndexOverview:
     vector_configured: bool
     unit_count: int
     estimated_vector_requests: int
-    active_task_id: str | None
+    active_task_id: int | None
     active_task_status: str | None
     error_code: str | None
 
 
 @dataclass(frozen=True)
 class KnowledgeIndexTaskView:
-    task_id: str
+    task_id: int
     index_kinds: tuple[str, ...]
     trigger: str
     status: str
@@ -68,12 +72,14 @@ class KnowledgeIndexService:
         embedding_service: EmbeddingService,
         embedding_settings_source: EmbeddingSettingsSource,
         start_worker: bool = True,
+        scheduler: JobScheduler | None = None,
     ) -> None:
         self._session_factory = session_factory
         self._semantic = semantic_service
         self._embedding = embedding_service
         self._embedding_settings = embedding_settings_source
         self._repository = KnowledgeRepository()
+        self._scheduler = scheduler
         self._queue: queue.Queue[str | object] = queue.Queue()
         self._status_executor = ThreadPoolExecutor(
             max_workers=1,
@@ -84,16 +90,17 @@ class KnowledgeIndexService:
         self._status_requests: set[Future[KnowledgeIndexOverview]] = set()
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
-        pending = self._recover_tasks()
-        if start_worker:
-            self._thread = threading.Thread(
-                target=self._worker_main,
-                name="xenix-knowledge-index",
-                daemon=True,
-            )
-            self._thread.start()
-            for task_id in pending:
-                self._queue.put(task_id)
+        if scheduler is None:
+            pending = self.recover_pending()
+            if start_worker:
+                self._thread = threading.Thread(
+                    target=self._worker_main,
+                    name="xenix-knowledge-index",
+                    daemon=True,
+                )
+                self._thread.start()
+                for task_id in pending:
+                    self._queue.put(task_id)
 
     def enqueue_rebuild(
         self,
@@ -101,7 +108,7 @@ class KnowledgeIndexService:
         *,
         trigger: str,
         library_id: str = "global",
-    ) -> str:
+    ) -> int:
         kinds = _normalize_index_kinds(index_kinds)
         if trigger not in _TRIGGERS:
             raise ValueError("Knowledge index task trigger is invalid.")
@@ -134,11 +141,11 @@ class KnowledgeIndexService:
                     created = True
                 session.commit()
                 task_id = row.id
-        if created and not self._stop.is_set():
-            self._queue.put(task_id)
+        if created:
+            self._submit(task_id)
         return task_id
 
-    def notify_corpus_changed(self, library_id: str = "global") -> str | None:
+    def notify_corpus_changed(self, library_id: str = "global") -> int | None:
         try:
             configured = self._embedding.freeze() is not None
         except EmbeddingValidationError:
@@ -218,20 +225,12 @@ class KnowledgeIndexService:
             keyword_state = "needs_rebuild"
 
         if KnowledgeIndexKind.TEXT_VECTOR.value in active_kinds:
-            try:
-                vector_configured = self._semantic.is_configured()
-            except Exception:
-                vector_configured = False
+            vector_configured = self._semantic.is_configured()
             vector_state = "building"
         else:
-            try:
-                semantic = self._semantic.inspect_index(library_id=library_id)
-            except Exception:
-                semantic = None
-            vector_configured = bool(semantic is not None and semantic.configured)
-            if semantic is None:
-                vector_state = "needs_attention"
-            elif not semantic.configured or semantic.unit_count == 0:
+            semantic = self._semantic.inspect_index(library_id=library_id)
+            vector_configured = semantic.configured
+            if not semantic.configured or semantic.unit_count == 0:
                 vector_state = "unavailable"
             elif semantic.ready:
                 vector_state = "ready"
@@ -257,11 +256,7 @@ class KnowledgeIndexService:
             None,
         )
 
-        batch_size = 1
-        try:
-            batch_size = max(1, self._embedding_settings.load().batch_size)
-        except Exception:
-            pass
+        batch_size = max(1, self._embedding_settings.load().batch_size)
         return KnowledgeIndexOverview(
             keyword_state=keyword_state,
             text_vector_state=vector_state,
@@ -321,7 +316,7 @@ class KnowledgeIndexService:
             for row in rows
         ]
 
-    def rebuild_now(self, task_id: str) -> KnowledgeIndexTaskView:
+    def rebuild_now(self, task_id: int) -> KnowledgeIndexTaskView:
         # Claim the task under the same short lock used by enqueue/coalescing.
         # Otherwise a producer can merge a new kind into a still-queued row after
         # this worker has read its old payload, making metadata claim work that the
@@ -352,7 +347,7 @@ class KnowledgeIndexService:
                         library_id=library_id,
                     )
                     session.commit()
-            generation_id: str | None = None
+            generation_id: int | None = None
             profile_fingerprint: str | None = None
             corpus_fingerprint: str | None = None
             if KnowledgeIndexKind.TEXT_VECTOR.value in kinds:
@@ -423,7 +418,7 @@ class KnowledgeIndexService:
                 )
         self._status_executor.shutdown(wait=True, cancel_futures=True)
 
-    def _set_phase(self, task_id: str, phase: str) -> None:
+    def _set_phase(self, task_id: int, phase: str) -> None:
         with self._session_factory() as session:
             row = self._repository.get_index_task(session, task_id)
             if row is None:
@@ -439,7 +434,7 @@ class KnowledgeIndexService:
             try:
                 if item is _STOP:
                     return
-                assert isinstance(item, str)
+                assert isinstance(item, int)
                 self.rebuild_now(item)
             finally:
                 self._queue.task_done()
@@ -451,8 +446,24 @@ class KnowledgeIndexService:
         with self._status_requests_lock:
             self._status_requests.discard(future)
 
-    def _recover_tasks(self) -> list[str]:
-        pending: list[str] = []
+    def _submit(self, task_id: int) -> None:
+        if self._scheduler is not None:
+            self._scheduler.enqueue(JobDomain.KNOWLEDGE, "index_build", task_id)
+        elif not self._stop.is_set():
+            self._queue.put(task_id)
+
+    def run_unit(self, task_id: int) -> None:
+        self.rebuild_now(task_id)
+
+    def job_outcome(self, task_id: int) -> tuple[str, str | None]:
+        with self._session_factory() as session:
+            row = self._repository.get_index_task(session, task_id)
+            if row is None:
+                return ("failed", "Knowledge index task is missing.")
+            return (row.status, row.error_summary)
+
+    def recover_pending(self) -> list[int]:
+        pending: list[int] = []
         with self._session_factory() as session:
             rows = self._repository.list_index_tasks(
                 session,

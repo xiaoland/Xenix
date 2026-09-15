@@ -9,6 +9,7 @@ from xenix.config import ensure_app_dirs, get_app_paths
 from xenix.exceptions import ValidationError
 from xenix.services.data_transform import (
     DataQueryInput,
+    DataTransformInput,
     DataQueryTransformService,
     DatasetSqlBinding,
 )
@@ -23,7 +24,7 @@ def _make_service(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> DataQueryT
 def _binding(source_path: Path) -> DatasetSqlBinding:
     return DatasetSqlBinding(
         alias="input",
-        dataset_id="dataset-1",
+        dataset_id=101,
         source_path=str(source_path.resolve()),
     )
 
@@ -81,3 +82,37 @@ def test_csv_binding_is_rejected(
                 limit=1,
             )
         )
+
+
+def test_materialize_comparison_metrics_without_a_dummy_source_join(monkeypatch, tmp_path):
+    service = _make_service(monkeypatch, tmp_path)
+    source = tmp_path / "observations.parquet"
+    pd.DataFrame({"value": [1, 2]}).to_parquet(source)
+    before = source.read_bytes()
+    sql = "SELECT * FROM (VALUES (2, 0.65), (3, 0.79)) AS metrics(segments, silhouette)"
+
+    queried = service.query(DataQueryInput(bindings=[_binding(source)], sql=sql))
+    result = service.transform(DataTransformInput(bindings=[_binding(source)], sql=sql, name="comparison"))
+
+    assert queried.total_row_count == 2
+    frame = pd.read_parquet(result.output_path)
+    assert frame["segments"].tolist() == [row["segments"] for row in queried.rows]
+    assert frame["silhouette"].astype(float).tolist() == pytest.approx([row["silhouette"] for row in queried.rows])
+    assert result.validation_summary["referenced_bindings"] == []
+    assert source.read_bytes() == before
+
+
+@pytest.mark.parametrize("sql", [
+    "CREATE TEMP TABLE totals AS SELECT SUM(value) AS total FROM input; SELECT total, ';' AS label FROM totals;",
+    "SELECT 42; CREATE TEMP TABLE output AS SELECT SUM(value) AS total FROM input; SELECT total, ';' AS label FROM output;",
+    "CREATE TEMP TABLE output AS SELECT SUM(value) AS total, ';' AS label FROM input;",
+])
+def test_transform_materializes_final_query_or_explicit_output(monkeypatch, tmp_path, sql):
+    service = _make_service(monkeypatch, tmp_path)
+    source = tmp_path / "source.parquet"
+    pd.DataFrame({"value": [1, 2]}).to_parquet(source)
+    before = source.read_bytes()
+    result = service.transform(DataTransformInput(bindings=[_binding(source)], sql=sql, name="totals"))
+    assert pd.read_parquet(result.output_path).to_dict("records") == [{"total": 3, "label": ";"}]
+    assert result.row_count == 1
+    assert source.read_bytes() == before

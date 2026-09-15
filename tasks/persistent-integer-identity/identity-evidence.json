@@ -1,0 +1,8 @@
+{
+  "concurrent_reservations": 240,
+  "allocation_workers": 8,
+  "deleted_id_not_reused_after_restart": true,
+  "migrated_text_model_public_apply": true,
+  "predictions_unchanged": true,
+  "original_model_unchanged": true
+}

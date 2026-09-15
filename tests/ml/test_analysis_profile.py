@@ -8,14 +8,15 @@ import pytest
 
 from xenix.config import ensure_app_dirs, get_app_paths
 from xenix.exceptions import ValidationError
-from xenix.services.agent.tools import AgentToolRegistry
+from xenix.services.agent.tools import build_agent_tools
+from xenix.services.llm.tool_registry import AgentToolRegistry
 from xenix.services.analysis_profile import (
     AnalysisProfileService,
     MAX_PROFILE_FIELD_LIMIT,
     ProfileDatasetInput,
 )
 from xenix.services.dataset_service import DatasetService, RegisterDatasetInput
-from xenix.services.llm.tooling import ToolExecutionContext
+from xenix.services.llm.tool_protocol import ToolExecutionContext
 from xenix.services.storage import StorageBootstrapService
 from xenix.services.tabular import TabularRuntimeError
 
@@ -149,7 +150,7 @@ def test_analysis_profile_is_registered_as_one_atomic_read_only_tool(
 ) -> None:
     paths, datasets, dataset = _registered_dataset(monkeypatch, tmp_path)
     data_transform = Mock()
-    registry = AgentToolRegistry(
+    registrations = build_agent_tools(
         paths=paths,
         dataset_service=datasets,
         data_cleaning_service=Mock(),
@@ -158,19 +159,11 @@ def test_analysis_profile_is_registered_as_one_atomic_read_only_tool(
         artifact_service=Mock(),
     )
 
-    spec = next(spec for spec in registry.list_specs() if spec.name == "analysis.profile")
-    assert spec.provider_name == "analysis_profile"
-    assert set(spec.parameters_schema["properties"]) == {
-        "dataset_id",
-        "field_limit",
-        "numeric_summary_limit",
-        "correlation_column_limit",
-    }
-    assert "source_path" not in json.dumps(spec.parameters_schema)
-    outcome = registry.execute(
-        "analysis.profile",
-        {"dataset_id": dataset.id},
-        ToolExecutionContext(thread_id="thread-profile", dataset_ids=(dataset.id,)),
+    registry = AgentToolRegistry(registrations)
+    outcome = registry.invoke(
+        tool_name="analysis.profile",
+        arguments={"dataset_id": dataset.id},
+        context=ToolExecutionContext(thread_id=101, dataset_ids=(dataset.id,)),
     )
 
     assert isinstance(outcome.value, dict)

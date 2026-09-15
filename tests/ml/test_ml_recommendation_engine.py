@@ -240,14 +240,14 @@ def test_service_fit_evaluate_and_apply_core_round_trip(tmp_path: Path) -> None:
     pd.DataFrame({"user_id": ["USER-01", "COLD-USER"]}).to_csv(apply_path, index=False)
     policy = get_default_policy(EvaluationKind.RANKING)
     snapshot = DatasetSnapshotFact(
-        dataset_id="dataset-1",
+        dataset_id=102,
         source_sha256=hashlib.sha256(source_path.read_bytes()).hexdigest(),
         source_byte_size=source_path.stat().st_size,
         schema_digest="b" * 64,
     )
     common = {
-        "project_id": "project-1",
-        "dataset_id": "dataset-1",
+        "project_id": 101,
+        "dataset_id": 102,
         "dataset_source_path": str(source_path),
         "evaluation_kind": EvaluationKind.RANKING,
         "train_role_bindings": [
@@ -261,7 +261,7 @@ def test_service_fit_evaluate_and_apply_core_round_trip(tmp_path: Path) -> None:
     }
     fit_result = CollaborativeTopKRecommendationService.fit(
         FitTaskRequest(
-            task_id="fit-1",
+            task_id=104,
             **common,
             manual_training=ManualTrainingPayload(
                 model_key=CollaborativeTopKRecommendationService.key,
@@ -301,10 +301,10 @@ def test_service_fit_evaluate_and_apply_core_round_trip(tmp_path: Path) -> None:
 
     evaluation = CollaborativeTopKRecommendationService.evaluate(
         EvaluateTaskRequest(
-            task_id="evaluate-1",
+            task_id=105,
             **common,
             evaluate_model=EvaluateModelPayload(
-                trained_model_id="trained-1",
+                trained_model_id=108,
                 model_key=CollaborativeTopKRecommendationService.key,
                 trained_model_artifact_path=fit_result.model_artifact_path,
                 holdout_artifact_path=fit_result.holdout_artifact_path or "",
@@ -330,10 +330,10 @@ def test_service_fit_evaluate_and_apply_core_round_trip(tmp_path: Path) -> None:
     with pytest.raises(ValidationError, match="does not match"):
         CollaborativeTopKRecommendationService.evaluate(
             EvaluateTaskRequest(
-                task_id="evaluate-tampered",
+                task_id=107,
                 **common,
                 evaluate_model=EvaluateModelPayload(
-                    trained_model_id="trained-1",
+                    trained_model_id=108,
                     model_key=CollaborativeTopKRecommendationService.key,
                     trained_model_artifact_path=fit_result.model_artifact_path,
                     holdout_artifact_path=str(tampered_context_path),
@@ -344,13 +344,13 @@ def test_service_fit_evaluate_and_apply_core_round_trip(tmp_path: Path) -> None:
 
     apply_result = CollaborativeTopKRecommendationService.apply(
         ApplyTaskRequest(
-            task_id="apply-1",
-            project_id="project-1",
-            dataset_id="dataset-1",
+            task_id=106,
+            project_id=101,
+            dataset_id=102,
             dataset_source_path=str(source_path),
             feature_columns=["user_id"],
             apply_model=ApplyModelPayload(
-                trained_model_id="trained-1",
+                trained_model_id=108,
                 model_key=CollaborativeTopKRecommendationService.key,
                 trained_model_artifact_path=fit_result.final_model_artifact_path or "",
             ),
@@ -359,14 +359,14 @@ def test_service_fit_evaluate_and_apply_core_round_trip(tmp_path: Path) -> None:
                     absolute_path=str(apply_path),
                     file_name=apply_path.name,
                     source_kind="user_file",
-                    dataset_id="apply-dataset",
+                    dataset_id=103,
                 )
             ],
         ),
         tmp_path / "apply-task",
     )
     applied = pd.read_csv(apply_result.output_file_path)
-    assert apply_result.source_dataset_ids == ["apply-dataset"]
+    assert apply_result.source_dataset_ids == [103]
     assert set(applied["user_id"]) == {"USER-01", "COLD-USER"}
     assert set(applied.loc[applied["user_id"] == "COLD-USER", "strategy"]) == {
         "popularity_cold_start"

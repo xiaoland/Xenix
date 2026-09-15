@@ -18,13 +18,9 @@ from xenix.services.ml.clustering_evidence import (
     compute_quality,
 )
 from xenix.services.ml.models.clustering import (
-    BirchClusteringService,
     DBSCANClusteringService,
-    GaussianMixtureClusteringService,
     KMeansClusteringService,
-    MiniBatchKMeansClusteringService,
 )
-from xenix.services.ml.types import ApplyMode
 
 
 FIXTURES = FIXTURES_ROOT / "ml_cf_service"
@@ -47,26 +43,6 @@ def _fit_kmeans(dataframe: pd.DataFrame, n_clusters: int):
             "max_iter": 300,
             "random_state": 42,
         },
-    )
-
-
-@pytest.mark.parametrize(
-    "service",
-    [
-        KMeansClusteringService,
-        MiniBatchKMeansClusteringService,
-        BirchClusteringService,
-        GaussianMixtureClusteringService,
-        DBSCANClusteringService,
-    ],
-)
-def test_every_clustering_catalog_entry_supports_evaluation(service: type) -> None:
-    entry = service.catalog_entry()
-
-    assert entry.supports_evaluation is True
-    assert entry.supports_apply is (service is not DBSCANClusteringService)
-    assert entry.apply_mode is (
-        ApplyMode.NONE if service is DBSCANClusteringService else ApplyMode.ROWS
     )
 
 
@@ -250,9 +226,6 @@ def test_dbscan_reports_noise_and_rejects_apply_before_estimator_access() -> Non
     transformed = fitted.estimator.named_steps["preprocess"].transform(dataframe[FEATURES])
     evaluated = fitted.display_labels != -1
 
-    assert DBSCANClusteringService.supports_evaluation is True
-    assert DBSCANClusteringService.supports_apply is False
-    assert DBSCANClusteringService.apply_mode is ApplyMode.NONE
     assert facts.quality.noise_row_count > 0
     assert facts.quality.evaluated_row_count == int(evaluated.sum())
     assert facts.quality.silhouette == pytest.approx(

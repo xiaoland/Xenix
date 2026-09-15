@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import shutil
 import tempfile
 from dataclasses import dataclass
@@ -74,6 +75,9 @@ class SshWorkerSetupService:
 
     def build_worker(self, input_data: SshWorkerSetupInput) -> MLWorkerConfig:
         requested_alias = input_data.ssh_alias.strip()
+        # Invariant: with write_ssh_config the worker id is the managed alias and
+        # always carries the "xenix." prefix; without it the id may be an
+        # independently generated id — callers must not assume id == ssh_alias.
         if input_data.write_ssh_config:
             ssh_alias = requested_alias or generate_worker_id()
             if not ssh_alias.startswith("xenix."):
@@ -163,6 +167,7 @@ class SshWorkerSetupService:
             imports = "; ".join(f"import {module}" for module in REQUIRED_REMOTE_IMPORTS)
             self._run_checked(client, f"{_sh_quote(worker.python_command)} - <<'PY'\n{imports}\nPY", "Remote imports", details)
         except Exception as exc:
+            logging.getLogger(__name__).exception("Operation failed: %s", exc)
             return worker.model_copy(
                 update={
                     "setup_state": MLWorkerSetupState.FAILED,
@@ -208,6 +213,8 @@ class SshWorkerSetupService:
         if worker.user:
             lines.append(f"    User {worker.user}")
         lines.append(f"    Port {worker.port}")
+        # BatchMode=yes forces non-interactive auth so dispatch never blocks on a
+        # password/passphrase prompt; credentials must be pre-configured (agent/key).
         lines.append("    BatchMode yes")
         if worker.identity_file_path:
             lines.append(f"    IdentityFile {worker.identity_file_path}")

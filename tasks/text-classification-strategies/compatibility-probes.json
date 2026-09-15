@@ -1,0 +1,53 @@
+{
+  "old_pickle_shape_preserves_predictions": true,
+  "incomplete_group_validation": [
+    {
+      "cross_validation": {
+        "method": "group_cross_validation",
+        "evaluation_id": "5a8c09bfb640fd94",
+        "fold_count": 2,
+        "group_count": 2,
+        "eligible_row_count": 4,
+        "evaluated_row_count": 0,
+        "status": "incomplete",
+        "folds": [
+          {
+            "fold": 1,
+            "train_rows": 2,
+            "validation_rows": 2,
+            "train_groups": 1,
+            "validation_groups": 1,
+            "group_overlap_count": 0,
+            "unavailable_reason": "Training partition contains only one class."
+          },
+          {
+            "fold": 2,
+            "train_rows": 2,
+            "validation_rows": 2,
+            "train_groups": 1,
+            "validation_groups": 1,
+            "group_overlap_count": 0,
+            "unavailable_reason": "Training partition contains only one class."
+          }
+        ],
+        "accuracy_range": null,
+        "interpretation": "Out-of-fold selection evidence, not independent acceptance after tuning. Matching evaluation_id means reused validation data."
+      }
+    },
+    {
+      "cross_validation": {
+        "method": "group_cross_validation",
+        "evaluation_id": "188cb2bd74696c59",
+        "fold_count": 1,
+        "group_count": 1,
+        "eligible_row_count": 4,
+        "evaluated_row_count": 0,
+        "status": "incomplete",
+        "folds": [],
+        "accuracy_range": null,
+        "interpretation": "Out-of-fold selection evidence, not independent acceptance after tuning. Matching evaluation_id means reused validation data.",
+        "unavailable_reason": "Only one independent group; grouped validation is unavailable."
+      }
+    }
+  ]
+}

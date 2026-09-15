@@ -8,6 +8,7 @@ from PySide6.QtCore import QRectF, QSize, Qt
 from PySide6.QtGui import QColor, QImage, QPainter, QPixmap
 from PySide6.QtSvg import QSvgRenderer
 
+from ....exceptions import report_exception
 from ..presentation import ArtifactResolver
 
 _ARTIFACT_PREVIEW_MIN_WIDTH = 160
@@ -26,7 +27,8 @@ def _load_artifact_preview_pixmap(
         return QPixmap()
     try:
         artifact = artifact_resolver(uri)
-    except Exception:
+    except Exception as exc:
+        report_exception(exc)
         return QPixmap()
 
     mime_type = str(getattr(artifact, "mime_type", "") or "")

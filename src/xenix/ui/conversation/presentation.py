@@ -9,6 +9,7 @@ once, then the rest of the Chatbot UI works with ``ChatbotBlock`` values.
 
 from __future__ import annotations
 
+import json
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from enum import StrEnum
@@ -18,6 +19,7 @@ from typing import Any, Callable
 from pydantic import BaseModel, ConfigDict, Field
 from PySide6.QtCore import QCoreApplication
 
+from ...exceptions import report_exception
 from ...services.agent import ChatbotEvent, ChatbotEventAuthor, ChatbotEventKind
 
 ArtifactResolver = Callable[[str], Any]
@@ -81,8 +83,15 @@ class ChatbotBlock(BaseModel):
     path: str = ""
     file_name: str = ""
     file_path: str = ""
-    artifact_id: str = ""
-    dataset_id: str = ""
+    artifact_id: int | None = None
+    dataset_id: int | None = None
+    name: str = ""
+    operation_name: str = ""
+    generation: int = 0
+    created_at: str = ""
+    inputs: list[dict[str, Any]] = Field(default_factory=list)
+    parameters_payload: dict[str, Any] = Field(default_factory=dict)
+    agent_explanation: str | None = None
     is_openable: bool = False
     chatbot_source_projection: bool = False
     chatbot_visible: bool | None = None
@@ -90,7 +99,7 @@ class ChatbotBlock(BaseModel):
     tool_name: str = ""
     status: str = ""
     error_summary: str = ""
-    source_group_id: str = ""
+    source_group_id: int | None = None
     retry_events: list[RetryEvent] = Field(default_factory=list)
 
 
@@ -135,7 +144,8 @@ def render_content_blocks(
                 if block.is_openable and source_attachment_target_resolver is not None:
                     try:
                         target = source_attachment_target_resolver(block)
-                    except Exception:
+                    except Exception as exc:
+                        report_exception(exc)
                         target = None
                 target = safe_ui_open_target(target)
                 if target:
@@ -143,7 +153,7 @@ def render_content_blocks(
                 else:
                     parts.append(f"`{file_name}`")
                 continue
-            artifact_id = block.artifact_id.strip()
+            artifact_id = block.artifact_id
             if artifact_id and file_name:
                 parts.append(f"[{escape_markdown_link_label(file_name)}](artifact://{artifact_id})")
             elif file_name:
@@ -153,6 +163,8 @@ def render_content_blocks(
             # Chatbot attachments.  Harness enrichment supplies a separate
             # UI-only source_attachment block when one can be resolved.
             continue
+        elif block_type == "dataset_audit":
+            parts.append(_dataset_audit_markdown(block))
         elif block_type == "step_confirmation":
             parts.append(block.text)
         elif block_type == "thinking":
@@ -181,6 +193,68 @@ def render_content_blocks(
                 text = f"{text} {error_summary}"
             parts.append(text)
     return "\n\n".join(part for part in parts if part)
+
+
+def _dataset_audit_markdown(block: ChatbotBlock) -> str:
+    lines = [
+        f"### {QCoreApplication.translate('DatasetAudit', 'Dataset audit')}",
+        "",
+        QCoreApplication.translate(
+            "DatasetAudit", "Dataset: `{name}` (`{dataset_id}`)"
+        ).format(name=_markdown_code(block.name), dataset_id=_markdown_code(str(block.dataset_id))),
+        QCoreApplication.translate("DatasetAudit", "Generation: {generation}").format(
+            generation=block.generation
+        ),
+        QCoreApplication.translate(
+            "DatasetAudit", "Recorded operation: `{operation}`"
+        ).format(operation=_markdown_code(block.operation_name)),
+        QCoreApplication.translate("DatasetAudit", "Recorded at: {created_at}").format(
+            created_at=block.created_at
+        ),
+    ]
+    if block.inputs:
+        lines.extend(["", f"#### {QCoreApplication.translate('DatasetAudit', 'Inputs')}"])
+        for item in block.inputs:
+            position = int(item.get("position", 0)) + 1
+            input_line = QCoreApplication.translate(
+                "DatasetAudit", "Input {position}: `{name}` (`{dataset_id}`)"
+            ).format(
+                position=position,
+                name=_markdown_code(str(item.get("name") or "")),
+                dataset_id=_markdown_code(str(item.get("dataset_id") or "")),
+            )
+            alias = str(item.get("alias") or "").strip()
+            if alias:
+                input_line += " — " + QCoreApplication.translate(
+                    "DatasetAudit", "alias `{alias}`"
+                ).format(alias=_markdown_code(alias))
+            lines.append(f"- {input_line}")
+    explanation = (block.agent_explanation or "").strip()
+    if explanation:
+        lines.extend(
+            [
+                "",
+                f"#### {QCoreApplication.translate('DatasetAudit', 'Agent-authored explanation')}",
+                f"*{QCoreApplication.translate('DatasetAudit', 'Not system-verified.')}*",
+                "",
+                explanation,
+            ]
+        )
+    if block.parameters_payload:
+        lines.extend(
+            [
+                "",
+                f"#### {QCoreApplication.translate('DatasetAudit', 'Recorded parameters')}",
+                "```json",
+                json.dumps(block.parameters_payload, ensure_ascii=False, indent=2, default=str),
+                "```",
+            ]
+        )
+    return "\n".join(lines)
+
+
+def _markdown_code(value: str) -> str:
+    return value.replace("`", "\\`")
 
 
 def chatbot_block_is_visible(block: ChatbotBlock) -> bool:

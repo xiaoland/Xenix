@@ -1,0 +1,17 @@
+{
+  "accepted": false,
+  "case_id": "business.routing.v1.standard",
+  "evaluation": "characterization",
+  "gate_eligible": false,
+  "policy_id": "agent-harness-report-policy-v2",
+  "qualified": false,
+  "reason_codes": [
+    "execution_not_completed",
+    "budget_not_within_limits"
+  ],
+  "report_kind": "xenix.agent_harness.policy_decision",
+  "run_ids": [
+    "eda04287e17742d8b51f180d1155917d"
+  ],
+  "schema_version": 1
+}

@@ -14,14 +14,14 @@ class TrainedModelRepository:
         session.refresh(row)
         return row
 
-    def get(self, session: Session, trained_model_id: str) -> TrainedModelRow | None:
+    def get(self, session: Session, trained_model_id: int) -> TrainedModelRow | None:
         return session.get(TrainedModelRow, trained_model_id)
 
-    def get_by_ml_task(self, session: Session, ml_task_id: str) -> TrainedModelRow | None:
+    def get_by_ml_task(self, session: Session, ml_task_id: int) -> TrainedModelRow | None:
         statement = select(TrainedModelRow).where(TrainedModelRow.ml_task_id == ml_task_id)
         return session.exec(statement).first()
 
-    def list_by_dataset(self, session: Session, dataset_id: str) -> list[TrainedModelRow]:
+    def list_by_dataset(self, session: Session, dataset_id: int) -> list[TrainedModelRow]:
         statement = (
             select(TrainedModelRow)
             .where(TrainedModelRow.dataset_id == dataset_id)
@@ -32,7 +32,7 @@ class TrainedModelRepository:
     def update_metadata(
         self,
         session: Session,
-        trained_model_id: str,
+        trained_model_id: int,
         metadata_payload: dict,
         now: datetime,
     ) -> TrainedModelRow | None:

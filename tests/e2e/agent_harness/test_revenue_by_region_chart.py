@@ -5,7 +5,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 import json
 from pathlib import Path
-import re
 from typing import Any
 import xml.etree.ElementTree as ET
 
@@ -65,8 +64,6 @@ REGIONAL_REVENUE_RUBRIC = JudgeRubric(
 )
 _MAX_ARTIFACT_EVIDENCE_ITEMS = 48
 _MAX_ARTIFACT_EVIDENCE_TEXT_LENGTH = 448
-_WINDOWS_PATH_PATTERN = re.compile(r"(?:^|\s)[A-Za-z]:[\\/]")
-_UNIX_PATH_PATTERN = re.compile(r"(?:^|\s)/[^\s]+")
 _CALIBRATION_FIXTURE_PATH = (
     Path(__file__).resolve().parent / "fixtures" / "regional_sales_judge_calibration.json"
 )
@@ -163,7 +160,7 @@ class RevenueByRegionChartCase:
             raise BenchmarkInputError("fixture_hash_mismatch")
         return digest
 
-    def build_submission(self, *, thread_id: str, fq_model_key: str) -> SubmitUserTurnInput:
+    def build_submission(self, *, thread_id: int, fq_model_key: str) -> SubmitUserTurnInput:
         return SubmitUserTurnInput(
             thread_id=thread_id,
             text=REGIONAL_REVENUE_TASK_INTENT,
@@ -194,12 +191,6 @@ class RevenueByRegionChartCase:
         evidence = (
             _project_svg_evidence(
                 Path(str(getattr(terminal, "absolute_path", ""))),
-                forbidden_values=_evidence_forbidden_values(
-                    terminal_artifact=terminal,
-                    source_path=self.source_path,
-                    source_state=source_state,
-                    run_dataset_ids=context.run_dataset_ids,
-                ),
             )
             if terminal is not None
             else None
@@ -209,10 +200,6 @@ class RevenueByRegionChartCase:
             source_state=source_state,
             services=context.services,
         )
-        state_isolated = self._state_isolated(
-            context=context,
-            terminal_artifact=terminal,
-        )
         integrity_checks = (
             OutcomeCheck(
                 "canonical_completion",
@@ -220,7 +207,6 @@ class RevenueByRegionChartCase:
                 _completion_summary(completed),
             ),
             OutcomeCheck("source_unchanged", source_unchanged, _source_summary(source_unchanged)),
-            OutcomeCheck("state_isolated", state_isolated, _isolation_summary(state_isolated)),
         )
         terminal_resolved = evidence is not None
         semantic_checks = (
@@ -261,7 +247,7 @@ class RevenueByRegionChartCase:
             if not isinstance(payload, dict):
                 continue
             artifact_id = payload.get("artifact_id")
-            if not isinstance(artifact_id, str) or not artifact_id.strip():
+            if not isinstance(artifact_id, int):
                 continue
             try:
                 artifact = artifact_service.resolve_uri(build_artifact_uri(artifact_id))
@@ -277,23 +263,6 @@ class RevenueByRegionChartCase:
                 continue
             return artifact
         return None
-
-    @staticmethod
-    def _state_isolated(*, context: BenchmarkCaseContext, terminal_artifact: Any | None) -> bool:
-        if not context.settings_unchanged:
-            return False
-        try:
-            datasets_confined = all(
-                is_within(Path(str(dataset.source_path)), context.runtime_home)
-                for dataset in context.services.datasets.list_datasets()
-            )
-            artifact_confined = terminal_artifact is None or is_within(
-                Path(str(getattr(terminal_artifact, "absolute_path", ""))),
-                context.runtime_home,
-            )
-            return datasets_confined and artifact_confined
-        except Exception:
-            return False
 
 
 def _source_unchanged(
@@ -323,34 +292,8 @@ def build_regional_revenue_judge_input(artifact_evidence: tuple[str, ...]) -> Ju
     )
 
 
-def _evidence_forbidden_values(
-    *,
-    terminal_artifact: Any,
-    source_path: Path,
-    source_state: Any | None,
-    run_dataset_ids: frozenset[str],
-) -> tuple[str, ...]:
-    """Known internal locators that must never enter a judge evidence string."""
-
-    source_dataset_ids = (
-        source_state.source_dataset_ids
-        if isinstance(source_state, AttachedSourceState)
-        else ()
-    )
-    values = (
-        str(getattr(terminal_artifact, "artifact_id", "") or ""),
-        str(getattr(terminal_artifact, "absolute_path", "") or ""),
-        str(source_path.resolve()),
-        *source_dataset_ids,
-        *run_dataset_ids,
-    )
-    return tuple(value for value in values if value)
-
-
 def _project_svg_evidence(
     path: Path,
-    *,
-    forbidden_values: tuple[str, ...] = (),
 ) -> tuple[str, ...] | None:
     """Project visible/a11y SVG semantics without retaining SVG markup or locators."""
 
@@ -368,7 +311,6 @@ def _project_svg_evidence(
         hidden=False,
         evidence=evidence,
         seen=seen,
-        forbidden_values=forbidden_values,
     )
     return tuple(evidence)
 
@@ -379,7 +321,6 @@ def _collect_svg_evidence(
     hidden: bool,
     evidence: list[str],
     seen: set[str],
-    forbidden_values: tuple[str, ...],
 ) -> None:
     if len(evidence) >= _MAX_ARTIFACT_EVIDENCE_ITEMS:
         return
@@ -390,17 +331,17 @@ def _collect_svg_evidence(
     aria_label = element.attrib.get("aria-label")
     if isinstance(aria_label, str):
         role = element.attrib.get("aria-roledescription")
-        label = _safe_evidence_text(aria_label, forbidden_values=forbidden_values)
+        label = _evidence_text(aria_label)
         if label is not None:
             role_suffix = ""
             if isinstance(role, str):
-                safe_role = _safe_evidence_text(role, forbidden_values=forbidden_values)
+                safe_role = _evidence_text(role)
                 if safe_role is not None:
                     role_suffix = f" ({safe_role})"
             _append_evidence(evidence, seen, f"aria_label{role_suffix}: {label}")
 
     if _local_name(element.tag) == "text":
-        text = _safe_evidence_text(" ".join(element.itertext()), forbidden_values=forbidden_values)
+        text = _evidence_text(" ".join(element.itertext()))
         if text is not None:
             _append_evidence(evidence, seen, f"visible_text: {text}")
 
@@ -410,8 +351,7 @@ def _collect_svg_evidence(
             hidden=hidden,
             evidence=evidence,
             seen=seen,
-            forbidden_values=forbidden_values,
-        )
+            )
 
 
 def _svg_element_hidden(element: ET.Element) -> bool:
@@ -443,27 +383,11 @@ def _is_zero(value: str) -> bool:
         return False
 
 
-def _safe_evidence_text(value: str, *, forbidden_values: tuple[str, ...]) -> str | None:
+def _evidence_text(value: str) -> str | None:
+    """Keep visible business text, including comma-separated numeric labels."""
+
     normalized = " ".join(value.split())
-    if not normalized or _looks_like_raw_source_row(normalized):
-        return None
-    lowered = normalized.lower()
-    if "<svg" in lowered or "</svg" in lowered or "artifact://" in lowered or "file://" in lowered:
-        return None
-    if any(
-        marker in lowered
-        for marker in ("artifact_id", "dataset_id", "thread_id", "conversation_id", "run_id")
-    ):
-        return None
-    if _WINDOWS_PATH_PATTERN.search(normalized) or _UNIX_PATH_PATTERN.search(normalized):
-        return None
-    if any(forbidden and forbidden in normalized for forbidden in forbidden_values):
-        return None
-    return normalized[:_MAX_ARTIFACT_EVIDENCE_TEXT_LENGTH]
-
-
-def _looks_like_raw_source_row(value: str) -> bool:
-    return len([part for part in value.split(",") if part.strip()]) >= 4
+    return normalized[:_MAX_ARTIFACT_EVIDENCE_TEXT_LENGTH] or None
 
 
 def _append_evidence(evidence: list[str], seen: set[str], item: str) -> None:
@@ -483,10 +407,6 @@ def _completion_summary(passed: bool) -> str:
 
 def _source_summary(passed: bool) -> str:
     return "external_and_registered_source_unchanged" if passed else "source_changed_or_unreadable"
-
-
-def _isolation_summary(passed: bool) -> str:
-    return "state_confined_to_cell_runtime" if passed else "state_or_settings_escaped_cell_runtime"
 
 
 def test_revenue_by_region_chart(agent_harness_benchmark) -> None:

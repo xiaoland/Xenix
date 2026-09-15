@@ -15,10 +15,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from uuid import uuid4
 
-from PySide6.QtCore import QCoreApplication, QObject, QUrl, Qt, Signal
+from PySide6.QtCore import QCoreApplication, QObject, Qt, QUrl, Signal
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import QProgressDialog
 
+from ..exceptions import XenixError, report_exception
 from ..services.agent import (
     AgentHarnessService,
     AgentHarnessStreamEvent,
@@ -131,7 +132,7 @@ class ChatWorkspace(QObject):
     def composer_attachments(self) -> dict[str, _ComposerAttachmentRecord]:
         return self._composer_attachments
 
-    def refresh_history(self, *, selected_thread_id: str | None = None) -> None:
+    def refresh_history(self, *, selected_thread_id: int | None = None) -> None:
         self._history_panel.refresh(selected_thread_id)
 
     def open_initial_thread(self) -> None:
@@ -141,17 +142,15 @@ class ChatWorkspace(QObject):
             self._history_panel.open_thread(first_thread_id)
 
     def sync_model_options(self) -> None:
-        options = [
-            (option.fq_model_key, option.label)
-            for option in self._llm_service.model_options()
-        ]
+        options = [(option.fq_model_key, option.label) for option in self._llm_service.model_options()]
         selected = None
         if self.conversation_thread_id is not None:
             try:
                 selected = self._agent_harness_service.get_thread_snapshot(
                     self.conversation_thread_id
                 ).thread.selected_fq_model_key
-            except Exception:
+            except Exception as exc:
+                report_exception(exc)
                 selected = None
         self._thread_detail_view.set_model_options(
             options,
@@ -180,7 +179,9 @@ class ChatWorkspace(QObject):
         try:
             snapshot = self._agent_harness_service.set_thread_model(self.conversation_thread_id, fq_model_key)
         except Exception as exc:
-            self._thread_detail_view.show_error(str(exc))
+            if not isinstance(exc, XenixError):
+                report_exception(exc)
+            self._thread_detail_view.show_operation_error(str(exc))
             return
         self._sync_thread_model_picker(snapshot)
 
@@ -218,12 +219,14 @@ class ChatWorkspace(QObject):
         try:
             attachment = self._source_attachment_input(normalized_path)
         except Exception as exc:
+            if not isinstance(exc, XenixError):
+                report_exception(exc)
             self._thread_detail_view.set_attachment_status(
                 normalized_path,
                 ComposerAttachmentStatus.FAILED,
                 error=str(exc),
             )
-            self._thread_detail_view.show_error(str(exc))
+            self._thread_detail_view.show_operation_error(str(exc))
             return
         self._composer_attachments[normalized_path] = _ComposerAttachmentRecord(
             path=normalized_path,
@@ -254,11 +257,14 @@ class ChatWorkspace(QObject):
                 client_submission_id=client_submission_id,
             )
         except Exception as exc:
-            self._thread_detail_view.show_error(str(exc))
+            if not isinstance(exc, XenixError):
+                report_exception(exc)
+            self._thread_detail_view.show_operation_error(str(exc))
             return
 
         if not self._conversation.begin(client_submission_id, len(file_paths)):
             return
+        self._thread_detail_view.clear_operation_notification()
         self._submission_attachment_paths = tuple(str(Path(path).resolve()) for path in file_paths)
         self._thread_detail_view.begin_composer_submission(file_paths)
         try:
@@ -294,7 +300,7 @@ class ChatWorkspace(QObject):
 
         try:
             source_path = Path(file_path).expanduser().resolve(strict=True)
-        except (OSError, RuntimeError):
+        except OSError, RuntimeError:
             return
         if source_path.is_file():
             QDesktopServices.openUrl(QUrl.fromLocalFile(str(source_path)))
@@ -351,9 +357,11 @@ class ChatWorkspace(QObject):
             self._restore_stable_message_view()
         self._submission_attachment_paths = ()
         self._thread_detail_view.abort_composer_submission()
-        self._thread_detail_view.show_error(str(failure))
+        self._thread_detail_view.show_submission_error(str(failure))
         self._thread_detail_view.set_running(False)
         self.harness_failed.emit(failure)
+        if isinstance(failure, Exception) and not isinstance(failure, XenixError):
+            report_exception(failure)
 
     def _render_attachment_import_progress(self, event: AgentHarnessStreamEvent, source_index: int) -> None:
         progress = event.attachment_import
@@ -371,7 +379,8 @@ class ChatWorkspace(QObject):
             return
         try:
             snapshot = self._agent_harness_service.get_thread_snapshot(self.conversation_thread_id)
-        except Exception:
+        except Exception as exc:
+            report_exception(exc)
             self._thread_detail_view.clear_messages()
             return
         self._thread_detail_view.render_events(self._agent_harness_service.project_chatbot_events(snapshot))
@@ -388,6 +397,8 @@ class ChatWorkspace(QObject):
             try:
                 self._link_router.activate(uri, thread_id=thread_id)
             except Exception as exc:
+                if not isinstance(exc, XenixError):
+                    report_exception(exc)
                 self._service_link_activation_failed.emit(
                     _ServiceLinkActivationFailed(
                         activation_id=activation_id,
@@ -450,7 +461,7 @@ class ChatWorkspace(QObject):
             return
         self._active_service_link_activation_ids.discard(result.activation_id)
         self._close_service_link_progress_if_idle()
-        self._thread_detail_view.show_error(result.message)
+        self._thread_detail_view.show_operation_error(result.message)
 
     # Tool actions and stop --------------------------------------------------
 
@@ -461,7 +472,7 @@ class ChatWorkspace(QObject):
         raw_task_ids = action.get("task_ids")
         if not isinstance(raw_task_ids, list):
             return
-        task_ids = [str(task_id) for task_id in raw_task_ids if str(task_id).strip()]
+        task_ids = [task_id for task_id in raw_task_ids if isinstance(task_id, int)]
         if not task_ids:
             return
         if action_type == "open_tool_call_detail":
@@ -470,7 +481,11 @@ class ChatWorkspace(QObject):
     def _request_harness_stop(self) -> None:
         disposition = self._conversation.stop_disposition()
         if disposition is StopDisposition.PREPARING:
-            self._thread_detail_view.show_error(QCoreApplication.translate("MainWindow", "The submitted message is being prepared and cannot be stopped."))
+            self._thread_detail_view.show_operation_error(
+                QCoreApplication.translate(
+                    "MainWindow", "The submitted message is being prepared and cannot be stopped."
+                )
+            )
             return
         thread_id = self.conversation_thread_id
         if disposition is StopDisposition.NO_THREAD or thread_id is None:
@@ -478,12 +493,14 @@ class ChatWorkspace(QObject):
         try:
             self._agent_harness_service.pause_thread(thread_id)
         except Exception as exc:
-            self._thread_detail_view.show_error(str(exc))
+            if not isinstance(exc, XenixError):
+                report_exception(exc)
+            self._thread_detail_view.show_operation_error(str(exc))
             return
         self._conversation.mark_paused(thread_id)
         self._thread_detail_view.hide_thinking_indicator()
         self._thread_detail_view.set_running(False)
-        self._thread_detail_view.show_error(QCoreApplication.translate("MainWindow", "Stopped."))
+        self._thread_detail_view.show_operation_status(QCoreApplication.translate("MainWindow", "Stopped."))
 
     # Thread lifecycle -------------------------------------------------------
 
@@ -496,19 +513,20 @@ class ChatWorkspace(QObject):
         self._thread_detail_view.render_events(self._agent_harness_service.project_chatbot_events(snapshot))
         self.refresh_history(selected_thread_id=snapshot.thread.id)
 
-    def _open_history_thread(self, thread_id: str) -> None:
+    def _open_history_thread(self, thread_id: int) -> None:
         snapshot = self._agent_harness_service.get_thread_snapshot(thread_id)
         self._select_conversation_thread(thread_id)
         self._sync_thread_model_picker(snapshot)
         self._thread_detail_view.render_events(self._agent_harness_service.project_chatbot_events(snapshot))
 
-    def _select_conversation_thread(self, thread_id: str | None) -> None:
+    def _select_conversation_thread(self, thread_id: int | None) -> None:
         self._conversation.select_thread(thread_id)
         self._submission_attachment_paths = ()
+        self._thread_detail_view.clear_operation_notification()
         self._thread_detail_view.abort_composer_submission()
         self._thread_detail_view.set_running(False)
 
-    def _on_history_thread_deleted(self, thread_id: str) -> None:
+    def _on_history_thread_deleted(self, thread_id: int) -> None:
         if self.conversation_thread_id != thread_id:
             self.refresh_history(selected_thread_id=self.conversation_thread_id)
             return

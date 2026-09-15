@@ -4,7 +4,7 @@ Use this file when the data has a subject-item structure: order-product, custome
 
 This workflow can be executed with `data.query` and `analysis.graph`; it does not require scripts.
 
-For single-dataset SQL calls, use `input` as the table name. For multi-dataset calls, pass explicit `bindings` and use each `bindings[].alias`.
+SQL calls use `datasets` to map table aliases to Dataset IDs. The examples below assume `{"input": 12}`; replace 12 with the actual Dataset ID. Additional sources use additional aliases in the same mapping.
 
 ## Structure recognition
 
@@ -141,5 +141,3 @@ Use business language:
 - “出现 A 的记录中，B 也出现的比例较高。”
 - “lift 大于 1 表示它们的共同出现强于随机独立情况下的预期。”
 - “关联不等于因果，也不代表必须推荐。”
-
-High-risk domains such as medical, finance, education placement, and compliance review require human validation.

@@ -1,6 +1,6 @@
 [project]
 name = "xenix-native"
-version = "1.4.0"
+version = "1.5.0"
 description = "Xenix native"
 authors = [{ name = "Lan_zhijiang", email = "lanzhijiang@foxmail.com" }]
 readme = "README.md"
@@ -33,12 +33,12 @@ dependencies = [
     "xlsxwriter>=3.2.0",
     "velopack==1.2.0",
     "docling<3,>=2.114.0",
+    "firecrawl-anydoc==0.2.4",
     "zstandard<1,>=0.23",
     "charset-normalizer<4,>=3.4",
     "lancedb<1,>=0.34",
     "pikepdf<11,>=10.10",
     "msoffcrypto-tool<7,>=6.0",
-    "jsonschema<5,>=4.26",
 ]
 
 [dependency-groups]
@@ -48,7 +48,6 @@ dev = [
     "PyYAML>=6.0.0",
     "ruff>=0.16.0",
     "mypy>=2.3.0",
-    "types-jsonschema>=4.26.0.20260518",
     "pytest-testmon>=2.2.0",
     "pytest-qt==4.5.0",
 ]
@@ -62,15 +61,16 @@ distribution = false
 [tool.pdm.scripts]
 agent-skills-check = "python scripts/agent_skills.py check"
 agent-skills-generate = "python scripts/agent_skills.py generate"
+prepare = { composite = ["agent-skills-generate", "i18n-compile"] }
 knowledge-ocr-lock-check = "python scripts/build_knowledge_ocr_runtime.py --check-lock"
 lint = "ruff check src tests scripts"
 typecheck = "mypy"
-dev = { composite = ["agent-skills-generate", "python scripts/run_dev.py"] }
+dev = { composite = ["prepare", "python scripts/run_dev.py {args}"] }
 i18n-extract = "python scripts/update_translations.py"
 i18n-compile = "python scripts/compile_translations.py"
-package = { composite = ["agent-skills-generate", "agent-skills-check", "python scripts/package_app.py"] }
+package = { composite = ["prepare", "agent-skills-check", "python scripts/package_app.py {args}"], env = { PYTHONHASHSEED = "0" } }
 build-knowledge-ocr = "python scripts/build_knowledge_ocr_runtime.py"
-smoke = { composite = ["agent-skills-generate", "python scripts/run_dev.py --smoke-test"] }
+smoke = { composite = ["prepare", "python scripts/run_dev.py --smoke-test {args}"] }
 smoke-package = "python scripts/verify_packaged_smoke.py"
 velopack = "python scripts/package_velopack.py"
 release-manifest = "python scripts/write_release_manifest.py"
@@ -80,17 +80,16 @@ release-timings = "python scripts/report_native_workflow_timings.py"
 release-package = { composite = ["package", "smoke-package", "velopack", "release-manifest"] }
 release-build = { composite = ["build-knowledge-ocr", "package", "smoke-package", "velopack", "release-manifest"] }
 release-publish = "python scripts/publish_oss_release.py"
-dist = "python scripts/build_distribution_zip.py"
-pytest = "python scripts/run_pytest.py"
-test = { composite = ["i18n-compile", "python scripts/run_pytest.py {args}"] }
-test-affected = { cmd = "python scripts/run_pytest.py --testmon {args}", env = { COVERAGE_CORE = "pytrace" } }
-list-affected = { cmd = "python scripts/run_pytest.py --testmon --collect-only {args}", env = { COVERAGE_CORE = "pytrace" } }
+pytest = { composite = ["prepare", "python scripts/run_pytest.py {args}"] }
+test = { composite = ["prepare", "python scripts/run_pytest.py {args}"] }
+test-affected = { composite = ["prepare", "python scripts/run_pytest.py --testmon {args}"], env = { COVERAGE_CORE = "pytrace" } }
+list-affected = { composite = ["prepare", "python scripts/run_pytest.py --testmon --collect-only {args}"], env = { COVERAGE_CORE = "pytrace" } }
 benchmark-agent-harness = "python scripts/run_agent_harness_benchmark.py"
 benchmark-agent-harness-headed = "python scripts/run_agent_harness_headed_benchmark.py"
-benchmark-agent-harness-check = "python scripts/check_agent_harness_benchmark.py"
 benchmark-agent-harness-evaluate = "python scripts/evaluate_agent_harness_reports.py"
 benchmark-agent-harness-calibrate-judge = "python scripts/calibrate_agent_harness_judge.py"
-check = { composite = ["agent-skills-generate", "agent-skills-check", "lint", "typecheck", "knowledge-ocr-lock-check", "python -m compileall src tests scripts"] }
+check = { composite = ["agent-skills-check", "lint", "typecheck", "knowledge-ocr-lock-check", "python -m compileall -q src tests scripts"] }
+verify = { composite = ["check", "test", "smoke --isolated"] }
 diagnostic-bundle = "python scripts/create_diagnostic_bundle.py"
 ui-lab = { cmd = "python -m scripts.ui_lab", env = { PYTHONPATH = "src" } }
 ui-capture = { cmd = "python -m scripts.ui_lab.capture_cli", env = { PYTHONPATH = "src" } }
@@ -110,7 +109,7 @@ markers = [
 target-version = "py314"
 line-length = 120
 src = ["src"]
-extend-exclude = ["ml", "tasks"]
+extend-exclude = ["/ml", "/tasks"]
 
 [tool.ruff.lint]
 select = ["E4", "E7", "E9", "F", "B", "A"]
@@ -126,7 +125,18 @@ python_version = "3.14"
 platform = "win32"
 mypy_path = "src"
 files = [
+    "src/xenix/exceptions.py",
+    "src/xenix/services/agent/harness_service.py",
+    "src/xenix/application_lifetime.py",
+    "src/xenix/application_composition.py",
     "src/xenix/application_services.py",
+    "src/xenix/services/lazy_services.py",
+    "src/xenix/services/job_scheduler.py",
+    "src/xenix/services/job_status.py",
+    "src/xenix/services/knowledge_job_handlers.py",
+    "src/xenix/services/ml_job_handler.py",
+    "src/xenix/services/cleaning/catalog.py",
+    "src/xenix/services/cleaning/contracts.py",
     "src/xenix/ui/history/panel.py",
     "src/xenix/ui/windows/auxiliary.py",
     "src/xenix/ui/settings/contracts.py",
@@ -157,12 +167,14 @@ files = [
     "src/xenix/services/knowledge_document_lifecycle_service.py",
     "src/xenix/services/knowledge_formats.py",
     "src/xenix/services/knowledge_import_worker.py",
-    "src/xenix/services/llm/tooling.py",
+    "src/xenix/services/llm/tool_protocol.py",
+    "src/xenix/services/llm/tool_schema.py",
+    "src/xenix/services/llm/tool_registry.py",
     "src/xenix/services/ml/contracts.py",
     "src/xenix/services/ml/registry.py",
     "src/xenix/services/ml/types.py",
     "src/xenix/services/ml/worker_settings.py",
-    "src/xenix/services/trained_model_metadata.py",
+    "src/xenix/services/ml/trained_model_metadata.py",
     "src/xenix/ui/semantic_identity.py",
     "src/xenix/ui/diagnostics/capture.py",
     "src/xenix/ui/diagnostics/schema.py",

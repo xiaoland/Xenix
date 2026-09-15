@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 from enum import StrEnum
 from typing import TYPE_CHECKING
 
@@ -37,9 +39,10 @@ class _DocumentsLoadTask(QRunnable):
 
     def run(self) -> None:
         try:
-            result = self._service.load_documents()
-        except Exception:
-            result = None
+            result: object = self._service.load_documents()
+        except Exception as exc:
+            logging.getLogger(__name__).exception("Background read failed")
+            result = exc
         self.signals.finished.emit(self._generation, self._request_id, result)
 
 
@@ -58,9 +61,10 @@ class _StatusLoadTask(QRunnable):
 
     def run(self) -> None:
         try:
-            result = self._service.load_status()
-        except Exception:
-            result = None
+            result: object = self._service.load_status()
+        except Exception as exc:
+            logging.getLogger(__name__).exception("Background read failed")
+            result = exc
         self.signals.finished.emit(self._generation, self._request_id, result)
 
 
@@ -73,7 +77,7 @@ class _DocumentRemovalTask(QRunnable):
         self,
         service: KnowledgeDocumentLifecycleService,
         generation: int,
-        document_id: str,
+        document_id: int,
     ) -> None:
         super().__init__()
         self._service = service
@@ -85,6 +89,7 @@ class _DocumentRemovalTask(QRunnable):
         try:
             result: object = self._service.remove_document(self._document_id)
         except Exception as exc:
+            logging.getLogger(__name__).exception("Background read failed")
             result = exc
         self.signals.finished.emit(self._generation, result)
 
@@ -110,9 +115,10 @@ class _TaskListLoad(QRunnable):
 
     def run(self) -> None:
         try:
-            tasks = self._query.list_tasks()
-        except Exception:
-            tasks = []
+            tasks: object = self._query.list_tasks()
+        except Exception as exc:
+            logging.getLogger(__name__).exception("Background read failed")
+            tasks = exc
         self.signals.finished.emit(self._generation, tasks)
 
 

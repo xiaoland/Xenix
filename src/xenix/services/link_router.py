@@ -13,7 +13,7 @@ class LinkActivationResult(SQLModel):
     uri: str
     scheme: str
     opened: bool
-    artifact_id: str | None = None
+    artifact_id: int | None = None
 
 
 class LinkRouter:
@@ -24,7 +24,7 @@ class LinkRouter:
     ) -> None:
         self._artifact_service = artifact_service
 
-    def activate(self, uri: str, *, thread_id: str | None = None) -> LinkActivationResult:
+    def activate(self, uri: str, *, thread_id: int | None = None) -> LinkActivationResult:
         _ = thread_id
         parsed = urlparse(uri)
         scheme = parsed.scheme

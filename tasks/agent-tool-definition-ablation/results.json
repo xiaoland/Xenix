@@ -1,0 +1,1125 @@
+{
+  "baseline_commit": "f077816",
+  "runs": [
+    {
+      "arm": "full",
+      "task": "campaign-r1",
+      "report": "build/tool-definition-ablation/full/campaign-r1/reports/business.campaign.v1.standard-deepseek-deepseek-v4-flash-b8225c2af56341f394f3a316152cb5af.json",
+      "trace_id": "b8225c2af56341f394f3a316152cb5af",
+      "model": "deepseek/deepseek-v4-flash",
+      "run_status": "runtime_error",
+      "verdict": "fail",
+      "outcome_reason": "runtime_error",
+      "oracle_verdict": "not_evaluated",
+      "failed_checks": [],
+      "judge": {
+        "independence": "not_applicable",
+        "metrics": {
+          "elapsed_seconds": null,
+          "provider_retry_count": 0,
+          "token_usage": null
+        },
+        "provider_model": null,
+        "reason_codes": [],
+        "required": false,
+        "rubric_id": null,
+        "rubric_sha256": null,
+        "scores": {},
+        "status": "blocked",
+        "summary": "subject_assessment_unavailable",
+        "verdict": "not_evaluated"
+      },
+      "failure_kind": "campaign_policy_derivation_timeout",
+      "knowledge_worker_id_repaired": false,
+      "subject_metrics": {
+        "assessment_seconds": null,
+        "derived_dataset_count": 0,
+        "message_counts": {},
+        "provider_retry_count": 0,
+        "sampling_round_count": 0,
+        "terminal_shape": null,
+        "token_usage": null,
+        "tool_call_counts_by_name": {},
+        "tool_result_counts_by_status": {},
+        "turn_seconds": null,
+        "usage_reported_primary_response_count": null
+      },
+      "identity": {
+        "case_definition_sha256": "91345DE7D5C5A698BE9E90F4755530A5ADCE172825668F508F092587B84B18B3",
+        "effective_settings_sha256": "6973FC1DA2E20673BAAAE75940A37DE309FD0DC58E98CC9606C23B4EE0E547E8",
+        "embedding_settings_sha256": "84855E3EADB8F092BBE6E6E87D5ECAD071F1981359295FBA2826AEC4630F0397",
+        "fixture_sha256": "DDF4B77B17E20F18327824EDA549E2DEEE5FF2DFEBA7005C3F446B7160124733",
+        "harness_variant": "tool-definitions-full",
+        "invocation_id": "0c2a49b5c6834ea8bc5704373c913139",
+        "judge_settings_sha256": "86A3403ECB36E19C283750DF3E07A5984AF12994769207E46981D0162835A507",
+        "repository_commit": "f0778162a5c7b552b0ef1a33a894720650a866c0",
+        "repository_dirty": true,
+        "runtime_sha256": "3E7E07CE574893944C99A5455753801D9145381BFB6F3CC0555A29F3AB4C1934",
+        "settings_sha256": "9BD35670D0D0AD156B5F4B148A530992988DA094A0F68365D796ECA83C6149B6"
+      },
+      "tool_failures": [],
+      "captured_requests": 0,
+      "tool_exposures": {},
+      "sent_tool_chars_sum": 0,
+      "unmodified_tool_chars_sum": 0,
+      "first_request": null
+    },
+    {
+      "arm": "full",
+      "task": "campaign-r2",
+      "report": "build/tool-definition-ablation/full/campaign-r2/reports/business.campaign.v1.standard-deepseek-deepseek-v4-flash-fad99e54c1f34529b357e173c9cedbd3.json",
+      "trace_id": "fad99e54c1f34529b357e173c9cedbd3",
+      "model": "deepseek/deepseek-v4-flash",
+      "run_status": "completed",
+      "verdict": "pass",
+      "outcome_reason": "judge_verdict",
+      "oracle_verdict": "pass",
+      "failed_checks": [],
+      "judge": {
+        "independence": "independent",
+        "metrics": {
+          "elapsed_seconds": 17.593189999985043,
+          "provider_retry_count": 0,
+          "token_usage": {
+            "cached_input_tokens": 1152,
+            "input_tokens": 6795,
+            "output_tokens": 989,
+            "total_tokens": 7784
+          }
+        },
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "reason_codes": [
+          "grounded_delivery"
+        ],
+        "required": true,
+        "rubric_id": "business.campaign_eligibility.explanation.v1",
+        "rubric_sha256": "8A6B83AD1C3AEC7C2EFAB2E62351A7A90BB3D9DDBA28C5BFD64517443B2F6FDA",
+        "scores": {
+          "effective_rule": 2,
+          "exceptions_explained": 2
+        },
+        "status": "completed",
+        "summary": "judge_completed",
+        "verdict": "pass"
+      },
+      "failure_kind": null,
+      "knowledge_worker_id_repaired": true,
+      "subject_metrics": {
+        "assessment_seconds": 0.001892699976451695,
+        "derived_dataset_count": 1,
+        "message_counts": {
+          "assistant": 6,
+          "tool_call": 11,
+          "tool_result": 11,
+          "user": 1
+        },
+        "provider_retry_count": 0,
+        "sampling_round_count": 6,
+        "terminal_shape": null,
+        "token_usage": {
+          "cached_input_tokens": 33536,
+          "input_tokens": 39651,
+          "output_tokens": 6073,
+          "total_tokens": 45724
+        },
+        "tool_call_counts_by_name": {
+          "agent.skill.activate": 1,
+          "analysis.profile": 1,
+          "data.query": 3,
+          "data.transform": 1,
+          "knowledge.lookup": 5
+        },
+        "tool_result_counts_by_status": {
+          "succeeded": 11
+        },
+        "turn_seconds": 32.52398479997646,
+        "usage_reported_primary_response_count": 6
+      },
+      "identity": {
+        "case_definition_sha256": "91345DE7D5C5A698BE9E90F4755530A5ADCE172825668F508F092587B84B18B3",
+        "effective_settings_sha256": "6973FC1DA2E20673BAAAE75940A37DE309FD0DC58E98CC9606C23B4EE0E547E8",
+        "embedding_settings_sha256": "84855E3EADB8F092BBE6E6E87D5ECAD071F1981359295FBA2826AEC4630F0397",
+        "fixture_sha256": "DDF4B77B17E20F18327824EDA549E2DEEE5FF2DFEBA7005C3F446B7160124733",
+        "harness_variant": "tool-definitions-full-knowledge-worker-int",
+        "invocation_id": "8dfa8c8f28f140cba72147d352c3c519",
+        "judge_settings_sha256": "86A3403ECB36E19C283750DF3E07A5984AF12994769207E46981D0162835A507",
+        "repository_commit": "f0778162a5c7b552b0ef1a33a894720650a866c0",
+        "repository_dirty": true,
+        "runtime_sha256": "3E7E07CE574893944C99A5455753801D9145381BFB6F3CC0555A29F3AB4C1934",
+        "settings_sha256": "9BD35670D0D0AD156B5F4B148A530992988DA094A0F68365D796ECA83C6149B6"
+      },
+      "tool_failures": [],
+      "captured_requests": 6,
+      "tool_exposures": {
+        "result_page": 6,
+        "knowledge_lookup": 6,
+        "agent_skill_activate": 6,
+        "analysis_profile": 5,
+        "analysis_graph": 5,
+        "data_query": 5,
+        "data_transform": 5,
+        "agent_skill_read_reference": 5,
+        "agent_skill_read_asset": 5
+      },
+      "sent_tool_chars_sum": 41205,
+      "unmodified_tool_chars_sum": 41205,
+      "first_request": {
+        "tool_names": [
+          "result_page",
+          "knowledge_lookup",
+          "agent_skill_activate"
+        ],
+        "system_message_chars": [
+          946,
+          575
+        ],
+        "request_chars": 3699,
+        "tool_chars": 1635
+      }
+    },
+    {
+      "arm": "full",
+      "task": "restock-r1",
+      "report": "build/tool-definition-ablation/full/restock-r1/reports/business.restock.v1.standard-deepseek-deepseek-v4-flash-2179e003882544f28f85c7229fae999d.json",
+      "trace_id": "2179e003882544f28f85c7229fae999d",
+      "model": "deepseek/deepseek-v4-flash",
+      "run_status": "completed",
+      "verdict": "pass",
+      "outcome_reason": "judge_verdict",
+      "oracle_verdict": "pass",
+      "failed_checks": [],
+      "judge": {
+        "independence": "independent",
+        "metrics": {
+          "elapsed_seconds": 20.495800699980464,
+          "provider_retry_count": 0,
+          "token_usage": {
+            "cached_input_tokens": 1792,
+            "input_tokens": 4378,
+            "output_tokens": 1486,
+            "total_tokens": 5864
+          }
+        },
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "reason_codes": [
+          "grounded_decision"
+        ],
+        "required": true,
+        "rubric_id": "business.restock_decision.explanation.v1",
+        "rubric_sha256": "6A5FA84263DA0DF7657651A75DC069D2AEAE184B465574CB61D8308C8D47394F",
+        "scores": {
+          "business_explanation": 2,
+          "selected_plan": 2
+        },
+        "status": "completed",
+        "summary": "judge_completed",
+        "verdict": "pass"
+      },
+      "failure_kind": null,
+      "knowledge_worker_id_repaired": false,
+      "subject_metrics": {
+        "assessment_seconds": 0.0011174000101163983,
+        "derived_dataset_count": 1,
+        "message_counts": {
+          "assistant": 5,
+          "tool_call": 6,
+          "tool_result": 6,
+          "user": 1
+        },
+        "provider_retry_count": 0,
+        "sampling_round_count": 5,
+        "terminal_shape": null,
+        "token_usage": {
+          "cached_input_tokens": 24064,
+          "input_tokens": 28101,
+          "output_tokens": 6861,
+          "total_tokens": 34962
+        },
+        "tool_call_counts_by_name": {
+          "agent.skill.activate": 1,
+          "data.query": 3,
+          "data.transform": 1,
+          "knowledge.lookup": 1
+        },
+        "tool_result_counts_by_status": {
+          "succeeded": 6
+        },
+        "turn_seconds": 32.583198499982245,
+        "usage_reported_primary_response_count": 5
+      },
+      "identity": {
+        "case_definition_sha256": "24CD6031DA1B7B9F9C70F2D77FD0A5DC29CEBC6947DE3E3FABA05D31F2697C2D",
+        "effective_settings_sha256": "6973FC1DA2E20673BAAAE75940A37DE309FD0DC58E98CC9606C23B4EE0E547E8",
+        "embedding_settings_sha256": "84855E3EADB8F092BBE6E6E87D5ECAD071F1981359295FBA2826AEC4630F0397",
+        "fixture_sha256": "0EEA8E8B1CA68DD617B60DD7BFF33794495981C932A686510B02581E8834267A",
+        "harness_variant": "tool-definitions-full",
+        "invocation_id": "36f5197760924e38bdb3684fd3dce45f",
+        "judge_settings_sha256": "86A3403ECB36E19C283750DF3E07A5984AF12994769207E46981D0162835A507",
+        "repository_commit": "f0778162a5c7b552b0ef1a33a894720650a866c0",
+        "repository_dirty": true,
+        "runtime_sha256": "3E7E07CE574893944C99A5455753801D9145381BFB6F3CC0555A29F3AB4C1934",
+        "settings_sha256": "9BD35670D0D0AD156B5F4B148A530992988DA094A0F68365D796ECA83C6149B6"
+      },
+      "tool_failures": [],
+      "captured_requests": 5,
+      "tool_exposures": {
+        "result_page": 5,
+        "knowledge_lookup": 5,
+        "agent_skill_activate": 5,
+        "analysis_profile": 4,
+        "analysis_graph": 4,
+        "data_query": 4,
+        "data_transform": 4,
+        "agent_skill_read_reference": 4,
+        "agent_skill_read_asset": 4
+      },
+      "sent_tool_chars_sum": 33291,
+      "unmodified_tool_chars_sum": 33291,
+      "first_request": {
+        "tool_names": [
+          "result_page",
+          "knowledge_lookup",
+          "agent_skill_activate"
+        ],
+        "system_message_chars": [
+          946,
+          575
+        ],
+        "request_chars": 3932,
+        "tool_chars": 1635
+      }
+    },
+    {
+      "arm": "full",
+      "task": "revenue-r1",
+      "report": "build/tool-definition-ablation/full/revenue-r1/reports/business.revenue.v1.standard-deepseek-deepseek-v4-flash-6b003c7aa42a4b73a77a6b5b18f28e11.json",
+      "trace_id": "6b003c7aa42a4b73a77a6b5b18f28e11",
+      "model": "deepseek/deepseek-v4-flash",
+      "run_status": "completed",
+      "verdict": "fail",
+      "outcome_reason": "judge_verdict",
+      "oracle_verdict": "pass",
+      "failed_checks": [],
+      "judge": {
+        "independence": "independent",
+        "metrics": {
+          "elapsed_seconds": 94.49813399999402,
+          "provider_retry_count": 0,
+          "token_usage": {
+            "cached_input_tokens": 2048,
+            "input_tokens": 5363,
+            "output_tokens": 7970,
+            "total_tokens": 13333
+          }
+        },
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "reason_codes": [
+          "incorrect_business_claim"
+        ],
+        "required": true,
+        "rubric_id": "business.revenue_revision.explanation.v1",
+        "rubric_sha256": "73E55EF6575ABE0E1DDB2D780DE0F0C5E2DB301C5E0CAE1AD1650DE1F1FE17AB",
+        "scores": {
+          "month_close_grounding": 2,
+          "revision_explanation": 0
+        },
+        "status": "completed",
+        "summary": "judge_completed",
+        "verdict": "fail"
+      },
+      "failure_kind": null,
+      "knowledge_worker_id_repaired": false,
+      "subject_metrics": {
+        "assessment_seconds": 0.00241650000680238,
+        "derived_dataset_count": 3,
+        "message_counts": {
+          "assistant": 9,
+          "tool_call": 11,
+          "tool_result": 11,
+          "user": 2
+        },
+        "provider_retry_count": 0,
+        "sampling_round_count": 9,
+        "terminal_shape": null,
+        "token_usage": {
+          "cached_input_tokens": 69888,
+          "input_tokens": 77982,
+          "output_tokens": 9639,
+          "total_tokens": 87621
+        },
+        "tool_call_counts_by_name": {
+          "agent.skill.activate": 1,
+          "analysis.graph": 2,
+          "data.query": 4,
+          "data.transform": 3,
+          "knowledge.lookup": 1
+        },
+        "tool_result_counts_by_status": {
+          "succeeded": 11
+        },
+        "turn_seconds": 51.93185870000161,
+        "usage_reported_primary_response_count": 9
+      },
+      "identity": {
+        "case_definition_sha256": "2D8D0F8633992A1BD0EE9FBEEF5B383572933997C3ADC97C78046156E2CFEFEC",
+        "effective_settings_sha256": "6973FC1DA2E20673BAAAE75940A37DE309FD0DC58E98CC9606C23B4EE0E547E8",
+        "embedding_settings_sha256": "84855E3EADB8F092BBE6E6E87D5ECAD071F1981359295FBA2826AEC4630F0397",
+        "fixture_sha256": "E281B883A03A0DDABD96E1EBF908AECCDFBBAB5FE36C8C9EC212D6F669ADDA70",
+        "harness_variant": "tool-definitions-full",
+        "invocation_id": "540090612d204fc6962fc2aae0e257df",
+        "judge_settings_sha256": "86A3403ECB36E19C283750DF3E07A5984AF12994769207E46981D0162835A507",
+        "repository_commit": "f0778162a5c7b552b0ef1a33a894720650a866c0",
+        "repository_dirty": true,
+        "runtime_sha256": "3E7E07CE574893944C99A5455753801D9145381BFB6F3CC0555A29F3AB4C1934",
+        "settings_sha256": "9BD35670D0D0AD156B5F4B148A530992988DA094A0F68365D796ECA83C6149B6"
+      },
+      "tool_failures": [],
+      "captured_requests": 9,
+      "tool_exposures": {
+        "result_page": 9,
+        "knowledge_lookup": 9,
+        "agent_skill_activate": 9,
+        "analysis_profile": 8,
+        "analysis_graph": 8,
+        "data_query": 8,
+        "data_transform": 8,
+        "agent_skill_read_reference": 8,
+        "agent_skill_read_asset": 8
+      },
+      "sent_tool_chars_sum": 64947,
+      "unmodified_tool_chars_sum": 64947,
+      "first_request": {
+        "tool_names": [
+          "result_page",
+          "knowledge_lookup",
+          "agent_skill_activate"
+        ],
+        "system_message_chars": [
+          946,
+          575
+        ],
+        "request_chars": 3953,
+        "tool_chars": 1635
+      }
+    },
+    {
+      "arm": "full",
+      "task": "routing-r1",
+      "report": "build/tool-definition-ablation/full/routing-r1/reports/business.routing.v1.standard-deepseek-deepseek-v4-flash-0a360cba2bba4a5e91c424223eec750c.json",
+      "trace_id": "0a360cba2bba4a5e91c424223eec750c",
+      "model": "deepseek/deepseek-v4-flash",
+      "run_status": "completed",
+      "verdict": "pass",
+      "outcome_reason": "judge_verdict",
+      "oracle_verdict": "pass",
+      "failed_checks": [],
+      "judge": {
+        "independence": "independent",
+        "metrics": {
+          "elapsed_seconds": 35.37649969995255,
+          "provider_retry_count": 0,
+          "token_usage": {
+            "cached_input_tokens": 896,
+            "input_tokens": 23528,
+            "output_tokens": 2951,
+            "total_tokens": 26479
+          }
+        },
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "reason_codes": [
+          "grounded_reuse"
+        ],
+        "required": true,
+        "rubric_id": "business.routing_reuse.explanation.v1",
+        "rubric_sha256": "A813A96D29847CB305A36AB2EE5F3F67032B064D8322EFE11D5B58F609B02289",
+        "scores": {
+          "adoption_evidence": 2,
+          "manual_correction_estimate": 2,
+          "selected_analyzer_reused": 2,
+          "usable_queue_labels": 2
+        },
+        "status": "completed",
+        "summary": "judge_completed",
+        "verdict": "pass"
+      },
+      "failure_kind": null,
+      "knowledge_worker_id_repaired": false,
+      "subject_metrics": {
+        "assessment_seconds": 0.001961000030860305,
+        "derived_dataset_count": 23,
+        "message_counts": {
+          "assistant": 30,
+          "tool_call": 75,
+          "tool_result": 75,
+          "user": 2
+        },
+        "provider_retry_count": 0,
+        "sampling_round_count": 31,
+        "terminal_shape": null,
+        "token_usage": {
+          "cached_input_tokens": 1238784,
+          "input_tokens": 1290271,
+          "output_tokens": 31960,
+          "total_tokens": 1322231
+        },
+        "tool_call_counts_by_name": {
+          "agent.skill.activate": 2,
+          "agent.skill.read_reference": 1,
+          "analysis.graph": 2,
+          "analysis.profile": 2,
+          "data.feature.select": 9,
+          "data.query": 20,
+          "data.transform": 17,
+          "knowledge.lookup": 1,
+          "model.apply": 7,
+          "model.metadata": 1,
+          "model.task.query": 1,
+          "model.train": 12
+        },
+        "tool_result_counts_by_status": {
+          "failed": 5,
+          "succeeded": 70
+        },
+        "turn_seconds": 430.9764851000509,
+        "usage_reported_primary_response_count": 31
+      },
+      "identity": {
+        "case_definition_sha256": "35744EC52709E4BF5D0B14C1BE957256E32C38D1113B494285E9427A16D066AE",
+        "effective_settings_sha256": "6973FC1DA2E20673BAAAE75940A37DE309FD0DC58E98CC9606C23B4EE0E547E8",
+        "embedding_settings_sha256": "84855E3EADB8F092BBE6E6E87D5ECAD071F1981359295FBA2826AEC4630F0397",
+        "fixture_sha256": "52FFEC11EDA483EB18AB85C0A3C9812ECDBA8045AE85A54A157BAC86DB8B4B3A",
+        "harness_variant": "tool-definitions-full",
+        "invocation_id": "bfccdcd9d06b4fdd81662490bc450684",
+        "judge_settings_sha256": "86A3403ECB36E19C283750DF3E07A5984AF12994769207E46981D0162835A507",
+        "repository_commit": "f0778162a5c7b552b0ef1a33a894720650a866c0",
+        "repository_dirty": true,
+        "runtime_sha256": "3E7E07CE574893944C99A5455753801D9145381BFB6F3CC0555A29F3AB4C1934",
+        "settings_sha256": "9BD35670D0D0AD156B5F4B148A530992988DA094A0F68365D796ECA83C6149B6"
+      },
+      "tool_failures": [
+        {
+          "tool": "data_transform",
+          "type": "tool_failure",
+          "code": "llm_tool_arguments_invalid",
+          "message": "Tool arguments do not match the registered input model.",
+          "details": {
+            "schema_keyword": "schema",
+            "validation_errors": [
+              {
+                "field": "",
+                "message": "Value error, data.transform requires dataset_id or bindings."
+              }
+            ]
+          },
+          "retryable": false
+        },
+        {
+          "tool": "data_query",
+          "type": "tool_failure",
+          "code": "tool_execution_failed",
+          "message": "Catalog Error: Table with name t does not exist!\nDid you mean \"pg_tables\"?\n\nLINE 1: ... = suggested_queue THEN 1.0 ELSE 0.0 END), 4) AS accuracy FROM t) AS xenix_query_result_count\n                                                                          ^"
+        },
+        {
+          "tool": "data_query",
+          "type": "tool_failure",
+          "code": "tool_execution_failed",
+          "message": "Catalog Error: Table with name t does not exist!\nDid you mean \"pg_tables\"?\n\nLINE 1: ...='退换货' THEN 1 ELSE 0 END) AS to_return, count(*) AS total FROM t GROUP BY actual_queue ORDER BY actual_queue) AS xenix_que...\n                                                                             ^"
+        },
+        {
+          "tool": "data_query",
+          "type": "tool_failure",
+          "code": "tool_execution_failed",
+          "message": "Catalog Error: Table with name t does not exist!\nDid you mean \"pg_tables\"?\n\nLINE 1: ... THEN 1 ELSE 0 END) / count(*), 1) AS accuracy_pct FROM t GROUP BY 1 ORDER BY 1) AS xenix_query_result_count\n                                                                   ^"
+        },
+        {
+          "tool": "data_query",
+          "type": "tool_failure",
+          "code": "tool_execution_failed",
+          "message": "Catalog Error: Table with name t does not exist!\nDid you mean \"pg_tables\"?\n\nLINE 1: ...d_queue, round(prediction_score, 3) AS score, message FROM t WHERE actual_queue <> suggested_queue ORDER BY prediction...\n                                                                      ^"
+        }
+      ],
+      "captured_requests": 31,
+      "tool_exposures": {
+        "result_page": 31,
+        "knowledge_lookup": 31,
+        "agent_skill_activate": 31,
+        "analysis_profile": 30,
+        "analysis_graph": 30,
+        "data_query": 30,
+        "data_transform": 30,
+        "data_feature_select": 30,
+        "model_metadata": 30,
+        "model_train": 30,
+        "model_hyper_train": 30,
+        "model_apply": 30,
+        "model_task_query": 30,
+        "agent_skill_read_reference": 30,
+        "agent_skill_read_asset": 30
+      },
+      "sent_tool_chars_sum": 395685,
+      "unmodified_tool_chars_sum": 395685,
+      "first_request": {
+        "tool_names": [
+          "result_page",
+          "knowledge_lookup",
+          "agent_skill_activate"
+        ],
+        "system_message_chars": [
+          946,
+          575
+        ],
+        "request_chars": 3720,
+        "tool_chars": 1635
+      }
+    },
+    {
+      "arm": "no-parameter-descriptions",
+      "task": "campaign-r2",
+      "report": "build/tool-definition-ablation/no-parameter-descriptions/campaign-r2/reports/business.campaign.v1.standard-deepseek-deepseek-v4-flash-8f388264b1ce42a6b51f148c7deb8a65.json",
+      "trace_id": "8f388264b1ce42a6b51f148c7deb8a65",
+      "model": "deepseek/deepseek-v4-flash",
+      "run_status": "completed",
+      "verdict": "pass",
+      "outcome_reason": "judge_verdict",
+      "oracle_verdict": "pass",
+      "failed_checks": [],
+      "judge": {
+        "independence": "independent",
+        "metrics": {
+          "elapsed_seconds": 13.254956999968272,
+          "provider_retry_count": 0,
+          "token_usage": {
+            "cached_input_tokens": 1152,
+            "input_tokens": 5306,
+            "output_tokens": 880,
+            "total_tokens": 6186
+          }
+        },
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "reason_codes": [
+          "grounded_delivery"
+        ],
+        "required": true,
+        "rubric_id": "business.campaign_eligibility.explanation.v1",
+        "rubric_sha256": "8A6B83AD1C3AEC7C2EFAB2E62351A7A90BB3D9DDBA28C5BFD64517443B2F6FDA",
+        "scores": {
+          "effective_rule": 2,
+          "exceptions_explained": 2
+        },
+        "status": "completed",
+        "summary": "judge_completed",
+        "verdict": "pass"
+      },
+      "failure_kind": null,
+      "knowledge_worker_id_repaired": true,
+      "subject_metrics": {
+        "assessment_seconds": 0.0021991999819874763,
+        "derived_dataset_count": 2,
+        "message_counts": {
+          "assistant": 11,
+          "tool_call": 14,
+          "tool_result": 14,
+          "user": 1
+        },
+        "provider_retry_count": 0,
+        "sampling_round_count": 11,
+        "terminal_shape": null,
+        "token_usage": {
+          "cached_input_tokens": 82048,
+          "input_tokens": 92224,
+          "output_tokens": 7500,
+          "total_tokens": 99724
+        },
+        "tool_call_counts_by_name": {
+          "agent.skill.activate": 1,
+          "analysis.profile": 1,
+          "data.query": 9,
+          "data.transform": 2,
+          "knowledge.lookup": 1
+        },
+        "tool_result_counts_by_status": {
+          "failed": 1,
+          "succeeded": 13
+        },
+        "turn_seconds": 44.787417700048536,
+        "usage_reported_primary_response_count": 11
+      },
+      "identity": {
+        "case_definition_sha256": "91345DE7D5C5A698BE9E90F4755530A5ADCE172825668F508F092587B84B18B3",
+        "effective_settings_sha256": "6973FC1DA2E20673BAAAE75940A37DE309FD0DC58E98CC9606C23B4EE0E547E8",
+        "embedding_settings_sha256": "84855E3EADB8F092BBE6E6E87D5ECAD071F1981359295FBA2826AEC4630F0397",
+        "fixture_sha256": "DDF4B77B17E20F18327824EDA549E2DEEE5FF2DFEBA7005C3F446B7160124733",
+        "harness_variant": "tool-definitions-no-parameter-descriptions-knowledge-worker-int",
+        "invocation_id": "8e8d76a7462f493586c6b02c33c45770",
+        "judge_settings_sha256": "86A3403ECB36E19C283750DF3E07A5984AF12994769207E46981D0162835A507",
+        "repository_commit": "f0778162a5c7b552b0ef1a33a894720650a866c0",
+        "repository_dirty": true,
+        "runtime_sha256": "3E7E07CE574893944C99A5455753801D9145381BFB6F3CC0555A29F3AB4C1934",
+        "settings_sha256": "9BD35670D0D0AD156B5F4B148A530992988DA094A0F68365D796ECA83C6149B6"
+      },
+      "tool_failures": [
+        {
+          "tool": "data_query",
+          "type": "tool_failure",
+          "code": "tool_execution_failed",
+          "message": "Catalog Error: Table with name customers does not exist!\nDid you mean \"sqlite_master\"?\n\nLINE 1: SELECT COUNT(*) AS total_rows FROM (SELECT * FROM customers ORDER BY customer_id) AS xenix_query_result_count\n                                                          ^"
+        }
+      ],
+      "captured_requests": 11,
+      "tool_exposures": {
+        "result_page": 11,
+        "knowledge_lookup": 11,
+        "agent_skill_activate": 11,
+        "analysis_profile": 10,
+        "analysis_graph": 10,
+        "data_query": 10,
+        "data_transform": 10,
+        "agent_skill_read_reference": 10,
+        "agent_skill_read_asset": 10
+      },
+      "sent_tool_chars_sum": 54469,
+      "unmodified_tool_chars_sum": 80775,
+      "first_request": {
+        "tool_names": [
+          "result_page",
+          "knowledge_lookup",
+          "agent_skill_activate"
+        ],
+        "system_message_chars": [
+          946,
+          575
+        ],
+        "request_chars": 3423,
+        "tool_chars": 1359
+      }
+    },
+    {
+      "arm": "no-parameter-descriptions",
+      "task": "restock-r1",
+      "report": "build/tool-definition-ablation/no-parameter-descriptions/restock-r1/reports/business.restock.v1.standard-deepseek-deepseek-v4-flash-bf3cbf12dc6a41149ddce98bd4b22912.json",
+      "trace_id": "bf3cbf12dc6a41149ddce98bd4b22912",
+      "model": "deepseek/deepseek-v4-flash",
+      "run_status": "completed",
+      "verdict": "pass",
+      "outcome_reason": "judge_verdict",
+      "oracle_verdict": "pass",
+      "failed_checks": [],
+      "judge": {
+        "independence": "independent",
+        "metrics": {
+          "elapsed_seconds": 13.94326930004172,
+          "provider_retry_count": 0,
+          "token_usage": {
+            "cached_input_tokens": 1792,
+            "input_tokens": 4944,
+            "output_tokens": 736,
+            "total_tokens": 5680
+          }
+        },
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "reason_codes": [
+          "grounded_decision"
+        ],
+        "required": true,
+        "rubric_id": "business.restock_decision.explanation.v1",
+        "rubric_sha256": "6A5FA84263DA0DF7657651A75DC069D2AEAE184B465574CB61D8308C8D47394F",
+        "scores": {
+          "business_explanation": 2,
+          "selected_plan": 2
+        },
+        "status": "completed",
+        "summary": "judge_completed",
+        "verdict": "pass"
+      },
+      "failure_kind": null,
+      "knowledge_worker_id_repaired": false,
+      "subject_metrics": {
+        "assessment_seconds": 0.0012959000305272639,
+        "derived_dataset_count": 1,
+        "message_counts": {
+          "assistant": 12,
+          "tool_call": 13,
+          "tool_result": 13,
+          "user": 1
+        },
+        "provider_retry_count": 0,
+        "sampling_round_count": 14,
+        "terminal_shape": null,
+        "token_usage": {
+          "cached_input_tokens": 85504,
+          "input_tokens": 92040,
+          "output_tokens": 7052,
+          "total_tokens": 99092
+        },
+        "tool_call_counts_by_name": {
+          "agent.skill.activate": 1,
+          "analysis.profile": 1,
+          "data.query": 9,
+          "data.transform": 2
+        },
+        "tool_result_counts_by_status": {
+          "failed": 6,
+          "succeeded": 7
+        },
+        "turn_seconds": 42.558944300049916,
+        "usage_reported_primary_response_count": 14
+      },
+      "identity": {
+        "case_definition_sha256": "24CD6031DA1B7B9F9C70F2D77FD0A5DC29CEBC6947DE3E3FABA05D31F2697C2D",
+        "effective_settings_sha256": "6973FC1DA2E20673BAAAE75940A37DE309FD0DC58E98CC9606C23B4EE0E547E8",
+        "embedding_settings_sha256": "84855E3EADB8F092BBE6E6E87D5ECAD071F1981359295FBA2826AEC4630F0397",
+        "fixture_sha256": "0EEA8E8B1CA68DD617B60DD7BFF33794495981C932A686510B02581E8834267A",
+        "harness_variant": "tool-definitions-no-parameter-descriptions",
+        "invocation_id": "c452901fa0064e1da971a7a0cd95ad66",
+        "judge_settings_sha256": "86A3403ECB36E19C283750DF3E07A5984AF12994769207E46981D0162835A507",
+        "repository_commit": "f0778162a5c7b552b0ef1a33a894720650a866c0",
+        "repository_dirty": true,
+        "runtime_sha256": "3E7E07CE574893944C99A5455753801D9145381BFB6F3CC0555A29F3AB4C1934",
+        "settings_sha256": "9BD35670D0D0AD156B5F4B148A530992988DA094A0F68365D796ECA83C6149B6"
+      },
+      "tool_failures": [
+        {
+          "tool": "data_query",
+          "type": "tool_failure",
+          "code": "tool_execution_failed",
+          "message": "Catalog Error: Table with name offers does not exist!\nDid you mean \"pg_views\"?\n\nLINE 1: SELECT COUNT(*) AS total_rows FROM (SELECT * FROM offers ORDER BY arrival_date, offer_id) AS xenix_query_resu...\n                                                          ^"
+        },
+        {
+          "tool": "data_query",
+          "type": "tool_failure",
+          "code": "tool_execution_failed",
+          "message": "Catalog Error: Table with name dataset_2 does not exist!\nDid you mean \"pg_database\"?\n\nLINE 1: SELECT COUNT(*) AS total_rows FROM (SELECT * FROM dataset_2 ORDER BY arrival_date, offer_id) AS xenix_query_r...\n                                                          ^"
+        },
+        {
+          "tool": "data_query",
+          "type": "tool_failure",
+          "code": "tool_execution_failed",
+          "message": "Binder Error: No function matches the given name and argument types '*(DOUBLE, STRUCT(generate_series BIGINT))'. You might need to add explicit type casts.\n\tCandidate functions:\n\t*(TINYINT, TINYINT) -> TINYINT\n\t*(SMALLINT, SMALLINT) -> SMALLINT\n\t*(INTEGER, INTEGER) -> INTEGER\n\t*(BIGINT, BIGINT) -> BIGINT\n\t*(HUGEINT, HUGEINT) -> HUGEINT\n\t*(FLOAT, FLOAT) -> FLOAT\n\t*(DOUBLE, DOUBLE) -> DOUBLE\n\t*(DECIMAL, DECIMAL) -> DECIMAL\n\t*(UTINYINT, UTINYINT) -> UTINYINT\n\t*(USMALLINT, USMALLINT) -> USMALLINT\n\t*(UINTEGER, UINTEGER) -> UINTEGER\n\t*(UBIGINT, UBIGINT) -> UBIGINT\n\t*(UHUGEINT, UHUGEINT) -> UHUGEINT\n\t*(INTERVAL, DOUBLE) -> INTERVAL\n\t*(DOUBLE, INTERVAL) -> INTERVAL\n\t*(BIGINT, INTERVAL) -> INTERVAL\n\t*(INTERVAL, BIGINT) -> INTERVAL\n\n\nLINE 9:   SELECT c.rn+1, c.cost + e.cost_yuan*b, c.boxes + e.boxes*b, c.margin + e.margin_yuan*b,\n                                             ^"
+        },
+        {
+          "tool": "data_query",
+          "type": "tool_failure",
+          "code": "tool_execution_failed",
+          "message": "Conversion Error: Could not cast value 1560.000000 to DECIMAL(2,1)\n\nLINE 9:   SELECT c.rn+1, c.cost + e.cost_yuan*t.b, c.boxes + e.boxes*t.b, c.margin + e.marg...\n                                ^"
+        },
+        {
+          "tool": "data_query",
+          "type": "tool_failure",
+          "code": "tool_execution_failed",
+          "message": "Conversion Error: Could not cast value 1560.000000 to DECIMAL(2,1)\n\nLINE 10:   SELECT c.rn+1, c.cost + e.cost_yuan*t.b, c.boxes + e.boxes*t.b, c.margin + e.marg...\n                                 ^"
+        },
+        {
+          "tool": "data_transform",
+          "type": "tool_failure",
+          "code": "tool_execution_failed",
+          "message": "Binder Error: Could not ORDER BY column \"(\"rows\".offer_id = 'TOTAL')\": add the expression/function to every SELECT, or move the UNION into a FROM clause.\nTraceback (most recent call last):\n  File \"F:\\CODING\\Project\\Xenix_native\\src\\xenix\\services\\preprocessing_worker.py\", line 71, in run_preprocessing_worker_task\n    result = execute_preprocessing_worker_operation(\n        str(request[\"operation\"]),\n        dict(request.get(\"payload\") or {}),\n        paths,\n    )\n  File \"F:\\CODING\\Project\\Xenix_native\\src\\xenix\\services\\preprocessing_worker.py\", line 111, in execute_preprocessing_worker_operation\n    )._transform_in_process(input_data)\n      ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^\n  File \"F:\\CODING\\Project\\Xenix_native\\src\\xenix\\services\\data_transform.py\", line 453, in _transform_in_process\n    with duckdb.connect(database=\":memory:\") as connection:\n         ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^\n  File \"F:\\CODING\\Project\\Xenix_native\\src\\xenix\\services\\data_transform.py\", line 465, in _transform_in_process\n    connection.execute(f\"CREATE OR REPLACE TEMP TABLE output AS {final.query}\")\n    ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n_duckdb.BinderException: Binder Error: Could not ORDER BY column \"(\"rows\".offer_id = 'TOTAL')\": add the expression/function to every SELECT, or move the UNION into a FROM clause."
+        }
+      ],
+      "captured_requests": 14,
+      "tool_exposures": {
+        "result_page": 14,
+        "knowledge_lookup": 14,
+        "agent_skill_activate": 14,
+        "analysis_profile": 13,
+        "analysis_graph": 13,
+        "data_query": 13,
+        "data_transform": 13,
+        "agent_skill_read_reference": 13,
+        "agent_skill_read_asset": 13
+      },
+      "sent_tool_chars_sum": 70402,
+      "unmodified_tool_chars_sum": 104517,
+      "first_request": {
+        "tool_names": [
+          "result_page",
+          "knowledge_lookup",
+          "agent_skill_activate"
+        ],
+        "system_message_chars": [
+          946,
+          575
+        ],
+        "request_chars": 3656,
+        "tool_chars": 1359
+      }
+    },
+    {
+      "arm": "no-parameter-descriptions",
+      "task": "revenue-r1",
+      "report": "build/tool-definition-ablation/no-parameter-descriptions/revenue-r1/reports/business.revenue.v1.standard-deepseek-deepseek-v4-flash-acb90cd0a142479d8fcb8f0ce6436644.json",
+      "trace_id": "acb90cd0a142479d8fcb8f0ce6436644",
+      "model": "deepseek/deepseek-v4-flash",
+      "run_status": "completed",
+      "verdict": "fail",
+      "outcome_reason": "judge_verdict",
+      "oracle_verdict": "pass",
+      "failed_checks": [],
+      "judge": {
+        "independence": "independent",
+        "metrics": {
+          "elapsed_seconds": 153.14337409997825,
+          "provider_retry_count": 0,
+          "token_usage": {
+            "cached_input_tokens": 2048,
+            "input_tokens": 4959,
+            "output_tokens": 12614,
+            "total_tokens": 17573
+          }
+        },
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "reason_codes": [
+          "incorrect_business_claim"
+        ],
+        "required": true,
+        "rubric_id": "business.revenue_revision.explanation.v1",
+        "rubric_sha256": "73E55EF6575ABE0E1DDB2D780DE0F0C5E2DB301C5E0CAE1AD1650DE1F1FE17AB",
+        "scores": {
+          "month_close_grounding": 1,
+          "revision_explanation": 2
+        },
+        "status": "completed",
+        "summary": "judge_completed",
+        "verdict": "fail"
+      },
+      "failure_kind": null,
+      "knowledge_worker_id_repaired": false,
+      "subject_metrics": {
+        "assessment_seconds": 0.002406999992672354,
+        "derived_dataset_count": 2,
+        "message_counts": {
+          "assistant": 11,
+          "tool_call": 18,
+          "tool_result": 18,
+          "user": 2
+        },
+        "provider_retry_count": 0,
+        "sampling_round_count": 12,
+        "terminal_shape": null,
+        "token_usage": {
+          "cached_input_tokens": 121728,
+          "input_tokens": 131156,
+          "output_tokens": 12886,
+          "total_tokens": 144042
+        },
+        "tool_call_counts_by_name": {
+          "agent.skill.activate": 1,
+          "analysis.graph": 3,
+          "data.query": 12,
+          "data.transform": 2
+        },
+        "tool_result_counts_by_status": {
+          "failed": 4,
+          "succeeded": 14
+        },
+        "turn_seconds": 60.0309460000135,
+        "usage_reported_primary_response_count": 12
+      },
+      "identity": {
+        "case_definition_sha256": "2D8D0F8633992A1BD0EE9FBEEF5B383572933997C3ADC97C78046156E2CFEFEC",
+        "effective_settings_sha256": "6973FC1DA2E20673BAAAE75940A37DE309FD0DC58E98CC9606C23B4EE0E547E8",
+        "embedding_settings_sha256": "84855E3EADB8F092BBE6E6E87D5ECAD071F1981359295FBA2826AEC4630F0397",
+        "fixture_sha256": "E281B883A03A0DDABD96E1EBF908AECCDFBBAB5FE36C8C9EC212D6F669ADDA70",
+        "harness_variant": "tool-definitions-no-parameter-descriptions",
+        "invocation_id": "0bdaaf75703a4c69be185602dc1ca95e",
+        "judge_settings_sha256": "86A3403ECB36E19C283750DF3E07A5984AF12994769207E46981D0162835A507",
+        "repository_commit": "f0778162a5c7b552b0ef1a33a894720650a866c0",
+        "repository_dirty": true,
+        "runtime_sha256": "3E7E07CE574893944C99A5455753801D9145381BFB6F3CC0555A29F3AB4C1934",
+        "settings_sha256": "9BD35670D0D0AD156B5F4B148A530992988DA094A0F68365D796ECA83C6149B6"
+      },
+      "tool_failures": [
+        {
+          "tool": "data_query",
+          "type": "tool_failure",
+          "code": "tool_execution_failed",
+          "message": "Catalog Error: Table with name orders does not exist!\nDid you mean \"pg_prepared_statements\"?\n\nLINE 1: SELECT COUNT(*) AS total_rows FROM (SELECT * FROM orders ORDER BY order_id) AS xenix_query_result_count\n                                                          ^"
+        },
+        {
+          "tool": "data_query",
+          "type": "tool_failure",
+          "code": "tool_execution_failed",
+          "message": "Catalog Error: Table with name stores does not exist!\nDid you mean \"sqlite_master\"?\n\nLINE 1: SELECT COUNT(*) AS total_rows FROM (SELECT * FROM stores ORDER BY 1) AS xenix_query_result_count\n                                                          ^"
+        },
+        {
+          "tool": "data_query",
+          "type": "tool_failure",
+          "code": "tool_execution_failed",
+          "message": "Catalog Error: Table with name refunds does not exist!\nDid you mean \"pg_prepared_statements\"?\n\nLINE 1: SELECT COUNT(*) AS total_rows FROM (SELECT * FROM refunds ORDER BY refund_id) AS xenix_query_result_count\n                                                          ^"
+        },
+        {
+          "tool": "analysis_graph",
+          "type": "tool_failure",
+          "code": "tool_validation_failed",
+          "message": "analysis.graph spec references unknown field(s): net. Use exact dataset columns. Available columns: store_id, region."
+        }
+      ],
+      "captured_requests": 12,
+      "tool_exposures": {
+        "result_page": 12,
+        "knowledge_lookup": 12,
+        "agent_skill_activate": 12,
+        "analysis_profile": 11,
+        "analysis_graph": 11,
+        "data_query": 11,
+        "data_transform": 11,
+        "agent_skill_read_reference": 11,
+        "agent_skill_read_asset": 11
+      },
+      "sent_tool_chars_sum": 59780,
+      "unmodified_tool_chars_sum": 88689,
+      "first_request": {
+        "tool_names": [
+          "result_page",
+          "knowledge_lookup",
+          "agent_skill_activate"
+        ],
+        "system_message_chars": [
+          946,
+          575
+        ],
+        "request_chars": 3677,
+        "tool_chars": 1359
+      }
+    },
+    {
+      "arm": "no-parameter-descriptions",
+      "task": "routing-r1",
+      "report": "build/tool-definition-ablation/no-parameter-descriptions/routing-r1/reports/business.routing.v1.standard-deepseek-deepseek-v4-flash-a18fd8ea7bd5414b807b98101252adfe.json",
+      "trace_id": "a18fd8ea7bd5414b807b98101252adfe",
+      "model": "deepseek/deepseek-v4-flash",
+      "run_status": "completed",
+      "verdict": "pass",
+      "outcome_reason": "judge_verdict",
+      "oracle_verdict": "pass",
+      "failed_checks": [],
+      "judge": {
+        "independence": "independent",
+        "metrics": {
+          "elapsed_seconds": 48.770916200010106,
+          "provider_retry_count": 0,
+          "token_usage": {
+            "cached_input_tokens": 896,
+            "input_tokens": 14496,
+            "output_tokens": 3974,
+            "total_tokens": 18470
+          }
+        },
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "reason_codes": [
+          "grounded_reuse"
+        ],
+        "required": true,
+        "rubric_id": "business.routing_reuse.explanation.v1",
+        "rubric_sha256": "A813A96D29847CB305A36AB2EE5F3F67032B064D8322EFE11D5B58F609B02289",
+        "scores": {
+          "adoption_evidence": 2,
+          "manual_correction_estimate": 2,
+          "selected_analyzer_reused": 2,
+          "usable_queue_labels": 2
+        },
+        "status": "completed",
+        "summary": "judge_completed",
+        "verdict": "pass"
+      },
+      "failure_kind": null,
+      "knowledge_worker_id_repaired": false,
+      "subject_metrics": {
+        "assessment_seconds": 0.001496999990195036,
+        "derived_dataset_count": 5,
+        "message_counts": {
+          "assistant": 21,
+          "tool_call": 31,
+          "tool_result": 31,
+          "user": 2
+        },
+        "provider_retry_count": 0,
+        "sampling_round_count": 21,
+        "terminal_shape": null,
+        "token_usage": {
+          "cached_input_tokens": 376576,
+          "input_tokens": 409348,
+          "output_tokens": 15663,
+          "total_tokens": 425011
+        },
+        "tool_call_counts_by_name": {
+          "agent.skill.activate": 3,
+          "agent.skill.read_asset": 1,
+          "agent.skill.read_reference": 3,
+          "analysis.graph": 1,
+          "analysis.profile": 2,
+          "data.feature.select": 1,
+          "data.query": 8,
+          "data.transform": 2,
+          "knowledge.lookup": 2,
+          "model.apply": 3,
+          "model.metadata": 1,
+          "model.train": 4
+        },
+        "tool_result_counts_by_status": {
+          "failed": 1,
+          "succeeded": 30
+        },
+        "turn_seconds": 165.63384750002297,
+        "usage_reported_primary_response_count": 21
+      },
+      "identity": {
+        "case_definition_sha256": "35744EC52709E4BF5D0B14C1BE957256E32C38D1113B494285E9427A16D066AE",
+        "effective_settings_sha256": "6973FC1DA2E20673BAAAE75940A37DE309FD0DC58E98CC9606C23B4EE0E547E8",
+        "embedding_settings_sha256": "84855E3EADB8F092BBE6E6E87D5ECAD071F1981359295FBA2826AEC4630F0397",
+        "fixture_sha256": "52FFEC11EDA483EB18AB85C0A3C9812ECDBA8045AE85A54A157BAC86DB8B4B3A",
+        "harness_variant": "tool-definitions-no-parameter-descriptions",
+        "invocation_id": "81633b2245554e30bb71ccfb38522536",
+        "judge_settings_sha256": "86A3403ECB36E19C283750DF3E07A5984AF12994769207E46981D0162835A507",
+        "repository_commit": "f0778162a5c7b552b0ef1a33a894720650a866c0",
+        "repository_dirty": true,
+        "runtime_sha256": "3E7E07CE574893944C99A5455753801D9145381BFB6F3CC0555A29F3AB4C1934",
+        "settings_sha256": "9BD35670D0D0AD156B5F4B148A530992988DA094A0F68365D796ECA83C6149B6"
+      },
+      "tool_failures": [
+        {
+          "tool": "data_query",
+          "type": "tool_failure",
+          "code": "tool_execution_failed",
+          "message": "Catalog Error: Table with name dataset_2 does not exist!\nDid you mean \"pg_database\"?\n\nLINE 1: SELECT COUNT(*) AS total_rows FROM (SELECT * FROM dataset_2 LIMIT 20) AS xenix_query_result_count\n                                                          ^"
+        }
+      ],
+      "captured_requests": 21,
+      "tool_exposures": {
+        "result_page": 21,
+        "knowledge_lookup": 21,
+        "agent_skill_activate": 21,
+        "analysis_profile": 20,
+        "analysis_graph": 20,
+        "data_query": 20,
+        "data_transform": 20,
+        "agent_skill_read_reference": 20,
+        "agent_skill_read_asset": 20,
+        "data_integrate": 16,
+        "data_clean": 16,
+        "data_clean_metadata": 16,
+        "data_tokenize": 16,
+        "data_feature_select": 16,
+        "model_metadata": 16,
+        "model_train": 16,
+        "model_hyper_train": 16,
+        "model_apply": 16,
+        "model_task_query": 16
+      },
+      "sent_tool_chars_sum": 206955,
+      "unmodified_tool_chars_sum": 298795,
+      "first_request": {
+        "tool_names": [
+          "result_page",
+          "knowledge_lookup",
+          "agent_skill_activate"
+        ],
+        "system_message_chars": [
+          946,
+          575
+        ],
+        "request_chars": 3444,
+        "tool_chars": 1359
+      }
+    }
+  ]
+}

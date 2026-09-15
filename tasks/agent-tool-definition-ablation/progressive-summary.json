@@ -1,0 +1,164 @@
+{
+  "completed_at_utc": "2026-09-13T16:06:52.814254+00:00",
+  "baseline_commit": "41adb2f6c766a95d20b5cb7cd7923686f80b8581",
+  "completed": {
+    "n": 22,
+    "pass": 16,
+    "fail": 6,
+    "oracle_pass": 22,
+    "rounds": 221,
+    "tool_failures": 23,
+    "subject_tokens": 3321446,
+    "judge_tokens": 260820
+  },
+  "incomplete_attempts": [
+    {
+      "arm": "g0",
+      "task": "routing-r1",
+      "status": "execution_interrupted_without_report",
+      "captured_requests": 16,
+      "captured_responses": 16,
+      "process_exit_code": null,
+      "outcome": null,
+      "subject_tokens": null,
+      "evidence": "build/tool-description-progressive/g0/routing-r1",
+      "reason": "At resumption no Python process remained and no cell report or batch completion was saved. Exact exit cause unknown; do not treat as business failure or completed ablation evidence."
+    },
+    {
+      "arm": "g1",
+      "task": "routing-r1",
+      "status": "execution_interrupted_without_report",
+      "captured_requests": 19,
+      "captured_responses": 19,
+      "process_exit_code": null,
+      "outcome": null,
+      "subject_tokens": null,
+      "evidence": "build/tool-description-progressive/g1/routing-r1",
+      "reason": "At resumption no Python process remained and no cell report or batch completion was saved. Exact exit cause unknown; do not treat as business failure or completed ablation evidence."
+    }
+  ],
+  "cohorts": {
+    "first_layer": {
+      "g0": {
+        "n": 7,
+        "pass": 5,
+        "fail": 2,
+        "oracle_pass": 7,
+        "rounds": 77,
+        "tool_failures": 9,
+        "subject_tokens": 1399228,
+        "judge_tokens": 95821
+      },
+      "g1": {
+        "n": 7,
+        "pass": 6,
+        "fail": 1,
+        "oracle_pass": 7,
+        "rounds": 76,
+        "tool_failures": 6,
+        "subject_tokens": 1218461,
+        "judge_tokens": 69184
+      }
+    },
+    "knowledge_localization": {
+      "g0": {
+        "n": 2,
+        "pass": 2,
+        "fail": 0,
+        "oracle_pass": 2,
+        "rounds": 10,
+        "tool_failures": 0,
+        "subject_tokens": 70155,
+        "judge_tokens": 13469
+      },
+      "g1": {
+        "n": 2,
+        "pass": 2,
+        "fail": 0,
+        "oracle_pass": 2,
+        "rounds": 16,
+        "tool_failures": 1,
+        "subject_tokens": 130102,
+        "judge_tokens": 13914
+      },
+      "g1k": {
+        "n": 2,
+        "pass": 2,
+        "fail": 0,
+        "oracle_pass": 2,
+        "rounds": 13,
+        "tool_failures": 1,
+        "subject_tokens": 112435,
+        "judge_tokens": 16581
+      }
+    },
+    "second_layer": {
+      "g1": {
+        "n": 4,
+        "pass": 3,
+        "fail": 1,
+        "oracle_pass": 4,
+        "rounds": 34,
+        "tool_failures": 4,
+        "subject_tokens": 310653,
+        "judge_tokens": 38049
+      },
+      "g2": {
+        "n": 4,
+        "pass": 1,
+        "fail": 3,
+        "oracle_pass": 4,
+        "rounds": 38,
+        "tool_failures": 6,
+        "subject_tokens": 367575,
+        "judge_tokens": 62685
+      }
+    },
+    "sql_restoration_r1": {
+      "g1": {
+        "n": 2,
+        "pass": 1,
+        "fail": 1,
+        "oracle_pass": 2,
+        "rounds": 18,
+        "tool_failures": 2,
+        "subject_tokens": 174677,
+        "judge_tokens": 22641
+      },
+      "g2": {
+        "n": 2,
+        "pass": 0,
+        "fail": 2,
+        "oracle_pass": 2,
+        "rounds": 22,
+        "tool_failures": 6,
+        "subject_tokens": 207103,
+        "judge_tokens": 34848
+      },
+      "g2g": {
+        "n": 2,
+        "pass": 2,
+        "fail": 0,
+        "oracle_pass": 2,
+        "rounds": 17,
+        "tool_failures": 1,
+        "subject_tokens": 223747,
+        "judge_tokens": 16549
+      }
+    }
+  },
+  "scope": "Four representative standard tasks and repetitions, not full historical/confirmation acceptance. Cohorts differ; do not compare unmatched aggregate totals. Subject tokens include cached input, exclude Judge. Incomplete attempt usage is unknown.",
+  "audit": {
+    "source_and_case_fingerprints_unchanged": true,
+    "settings_and_fixtures_fixed_per_task": true,
+    "all_subject_captures_description_only": true,
+    "captured_requests_match_sampling_rounds": true,
+    "captured_failures_match_report_status_counts": true
+  },
+  "g3": "not_run; stopped after second-layer localization",
+  "actual_routing_accuracy": {
+    "g0/routing-r2": "28/30 (93.3%)",
+    "g1/routing-r2": "28/30 (93.3%)",
+    "note": "The raw program check records the best candidate column (1.0), not the selected prediction column."
+  }
+}

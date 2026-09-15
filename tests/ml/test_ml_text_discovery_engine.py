@@ -195,7 +195,7 @@ def test_retrieval_fact_rejects_relevance_claim_without_ranking_truth() -> None:
 
 def test_active_service_adapters_fit_evaluate_apply_and_materialize_local_tables(tmp_path: Path) -> None:
     snapshot = DatasetSnapshotFact(
-        dataset_id="text-discovery-source",
+        dataset_id=101,
         source_sha256=hashlib.sha256(FIXTURE.read_bytes()).hexdigest(),
         source_byte_size=FIXTURE.stat().st_size,
         schema_digest="8" * 64,
@@ -231,8 +231,8 @@ def test_active_service_adapters_fit_evaluate_apply_and_materialize_local_tables
 
     for service, evaluation_kind, role_bindings, params in cases:
         common = {
-            "project_id": "project",
-            "dataset_id": "text-discovery-source",
+            "project_id": 102,
+            "dataset_id": 101,
             "dataset_source_path": str(FIXTURE.resolve()),
             "evaluation_kind": evaluation_kind,
             "train_role_bindings": role_bindings,
@@ -242,18 +242,24 @@ def test_active_service_adapters_fit_evaluate_apply_and_materialize_local_tables
         }
         fit = service.fit(
             FitTaskRequest(
-                task_id=f"fit-{service.key}",
+                task_id=201,
                 **common,
                 manual_training=ManualTrainingPayload(model_key=service.key, params=params),
             ),
             tmp_path / service.key / "fit",
         )
+        # Historical FIT diagnostics may gain fields between versions. EVALUATE
+        # must publish metrics recomputed from the retained analyzer and source.
+        evidence_path = Path(str(fit.holdout_artifact_path))
+        evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
+        evidence["facts"]["historical_diagnostic"] = {"library_version": "previous"}
+        evidence_path.write_text(json.dumps(evidence), encoding="utf-8")
         evaluated = service.evaluate(
             EvaluateTaskRequest(
-                task_id=f"evaluate-{service.key}",
+                task_id=202,
                 **common,
                 evaluate_model=EvaluateModelPayload(
-                    trained_model_id=f"trained-{service.key}",
+                    trained_model_id=204,
                     model_key=service.key,
                     trained_model_artifact_path=fit.model_artifact_path,
                     holdout_artifact_path=str(fit.holdout_artifact_path),
@@ -263,13 +269,13 @@ def test_active_service_adapters_fit_evaluate_apply_and_materialize_local_tables
         )
         applied = service.apply(
             ApplyTaskRequest(
-                task_id=f"apply-{service.key}",
-                project_id="project",
-                dataset_id="text-discovery-source",
+                task_id=203,
+                project_id=102,
+                dataset_id=101,
                 dataset_source_path=str(FIXTURE.resolve()),
                 feature_columns=["text"],
                 apply_model=ApplyModelPayload(
-                    trained_model_id=f"trained-{service.key}",
+                    trained_model_id=204,
                     model_key=service.key,
                     trained_model_artifact_path=str(fit.final_model_artifact_path),
                 ),
@@ -278,7 +284,7 @@ def test_active_service_adapters_fit_evaluate_apply_and_materialize_local_tables
                         absolute_path=str(FIXTURE.resolve()),
                         file_name=FIXTURE.name,
                         source_kind="dataset",
-                        dataset_id="text-discovery-source",
+                        dataset_id=101,
                     )
                 ],
             ),
@@ -289,7 +295,7 @@ def test_active_service_adapters_fit_evaluate_apply_and_materialize_local_tables
         apply_table = pd.read_csv(applied.output_file_path)
         assert fit.report_artifact_path is not None
         assert evaluated.model_key == service.key
-        assert applied.source_dataset_ids == ["text-discovery-source"]
+        assert applied.source_dataset_ids == [101]
         assert "text" in apply_table.columns
         if evaluation_kind is EvaluationKind.TEXT_CLUSTERING:
             assert "text" in training_table.columns

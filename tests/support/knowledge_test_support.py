@@ -9,15 +9,14 @@ from xenix.services.knowledge_service import (
     bound_knowledge_units,
     prepare_knowledge_search_text,
 )
-from xenix.services.knowledge_projection import (
+from xenix.services.storage.knowledge_projection import (
     RETRIEVAL_PROJECTION_VERSION,
-    knowledge_unit_id,
     retrieval_content_fingerprint,
 )
+from xenix.services.storage.identity import allocate_ids
 from xenix.services.storage.models import (
     KnowledgeDocumentRow,
     KnowledgeUnitRow,
-    generate_id,
     utc_now,
 )
 from xenix.services.storage.repositories.knowledge import KnowledgeRepository
@@ -49,12 +48,12 @@ def seed_knowledge_text(
     session_factory = service._session_factory  # noqa: SLF001 - explicit test seam
     with session_factory() as session:
         document = repository.get_document(session, document_id) if document_id else None
-        generation_id = generate_id()
+        generation_id = allocate_ids(session.connection())[0]
         if document is None:
             document = repository.create_document(
                 session,
                 KnowledgeDocumentRow(
-                    id=document_id or generate_id(),
+                    id=document_id or allocate_ids(session.connection())[0],
                     library_id=library_id,
                     title=normalized_title,
                     source_artifact_id=source_artifact_id,
@@ -75,11 +74,6 @@ def seed_knowledge_text(
 
         rows = [
             KnowledgeUnitRow(
-                id=knowledge_unit_id(
-                    document_id=document.id,
-                    canonical_generation_id=generation_id,
-                    ordinal=ordinal,
-                ),
                 document_id=document.id,
                 canonical_generation_id=generation_id,
                 ordinal=ordinal,

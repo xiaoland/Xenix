@@ -1,0 +1,485 @@
+{
+  "baseline_commit": "f077816",
+  "runs": [
+    {
+      "arm": "layered",
+      "task": "campaign-r1",
+      "report": "build/tool-definition-ablation/layered/campaign-r1/reports/business.campaign.v1.standard-deepseek-deepseek-v4-flash-8ba894d12a214d34b0964816dac7e5c0.json",
+      "trace_id": "8ba894d12a214d34b0964816dac7e5c0",
+      "model": "deepseek/deepseek-v4-flash",
+      "run_status": "completed",
+      "verdict": "pass",
+      "outcome_reason": "judge_verdict",
+      "oracle_verdict": "pass",
+      "failed_checks": [],
+      "judge": {
+        "independence": "independent",
+        "metrics": {
+          "elapsed_seconds": 41.73826179996831,
+          "provider_retry_count": 0,
+          "token_usage": {
+            "cached_input_tokens": 1152,
+            "input_tokens": 5549,
+            "output_tokens": 3434,
+            "total_tokens": 8983
+          }
+        },
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "reason_codes": [
+          "grounded_delivery"
+        ],
+        "required": true,
+        "rubric_id": "business.campaign_eligibility.explanation.v1",
+        "rubric_sha256": "8A6B83AD1C3AEC7C2EFAB2E62351A7A90BB3D9DDBA28C5BFD64517443B2F6FDA",
+        "scores": {
+          "effective_rule": 2,
+          "exceptions_explained": 2
+        },
+        "status": "completed",
+        "summary": "judge_completed",
+        "verdict": "pass"
+      },
+      "failure_kind": null,
+      "knowledge_worker_id_repaired": false,
+      "subject_metrics": {
+        "assessment_seconds": 0.0035891999723389745,
+        "derived_dataset_count": 1,
+        "message_counts": {
+          "assistant": 5,
+          "tool_call": 7,
+          "tool_result": 7,
+          "user": 1
+        },
+        "provider_retry_count": 0,
+        "sampling_round_count": 5,
+        "terminal_shape": null,
+        "token_usage": {
+          "cached_input_tokens": 22528,
+          "input_tokens": 30004,
+          "output_tokens": 4749,
+          "total_tokens": 34753
+        },
+        "tool_call_counts_by_name": {
+          "agent.skill.activate": 1,
+          "analysis.profile": 1,
+          "data.query": 3,
+          "data.transform": 1,
+          "knowledge.lookup": 1
+        },
+        "tool_result_counts_by_status": {
+          "succeeded": 7
+        },
+        "turn_seconds": 26.72819310001796,
+        "usage_reported_primary_response_count": 5
+      },
+      "identity": {
+        "case_definition_sha256": "91345DE7D5C5A698BE9E90F4755530A5ADCE172825668F508F092587B84B18B3",
+        "effective_settings_sha256": "6973FC1DA2E20673BAAAE75940A37DE309FD0DC58E98CC9606C23B4EE0E547E8",
+        "embedding_settings_sha256": "84855E3EADB8F092BBE6E6E87D5ECAD071F1981359295FBA2826AEC4630F0397",
+        "fixture_sha256": "DDF4B77B17E20F18327824EDA549E2DEEE5FF2DFEBA7005C3F446B7160124733",
+        "harness_variant": "tool-definitions-layered",
+        "invocation_id": "462f0c39c8934decb5f03fd32027b0cf",
+        "judge_settings_sha256": "86A3403ECB36E19C283750DF3E07A5984AF12994769207E46981D0162835A507",
+        "repository_commit": "f0778162a5c7b552b0ef1a33a894720650a866c0",
+        "repository_dirty": true,
+        "runtime_sha256": "3E7E07CE574893944C99A5455753801D9145381BFB6F3CC0555A29F3AB4C1934",
+        "settings_sha256": "9BD35670D0D0AD156B5F4B148A530992988DA094A0F68365D796ECA83C6149B6"
+      },
+      "tool_failures": [],
+      "captured_requests": 5,
+      "tool_exposures": {
+        "result_page": 5,
+        "knowledge_lookup": 5,
+        "agent_skill_activate": 5,
+        "analysis_profile": 4,
+        "analysis_graph": 4,
+        "data_query": 4,
+        "data_transform": 4,
+        "agent_skill_read_reference": 4,
+        "agent_skill_read_asset": 4
+      },
+      "sent_tool_chars_sum": 29042,
+      "unmodified_tool_chars_sum": 29042,
+      "first_request": {
+        "tool_names": [
+          "result_page",
+          "knowledge_lookup",
+          "agent_skill_activate"
+        ],
+        "system_message_chars": [
+          946,
+          575
+        ],
+        "request_chars": 3638,
+        "tool_chars": 1574
+      }
+    },
+    {
+      "arm": "layered",
+      "task": "restock-r1",
+      "report": "build/tool-definition-ablation/layered/restock-r1/reports/business.restock.v1.standard-deepseek-deepseek-v4-flash-81dcf668b22e4b38a00eb67b3457dedf.json",
+      "trace_id": "81dcf668b22e4b38a00eb67b3457dedf",
+      "model": "deepseek/deepseek-v4-flash",
+      "run_status": "completed",
+      "verdict": "pass",
+      "outcome_reason": "judge_verdict",
+      "oracle_verdict": "pass",
+      "failed_checks": [],
+      "judge": {
+        "independence": "independent",
+        "metrics": {
+          "elapsed_seconds": 12.49122600001283,
+          "provider_retry_count": 0,
+          "token_usage": {
+            "cached_input_tokens": 1792,
+            "input_tokens": 4945,
+            "output_tokens": 973,
+            "total_tokens": 5918
+          }
+        },
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "reason_codes": [
+          "grounded_decision"
+        ],
+        "required": true,
+        "rubric_id": "business.restock_decision.explanation.v1",
+        "rubric_sha256": "6A5FA84263DA0DF7657651A75DC069D2AEAE184B465574CB61D8308C8D47394F",
+        "scores": {
+          "business_explanation": 2,
+          "selected_plan": 2
+        },
+        "status": "completed",
+        "summary": "judge_completed",
+        "verdict": "pass"
+      },
+      "failure_kind": null,
+      "knowledge_worker_id_repaired": false,
+      "subject_metrics": {
+        "assessment_seconds": 0.001179700018838048,
+        "derived_dataset_count": 1,
+        "message_counts": {
+          "assistant": 8,
+          "tool_call": 10,
+          "tool_result": 10,
+          "user": 1
+        },
+        "provider_retry_count": 0,
+        "sampling_round_count": 8,
+        "terminal_shape": null,
+        "token_usage": {
+          "cached_input_tokens": 55936,
+          "input_tokens": 61437,
+          "output_tokens": 8148,
+          "total_tokens": 69585
+        },
+        "tool_call_counts_by_name": {
+          "agent.skill.activate": 1,
+          "agent.skill.read_reference": 1,
+          "data.query": 6,
+          "data.transform": 1,
+          "knowledge.lookup": 1
+        },
+        "tool_result_counts_by_status": {
+          "succeeded": 10
+        },
+        "turn_seconds": 40.26318969996646,
+        "usage_reported_primary_response_count": 8
+      },
+      "identity": {
+        "case_definition_sha256": "24CD6031DA1B7B9F9C70F2D77FD0A5DC29CEBC6947DE3E3FABA05D31F2697C2D",
+        "effective_settings_sha256": "6973FC1DA2E20673BAAAE75940A37DE309FD0DC58E98CC9606C23B4EE0E547E8",
+        "embedding_settings_sha256": "84855E3EADB8F092BBE6E6E87D5ECAD071F1981359295FBA2826AEC4630F0397",
+        "fixture_sha256": "0EEA8E8B1CA68DD617B60DD7BFF33794495981C932A686510B02581E8834267A",
+        "harness_variant": "tool-definitions-layered",
+        "invocation_id": "ef7c8bddc3eb4b10ac53939415f36d98",
+        "judge_settings_sha256": "86A3403ECB36E19C283750DF3E07A5984AF12994769207E46981D0162835A507",
+        "repository_commit": "f0778162a5c7b552b0ef1a33a894720650a866c0",
+        "repository_dirty": true,
+        "runtime_sha256": "3E7E07CE574893944C99A5455753801D9145381BFB6F3CC0555A29F3AB4C1934",
+        "settings_sha256": "9BD35670D0D0AD156B5F4B148A530992988DA094A0F68365D796ECA83C6149B6"
+      },
+      "tool_failures": [],
+      "captured_requests": 8,
+      "tool_exposures": {
+        "result_page": 8,
+        "knowledge_lookup": 8,
+        "agent_skill_activate": 8,
+        "analysis_profile": 7,
+        "analysis_graph": 7,
+        "data_query": 7,
+        "data_transform": 7,
+        "agent_skill_read_reference": 7,
+        "agent_skill_read_asset": 7
+      },
+      "sent_tool_chars_sum": 49643,
+      "unmodified_tool_chars_sum": 49643,
+      "first_request": {
+        "tool_names": [
+          "result_page",
+          "knowledge_lookup",
+          "agent_skill_activate"
+        ],
+        "system_message_chars": [
+          946,
+          575
+        ],
+        "request_chars": 3871,
+        "tool_chars": 1574
+      }
+    },
+    {
+      "arm": "layered",
+      "task": "revenue-r1",
+      "report": "build/tool-definition-ablation/layered/revenue-r1/reports/business.revenue.v1.standard-deepseek-deepseek-v4-flash-7c2a8c0e27d74abbbcb741cd4739b6dd.json",
+      "trace_id": "7c2a8c0e27d74abbbcb741cd4739b6dd",
+      "model": "deepseek/deepseek-v4-flash",
+      "run_status": "completed",
+      "verdict": "pass",
+      "outcome_reason": "judge_verdict",
+      "oracle_verdict": "pass",
+      "failed_checks": [],
+      "judge": {
+        "independence": "independent",
+        "metrics": {
+          "elapsed_seconds": 43.370814400026575,
+          "provider_retry_count": 0,
+          "token_usage": {
+            "cached_input_tokens": 2048,
+            "input_tokens": 9222,
+            "output_tokens": 4124,
+            "total_tokens": 13346
+          }
+        },
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "reason_codes": [
+          "grounded_delivery"
+        ],
+        "required": true,
+        "rubric_id": "business.revenue_revision.explanation.v1",
+        "rubric_sha256": "73E55EF6575ABE0E1DDB2D780DE0F0C5E2DB301C5E0CAE1AD1650DE1F1FE17AB",
+        "scores": {
+          "month_close_grounding": 2,
+          "revision_explanation": 2
+        },
+        "status": "completed",
+        "summary": "judge_completed",
+        "verdict": "pass"
+      },
+      "failure_kind": null,
+      "knowledge_worker_id_repaired": false,
+      "subject_metrics": {
+        "assessment_seconds": 0.002546000003349036,
+        "derived_dataset_count": 5,
+        "message_counts": {
+          "assistant": 10,
+          "tool_call": 15,
+          "tool_result": 15,
+          "user": 2
+        },
+        "provider_retry_count": 0,
+        "sampling_round_count": 10,
+        "terminal_shape": null,
+        "token_usage": {
+          "cached_input_tokens": 90624,
+          "input_tokens": 100024,
+          "output_tokens": 9800,
+          "total_tokens": 109824
+        },
+        "tool_call_counts_by_name": {
+          "agent.skill.activate": 2,
+          "analysis.graph": 2,
+          "data.query": 4,
+          "data.transform": 6,
+          "knowledge.lookup": 1
+        },
+        "tool_result_counts_by_status": {
+          "failed": 1,
+          "succeeded": 14
+        },
+        "turn_seconds": 66.09478709998075,
+        "usage_reported_primary_response_count": 10
+      },
+      "identity": {
+        "case_definition_sha256": "2D8D0F8633992A1BD0EE9FBEEF5B383572933997C3ADC97C78046156E2CFEFEC",
+        "effective_settings_sha256": "6973FC1DA2E20673BAAAE75940A37DE309FD0DC58E98CC9606C23B4EE0E547E8",
+        "embedding_settings_sha256": "84855E3EADB8F092BBE6E6E87D5ECAD071F1981359295FBA2826AEC4630F0397",
+        "fixture_sha256": "E281B883A03A0DDABD96E1EBF908AECCDFBBAB5FE36C8C9EC212D6F669ADDA70",
+        "harness_variant": "tool-definitions-layered",
+        "invocation_id": "f2880b63a50644faae6c202af39589f0",
+        "judge_settings_sha256": "86A3403ECB36E19C283750DF3E07A5984AF12994769207E46981D0162835A507",
+        "repository_commit": "f0778162a5c7b552b0ef1a33a894720650a866c0",
+        "repository_dirty": true,
+        "runtime_sha256": "3E7E07CE574893944C99A5455753801D9145381BFB6F3CC0555A29F3AB4C1934",
+        "settings_sha256": "9BD35670D0D0AD156B5F4B148A530992988DA094A0F68365D796ECA83C6149B6"
+      },
+      "tool_failures": [
+        {
+          "tool": "data_transform",
+          "type": "tool_failure",
+          "code": "tool_execution_failed",
+          "message": "Binder Error: Cannot mix values of type VARCHAR and DATE in BETWEEN clause - an explicit cast is required\n\nLINE 15:   WHERE ord.status = 'paid' AND ord.paid_date BETWEEN DATE '2026-06-01' AND DATE '2026-06-30'\n                                                       ^\nTraceback (most recent call last):\n  File \"F:\\CODING\\Project\\Xenix_native\\src\\xenix\\services\\preprocessing_worker.py\", line 71, in run_preprocessing_worker_task\n    result = execute_preprocessing_worker_operation(\n        str(request[\"operation\"]),\n        dict(request.get(\"payload\") or {}),\n        paths,\n    )\n  File \"F:\\CODING\\Project\\Xenix_native\\src\\xenix\\services\\preprocessing_worker.py\", line 111, in execute_preprocessing_worker_operation\n    )._transform_in_process(input_data)\n      ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^\n  File \"F:\\CODING\\Project\\Xenix_native\\src\\xenix\\services\\data_transform.py\", line 453, in _transform_in_process\n    with duckdb.connect(database=\":memory:\") as connection:\n         ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^\n  File \"F:\\CODING\\Project\\Xenix_native\\src\\xenix\\services\\data_transform.py\", line 465, in _transform_in_process\n    connection.execute(f\"CREATE OR REPLACE TEMP TABLE output AS {final.query}\")\n    ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n_duckdb.BinderException: Binder Error: Cannot mix values of type VARCHAR and DATE in BETWEEN clause - an explicit cast is required\n\nLINE 15:   WHERE ord.status = 'paid' AND ord.paid_date BETWEEN DATE '2026-06-01' AND DATE '2026-06-30'\n                                                       ^"
+        }
+      ],
+      "captured_requests": 10,
+      "tool_exposures": {
+        "result_page": 10,
+        "knowledge_lookup": 10,
+        "agent_skill_activate": 10,
+        "data_integrate": 9,
+        "analysis_profile": 9,
+        "analysis_graph": 9,
+        "data_clean": 9,
+        "data_clean_metadata": 9,
+        "data_tokenize": 9,
+        "data_query": 9,
+        "data_transform": 9,
+        "data_feature_select": 9,
+        "agent_skill_read_reference": 9,
+        "agent_skill_read_asset": 9
+      },
+      "sent_tool_chars_sum": 102014,
+      "unmodified_tool_chars_sum": 102014,
+      "first_request": {
+        "tool_names": [
+          "result_page",
+          "knowledge_lookup",
+          "agent_skill_activate"
+        ],
+        "system_message_chars": [
+          946,
+          575
+        ],
+        "request_chars": 3892,
+        "tool_chars": 1574
+      }
+    },
+    {
+      "arm": "layered",
+      "task": "routing-r1",
+      "report": "build/tool-definition-ablation/layered/routing-r1/reports/business.routing.v1.standard-deepseek-deepseek-v4-flash-66c42bec691245e4b230babcc814a1e2.json",
+      "trace_id": "66c42bec691245e4b230babcc814a1e2",
+      "model": "deepseek/deepseek-v4-flash",
+      "run_status": "completed",
+      "verdict": "pass",
+      "outcome_reason": "judge_verdict",
+      "oracle_verdict": "pass",
+      "failed_checks": [],
+      "judge": {
+        "independence": "independent",
+        "metrics": {
+          "elapsed_seconds": 36.49932609999087,
+          "provider_retry_count": 0,
+          "token_usage": {
+            "cached_input_tokens": 896,
+            "input_tokens": 20474,
+            "output_tokens": 2995,
+            "total_tokens": 23469
+          }
+        },
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "reason_codes": [
+          "grounded_reuse"
+        ],
+        "required": true,
+        "rubric_id": "business.routing_reuse.explanation.v1",
+        "rubric_sha256": "A813A96D29847CB305A36AB2EE5F3F67032B064D8322EFE11D5B58F609B02289",
+        "scores": {
+          "adoption_evidence": 2,
+          "manual_correction_estimate": 2,
+          "selected_analyzer_reused": 2,
+          "usable_queue_labels": 2
+        },
+        "status": "completed",
+        "summary": "judge_completed",
+        "verdict": "pass"
+      },
+      "failure_kind": null,
+      "knowledge_worker_id_repaired": false,
+      "subject_metrics": {
+        "assessment_seconds": 0.002022799977567047,
+        "derived_dataset_count": 5,
+        "message_counts": {
+          "assistant": 20,
+          "tool_call": 28,
+          "tool_result": 28,
+          "user": 2
+        },
+        "provider_retry_count": 0,
+        "sampling_round_count": 20,
+        "terminal_shape": null,
+        "token_usage": {
+          "cached_input_tokens": 437504,
+          "input_tokens": 468193,
+          "output_tokens": 16693,
+          "total_tokens": 484886
+        },
+        "tool_call_counts_by_name": {
+          "agent.skill.activate": 2,
+          "agent.skill.read_reference": 2,
+          "analysis.graph": 2,
+          "analysis.profile": 2,
+          "data.feature.select": 1,
+          "data.query": 9,
+          "data.transform": 3,
+          "knowledge.lookup": 1,
+          "model.apply": 2,
+          "model.metadata": 1,
+          "model.task.query": 1,
+          "model.train": 2
+        },
+        "tool_result_counts_by_status": {
+          "succeeded": 28
+        },
+        "turn_seconds": 144.61478689999785,
+        "usage_reported_primary_response_count": 20
+      },
+      "identity": {
+        "case_definition_sha256": "35744EC52709E4BF5D0B14C1BE957256E32C38D1113B494285E9427A16D066AE",
+        "effective_settings_sha256": "6973FC1DA2E20673BAAAE75940A37DE309FD0DC58E98CC9606C23B4EE0E547E8",
+        "embedding_settings_sha256": "84855E3EADB8F092BBE6E6E87D5ECAD071F1981359295FBA2826AEC4630F0397",
+        "fixture_sha256": "52FFEC11EDA483EB18AB85C0A3C9812ECDBA8045AE85A54A157BAC86DB8B4B3A",
+        "harness_variant": "tool-definitions-layered",
+        "invocation_id": "a6af0e7a437145bda5678f8a816df499",
+        "judge_settings_sha256": "86A3403ECB36E19C283750DF3E07A5984AF12994769207E46981D0162835A507",
+        "repository_commit": "f0778162a5c7b552b0ef1a33a894720650a866c0",
+        "repository_dirty": true,
+        "runtime_sha256": "3E7E07CE574893944C99A5455753801D9145381BFB6F3CC0555A29F3AB4C1934",
+        "settings_sha256": "9BD35670D0D0AD156B5F4B148A530992988DA094A0F68365D796ECA83C6149B6"
+      },
+      "tool_failures": [],
+      "captured_requests": 20,
+      "tool_exposures": {
+        "result_page": 20,
+        "knowledge_lookup": 20,
+        "agent_skill_activate": 20,
+        "analysis_profile": 19,
+        "analysis_graph": 19,
+        "data_query": 19,
+        "data_transform": 19,
+        "data_feature_select": 19,
+        "model_metadata": 19,
+        "model_train": 19,
+        "model_hyper_train": 19,
+        "model_apply": 19,
+        "model_task_query": 19,
+        "agent_skill_read_reference": 19,
+        "agent_skill_read_asset": 19
+      },
+      "sent_tool_chars_sum": 223532,
+      "unmodified_tool_chars_sum": 223532,
+      "first_request": {
+        "tool_names": [
+          "result_page",
+          "knowledge_lookup",
+          "agent_skill_activate"
+        ],
+        "system_message_chars": [
+          946,
+          575
+        ],
+        "request_chars": 3659,
+        "tool_chars": 1574
+      }
+    }
+  ]
+}

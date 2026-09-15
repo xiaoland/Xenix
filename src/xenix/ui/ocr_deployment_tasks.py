@@ -6,7 +6,7 @@ from typing import Protocol
 
 from PySide6.QtCore import QObject, QRunnable, Signal
 
-from ..exceptions import ValidationError
+from ..exceptions import ValidationError, report_exception
 from ..services.paddle_ocr_service import (
     PaddleOcrState,
     PaddleOcrStatus,
@@ -38,7 +38,8 @@ class OcrStatusTask(QRunnable):
             status = self._deployment.status_snapshot()
             if status.state is PaddleOcrState.CHECKING:
                 status = self._deployment.verify_active()
-        except Exception:
+        except Exception as exc:
+            report_exception(exc)
             status = PaddleOcrStatus(
                 PaddleOcrState.REPAIR_REQUIRED,
                 "status_unavailable",
@@ -63,6 +64,7 @@ class OcrInstallTask(QRunnable):
         try:
             status = self._deployment.install(lambda phase: self.signals.phase.emit(self._generation, phase))
         except Exception as exc:
+            report_exception(exc)
             code = (
                 exc.error_code
                 if isinstance(exc, ValidationError)

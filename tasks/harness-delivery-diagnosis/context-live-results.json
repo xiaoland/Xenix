@@ -1,0 +1,271 @@
+{
+  "scope": "Two newly measured full standard cases, no repetition until passing; observational baseline and skill first-paragraph intervention from activation. Not a controlled equal-history pair: baseline activated two skills before the intervention could apply, treatment activated one.",
+  "runs": [
+    {
+      "variant": "harness-context-diagnosis",
+      "source_report": "build/harness-context-diagnosis/reports/business.revenue.v1.standard-deepseek-deepseek-v4-flash-e6115d92827e4be5a2adef79fd0d02c2.json",
+      "sha256": "59d777fe4c8049670c1acb8ff1d447c91763702582bb78eac296c1ddcb74470b",
+      "run_id": "e6115d92827e4be5a2adef79fd0d02c2",
+      "identity": {
+        "case_definition_sha256": "2D8D0F8633992A1BD0EE9FBEEF5B383572933997C3ADC97C78046156E2CFEFEC",
+        "effective_settings_sha256": "6973FC1DA2E20673BAAAE75940A37DE309FD0DC58E98CC9606C23B4EE0E547E8",
+        "embedding_settings_sha256": "84855E3EADB8F092BBE6E6E87D5ECAD071F1981359295FBA2826AEC4630F0397",
+        "fixture_sha256": "E281B883A03A0DDABD96E1EBF908AECCDFBBAB5FE36C8C9EC212D6F669ADDA70",
+        "harness_variant": "context-capture-baseline",
+        "invocation_id": "e552f798d0b64f208059e27694238954",
+        "judge_settings_sha256": "86A3403ECB36E19C283750DF3E07A5984AF12994769207E46981D0162835A507",
+        "repository_commit": "a94aa280a6cd41ce312f19742a07f57ec1b3929f",
+        "repository_dirty": true,
+        "runtime_sha256": "4010B1D8E998EDBE481549A554DE720FE74E8A541C49EF8E40D5302174D33B2D",
+        "settings_sha256": "9BD35670D0D0AD156B5F4B148A530992988DA094A0F68365D796ECA83C6149B6"
+      },
+      "semantic": {
+        "checks": [
+          {
+            "name": "turn_1.answer_completed",
+            "passed": true,
+            "summary": "terminal_assistant_answer"
+          },
+          {
+            "name": "turn_1.deliveries_accessible",
+            "passed": true,
+            "summary": "linked_artifacts_readable"
+          },
+          {
+            "name": "turn_1.net_receipts_delivered",
+            "passed": true,
+            "summary": "expected_yuan={'东区': 40750.0, '西区': 32900.0, '北区': 22000.0, '南区': -1200.0}"
+          },
+          {
+            "name": "turn_2.answer_completed",
+            "passed": true,
+            "summary": "terminal_assistant_answer"
+          },
+          {
+            "name": "turn_2.deliveries_accessible",
+            "passed": true,
+            "summary": "linked_artifacts_readable"
+          },
+          {
+            "name": "turn_2.net_receipts_delivered",
+            "passed": true,
+            "summary": "expected_yuan={'东区': 29750.0, '西区': 32900.0, '北区': 22000.0, '南区': -900.0}"
+          }
+        ],
+        "passed": true,
+        "verdict": "pass"
+      },
+      "judge": {
+        "independence": "independent",
+        "metrics": {
+          "elapsed_seconds": 145.0389778999961,
+          "provider_retry_count": 0,
+          "token_usage": {
+            "cached_input_tokens": 896,
+            "input_tokens": 5969,
+            "output_tokens": 12544,
+            "total_tokens": 18513
+          }
+        },
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "reason_codes": [
+          "incorrect_business_claim"
+        ],
+        "required": true,
+        "rubric_id": "business.revenue_revision.explanation.v1",
+        "rubric_sha256": "73E55EF6575ABE0E1DDB2D780DE0F0C5E2DB301C5E0CAE1AD1650DE1F1FE17AB",
+        "scores": {
+          "month_close_grounding": 2,
+          "revision_explanation": 2
+        },
+        "status": "completed",
+        "summary": "judge_completed",
+        "verdict": "fail"
+      },
+      "subject_metrics": {
+        "assessment_seconds": 0.002582099987193942,
+        "derived_dataset_count": 2,
+        "message_counts": {
+          "assistant": 10,
+          "tool_call": 15,
+          "tool_result": 15,
+          "user": 2
+        },
+        "provider_retry_count": 0,
+        "sampling_round_count": 10,
+        "terminal_shape": null,
+        "token_usage": {
+          "cached_input_tokens": 168192,
+          "input_tokens": 178697,
+          "output_tokens": 16356,
+          "total_tokens": 195053
+        },
+        "tool_call_counts_by_name": {
+          "agent.skill.activate": 2,
+          "analysis.graph": 2,
+          "data.query": 8,
+          "data.transform": 2,
+          "knowledge.lookup": 1
+        },
+        "tool_result_counts_by_status": {
+          "failed": 1,
+          "succeeded": 14
+        },
+        "turn_seconds": 81.35811969998758,
+        "usage_reported_primary_response_count": 10
+      },
+      "budget": {
+        "exhaustion_reason": null,
+        "invocation_reported_subject_tokens": 195053,
+        "policy": {
+          "execution_limits": "production_harness_and_llm_settings",
+          "max_reported_invocation_subject_tokens": 4000000,
+          "max_wall_seconds": 900.0,
+          "policy_id": "agent-harness-budget-v2",
+          "token_enforcement": "next_cell_admission"
+        },
+        "provider_attempts_dispatched": 10,
+        "reported_subject_tokens": 195053,
+        "sampling_rounds_admitted": 10,
+        "status": "within_limits"
+      },
+      "answers": [
+        "user_turn=1; final_answer=## Bottom line\n\n**东区 (East) delivered the strongest June settlement: net collections of ¥40,750.00**, ahead of 西区 (West) ¥32,900.00, 北区 (North) ¥22,000.00 and 南区 (South) ¥-1,200.00.\n\n![2026年6月各区域净回款](artifact://2833c7759de947039ee655709aa8ddd2)\n\n## Summary table (2026-06-01 to 2026-06-30, CNY)\n\n| Region | June paid orders | June collections | Refunds incurred in June | **Net collections** |\n|---|---:|---:|---:|---:|\n| 东区 East | 7 | 49,350.50 | 8,600.50 | **40,750.00** |\n| 西区 West | 6 | 37,300.25 | 4,400.25 | **32,900.00** |\n| 北区 North | 3 | 22,000.00 | 0.00 | **22,000.00** |\n| 南区 South | 0 | 0.00 | 1,200.00 | **-1,200.00** |\n| **Total** | 16 | 108,650.75 | 14,200.75 | **94,450.00** |\n\nDownloadable / reusable outputs:\n- [Regional June net-collection summary (workbook)](artifact://da302e82f81e4bb386ab401d1a8b956c) — one row per region, ready for further reporting or joining.\n\n## Why 东区 is the better performer — and what tempers it\n\n- 东区 leads on both sides of the equation: the highest June collections (¥49,350.50, ~45% of the total) and the largest absolute refund outflow (¥8,600.50), still netting ¥7,850 more than 西区.\n- The lead is concentrated, not broad: ¥35,000 of 东区's ¥49,350.50 comes from two orders (O02 ¥20,000 and O07 ¥15,000). It is a large-ticket story rather than a unique strength across many stores.\n- 北区 looks efficient (no June refunds, ¥22,000 pulled from only two real orders of ¥11,000 each, plus one ¥0 order). That is high average value but thinly supported — a repeat month would likely look very different.\n- 南区 is negative purely because it booked no June sales but absorbed a ¥1,200 refund against an April order (O15). That is a timing artifact, not operational deterioration in the month.\n\n## Data handling that affects the conclusion\n\n1. **Duplicate business records counted once.** O12 (¥2,000, 东区) appeared twice in the export and refund R09 (¥100, 东区) appeared twice; each is counted once. Counting the duplicates would have overstated 东区's net by ¥1,900 (and would wrongly book a phantom refund).\n2. **Different IDs with identical date/amount are treated as separate transactions.** O13 and O14 are both 北区, 2026-06-09, ¥11,000, and R16/R17 are both ¥100 against order O22 on the same day. Per your rule they all count. This is the single biggest swing factor: if O13/O14 were actually one duplicated sale, 北区 would drop to ¥11,000 and change its standing versus 西区 materially. **Worth confirming with the source system.**\n3. **Refunds are dated by when the refund happened, not by the original order month.** Two June refunds relate to older orders: R03 ¥2,000 (order O08 from May 31 → hits 西区) and R12 ¥1,200 (order O15 from April 30 → the only item in 南区). Conversely, refund R18 on order O18 was booked May 31 and is excluded from June.\n4. **Cancelled orders earn nothing.** O10 (¥3,000, 东区) and O20 (¥2,700, 南区), both dated in June, are excluded. Including them would have lifted 东区 to ¥43,750 — the ranking does not change, but the level does.\n5. **Boundary dates kept inclusive.** June 1 and June 30 items are in (O01, R12, O02 paid 6/30, R07/R09/R15 refunds on 6/30); the neighbours are out (O08 paid 5/31 with its 5/31 refund R08, O09 paid 7/1, O19 paid 7/2, and order O02's July 3 refund R02 of ¥3,000).\n6. **Region comes from the store table, not the order file.** All 8 stores map to the 4 regions, and 北区 is defined by a single store (S05). All four regions are shown even where there is no June activity, which is why 南区 appears at ¥-1,200.\n\n## One forward-looking caveat\n\nOrder O02 (东区, ¥20,000) has a ¥3,000 refund dated 2026-07-03 — outside June, so it does not reduce June's ¥40,750. It will land in July's settlement, so 东区 starts next month ¥3,000 in the hole. Scope of this analysis is the single 25-order / 17-refund file; the comparisons describe this file only.",
+        "user_turn=2; final_answer=## Bottom line: the ranking flipped\n\nUnder the same June settlement rules, **西区 (West) is now the best performer at ¥32,900.00, overtaking 东区 (East), which drops to ¥29,750.00.** The two leaders swap places; 北区 stays 3rd and 南区 4th (less negative).\n\n![各区域净回款对比](artifact://fe41ddf6aadc4881a00e9ea1c543cea7)\n\n## Updated summary (2026-06-01 to 2026-06-30, CNY)\n\n| Region | June collections | Prior refunds | **Updated refunds** | Prior net | **Updated net** | Change | Rank (was → now) |\n|---|---:|---:|---:|---:|---:|---:|---|\n| 西区 West | 37,300.25 | 4,400.25 | 4,400.25 | 32,900.00 | **32,900.00** | 0.00 | 2 → **1** |\n| 东区 East | 49,350.50 | 8,600.50 | 19,600.50 | 40,750.00 | **29,750.00** | **-11,000.00** | 1 → **2** |\n| 北区 North | 22,000.00 | 0.00 | 0.00 | 22,000.00 | **22,000.00** | 0.00 | 3 → 3 |\n| 南区 South | 0.00 | 1,200.00 | 900.00 | -1,200.00 | **-900.00** | +300.00 | 4 → 4 |\n| **Total** | 108,650.75 | 14,200.75 | 24,900.75 | 94,450.00 | **83,750.00** | **-10,700.00** | — |\n\nDownloadable / reusable outputs:\n- [Updated regional June net-collection summary (workbook)](artifact://a257c3524ce64b43937ec54283abf61d) — one row per region, with the prior version and the change alongside, so it doubles as the audit comparison.\n\n## What changed, region by region\n\nOnly two regions moved, and only three of the five new records had any June effect:\n\n| Refund | Region | What happened | June impact |\n|---|---|---|---|\n| **R10** (new) | 东区 | Previously unrecorded refund of ¥9,000 on order O02, dated 2026-06-30 | **-9,000** |\n| **R07** (corrected) | 东区 | Amount raised from ¥7,000 to ¥9,000, same order/date | **-2,000** |\n| **R12** (corrected) | 南区 | Amount reduced from ¥1,200 to ¥900, same order/date | **+300** |\n| R11 (new) | 西区 | ¥500 refund on order O05 dated **2026-07-01** | none (July) |\n| R19 (new) | 北区 | ¥500 refund on order O13 dated **2026-07-02** | none (July) |\n\n- **东区: -11,000** — both hits land in June and both hit the same order family. Order O02 (¥20,000, the region's largest order) was already carrying a ¥3,000 refund dated 2026-07-03; the newly registered R10 adds a further ¥9,000 refunded on 2026-06-30. O02 is now **60% refunded (¥12,000 of ¥20,000)**.\n- **西区: unchanged.** Its new item (R11) is dated July 1, so by the \"refund by date incurred\" rule it belongs to next month. 西区 therefore keeps the best-in-class refund ratio: 11.8% of collections, versus 东区's 39.7%.\n- **北区: unchanged in June**, but note that R19 is the region's **first refund ever** — 北区's clean record in the June table is coincidental timing, and July will show ¥500.\n- **南区: improved by 300**, purely because its only June item (a refund on an April order) was corrected downward. It remains negative since the region booked no June sales.\n\n## Does the conclusion change?\n\n**Yes — the winner changes, and it is not a close call relative to rounding:** 西区 now leads 东区 by ¥3,150, whereas the previous version had 东区 ahead by ¥7,850. This is a genuine re-ranking driven by one newly registered large refund, not a rounding or presentation effect.\n\nThe qualitative read also shifts: on collections alone 东区 is still the biggest region, but after refunds it is the **most refund-eroded**, and its lead depends heavily on O02 — an order that has now been refunded twice on two different dates. 西区 is the better settlement performer because it converts collections to net cash more efficiently.\n\n## Caveats worth checking\n\n- **O02's two refunds (¥9,000 in June + ¥3,000 in July) should be confirmed as two separate real events** rather than a re-registration of one event under a new ID (R10 vs R02). If they are in fact one event, 东区's June refund is ¥9,000 too high and 东区 would return to roughly ¥38,750 — in which case 东区 would lead again. This is the single item that decides the ranking.\n- My earlier flag on **O13/O14** (北区, identical ¥11,000 on 2026-06-09) is partly, but not fully, resolved: R19 refunds against O13 specifically, which suggests O13 is a real separate order. Still worth a source-system check, since ¥11,000 of 北区's ¥22,000 sits on it.\n- Unchanged from before: cancelled orders earn nothing (O10 ¥3,000 东区, O20 ¥2,700 南区 excluded), and duplicate export rows are counted once (O12 order, R09 refund). The O12/R09 dedupe no longer affects any ranking question now that O12's refund and O02's are in play.\n- All figures describe this file set only; with 4 regions and 16 June orders, per-region results are sensitive to single large transactions."
+      ]
+    },
+    {
+      "variant": "harness-context-skill-scope-from-start",
+      "source_report": "build/harness-context-skill-scope-from-start/reports/business.revenue.v1.standard-deepseek-deepseek-v4-flash-bd7fe7870b9e49c4b62ae7fa024cdccc.json",
+      "sha256": "a11465291d1dab3906b73870e195387df523217e69ea56e42dd689941f60007c",
+      "run_id": "bd7fe7870b9e49c4b62ae7fa024cdccc",
+      "identity": {
+        "case_definition_sha256": "2D8D0F8633992A1BD0EE9FBEEF5B383572933997C3ADC97C78046156E2CFEFEC",
+        "effective_settings_sha256": "6973FC1DA2E20673BAAAE75940A37DE309FD0DC58E98CC9606C23B4EE0E547E8",
+        "embedding_settings_sha256": "84855E3EADB8F092BBE6E6E87D5ECAD071F1981359295FBA2826AEC4630F0397",
+        "fixture_sha256": "E281B883A03A0DDABD96E1EBF908AECCDFBBAB5FE36C8C9EC212D6F669ADDA70",
+        "harness_variant": "skill-scope-from-start",
+        "invocation_id": "418bb978f2e04f6692f3a143c31fbd92",
+        "judge_settings_sha256": "86A3403ECB36E19C283750DF3E07A5984AF12994769207E46981D0162835A507",
+        "repository_commit": "a94aa280a6cd41ce312f19742a07f57ec1b3929f",
+        "repository_dirty": true,
+        "runtime_sha256": "4010B1D8E998EDBE481549A554DE720FE74E8A541C49EF8E40D5302174D33B2D",
+        "settings_sha256": "9BD35670D0D0AD156B5F4B148A530992988DA094A0F68365D796ECA83C6149B6"
+      },
+      "semantic": {
+        "checks": [
+          {
+            "name": "turn_1.answer_completed",
+            "passed": true,
+            "summary": "terminal_assistant_answer"
+          },
+          {
+            "name": "turn_1.deliveries_accessible",
+            "passed": true,
+            "summary": "linked_artifacts_readable"
+          },
+          {
+            "name": "turn_1.net_receipts_delivered",
+            "passed": true,
+            "summary": "expected_yuan={'东区': 40750.0, '西区': 32900.0, '北区': 22000.0, '南区': -1200.0}"
+          },
+          {
+            "name": "turn_2.answer_completed",
+            "passed": true,
+            "summary": "terminal_assistant_answer"
+          },
+          {
+            "name": "turn_2.deliveries_accessible",
+            "passed": true,
+            "summary": "linked_artifacts_readable"
+          },
+          {
+            "name": "turn_2.net_receipts_delivered",
+            "passed": true,
+            "summary": "expected_yuan={'东区': 29750.0, '西区': 32900.0, '北区': 22000.0, '南区': -900.0}"
+          }
+        ],
+        "passed": true,
+        "verdict": "pass"
+      },
+      "judge": {
+        "independence": "independent",
+        "metrics": {
+          "elapsed_seconds": 68.37268450000556,
+          "provider_retry_count": 0,
+          "token_usage": {
+            "cached_input_tokens": 2048,
+            "input_tokens": 5095,
+            "output_tokens": 5553,
+            "total_tokens": 10648
+          }
+        },
+        "provider_model": "deepseek/deepseek-v4-pro",
+        "reason_codes": [
+          "incorrect_business_claim"
+        ],
+        "required": true,
+        "rubric_id": "business.revenue_revision.explanation.v1",
+        "rubric_sha256": "73E55EF6575ABE0E1DDB2D780DE0F0C5E2DB301C5E0CAE1AD1650DE1F1FE17AB",
+        "scores": {
+          "month_close_grounding": 2,
+          "revision_explanation": 1
+        },
+        "status": "completed",
+        "summary": "judge_completed",
+        "verdict": "fail"
+      },
+      "subject_metrics": {
+        "assessment_seconds": 0.002473000029567629,
+        "derived_dataset_count": 2,
+        "message_counts": {
+          "assistant": 10,
+          "tool_call": 14,
+          "tool_result": 14,
+          "user": 2
+        },
+        "provider_retry_count": 0,
+        "sampling_round_count": 10,
+        "terminal_shape": null,
+        "token_usage": {
+          "cached_input_tokens": 133248,
+          "input_tokens": 139828,
+          "output_tokens": 14130,
+          "total_tokens": 153958
+        },
+        "tool_call_counts_by_name": {
+          "agent.skill.activate": 1,
+          "analysis.graph": 2,
+          "data.query": 7,
+          "data.transform": 3,
+          "knowledge.lookup": 1
+        },
+        "tool_result_counts_by_status": {
+          "failed": 2,
+          "succeeded": 12
+        },
+        "turn_seconds": 67.23815439996542,
+        "usage_reported_primary_response_count": 10
+      },
+      "budget": {
+        "exhaustion_reason": null,
+        "invocation_reported_subject_tokens": 153958,
+        "policy": {
+          "execution_limits": "production_harness_and_llm_settings",
+          "max_reported_invocation_subject_tokens": 4000000,
+          "max_wall_seconds": 900.0,
+          "policy_id": "agent-harness-budget-v2",
+          "token_enforcement": "next_cell_admission"
+        },
+        "provider_attempts_dispatched": 10,
+        "reported_subject_tokens": 153958,
+        "sampling_rounds_admitted": 10,
+        "status": "within_limits"
+      },
+      "answers": [
+        "user_turn=1; final_answer=已完成整理。以下是 2026 年 6 月月结口径的各区域净回款结果。\n\n## 结论：东区表现最好\n\n| 区域 | 本月已付订单金额(元) | 本月退款金额(元) | 净回款(元) |\n|---|---:|---:|---:|\n| 东区 | 49,350.50 | 8,600.50 | **40,750.00** |\n| 西区 | 37,300.25 | 4,400.25 | 32,900.00 |\n| 北区 | 22,000.00 | 0.00 | 22,000.00 |\n| 南区 | 0.00 | 1,200.00 | -1,200.00 |\n| 合计 | 108,650.75 | 14,200.75 | 94,450.00 |\n\n**哪个区域更好：东区净回款最高（40,750 元），是唯一规模与质量都靠前的区域**——它在本月承担了全区最大退款额（8,600.50 元）后仍居首。西区次之（32,900 元），北区虽无退款但销售额较小（22,000 元）。**南区是唯一净回款为负的区域**（-1,200 元），因本月没有已收款订单，却有一笔退计入本月。\n\n**可下载、继续使用的汇总表：**\n- [各区域 2026 年 6 月净回款汇总表（可下载）](artifact://b25bb34e92894f57ad047e04018e4620)\n- 图表：![2026年6月各区域净回款对比](artifact://195666af23f04d6496d1ba388b1c5aa4)\n\n门店级明细（区域按门店表归属，供核对）：\n\n| 门店 | 区域 | 本月已付 | 本月退款 | 净回款 |\n|---|---|---:|---:|---:|\n| S01 | 东区 | 32,000.00 | 1,200.00 | 30,800.00 |\n| S04 | 东区 | 16,000.00 | 7,100.00 | 8,900.00 |\n| S08 | 东区 | 1,350.50 | 300.50 | 1,050.00 |\n| S05 | 北区 | 22,000.00 | 0.00 | 22,000.00 |\n| S06 | 南区 | 0.00 | 1,200.00 | -1,200.00 |\n| S02 | 西区 | 20,000.00 | 2,500.00 | 17,500.00 |\n| S03 | 西区 | 16,000.00 | 1,500.00 | 14,500.00 |\n| S07 | 西区 | 1,300.25 | 400.25 | 900.00 |\n\n## 会直接影响结论的数据处理\n\n1. **退款按“退款发生日”计入，而非原订单月份。** 本月退款里有跨期退款：R03（2,000 元，来自 5 月订单 O08）、R12（1,200 元，来自 4 月订单 O15）。它们把南区/西区的 6 月净回款相应压低——南区正是因此为负。\n2. **业务记录按编号去重。** 订单里 O12 有两行完全相同的记录，只计一次 2,000 元；退款里 R09 重复两行，只计一次 100 元。而 R16、R17 编号不同、即便同日同额（各 100 元），仍按两笔计入。去重口径不同会直接改变各区域金额。\n3. **cancelled 订单不计收入。** O10、O20 已取消、未收到款项，其金额未进入本月已付。\n4. **邻月订单不计入本月销售，但退款照计。** 5 月/7 月的已付订单（O08、O18、O24、O09、O19）不计本月销售额；但它们发生在 6 月的退款仍计入本月。因此各区域“净回款”并不等于“本月销售净额”。\n5. **四个区域全部列出。** 南区本月无销售，但仍因退款列为 -1,200 元（净回款允许为负）。\n\n数据说明：订单/退款日期在源文件中是文本，按日期比较时已显式转换；金额单位为人民币元。",
+        "user_turn=2; final_answer=已按“同退款编号以本次文件为准、未出现的编号保留”的规则合并后，沿用 6 月月结口径重算完成。\n\n## 更新后的结果与结论\n\n**结论：区域排序发生了改变，第一名由东区换成西区。**\n\n| 区域 | 本月已付(元) | 本月退款(元) | 净回款(元) | 相对上一版变化 |\n|---|---:|---:|---:|---:|\n| **西区** | 37,300.25 | 4,400.25 | **32,900.00** | 0（不变） |\n| 东区 | 49,350.50 | 19,600.50 | 29,750.00 | **-11,000.00** |\n| 北区 | 22,000.00 | 0.00 | 22,000.00 | 0（不变） |\n| 南区 | 0.00 | 900.00 | -900.00 | **+300.00** |\n| 合计 | 108,650.75 | 24,900.75 | 83,750.00 | -10,700.00 |\n\n**排序是否改变：改变。**\n- 上一版：东区 40,750 > 西区 32,900 > 北区 22,000 > 南区 -1,200\n- 本版：**西区 32,900 > 东区 29,750 > 北区 22,000 > 南区 -900**\n- 东区与西区互换名次，西区升为第一；北区、南区名次不变。南区虽排名仍末位，但亏损收窄。\n\n**更新后可下载的汇总表：**\n- [各区域 2026 年 6 月净回款汇总表（更新版，可下载）](artifact://94b3b27fc7ca4aca978e39ae233a1413)\n- 图表：![2026年6月各区域净回款对比（更新后）](artifact://db398d755ac44b6eb3066dd141fa3d7e)\n\n## 各区域变化的具体来源\n\n本次文件 5 条记录的处理结果：\n\n| 退款编号 | 内容 | 是否计入 6 月 | 影响区域 |\n|---|---|---|---|\n| R07 | 更正：7,000 → **9,000**（O07） | 是（6-30） | 东区 +2,000 退款 |\n| R10 | 补登记新增：9,000（O02） | 是（6-30） | 东区 +9,000 退款 |\n| R12 | 更正：1,200 → **900**（O15） | 是（6-01） | 南区 -300 退款（净回款 +300） |\n| R11 | 补登记新增：500（O05） | **否**（退款日 2026-07-01） | 不计入 |\n| R19 | 补登记新增：500（O13） | **否**（退款日 2026-07-02） | 不计入 |\n\n- **东区下降 11,000 元**：全部来自东区两笔退款变化——R07 更正加 2,000（S04）＋ R10 新增 9,000（S01）。\n- **南区收窄 300 元**：R12 从 1,200 更正为 900。\n- **西区、北区无变化**：本次文件没有任何落在 6 月且归属这两个区域的退款。\n\n## 会影响本版结论的数据处理\n\n1. **合并优先级**：R07、R12 同编号以本次文件覆盖旧值（不是累加）；其余 14 个旧退款编号（如 R01、R03、R05、R09、R13–R17 等）本文件未出现，继续保留。\n2. **新增编号是否计入取决于退款发生日**：R11、R19 是新登记退款，但退款日落在 7 月，按“退款按发生日计入”的规则不进 6 月——因此它们不影响本次结果（若误按登记日或原订单月计入，会额外压低西区 1,000 元，需避免）。\n3. **金额未去重**：R16、R17 编号不同、同日同额（各 100 元）仍按两笔计入，维持与上一版一致的口径。\n4. **其他口径未变**：订单按 order_id 去重、cancelled 不计、跨期退款（R03 来自 5 月订单、R12 来自 4 月订单）仍计入 6 月、四个区域全部列出（南区净回款仍为负）。\n\n数据说明：退款日期在源文件中为文本，比较时已显式转换为日期；金额单位为人民币元。"
+      ]
+    }
+  ]
+}

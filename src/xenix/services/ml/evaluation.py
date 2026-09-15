@@ -132,6 +132,7 @@ def get_default_policy(
     *,
     summary_metric_name: str | None = None,
     group_aware: bool = False,
+    model_key: str | None = None,
 ) -> EvaluationPolicySnapshot:
     if evaluation_kind is EvaluationKind.SUMMARY:
         metric_name = summary_metric_name or "result_count"
@@ -147,6 +148,11 @@ def get_default_policy(
             random_state=42,
         )
     policy = _POLICIES[evaluation_kind].model_copy(deep=True)
+    if model_key == "text.classification.multilingual_logistic_regression_tfidf":
+        return policy.model_copy(update={
+            "policy_key": "classification.group_cross_validation.v1",
+            "split_strategy": "group_kfold.v1", "test_size": 0.0,
+        })
     if not group_aware or evaluation_kind in {
         EvaluationKind.FORECASTING,
         EvaluationKind.RANKING,
@@ -159,8 +165,8 @@ def get_default_policy(
         raise ValueError("Group-aware holdout is supported only for supervised evaluation.")
     return policy.model_copy(
         update={
-            "policy_key": f"{evaluation_kind.value}.group_hash_holdout.v1",
-            "split_strategy": "group_hash_holdout.v1",
+            "policy_key": f"{evaluation_kind.value}.group_hash_holdout.v2",
+            "split_strategy": "group_hash_holdout.v2",
         }
     )
 
@@ -310,6 +316,9 @@ def _compare_metric(direction: MetricDirection, left: float | None, right: float
 
 
 def _direction_for_metric(metric_name: str) -> MetricDirection:
+    # Single authority for "lower is better" (MIN) tie-breaker metrics. Every
+    # MIN-direction metric listed in any policy's tie_breaker_metrics must be
+    # enumerated here, or it is mis-ranked as higher-is-better.
     if metric_name in {"rmse", "mae", "mse", "mape", "log_loss"}:
         return MetricDirection.MIN
     return MetricDirection.MAX

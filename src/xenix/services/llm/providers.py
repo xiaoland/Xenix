@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import json
 from dataclasses import dataclass, field
 from typing import Any, Protocol
@@ -19,10 +20,13 @@ from .messages import (
     normalize_message_blocks,
     output_items_are_ordered,
 )
-from .tooling import (
+from .tool_protocol import (
     MAX_TOOL_CALLS,
     AgentToolSpec as _ToolDefinition,
+    InvalidToolArguments,
+    ToolFailure,
     ensure_bounded_json,
+    tool_failure_from_exception,
 )
 
 
@@ -43,29 +47,21 @@ class ProviderMessage(SQLModel):
     # not a provider wire encoding; each adapter chooses its own carrier.
     tool_result_value: Any = None
     provider_payload: dict[str, Any] = Field(default_factory=dict)
-    source_message_id: str | None = None
+    source_message_id: int | None = None
 
     @field_validator("content_blocks", mode="before")
     @classmethod
     def _parse_content_blocks(cls, value: Any) -> list[CanonicalMessageBlock]:
         return list(normalize_message_blocks(value))
 
-    @property
-    def blocks(self) -> list[CanonicalMessageBlock]:
-        """Alias exposing the canonical transcript shape without mutation."""
-
-        return list(self.content_blocks)
-
-    @property
-    def canonical_blocks(self) -> tuple[CanonicalMessageBlock, ...]:
-        return tuple(self.content_blocks)
-
 
 class ProviderToolCall(SQLModel):
+    """A requested Tool identity; the registry resolves wire names at staging."""
+
     provider_call_id: str
     tool_name: str
     provider_name: str | None = None
-    arguments: dict[str, Any] = Field(default_factory=dict)
+    arguments: dict[str, Any] | InvalidToolArguments = Field(default_factory=dict)
     stream_index: int | None = None
 
 
@@ -95,7 +91,7 @@ class ProviderResponse(SQLModel):
                 provider_call_id=call.provider_call_id,
                 tool_name=call.tool_name,
                 provider_name=call.provider_name or "",
-                arguments=dict(call.arguments),
+                arguments=copy.deepcopy(call.arguments),
                 stream_index=call.stream_index,
             )
             for call in self.tool_calls
@@ -112,16 +108,8 @@ class ProviderStreamEvent:
     raw_payload: dict[str, Any] = field(default_factory=dict)
 
     @property
-    def is_delta(self) -> bool:
-        return bool(self.delta_text)
-
-    @property
     def is_tool_call_delta(self) -> bool:
         return self.tool_call_delta
-
-    @property
-    def is_complete(self) -> bool:
-        return self.response is not None
 
 
 @dataclass(frozen=True)
@@ -213,7 +201,7 @@ class OpenAICompatibleChatProvider:
             stream=False,
         )
         raw = self._post_json(payload)
-        return self._parse_chat_completion(raw, tools)
+        return self._parse_chat_completion(raw)
 
     def stream(
         self,
@@ -290,27 +278,14 @@ class OpenAICompatibleChatProvider:
         text = "".join(text_parts)
         reasoning = "".join(reasoning_parts)
         refusal = "".join(refusal_parts)
-        tool_calls = self._build_tool_calls(tool_call_accumulator, tools)
         raw_message: dict[str, Any] = {
             "content": text or None,
             "reasoning_content": reasoning or None,
             "refusal": refusal or None,
-            "tool_calls": [
-                {
-                    "index": call.stream_index,
-                    "id": call.provider_call_id,
-                    "type": "function",
-                    "function": {
-                        "name": call.provider_name,
-                        "arguments": json.dumps(call.arguments, ensure_ascii=False),
-                    },
-                }
-                for call in tool_calls
-            ],
+            "tool_calls": self._stream_tool_calls(tool_call_accumulator),
         }
         normalized = self._parse_chat_completion(
             {"choices": [{"message": raw_message}]},
-            tools,
         )
         yield ProviderStreamEvent(
             response=normalized.model_copy(
@@ -447,7 +422,7 @@ class OpenAICompatibleChatProvider:
                 return str(message)
         return body.strip()
 
-    def _parse_chat_completion(self, raw: dict[str, Any], tools: list[_ToolDefinition]) -> ProviderResponse:
+    def _parse_chat_completion(self, raw: dict[str, Any]) -> ProviderResponse:
         if not isinstance(raw, dict):
             raise ValidationError("LLM provider response must be an object.")
         choices = raw.get("choices")
@@ -460,7 +435,6 @@ class OpenAICompatibleChatProvider:
         content = self._optional_text(message, "content")
         reasoning = self._optional_text(message, "reasoning_content")
         refusal = self._optional_text(message, "refusal")
-        tool_by_provider_name = {tool.provider_name: tool for tool in tools}
         raw_tool_calls = message.get("tool_calls")
         if raw_tool_calls is None:
             raw_tool_calls = []
@@ -495,14 +469,8 @@ class OpenAICompatibleChatProvider:
             if not isinstance(provider_name, str) or not provider_name.strip():
                 raise ValidationError("LLM provider tool name cannot be blank.")
             provider_name = provider_name.strip()
-            spec = tool_by_provider_name.get(provider_name)
-            if spec is None:
-                raise ValidationError(
-                    f"LLM provider requested an unexposed tool '{provider_name}'.",
-                    error_code="llm_tool_not_exposed",
-                )
             raw_arguments = function.get("arguments", "{}")
-            arguments = self._parse_arguments(raw_arguments, spec.name)
+            arguments = self._parse_arguments(raw_arguments, provider_name)
             stream_index = call.get("index")
             if stream_index is not None and (
                 isinstance(stream_index, bool)
@@ -512,7 +480,7 @@ class OpenAICompatibleChatProvider:
                 raise ValidationError("LLM provider tool call index is invalid.")
             tool_call = ProviderToolCall(
                 provider_call_id=call_id,
-                tool_name=spec.name,
+                tool_name=provider_name,
                 provider_name=provider_name,
                 arguments=arguments,
                 stream_index=stream_index,
@@ -521,7 +489,7 @@ class OpenAICompatibleChatProvider:
             output_items.append(
                 ToolCallOutputItem(
                     provider_call_id=call_id,
-                    tool_name=spec.name,
+                    tool_name=provider_name,
                     provider_name=provider_name,
                     arguments=arguments,
                     stream_index=stream_index,
@@ -549,20 +517,29 @@ class OpenAICompatibleChatProvider:
             raise ValidationError(f"LLM provider field '{key}' must be a string or null.")
         return raw
 
-    def _parse_arguments(self, raw_arguments: Any, tool_name: str) -> dict[str, Any]:
+    def _parse_arguments(self, raw_arguments: Any, tool_name: str) -> dict[str, Any] | InvalidToolArguments:
+        raw_text = raw_arguments if isinstance(raw_arguments, str) else json.dumps(raw_arguments, ensure_ascii=False)
         if isinstance(raw_arguments, str):
             try:
-                arguments = json.loads(raw_arguments or "{}")
+                arguments = json.loads(raw_arguments)
             except json.JSONDecodeError as exc:
-                raise ValidationError(
-                    f"Tool call '{tool_name}' arguments are not valid JSON.",
-                    error_code="llm_tool_arguments_invalid_json",
-                ) from exc
-        elif isinstance(raw_arguments, dict):
-            arguments = raw_arguments
+                return InvalidToolArguments(
+                    raw_text=raw_text,
+                    failure=ToolFailure(
+                        code="llm_tool_arguments_invalid_json",
+                        message=(
+                            f"Tool call '{tool_name}' arguments are not valid JSON: {exc.msg} "
+                            f"(line {exc.lineno}, column {exc.colno})."
+                        ),
+                        details={"line": exc.lineno, "column": exc.colno, "position": exc.pos},
+                    ),
+                )
         else:
-            raise ValidationError(f"Tool call '{tool_name}' arguments must be a JSON object.")
-        ensure_bounded_json(arguments, label=f"Tool call '{tool_name}' arguments")
+            arguments = raw_arguments
+        try:
+            ensure_bounded_json(arguments, label=f"Tool call '{tool_name}' arguments")
+        except ValidationError as exc:
+            return InvalidToolArguments(raw_text=raw_text, failure=tool_failure_from_exception(exc))
         return dict(arguments)
 
     def _normalize_usage_payload(self, raw_usage: Any) -> dict[str, Any] | None:
@@ -645,49 +622,28 @@ class OpenAICompatibleChatProvider:
                     raise ValidationError("LLM provider stream tool arguments must be text.")
                 current["arguments"] += arguments
 
-    def _build_tool_calls(
+    def _stream_tool_calls(
         self,
         accumulator: dict[int, dict[str, Any]],
-        tools: list[_ToolDefinition],
-    ) -> list[ProviderToolCall]:
+    ) -> list[dict[str, Any]]:
+        """Assemble wire calls for the same parser used by complete responses."""
         indexes = sorted(accumulator)
-        if len(indexes) > MAX_TOOL_CALLS:
-            raise ValidationError(
-                f"LLM provider returned more than {MAX_TOOL_CALLS} tool calls.",
-                error_code="llm_tool_call_limit_exceeded",
-            )
         if indexes and indexes != list(range(len(indexes))):
             raise ValidationError(
                 "LLM provider stream tool call indexes must be contiguous from zero."
             )
-        tool_by_provider_name = {tool.provider_name: tool for tool in tools}
-        tool_calls: list[ProviderToolCall] = []
-        seen_ids: set[str] = set()
-        for index in indexes:
-            current = accumulator[index]
-            call_id = current["id"].strip()
-            if not call_id:
-                raise ValidationError("LLM provider stream tool call ID cannot be blank.")
-            if call_id in seen_ids:
-                raise ValidationError(f"LLM provider tool call ID '{call_id}' is duplicated.")
-            seen_ids.add(call_id)
-            spec = tool_by_provider_name.get(current["name"])
-            if spec is None:
-                raise ValidationError(
-                    f"LLM provider requested an unexposed tool '{current['name']}'.",
-                    error_code="llm_tool_not_exposed",
-                )
-            arguments = self._parse_arguments(current["arguments"] or "{}", spec.name)
-            tool_calls.append(
-                ProviderToolCall(
-                    provider_call_id=call_id,
-                    tool_name=spec.name,
-                    provider_name=current["name"],
-                    arguments=arguments,
-                    stream_index=index,
-                )
-            )
-        return tool_calls
+        return [
+            {
+                "index": index,
+                "id": accumulator[index]["id"],
+                "type": "function",
+                "function": {
+                    "name": accumulator[index]["name"],
+                    "arguments": accumulator[index]["arguments"],
+                },
+            }
+            for index in indexes
+        ]
 
     def _build_messages(self, rows: list[ProviderMessage]) -> list[dict[str, Any]]:
         provider_messages: list[dict[str, Any]] = []

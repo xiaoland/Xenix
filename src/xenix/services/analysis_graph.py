@@ -21,11 +21,10 @@ from sqlmodel import SQLModel
 from wordcloud import WordCloud
 
 from ..config import AppPaths
-from ..exceptions import ValidationError
+from ..exceptions import ValidationError, report_exception
 from ..observability import record_counter, record_histogram, start_span
 from .dataset_inspection import detect_source_format, load_dataframe
 from .storage.models import DatasetSourceFormat
-
 
 _DEFAULT_WIDTH = 960
 _DEFAULT_HEIGHT = 540
@@ -76,25 +75,6 @@ _SVG_STYLE_TAGS = {f"{{{_SVG_NS}}}style", f"{{{_SVG_NS}}}defs", f"{{{_SVG_NS}}}m
 _CJK_RE = re.compile(r"[\u3400-\u9fff]")
 
 ET.register_namespace("", _SVG_NS)
-
-
-class AnalysisGraphValidationError(ValidationError):
-    def __init__(
-        self,
-        message: str,
-        *,
-        error_code: str | None = None,
-        error_details: dict[str, Any] | None = None,
-        repair_hints: list[str] | None = None,
-        retryable: bool | None = None,
-    ) -> None:
-        super().__init__(
-            message,
-            error_code=error_code,
-            error_details=error_details,
-            repair_hints=repair_hints,
-            retryable=retryable,
-        )
 
 
 class GraphDatasetInput(SQLModel):
@@ -316,7 +296,7 @@ class AnalysisGraphService:
         self._validate_visual_shape(user_spec)
         self._validate_no_wordcloud_transform(user_spec)
         spec = copy.deepcopy(user_spec)
-        self._drop_user_data_declarations(spec)
+        self._validate_dataset_sources(spec)
         self._validate_no_external_urls(spec)
         self._validate_dimensions(spec)
         spec.setdefault("width", _DEFAULT_WIDTH)
@@ -340,7 +320,8 @@ class AnalysisGraphService:
         render_frame = frame.head(_MAX_RENDER_ROWS) if truncated else frame
         spec.setdefault("$schema", "https://vega.github.io/schema/vega-lite/v5.json")
         spec.setdefault("title", dataset_name)
-        spec["data"] = {"values": self._records(render_frame)}
+        spec["datasets"] = {"data": self._records(render_frame)}
+        spec.setdefault("data", {"name": "data"})
         warnings = self._static_warnings(spec)
         if truncated:
             warnings.append(
@@ -530,22 +511,39 @@ class AnalysisGraphService:
             for child in value:
                 self._validate_no_wordcloud_transform_value(child)
 
-    def _drop_user_data_declarations(self, value: Any, path: str = "spec") -> None:
-        if isinstance(value, dict):
-            for key in list(value):
-                child = value[key]
-                child_path = f"{path}.{key}"
-                if key == "data":
-                    del value[key]
-                    continue
-                if key == "datasets":
-                    del value[key]
-                    continue
-                self._drop_user_data_declarations(child, child_path)
-        elif isinstance(value, list):
-            for index, child in enumerate(value):
-                self._drop_user_data_declarations(child, f"{path}[{index}]")
+    def _validate_dataset_sources(self, spec: dict[str, Any], path: str = "spec") -> None:
+        # Visit source-bearing Vega-Lite nodes, not arbitrary objects: a datum,
+        # parameter or user metadata may legitimately contain a key named data.
+        if "data" in spec and spec["data"] != {"name": "data"}:
+            raise ValidationError(
+                f"analysis.graph {path}.data conflicts with the selected Dataset. "
+                'Omit data or use {"name":"data"} to reference that Dataset. '
+                "Inline values and other sources are not substituted for it."
+            )
+        if spec.get("datasets"):
+            raise ValidationError(
+                f"analysis.graph {path}.datasets conflicts with the selected Dataset. "
+                'Xenix binds that Dataset as "data"; omit datasets.'
+            )
+        for key in ("layer", "hconcat", "vconcat", "concat"):
+            children = spec.get(key)
+            if isinstance(children, list):
+                for index, child in enumerate(children):
+                    if isinstance(child, dict):
+                        self._validate_dataset_sources(child, f"{path}.{key}[{index}]")
+        child_spec = spec.get("spec")
+        if isinstance(child_spec, dict):
+            self._validate_dataset_sources(child_spec, f"{path}.spec")
+        transforms = spec.get("transform")
+        if isinstance(transforms, list):
+            for index, transform in enumerate(transforms):
+                if isinstance(transform, dict) and "lookup" in transform:
+                    source = transform.get("from")
+                    if isinstance(source, dict):
+                        self._validate_dataset_sources(source, f"{path}.transform[{index}].from")
 
+    # LLM-authored specs must stay local-only: reject every "url" key so rendering
+    # cannot fetch remote data (SSRF / exfiltration via Vega-Lite url loading).
     def _validate_no_external_urls(self, value: Any, path: str = "spec") -> None:
         if isinstance(value, dict):
             for key, child in value.items():
@@ -1182,7 +1180,7 @@ class AnalysisGraphService:
         hints = list(_WORDCLOUD_REPAIR_HINTS)
         if repair_hints:
             hints.extend(repair_hints)
-        raise AnalysisGraphValidationError(
+        raise ValidationError(
             message,
             error_code=error_code,
             error_details=error_details,
@@ -1191,6 +1189,11 @@ class AnalysisGraphService:
         )
 
     def _allocate_hidden_console_for_packaged_windows(self):
+        """Give vl_convert a hidden console on windowed frozen builds.
+
+        A GUI (no-console) frozen process can fail when the native vl_convert
+        binary touches the console, so allocate a hidden one and free it after.
+        """
         if sys.platform != "win32" or not getattr(sys, "frozen", False):
             return None
         try:
@@ -1205,7 +1208,8 @@ class AnalysisGraphService:
             if hwnd:
                 ctypes.windll.user32.ShowWindow(hwnd, 0)
             return kernel32
-        except Exception:
+        except Exception as exc:
+            report_exception(exc)
             return None
 
     def _records(self, frame: pd.DataFrame) -> list[dict[str, Any]]:

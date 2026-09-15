@@ -18,6 +18,14 @@ Automatic migration does not create a pre-migration backup and has no rollback p
 
 The nearest `src/xenix/services/storage/AGENTS.md` owns migration-author tripwires. Migration functions, models, and tests own SQL, table/field shape, version values, and edge composition.
 
+## Integer identity transition
+
+The [persistent identity design](../30-unit-tdd/persistent-identity.md) replaces string business IDs across SQLite and managed references. Close the application before upgrading and back up the runtime state, managed artifacts and usage journals together. The transition copies task, model and apply directories and canonical bundles before publishing the new database references, so allow additional space for those copies.
+
+SQLite changes roll back on a reported migration failure; original managed files are retained and changed usage journals are restored on that failure. This is not a downgrade facility or a substitute for a complete backup. Copies from a failed attempt may remain and be replaced on retry. After success, original task directories are no longer referenced and may still consume disk space; current cleanup owners determine reclamation rather than a general recursive migration sweep.
+
+Historical conversations and valid Artifact references are rewritten to their new numbers. Links copied outside Xenix before the transition do not have a UUID compatibility lookup. Knowledge keyword retrieval remains available from retained Units; vector projections are marked stale and rebuilt through the usual index service.
+
 ## Derived-State Reconciliation
 
 Knowledge vector bytes are rebuildable projections; their SQLite generation rows

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import threading
 from dataclasses import asdict, dataclass
 from enum import StrEnum
@@ -103,6 +104,7 @@ class UpdateService:
                 return self._set(UpdateState.IDLE, message="Xenix is up to date.")
             return self._set(UpdateState.UPDATE_AVAILABLE, target_version=self._target_version(update_info))
         except Exception as exc:
+            logging.getLogger(__name__).exception("Operation failed: %s", exc)
             return self._set(UpdateState.FAILED, message=str(exc))
         finally:
             self._operation_lock.release()
@@ -126,6 +128,7 @@ class UpdateService:
             manager.download_updates(self._update_info, report)
             return self._set(UpdateState.READY, target_version=target, progress=100)
         except Exception as exc:
+            logging.getLogger(__name__).exception("Operation failed: %s", exc)
             return self._set(UpdateState.FAILED, target_version=target, message=str(exc))
         finally:
             self._operation_lock.release()

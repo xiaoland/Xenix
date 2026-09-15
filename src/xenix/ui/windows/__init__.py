@@ -2,6 +2,7 @@
 
 from .auxiliary import (
     AuxiliaryWindowCoordinator,
+    DatasetAuditWindowFactory,
     DetailWindowFactory,
     KnowledgeWindowFactory,
     SettingsWindowFactory,
@@ -9,6 +10,7 @@ from .auxiliary import (
 
 __all__ = [
     "AuxiliaryWindowCoordinator",
+    "DatasetAuditWindowFactory",
     "DetailWindowFactory",
     "KnowledgeWindowFactory",
     "SettingsWindowFactory",

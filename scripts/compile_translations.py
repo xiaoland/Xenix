@@ -1,24 +1,19 @@
 from __future__ import annotations
 
-import shutil
 import subprocess
 import sys
 from pathlib import Path
 
+from PySide6.QtCore import QLibraryInfo
 
-def _resolve_lrelease(project_root: Path) -> str | None:
-    command = shutil.which("pyside6-lrelease")
-    if command is not None:
-        return command
 
-    candidates = (
-        project_root / ".venv" / "Scripts" / "pyside6-lrelease.exe",
-        project_root / ".venv" / "Lib" / "site-packages" / "PySide6" / "lrelease.exe",
-    )
-    for candidate in candidates:
-        if candidate.is_file():
-            return str(candidate)
-    return None
+def _resolve_lrelease() -> Path:
+    command = Path(
+        QLibraryInfo.path(QLibraryInfo.LibraryPath.LibraryExecutablesPath)
+    ) / "lrelease.exe"
+    if not command.is_file():
+        raise SystemExit("lrelease is not available in the active PySide6 installation.")
+    return command
 
 
 def _supported_translation_names(project_root: Path) -> frozenset[str]:
@@ -48,9 +43,7 @@ def main() -> int:
             + ", ".join(missing_names)
         )
 
-    command = _resolve_lrelease(project_root)
-    if command is None:
-        raise SystemExit("pyside6-lrelease is not available in the active environment.")
+    command = _resolve_lrelease()
 
     for ts_path in ts_paths:
         qm_path = ts_path.with_suffix(".qm")

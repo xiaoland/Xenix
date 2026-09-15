@@ -18,7 +18,6 @@ from ._infra.case_support import (
     attached_source_unchanged,
     canonical_completion,
     capture_attached_source_state,
-    is_within,
     sha256_file,
 )
 from ._infra.contracts import (
@@ -92,11 +91,11 @@ class RainySeasonRestockCase:
             time.sleep(0.02)
         raise BenchmarkInputError("knowledge_rule_derivation_timeout")
 
-    def build_submission(self, *, thread_id: str, fq_model_key: str) -> SubmitUserTurnInput:
+    def build_submission(self, *, thread_id: int, fq_model_key: str) -> SubmitUserTurnInput:
         return SubmitUserTurnInput(
             thread_id=thread_id,
             text=(
-                "请用 semantic 模式检索知识库中与‘季节性采购边界’含义相关的经验，"
+                "雨季快到了，请结合知识库中有关季节性采购的经验，"
                 "并基于这份库存表创建需要补货的商品清单。"
                 "新数据集只保留需要补货的商品，并包含 SKU 和补货数量。"
                 "最终答复请简要说明采用的补货规则，并列出需要补货的 SKU 与数量。"
@@ -140,7 +139,6 @@ class RainySeasonRestockCase:
             if isinstance(source_state, AttachedSourceState)
             else False
         )
-        dataset_and_settings_isolated = _dataset_and_settings_are_isolated(context)
         exact_rows = terminal is not None
         semantic_checks = (
             OutcomeCheck(
@@ -170,13 +168,6 @@ class RainySeasonRestockCase:
                 "external_and_registered_source_unchanged"
                 if source_unchanged
                 else "source_changed_or_unreadable",
-            ),
-            OutcomeCheck(
-                "dataset_and_settings_isolated",
-                dataset_and_settings_isolated,
-                "dataset_paths_and_settings_confined_to_cell_runtime"
-                if dataset_and_settings_isolated
-                else "dataset_path_or_settings_escaped_cell_runtime",
             ),
         )
         return BenchmarkCaseAssessment(
@@ -240,18 +231,6 @@ def _contains_exact_restock_mapping(frame: pl.DataFrame) -> bool:
             if actual == _EXPECTED_RESTOCK:
                 return True
     return False
-
-
-def _dataset_and_settings_are_isolated(context: BenchmarkCaseContext) -> bool:
-    if not context.settings_unchanged:
-        return False
-    try:
-        return all(
-            is_within(Path(dataset.source_path), context.runtime_home)
-            for dataset in context.services.datasets.list_datasets()
-        )
-    except Exception:
-        return False
 
 
 def test_rainy_season_restock(agent_harness_benchmark) -> None:

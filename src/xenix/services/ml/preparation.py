@@ -19,7 +19,7 @@ from .contracts import (
 )
 from .types import EvaluationKind
 
-_GROUP_SPLIT_STRATEGY = "group_hash_holdout.v1"
+_GROUP_SPLIT_STRATEGIES = {"group_hash_holdout.v1", "group_hash_holdout.v2"}
 _HOLDOUT_CONTEXT_KEY = "xenix.evaluation_context.v1"
 
 
@@ -55,9 +55,9 @@ def prepare_supervised_split(
     policy = request.evaluation_policy
 
     if normalized_groups is not None:
-        if policy.split_strategy != _GROUP_SPLIT_STRATEGY:
+        if policy.split_strategy not in _GROUP_SPLIT_STRATEGIES:
             raise ValidationError(
-                "A group role requires evaluation policy 'group_hash_holdout.v1'; re-create the training task."
+                "Grouped training requires a grouped evaluation policy; re-create the training task."
             )
         train_positions, holdout_positions = _group_hash_positions(
             normalized_groups,
@@ -66,6 +66,7 @@ def prepare_supervised_split(
             test_size=policy.test_size,
             random_state=policy.random_state,
             snapshot=request.dataset_snapshot,
+            split_strategy=policy.split_strategy,
         )
         train_groups = normalized_groups.iloc[train_positions].reset_index(drop=True)
         holdout_groups = normalized_groups.iloc[holdout_positions].reset_index(drop=True)
@@ -79,7 +80,7 @@ def prepare_supervised_split(
             len(train_group_values),
             len(holdout_group_values),
         )
-        realized_strategy = _GROUP_SPLIT_STRATEGY
+        realized_strategy = policy.split_strategy
     else:
         expected_strategy = _expected_row_strategy(request.evaluation_kind)
         if policy.split_strategy != expected_strategy:
@@ -246,6 +247,8 @@ def read_evaluation_context(
 
 
 def dataset_snapshot_digest(snapshot: DatasetSnapshotFact) -> str:
+    if snapshot.sampling_fingerprint is not None:
+        return snapshot.sampling_fingerprint
     serialized = json.dumps(
         snapshot.model_dump(mode="json"),
         ensure_ascii=False,
@@ -287,15 +290,30 @@ def _group_hash_positions(
     test_size: float,
     random_state: int,
     snapshot: DatasetSnapshotFact,
+    split_strategy: str = "group_hash_holdout.v1",
 ) -> tuple[np.ndarray, np.ndarray]:
+    """Deterministic group-safe holdout split.
+
+    Group order is derived from a hash of (strategy, random_state,
+    snapshot_digest, group value) so the split reproduces identically when
+    evaluation recomputes it from the request, independent of row order. The final
+    group is never assigned to holdout so at least one group always remains in
+    training.
+    """
     unique_groups = groups.drop_duplicates().tolist()
     if len(unique_groups) < 2:
         raise ValidationError("Group-safe evaluation requires at least two distinct groups.")
-    snapshot_digest = dataset_snapshot_digest(snapshot)
+    # v1 remains reproducible for retained models. New training uses content,
+    # so reimporting identical data does not redraw the evaluation partition.
+    split_seed = (
+        dataset_snapshot_digest(snapshot)
+        if split_strategy == "group_hash_holdout.v1"
+        else snapshot.source_sha256
+    )
     ordered_groups = sorted(
         unique_groups,
         key=lambda value: hashlib.sha256(
-            f"{_GROUP_SPLIT_STRATEGY}|{random_state}|{snapshot_digest}|{value}".encode("utf-8")
+            f"{split_strategy}|{random_state}|{split_seed}|{value}".encode("utf-8")
         ).hexdigest(),
     )
     target_rows = max(1, round(len(groups.index) * test_size))
