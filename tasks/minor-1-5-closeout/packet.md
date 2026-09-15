@@ -27,3 +27,5 @@
 根因是 scripts/verify_release_identity.py 的 subprocess 文本输出使用 Windows 默认 CP1252 解码 gh 的 UTF-8 中文 PR 信息，后台读取线程抛出 UnicodeDecodeError，随后 stdout 为 None 引发 AttributeError。修复为显式 encoding="utf-8"，不改变发布身份或推广校验。手工以 PYTHONUTF8=0 验证中文子进程输出及当前 tag 身份均通过，Ruff 与 diff 检查通过；未新增自动化测试。
 
 v1.5.0 已推送且不可移动。已向用户请求改发 1.5.1 或暂停发布的决定；确定前不创建新版本 tag，也不重试相同的确定性编码错误。原始失败日志保存在 build/release-1-5-failure.log。
+
+用户已确认改发 1.5.1；保留 v1.5.0，更新版本后通过 develop → main PR 合并修复，再从合并结果发布 v1.5.1。

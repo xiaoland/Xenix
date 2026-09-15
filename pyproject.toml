@@ -1,6 +1,6 @@
 [project]
 name = "xenix-native"
-version = "1.5.0"
+version = "1.5.1"
 description = "Xenix native"
 authors = [{ name = "Lan_zhijiang", email = "lanzhijiang@foxmail.com" }]
 readme = "README.md"
