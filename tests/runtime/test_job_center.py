@@ -64,6 +64,7 @@ def test_job_center_filters_status_domain_and_search_through_qt(app, qtbot, stor
 
     from PySide6.QtCore import Qt
     try:
+        dialog._scope_filter.setCurrentIndex(1)
         dialog.show()
         qtbot.waitUntil(lambda: dialog._table.rowCount() == 6)
         for status in JobStatus:

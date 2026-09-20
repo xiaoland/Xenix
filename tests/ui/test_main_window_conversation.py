@@ -94,7 +94,7 @@ def _window(qtbot: QtBot, ui_artifacts: UiArtifactRegistry, tmp_path):
         link_router=Mock(),
         history_port=HarnessHistoryAdapter(harness),
         auxiliary_factory=lambda owner: AuxiliaryWindowCoordinator(
-            owner, settings_factory=Mock(), knowledge_factory=None, detail_factory=Mock(),
+            owner, settings_factory=Mock(), knowledge_factory=None,
         ),
         conversation_executor=executor,
     )
@@ -117,9 +117,9 @@ def _submit(view, text: str, attachment: Path | None = None) -> None:
 def test_main_window_exposes_dataset_audit_entry(qtbot: QtBot, ui_artifacts, tmp_path) -> None:
     window, _harness, _executor = _window(qtbot, ui_artifacts, tmp_path)
 
-    assert window._datasets_button.isVisible()
-    assert window._datasets_button.text() == window.tr("Datasets")
-    assert window._datasets_button.accessibleIdentifier() == "main.header.datasets"
+    assert window._audit_button.isVisible()
+    assert window._audit_button.text() == window.tr("Audit Center")
+    assert window._audit_button.accessibleIdentifier() == "main.header.audit"
 
 
 def test_pre_ack_failure_preserves_composer_for_retry(qtbot: QtBot, ui_artifacts, tmp_path) -> None:

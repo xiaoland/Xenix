@@ -80,6 +80,7 @@ class DatasetDerivationInput(SQLModel):
     parameters_payload: dict[str, Any] = Field(default_factory=dict)
     agent_explanation: str | None = None
     tool_call_message_id: int | None = None
+    origin_thread_id: int | None = None
 
 
 class RegisterDatasetInput(SQLModel):
@@ -899,6 +900,7 @@ class DatasetService:
                 parameters_payload=dict(derivation.parameters_payload),
                 agent_explanation=derivation.agent_explanation,
                 tool_call_message_id=derivation.tool_call_message_id,
+                origin_thread_id=derivation.origin_thread_id,
                 created_at=now,
             ),
             inputs=[

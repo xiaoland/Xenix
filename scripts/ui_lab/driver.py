@@ -35,11 +35,11 @@ def _ensure_scenario_font(family: str) -> None:
     # Register installed files in this process only; never download/install fonts.
     if (
         sys.platform == "win32"
-        and family == "Segoe UI"
+        and family in {"Segoe UI", "Microsoft YaHei"}
         and family not in QFontDatabase.families()
     ):
         fonts = Path(os.environ.get("WINDIR", "C:/Windows")) / "Fonts"
-        for filename in ("segoeui.ttf", "segoeuib.ttf", "segoeuii.ttf", "segoeuiz.ttf"):
+        for filename in (("msyh.ttc", "msyhbd.ttc", "msyhl.ttc") if family == "Microsoft YaHei" else ("segoeui.ttf", "segoeuib.ttf", "segoeuii.ttf", "segoeuiz.ttf")):
             if QFontDatabase.addApplicationFont(str(fonts / filename)) < 0:
                 raise RuntimeError(f"Cannot load required scenario font face: {filename}")
 

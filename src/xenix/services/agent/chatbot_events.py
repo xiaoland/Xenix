@@ -67,7 +67,6 @@ class ChatbotEvent(SQLModel):
     summary: str | None = None
     usage_payload: dict[str, Any] | None = None
     detail_blocks: list[dict[str, Any]] = Field(default_factory=list)
-    actions: list[dict[str, Any]] = Field(default_factory=list)
 
     @model_serializer(mode="wrap")
     def _serialize_without_ui_open_paths(self, handler) -> Any:
@@ -422,7 +421,6 @@ def project_tool_chatbot_event(
         tool_name=tool_name, icon_key=presentation.icon_key, summary=summary,
         tool_result_value=result_value,
         detail_blocks=_tool_detail_blocks(tool_call, result_value, result_status),
-        actions=_tool_actions(tool_name, payload),
     )
 
 
@@ -500,16 +498,6 @@ def _tool_summary_from_payload(tool_name: str, payload: dict[str, Any]) -> str |
         "model.train": "Model training running in background",
         "model.apply": "Model apply running in background",
     }.get(tool_name, "ML task running in background")
-
-
-def _tool_actions(tool_name: str, payload: dict[str, Any] | None) -> list[dict[str, Any]]:
-    if not payload or tool_name == "model.task.query":
-        return []
-    raw = payload.get("task_ids")
-    if not isinstance(raw, list):
-        raw = [payload.get("ml_task_id")] if isinstance(payload.get("ml_task_id"), int) else []
-    task_ids = [value for value in raw if isinstance(value, int)]
-    return [{"type": "open_tool_call_detail", "task_ids": task_ids}] if task_ids else []
 
 
 def _tool_detail_blocks(tool_call: Any, result_value: Any, result_status: str | None) -> list[dict[str, Any]]:

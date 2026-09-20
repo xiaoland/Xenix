@@ -123,6 +123,351 @@
     </message>
 </context>
 <context>
+    <name>AuditCenterDialog</name>
+    <message>
+        <location filename="../ui/audit_center.py" line="196"/>
+        <source>No current conversation</source>
+        <translation>尚未打开会话</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="197"/>
+        <source>Open a conversation, or select All conversations.</source>
+        <translation>请打开一个会话，或选择“所有会话”。</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="213"/>
+        <source>Outputs could not be loaded. Retry with Refresh.</source>
+        <translation>无法加载产出，请点击“刷新”重试。</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="240"/>
+        <source>No matching outputs</source>
+        <translation>没有符合条件的产出</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="241"/>
+        <source>This conversation has no outputs yet, or no outputs match these filters.</source>
+        <translation>当前范围暂无产出，或没有产出符合筛选条件。</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="261"/>
+        <source>Loading recorded evidence…</source>
+        <translation>正在加载已记录的证据…</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="275"/>
+        <source>Evidence could not be loaded. Retry with Refresh.</source>
+        <translation>无法加载证据，请点击“刷新”重试。</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="295"/>
+        <source>Evaluation</source>
+        <translation>评估结果</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="296"/>
+        <source>Baseline evaluation</source>
+        <translation>基线评估</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="297"/>
+        <source>Data split</source>
+        <translation>数据划分</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="298"/>
+        <source>Test rows</source>
+        <translation>测试记录数</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="299"/>
+        <source>Training rows</source>
+        <translation>训练记录数</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="300"/>
+        <source>Total rows</source>
+        <translation>总记录数</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="301"/>
+        <source>Rendered rows</source>
+        <translation>实际绘制记录数</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="302"/>
+        <source>Partial data</source>
+        <translation>仅展示部分数据</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="303"/>
+        <location filename="../ui/audit_center.py" line="339"/>
+        <source>Limitations</source>
+        <translation>适用范围与限制</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="304"/>
+        <source>Error</source>
+        <translation>错误</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="305"/>
+        <source>Source file</source>
+        <translation>来源文件</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="306"/>
+        <source>Worksheet</source>
+        <translation>工作表</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="307"/>
+        <source>Operation</source>
+        <translation>处理操作</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="316"/>
+        <source>Yes</source>
+        <translation>是</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="316"/>
+        <source>No</source>
+        <translation>否</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="331"/>
+        <source>Why this approach</source>
+        <translation>为什么采用这个方法</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="332"/>
+        <source>Not recorded</source>
+        <translation>未记录</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="333"/>
+        <source>What the result means</source>
+        <translation>结果意味着什么</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="335"/>
+        <source>Agent-authored interpretation; inspect the recorded evidence.</source>
+        <translation>此解读由 Agent 撰写，可对照已记录的证据检查。</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="337"/>
+        <source>View evidence</source>
+        <translation>查看证据</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="338"/>
+        <source>Earlier and other-conversation interpretations</source>
+        <translation>历史版本与其他会话的解读</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="340"/>
+        <source>Recorded evidence</source>
+        <translation>已记录的证据</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="342"/>
+        <source>No upstream inputs recorded.</source>
+        <translation>没有记录上游输入。</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="343"/>
+        <source>Not recorded / not applicable</source>
+        <translation>未记录或不适用</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="495"/>
+        <source>All conversations</source>
+        <translation>所有会话</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="494"/>
+        <source>Current conversation</source>
+        <translation>当前会话</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="348"/>
+        <source>Source conversation unavailable</source>
+        <translation>来源会话不可用</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="351"/>
+        <source>Agent interpretation recorded</source>
+        <translation>已记录 Agent 解读</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="353"/>
+        <source>Waiting for task results; no interpretation yet.</source>
+        <translation>正在等待任务结果，尚无结果解读。</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="355"/>
+        <source>Output available; the Agent has not interpreted it yet.</source>
+        <translation>已有产出，Agent 尚未解读结果。</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="357"/>
+        <source>No Agent explanation was saved for this output.</source>
+        <translation>此产出没有保存 Agent 解释。</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="359"/>
+        <source>Queued</source>
+        <translation>排队中</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="360"/>
+        <source>Running</source>
+        <translation>运行中</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="361"/>
+        <source>Succeeded</source>
+        <translation>已成功</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="362"/>
+        <source>Failed</source>
+        <translation>已失败</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="363"/>
+        <source>Cancelled</source>
+        <translation>已取消</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="368"/>
+        <source>Task: {status}</source>
+        <translation>任务：{status}</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="418"/>
+        <source>Submitted parameters</source>
+        <translation>提交的参数</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="419"/>
+        <source>Effective parameters</source>
+        <translation>实际执行参数</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="420"/>
+        <source>Selected tuning parameters</source>
+        <translation>调参选中的参数</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="433"/>
+        <source>File unavailable</source>
+        <translation>文件不可用</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="481"/>
+        <source>Dataset</source>
+        <translation>数据集</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="482"/>
+        <source>Model</source>
+        <translation>模型</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="483"/>
+        <source>Chart</source>
+        <translation>图表</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="484"/>
+        <source>Report</source>
+        <translation>报告</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="485"/>
+        <source>Application result</source>
+        <translation>模型应用结果</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="486"/>
+        <source>Other output</source>
+        <translation>其他产出</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="490"/>
+        <source>Audit Center</source>
+        <translation>审计中心</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="498"/>
+        <source>All output types</source>
+        <translation>所有产出类型</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="504"/>
+        <source>Search outputs</source>
+        <translation>搜索产出</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="506"/>
+        <source>Refresh</source>
+        <translation>刷新</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="507"/>
+        <source>Load more</source>
+        <translation>加载更多</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="508"/>
+        <source>Back to output</source>
+        <translation>返回产出</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="509"/>
+        <source>Clear task filter</source>
+        <translation>清除任务筛选</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="510"/>
+        <source>Show original records and interpretation history</source>
+        <translation>显示原始记录与解读历史</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="511"/>
+        <source>Open output</source>
+        <translation>打开产出</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="512"/>
+        <source>View task</source>
+        <translation>查看任务</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="513"/>
+        <source>Source conversation</source>
+        <translation>来源会话</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="517"/>
+        <source>Explanation and evidence</source>
+        <translation>解释与证据</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="341"/>
+        <location filename="../ui/audit_center.py" line="517"/>
+        <source>Inputs and source</source>
+        <translation>输入与来源</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="517"/>
+        <source>Parameters and records</source>
+        <translation>参数与记录</translation>
+    </message>
+</context>
+<context>
     <name>ChatComposer</name>
     <message>
         <location filename="../ui/conversation/composer.py" line="183"/>
@@ -205,8 +550,8 @@
 <context>
     <name>ChatTimeline</name>
     <message>
+        <location filename="../ui/conversation/timeline.py" line="99"/>
         <location filename="../ui/conversation/timeline.py" line="100"/>
-        <location filename="../ui/conversation/timeline.py" line="101"/>
         <source>Scroll to bottom</source>
         <translation>滚动到底部</translation>
     </message>
@@ -294,37 +639,37 @@ This route will stay available after model selection is connected.</source>
 <context>
     <name>ConnectionRetryItem</name>
     <message>
-        <location filename="../ui/conversation/widgets/items.py" line="249"/>
+        <location filename="../ui/conversation/widgets/items.py" line="219"/>
         <source>Connecting ({attempt}/{max})</source>
         <translation>正在连接（{attempt}/{max}）</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/widgets/items.py" line="260"/>
+        <location filename="../ui/conversation/widgets/items.py" line="230"/>
         <source>Hide details</source>
         <translation>隐藏详情</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/widgets/items.py" line="260"/>
+        <location filename="../ui/conversation/widgets/items.py" line="230"/>
         <source>Show details</source>
         <translation>显示详情</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/widgets/items.py" line="288"/>
+        <location filename="../ui/conversation/widgets/items.py" line="258"/>
         <source>LLM connection retry</source>
         <translation>LLM 连接重试</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/widgets/items.py" line="295"/>
+        <location filename="../ui/conversation/widgets/items.py" line="265"/>
         <source>Attempt {attempt}/{max}</source>
         <translation>第 {attempt}/{max} 次尝试</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/widgets/items.py" line="301"/>
+        <location filename="../ui/conversation/widgets/items.py" line="271"/>
         <source>Attempt</source>
         <translation>尝试</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/widgets/items.py" line="305"/>
+        <location filename="../ui/conversation/widgets/items.py" line="275"/>
         <source>Error code: `{code}`</source>
         <translation>错误代码：`{code}`</translation>
     </message>
@@ -365,105 +710,84 @@ This route will stay available after model selection is connected.</source>
 <context>
     <name>DatasetAuditDialog</name>
     <message>
-        <location filename="../ui/dataset_audit_dialog.py" line="109"/>
         <source>Dataset loading failed. Retry with Refresh.</source>
-        <translation>数据集加载失败，请点击“刷新”重试。</translation>
+        <translation type="vanished">数据集加载失败，请点击“刷新”重试。</translation>
     </message>
     <message>
-        <location filename="../ui/dataset_audit_dialog.py" line="110"/>
-        <location filename="../ui/dataset_audit_dialog.py" line="201"/>
         <source>No datasets are associated with this conversation yet.</source>
-        <translation>此会话尚未关联数据集。</translation>
+        <translation type="vanished">此会话尚未关联数据集。</translation>
     </message>
     <message>
-        <location filename="../ui/dataset_audit_dialog.py" line="153"/>
         <source>Dataset: {name} ({dataset_id})</source>
-        <translation>数据集：{name} ({dataset_id})</translation>
+        <translation type="vanished">数据集：{name} ({dataset_id})</translation>
     </message>
     <message>
-        <location filename="../ui/dataset_audit_dialog.py" line="156"/>
         <source>Generation: {generation}</source>
-        <translation>代数：{generation}</translation>
+        <translation type="vanished">代数：{generation}</translation>
     </message>
     <message>
-        <location filename="../ui/dataset_audit_dialog.py" line="157"/>
         <source>Recorded operation: {operation}</source>
-        <translation>记录的操作：{operation}</translation>
+        <translation type="vanished">记录的操作：{operation}</translation>
     </message>
     <message>
-        <location filename="../ui/dataset_audit_dialog.py" line="160"/>
         <source>Recorded at: {created_at}</source>
-        <translation>记录于：{created_at}</translation>
+        <translation type="vanished">记录于：{created_at}</translation>
     </message>
     <message>
-        <location filename="../ui/dataset_audit_dialog.py" line="166"/>
-        <location filename="../ui/dataset_audit_dialog.py" line="196"/>
         <source>Inputs</source>
-        <translation>输入</translation>
+        <translation type="vanished">输入</translation>
     </message>
     <message>
-        <location filename="../ui/dataset_audit_dialog.py" line="168"/>
         <source>{position}. {name} ({dataset_id})</source>
-        <translation>{position}. {name} ({dataset_id})</translation>
+        <translation type="vanished">{position}. {name} ({dataset_id})</translation>
     </message>
     <message>
-        <location filename="../ui/dataset_audit_dialog.py" line="174"/>
         <source>alias {alias}</source>
-        <translation>别名 {alias}</translation>
+        <translation type="vanished">别名 {alias}</translation>
     </message>
     <message>
-        <location filename="../ui/dataset_audit_dialog.py" line="178"/>
         <source>Recorded parameters</source>
-        <translation>记录的参数</translation>
+        <translation type="vanished">记录的参数</translation>
     </message>
     <message>
-        <location filename="../ui/dataset_audit_dialog.py" line="184"/>
         <source>Agent-authored explanation</source>
-        <translation>Agent 生成的说明</translation>
+        <translation type="vanished">Agent 生成的说明</translation>
     </message>
     <message>
-        <location filename="../ui/dataset_audit_dialog.py" line="185"/>
         <source>Not system-verified.</source>
-        <translation>未经系统验证。</translation>
+        <translation type="vanished">未经系统验证。</translation>
     </message>
     <message>
-        <location filename="../ui/dataset_audit_dialog.py" line="190"/>
         <source>Session Datasets</source>
-        <translation>会话数据集</translation>
+        <translation type="vanished">会话数据集</translation>
     </message>
     <message>
-        <location filename="../ui/dataset_audit_dialog.py" line="193"/>
         <source>Dataset</source>
-        <translation>数据集</translation>
+        <translation type="vanished">数据集</translation>
     </message>
     <message>
-        <location filename="../ui/dataset_audit_dialog.py" line="194"/>
         <source>Generation</source>
-        <translation>代数</translation>
+        <translation type="vanished">代数</translation>
     </message>
     <message>
-        <location filename="../ui/dataset_audit_dialog.py" line="195"/>
         <source>Operation</source>
-        <translation>操作</translation>
+        <translation type="vanished">操作</translation>
     </message>
     <message>
-        <location filename="../ui/dataset_audit_dialog.py" line="197"/>
         <source>Recorded</source>
-        <translation>记录于</translation>
+        <translation type="vanished">记录于</translation>
     </message>
     <message>
         <source>No datasets have been produced by this conversation yet.</source>
         <translation type="vanished">此会话尚未生成数据集。</translation>
     </message>
     <message>
-        <location filename="../ui/dataset_audit_dialog.py" line="203"/>
         <source>Refresh</source>
-        <translation>刷新</translation>
+        <translation type="vanished">刷新</translation>
     </message>
     <message>
-        <location filename="../ui/dataset_audit_dialog.py" line="204"/>
         <source>Close</source>
-        <translation>关闭</translation>
+        <translation type="vanished">关闭</translation>
     </message>
 </context>
 <context>
@@ -495,17 +819,27 @@ This route will stay available after model selection is connected.</source>
 <context>
     <name>JobCenterDialog</name>
     <message>
-        <location filename="../ui/job_center.py" line="182"/>
+        <location filename="../ui/job_center.py" line="219"/>
         <source>Jobs could not be loaded.</source>
         <translation>无法加载任务。</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="220"/>
+        <location filename="../ui/job_center.py" line="248"/>
+        <source>Global</source>
+        <translation>全局任务</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="248"/>
+        <source>Source not recorded</source>
+        <translation>来源未记录</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="269"/>
         <source>%1 jobs · %2 active · %3 failed</source>
         <translation>%1 个任务 · %2 个进行中 · %3 个失败</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="258"/>
+        <location filename="../ui/job_center.py" line="314"/>
         <source>Reference: %1
 Domain: %2
 Type: %3
@@ -522,156 +856,198 @@ Updated: %7</source>
 更新时间：%7</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="271"/>
+        <location filename="../ui/job_center.py" line="327"/>
         <source>
 Error: %1</source>
         <translation>
 错误：%1</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="272"/>
         <source>Job Details</source>
-        <translation>任务详情</translation>
+        <translation type="vanished">任务详情</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="276"/>
-        <location filename="../ui/job_center.py" line="308"/>
+        <location filename="../ui/job_center.py" line="329"/>
+        <source>
+Started: {time}</source>
+        <translation>
+开始时间：{time}</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="331"/>
+        <source>
+Finished: {time}</source>
+        <translation>
+结束时间：{time}</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="358"/>
+        <source>Task logs could not be loaded.</source>
+        <translation>无法加载任务日志。</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="376"/>
+        <location filename="../ui/job_center.py" line="415"/>
         <source>Knowledge</source>
         <translation>知识库</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="277"/>
-        <location filename="../ui/job_center.py" line="309"/>
+        <location filename="../ui/job_center.py" line="377"/>
+        <location filename="../ui/job_center.py" line="416"/>
         <source>Machine learning</source>
         <translation>机器学习</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="282"/>
+        <location filename="../ui/job_center.py" line="382"/>
         <source>Queued</source>
         <translation>已排队</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="283"/>
+        <location filename="../ui/job_center.py" line="383"/>
         <source>Running</source>
         <translation>运行中</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="284"/>
+        <location filename="../ui/job_center.py" line="384"/>
         <source>Succeeded</source>
         <translation>成功</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="285"/>
+        <location filename="../ui/job_center.py" line="385"/>
         <source>Failed</source>
         <translation>失败</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="286"/>
+        <location filename="../ui/job_center.py" line="386"/>
         <source>Cancelled</source>
         <translation>已取消</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="291"/>
+        <location filename="../ui/job_center.py" line="391"/>
         <source>Import</source>
         <translation>导入</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="292"/>
+        <location filename="../ui/job_center.py" line="392"/>
         <source>Content preparation</source>
         <translation>内容准备</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="293"/>
+        <location filename="../ui/job_center.py" line="393"/>
         <source>Index build</source>
         <translation>索引构建</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="294"/>
+        <location filename="../ui/job_center.py" line="394"/>
         <source>Model training</source>
         <translation>模型训练</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="295"/>
+        <location filename="../ui/job_center.py" line="395"/>
         <source>Parameter tuning</source>
         <translation>参数调优</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="296"/>
+        <location filename="../ui/job_center.py" line="396"/>
         <source>Evaluation</source>
         <translation>评估</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="297"/>
+        <location filename="../ui/job_center.py" line="397"/>
         <source>Apply model</source>
         <translation>应用模型</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="305"/>
+        <location filename="../ui/job_center.py" line="404"/>
+        <source>Current conversation</source>
+        <translation>当前会话</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="405"/>
+        <source>All conversations</source>
+        <translation>所有会话</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="412"/>
         <source>Jobs</source>
         <translation>任务</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="307"/>
+        <location filename="../ui/job_center.py" line="414"/>
         <source>All services</source>
         <translation>所有服务</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="311"/>
+        <location filename="../ui/job_center.py" line="418"/>
         <source>All statuses</source>
         <translation>所有状态</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="318"/>
+        <location filename="../ui/job_center.py" line="425"/>
         <source>Search jobs</source>
         <translation>搜索任务</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="321"/>
+        <location filename="../ui/job_center.py" line="428"/>
         <source>Service</source>
         <translation>服务</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="322"/>
+        <location filename="../ui/job_center.py" line="429"/>
         <source>Type</source>
         <translation>类型</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="323"/>
+        <location filename="../ui/job_center.py" line="430"/>
         <source>Target</source>
         <translation>对象</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="324"/>
+        <location filename="../ui/job_center.py" line="431"/>
         <source>Status</source>
         <translation>状态</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="325"/>
+        <location filename="../ui/job_center.py" line="432"/>
         <source>Updated</source>
         <translation>更新时间</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="328"/>
-        <source>Details</source>
-        <translation>详情</translation>
+        <location filename="../ui/job_center.py" line="433"/>
+        <source>Conversation</source>
+        <translation>会话</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="329"/>
+        <location filename="../ui/job_center.py" line="436"/>
+        <source>Source conversation</source>
+        <translation>来源会话</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="437"/>
+        <source>View outputs</source>
+        <translation>查看产出</translation>
+    </message>
+    <message>
+        <source>Details</source>
+        <translation type="vanished">详情</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="438"/>
         <source>Cancel</source>
         <translation>取消</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="330"/>
+        <location filename="../ui/job_center.py" line="439"/>
         <source>Refresh</source>
         <translation>刷新</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="331"/>
+        <location filename="../ui/job_center.py" line="440"/>
         <source>Close</source>
         <translation>关闭</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="332"/>
+        <location filename="../ui/job_center.py" line="441"/>
         <source>Load more</source>
         <translation>加载更多</translation>
     </message>
@@ -1700,16 +2076,17 @@ Trigger: %2</source>
     </message>
     <message>
         <location filename="../ui/main_window.py" line="189"/>
-        <location filename="../ui/windows/auxiliary.py" line="114"/>
         <source>Jobs</source>
         <translation>任务</translation>
     </message>
     <message>
         <location filename="../ui/main_window.py" line="190"/>
-        <location filename="../ui/windows/auxiliary.py" line="141"/>
-        <location filename="../ui/windows/auxiliary.py" line="150"/>
+        <source>Audit Center</source>
+        <translation>审计中心</translation>
+    </message>
+    <message>
         <source>Datasets</source>
-        <translation>数据集</translation>
+        <translation type="vanished">数据集</translation>
     </message>
     <message>
         <location filename="../ui/history/panel.py" line="222"/>
@@ -1739,18 +2116,18 @@ Trigger: %2</source>
         <translation type="vanished">无法打开产物：{path}</translation>
     </message>
     <message>
-        <location filename="../ui/chat_workspace.py" line="423"/>
-        <location filename="../ui/chat_workspace.py" line="440"/>
+        <location filename="../ui/chat_workspace.py" line="420"/>
+        <location filename="../ui/chat_workspace.py" line="437"/>
         <source>Opening link...</source>
         <translation>正在打开链接...</translation>
     </message>
     <message>
-        <location filename="../ui/chat_workspace.py" line="441"/>
+        <location filename="../ui/chat_workspace.py" line="438"/>
         <source>Open Link</source>
         <translation>打开链接</translation>
     </message>
     <message>
-        <location filename="../ui/chat_workspace.py" line="485"/>
+        <location filename="../ui/chat_workspace.py" line="478"/>
         <source>The submitted message is being prepared and cannot be stopped.</source>
         <translation>已提交的消息正在准备中，无法停止。</translation>
     </message>
@@ -1795,37 +2172,34 @@ Trigger: %2</source>
         <translation type="vanished">正在下载 Xenix {version}...</translation>
     </message>
     <message>
-        <location filename="../ui/windows/auxiliary.py" line="95"/>
+        <location filename="../ui/windows/auxiliary.py" line="93"/>
         <source>Knowledge Workspace</source>
         <translation>知识工作区</translation>
     </message>
     <message>
-        <location filename="../ui/windows/auxiliary.py" line="96"/>
+        <location filename="../ui/windows/auxiliary.py" line="94"/>
         <source>Knowledge services are not available.</source>
         <translation>知识库服务当前不可用。</translation>
     </message>
     <message>
-        <location filename="../ui/windows/auxiliary.py" line="115"/>
         <source>Job services are not available.</source>
-        <translation>任务服务不可用。</translation>
+        <translation type="vanished">任务服务不可用。</translation>
     </message>
     <message>
-        <location filename="../ui/windows/auxiliary.py" line="142"/>
         <source>Open a conversation to inspect its datasets.</source>
-        <translation>请先打开一个会话，再检查其中的数据集。</translation>
+        <translation type="vanished">请先打开一个会话，再检查其中的数据集。</translation>
     </message>
     <message>
-        <location filename="../ui/windows/auxiliary.py" line="151"/>
         <source>Dataset audit services are not available.</source>
-        <translation>数据集审计服务不可用。</translation>
+        <translation type="vanished">数据集审计服务不可用。</translation>
     </message>
     <message>
-        <location filename="../ui/chat_workspace.py" line="282"/>
+        <location filename="../ui/chat_workspace.py" line="279"/>
         <source>The selected source path is not a file.</source>
         <translation>所选源路径不是文件。</translation>
     </message>
     <message>
-        <location filename="../ui/chat_workspace.py" line="503"/>
+        <location filename="../ui/chat_workspace.py" line="496"/>
         <source>Stopped.</source>
         <translation>已停止。</translation>
     </message>
@@ -2754,88 +3128,72 @@ Text vectors: %2</source>
 <context>
     <name>ToolCallDetailView</name>
     <message>
-        <location filename="../ui/tool_call_detail_view.py" line="90"/>
-        <location filename="../ui/tool_call_detail_view.py" line="91"/>
         <source>Tool Call Details</source>
-        <translation>工具调用详情</translation>
+        <translation type="vanished">工具调用详情</translation>
     </message>
     <message>
-        <location filename="../ui/tool_call_detail_view.py" line="94"/>
         <source>Item</source>
-        <translation>项目</translation>
+        <translation type="vanished">项目</translation>
     </message>
     <message>
-        <location filename="../ui/tool_call_detail_view.py" line="95"/>
         <source>Status</source>
-        <translation>状态</translation>
+        <translation type="vanished">状态</translation>
     </message>
     <message>
-        <location filename="../ui/tool_call_detail_view.py" line="96"/>
         <source>Model</source>
-        <translation>模型</translation>
+        <translation type="vanished">模型</translation>
     </message>
     <message>
-        <location filename="../ui/tool_call_detail_view.py" line="97"/>
         <source>Started</source>
-        <translation>开始时间</translation>
+        <translation type="vanished">开始时间</translation>
     </message>
     <message>
-        <location filename="../ui/tool_call_detail_view.py" line="98"/>
         <source>Finished</source>
-        <translation>完成时间</translation>
+        <translation type="vanished">完成时间</translation>
     </message>
     <message>
-        <location filename="../ui/tool_call_detail_view.py" line="101"/>
         <source>Refresh</source>
-        <translation>刷新</translation>
+        <translation type="vanished">刷新</translation>
     </message>
     <message>
         <source>Cancel</source>
         <translation type="vanished">取消</translation>
     </message>
     <message>
-        <location filename="../ui/tool_call_detail_view.py" line="102"/>
         <source>Open</source>
-        <translation>打开</translation>
+        <translation type="vanished">打开</translation>
     </message>
     <message>
-        <location filename="../ui/tool_call_detail_view.py" line="130"/>
         <source>Error</source>
-        <translation>错误</translation>
+        <translation type="vanished">错误</translation>
     </message>
     <message>
-        <location filename="../ui/tool_call_detail_view.py" line="159"/>
         <source>Ready</source>
-        <translation>就绪</translation>
+        <translation type="vanished">就绪</translation>
     </message>
     <message>
-        <location filename="../ui/tool_call_detail_view.py" line="159"/>
         <source>Not ready</source>
-        <translation>未就绪</translation>
+        <translation type="vanished">未就绪</translation>
     </message>
     <message>
-        <location filename="../ui/tool_call_detail_view.py" line="183"/>
         <source>{count} task(s) still running.</source>
-        <translation>仍有 {count} 个任务在运行。</translation>
+        <translation type="vanished">仍有 {count} 个任务在运行。</translation>
     </message>
     <message>
-        <location filename="../ui/tool_call_detail_view.py" line="187"/>
         <source>All tracked tasks are terminal.</source>
-        <translation>所有跟踪的任务都已结束。</translation>
+        <translation type="vanished">所有跟踪的任务都已结束。</translation>
     </message>
     <message>
         <source>Cancel Failed</source>
         <translation type="vanished">取消失败</translation>
     </message>
     <message>
-        <location filename="../ui/tool_call_detail_view.py" line="220"/>
         <source>Open Failed</source>
-        <translation>打开失败</translation>
+        <translation type="vanished">打开失败</translation>
     </message>
     <message>
-        <location filename="../ui/tool_call_detail_view.py" line="221"/>
         <source>Could not open artifact: {path}</source>
-        <translation>无法打开产物：{path}</translation>
+        <translation type="vanished">无法打开产物：{path}</translation>
     </message>
 </context>
 <context>
@@ -3086,14 +3444,12 @@ Text vectors: %2</source>
         <translation>模型应用已取消</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/widgets/items.py" line="129"/>
         <source>Details</source>
-        <translation>详情</translation>
+        <translation type="vanished">详情</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/widgets/items.py" line="130"/>
         <source>Open tool call details</source>
-        <translation>打开工具调用详情</translation>
+        <translation type="vanished">打开工具调用详情</translation>
     </message>
     <message>
         <source>Hide details</source>
@@ -3144,12 +3500,12 @@ Text vectors: %2</source>
         <translation type="vanished">预测运行已取消</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/widgets/items.py" line="137"/>
+        <location filename="../ui/conversation/widgets/items.py" line="118"/>
         <source>Hide result</source>
         <translation>隐藏结果</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/widgets/items.py" line="137"/>
+        <location filename="../ui/conversation/widgets/items.py" line="118"/>
         <source>Show result</source>
         <translation>显示结果</translation>
     </message>

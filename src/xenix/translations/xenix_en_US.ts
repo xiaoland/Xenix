@@ -96,6 +96,351 @@
     </message>
 </context>
 <context>
+    <name>AuditCenterDialog</name>
+    <message>
+        <location filename="../ui/audit_center.py" line="196"/>
+        <source>No current conversation</source>
+        <translation>No current conversation</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="197"/>
+        <source>Open a conversation, or select All conversations.</source>
+        <translation>Open a conversation, or select All conversations.</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="213"/>
+        <source>Outputs could not be loaded. Retry with Refresh.</source>
+        <translation>Outputs could not be loaded. Retry with Refresh.</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="240"/>
+        <source>No matching outputs</source>
+        <translation>No matching outputs</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="241"/>
+        <source>This conversation has no outputs yet, or no outputs match these filters.</source>
+        <translation>This conversation has no outputs yet, or no outputs match these filters.</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="261"/>
+        <source>Loading recorded evidence…</source>
+        <translation>Loading recorded evidence…</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="275"/>
+        <source>Evidence could not be loaded. Retry with Refresh.</source>
+        <translation>Evidence could not be loaded. Retry with Refresh.</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="295"/>
+        <source>Evaluation</source>
+        <translation>Evaluation</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="296"/>
+        <source>Baseline evaluation</source>
+        <translation>Baseline evaluation</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="297"/>
+        <source>Data split</source>
+        <translation>Data split</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="298"/>
+        <source>Test rows</source>
+        <translation>Test rows</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="299"/>
+        <source>Training rows</source>
+        <translation>Training rows</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="300"/>
+        <source>Total rows</source>
+        <translation>Total rows</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="301"/>
+        <source>Rendered rows</source>
+        <translation>Rendered rows</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="302"/>
+        <source>Partial data</source>
+        <translation>Partial data</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="303"/>
+        <location filename="../ui/audit_center.py" line="339"/>
+        <source>Limitations</source>
+        <translation>Limitations</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="304"/>
+        <source>Error</source>
+        <translation>Error</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="305"/>
+        <source>Source file</source>
+        <translation>Source file</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="306"/>
+        <source>Worksheet</source>
+        <translation>Worksheet</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="307"/>
+        <source>Operation</source>
+        <translation>Operation</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="316"/>
+        <source>Yes</source>
+        <translation>Yes</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="316"/>
+        <source>No</source>
+        <translation>No</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="331"/>
+        <source>Why this approach</source>
+        <translation>Why this approach</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="332"/>
+        <source>Not recorded</source>
+        <translation>Not recorded</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="333"/>
+        <source>What the result means</source>
+        <translation>What the result means</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="335"/>
+        <source>Agent-authored interpretation; inspect the recorded evidence.</source>
+        <translation>Agent-authored interpretation; inspect the recorded evidence.</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="337"/>
+        <source>View evidence</source>
+        <translation>View evidence</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="338"/>
+        <source>Earlier and other-conversation interpretations</source>
+        <translation>Earlier and other-conversation interpretations</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="340"/>
+        <source>Recorded evidence</source>
+        <translation>Recorded evidence</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="342"/>
+        <source>No upstream inputs recorded.</source>
+        <translation>No upstream inputs recorded.</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="343"/>
+        <source>Not recorded / not applicable</source>
+        <translation>Not recorded / not applicable</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="495"/>
+        <source>All conversations</source>
+        <translation>All conversations</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="494"/>
+        <source>Current conversation</source>
+        <translation>Current conversation</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="348"/>
+        <source>Source conversation unavailable</source>
+        <translation>Source conversation unavailable</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="351"/>
+        <source>Agent interpretation recorded</source>
+        <translation>Agent interpretation recorded</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="353"/>
+        <source>Waiting for task results; no interpretation yet.</source>
+        <translation>Waiting for task results; no interpretation yet.</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="355"/>
+        <source>Output available; the Agent has not interpreted it yet.</source>
+        <translation>Output available; the Agent has not interpreted it yet.</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="357"/>
+        <source>No Agent explanation was saved for this output.</source>
+        <translation>No Agent explanation was saved for this output.</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="359"/>
+        <source>Queued</source>
+        <translation>Queued</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="360"/>
+        <source>Running</source>
+        <translation>Running</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="361"/>
+        <source>Succeeded</source>
+        <translation>Succeeded</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="362"/>
+        <source>Failed</source>
+        <translation>Failed</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="363"/>
+        <source>Cancelled</source>
+        <translation>Cancelled</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="368"/>
+        <source>Task: {status}</source>
+        <translation>Task: {status}</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="418"/>
+        <source>Submitted parameters</source>
+        <translation>Submitted parameters</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="419"/>
+        <source>Effective parameters</source>
+        <translation>Effective parameters</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="420"/>
+        <source>Selected tuning parameters</source>
+        <translation>Selected tuning parameters</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="433"/>
+        <source>File unavailable</source>
+        <translation>File unavailable</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="481"/>
+        <source>Dataset</source>
+        <translation>Dataset</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="482"/>
+        <source>Model</source>
+        <translation>Model</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="483"/>
+        <source>Chart</source>
+        <translation>Chart</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="484"/>
+        <source>Report</source>
+        <translation>Report</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="485"/>
+        <source>Application result</source>
+        <translation>Application result</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="486"/>
+        <source>Other output</source>
+        <translation>Other output</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="490"/>
+        <source>Audit Center</source>
+        <translation>Audit Center</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="498"/>
+        <source>All output types</source>
+        <translation>All output types</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="504"/>
+        <source>Search outputs</source>
+        <translation>Search outputs</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="506"/>
+        <source>Refresh</source>
+        <translation>Refresh</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="507"/>
+        <source>Load more</source>
+        <translation>Load more</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="508"/>
+        <source>Back to output</source>
+        <translation>Back to output</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="509"/>
+        <source>Clear task filter</source>
+        <translation>Clear task filter</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="510"/>
+        <source>Show original records and interpretation history</source>
+        <translation>Show original records and interpretation history</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="511"/>
+        <source>Open output</source>
+        <translation>Open output</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="512"/>
+        <source>View task</source>
+        <translation>View task</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="513"/>
+        <source>Source conversation</source>
+        <translation>Source conversation</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="517"/>
+        <source>Explanation and evidence</source>
+        <translation>Explanation and evidence</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="341"/>
+        <location filename="../ui/audit_center.py" line="517"/>
+        <source>Inputs and source</source>
+        <translation>Inputs and source</translation>
+    </message>
+    <message>
+        <location filename="../ui/audit_center.py" line="517"/>
+        <source>Parameters and records</source>
+        <translation>Parameters and records</translation>
+    </message>
+</context>
+<context>
     <name>ChatComposer</name>
     <message>
         <location filename="../ui/conversation/composer.py" line="183"/>
@@ -178,8 +523,8 @@
 <context>
     <name>ChatTimeline</name>
     <message>
+        <location filename="../ui/conversation/timeline.py" line="99"/>
         <location filename="../ui/conversation/timeline.py" line="100"/>
-        <location filename="../ui/conversation/timeline.py" line="101"/>
         <source>Scroll to bottom</source>
         <translation>Scroll to bottom</translation>
     </message>
@@ -221,37 +566,37 @@
 <context>
     <name>ConnectionRetryItem</name>
     <message>
-        <location filename="../ui/conversation/widgets/items.py" line="249"/>
+        <location filename="../ui/conversation/widgets/items.py" line="219"/>
         <source>Connecting ({attempt}/{max})</source>
         <translation>Connecting ({attempt}/{max})</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/widgets/items.py" line="260"/>
+        <location filename="../ui/conversation/widgets/items.py" line="230"/>
         <source>Hide details</source>
         <translation>Hide details</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/widgets/items.py" line="260"/>
+        <location filename="../ui/conversation/widgets/items.py" line="230"/>
         <source>Show details</source>
         <translation>Show details</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/widgets/items.py" line="288"/>
+        <location filename="../ui/conversation/widgets/items.py" line="258"/>
         <source>LLM connection retry</source>
         <translation>LLM connection retry</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/widgets/items.py" line="295"/>
+        <location filename="../ui/conversation/widgets/items.py" line="265"/>
         <source>Attempt {attempt}/{max}</source>
         <translation>Attempt {attempt}/{max}</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/widgets/items.py" line="301"/>
+        <location filename="../ui/conversation/widgets/items.py" line="271"/>
         <source>Attempt</source>
         <translation>Attempt</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/widgets/items.py" line="305"/>
+        <location filename="../ui/conversation/widgets/items.py" line="275"/>
         <source>Error code: `{code}`</source>
         <translation>Error code: `{code}`</translation>
     </message>
@@ -292,105 +637,84 @@
 <context>
     <name>DatasetAuditDialog</name>
     <message>
-        <location filename="../ui/dataset_audit_dialog.py" line="109"/>
         <source>Dataset loading failed. Retry with Refresh.</source>
-        <translation>Dataset loading failed. Retry with Refresh.</translation>
+        <translation type="vanished">Dataset loading failed. Retry with Refresh.</translation>
     </message>
     <message>
-        <location filename="../ui/dataset_audit_dialog.py" line="110"/>
-        <location filename="../ui/dataset_audit_dialog.py" line="201"/>
         <source>No datasets are associated with this conversation yet.</source>
-        <translation>No datasets are associated with this conversation yet.</translation>
+        <translation type="vanished">No datasets are associated with this conversation yet.</translation>
     </message>
     <message>
-        <location filename="../ui/dataset_audit_dialog.py" line="153"/>
         <source>Dataset: {name} ({dataset_id})</source>
-        <translation>Dataset: {name} ({dataset_id})</translation>
+        <translation type="vanished">Dataset: {name} ({dataset_id})</translation>
     </message>
     <message>
-        <location filename="../ui/dataset_audit_dialog.py" line="156"/>
         <source>Generation: {generation}</source>
-        <translation>Generation: {generation}</translation>
+        <translation type="vanished">Generation: {generation}</translation>
     </message>
     <message>
-        <location filename="../ui/dataset_audit_dialog.py" line="157"/>
         <source>Recorded operation: {operation}</source>
-        <translation>Recorded operation: {operation}</translation>
+        <translation type="vanished">Recorded operation: {operation}</translation>
     </message>
     <message>
-        <location filename="../ui/dataset_audit_dialog.py" line="160"/>
         <source>Recorded at: {created_at}</source>
-        <translation>Recorded at: {created_at}</translation>
+        <translation type="vanished">Recorded at: {created_at}</translation>
     </message>
     <message>
-        <location filename="../ui/dataset_audit_dialog.py" line="166"/>
-        <location filename="../ui/dataset_audit_dialog.py" line="196"/>
         <source>Inputs</source>
-        <translation>Inputs</translation>
+        <translation type="vanished">Inputs</translation>
     </message>
     <message>
-        <location filename="../ui/dataset_audit_dialog.py" line="168"/>
         <source>{position}. {name} ({dataset_id})</source>
-        <translation>{position}. {name} ({dataset_id})</translation>
+        <translation type="vanished">{position}. {name} ({dataset_id})</translation>
     </message>
     <message>
-        <location filename="../ui/dataset_audit_dialog.py" line="174"/>
         <source>alias {alias}</source>
-        <translation>alias {alias}</translation>
+        <translation type="vanished">alias {alias}</translation>
     </message>
     <message>
-        <location filename="../ui/dataset_audit_dialog.py" line="178"/>
         <source>Recorded parameters</source>
-        <translation>Recorded parameters</translation>
+        <translation type="vanished">Recorded parameters</translation>
     </message>
     <message>
-        <location filename="../ui/dataset_audit_dialog.py" line="184"/>
         <source>Agent-authored explanation</source>
-        <translation>Agent-authored explanation</translation>
+        <translation type="vanished">Agent-authored explanation</translation>
     </message>
     <message>
-        <location filename="../ui/dataset_audit_dialog.py" line="185"/>
         <source>Not system-verified.</source>
-        <translation>Not system-verified.</translation>
+        <translation type="vanished">Not system-verified.</translation>
     </message>
     <message>
-        <location filename="../ui/dataset_audit_dialog.py" line="190"/>
         <source>Session Datasets</source>
-        <translation>Session Datasets</translation>
+        <translation type="vanished">Session Datasets</translation>
     </message>
     <message>
-        <location filename="../ui/dataset_audit_dialog.py" line="193"/>
         <source>Dataset</source>
-        <translation>Dataset</translation>
+        <translation type="vanished">Dataset</translation>
     </message>
     <message>
-        <location filename="../ui/dataset_audit_dialog.py" line="194"/>
         <source>Generation</source>
-        <translation>Generation</translation>
+        <translation type="vanished">Generation</translation>
     </message>
     <message>
-        <location filename="../ui/dataset_audit_dialog.py" line="195"/>
         <source>Operation</source>
-        <translation>Operation</translation>
+        <translation type="vanished">Operation</translation>
     </message>
     <message>
-        <location filename="../ui/dataset_audit_dialog.py" line="197"/>
         <source>Recorded</source>
-        <translation>Recorded</translation>
+        <translation type="vanished">Recorded</translation>
     </message>
     <message>
         <source>No datasets have been produced by this conversation yet.</source>
         <translation type="vanished">No datasets have been produced by this conversation yet.</translation>
     </message>
     <message>
-        <location filename="../ui/dataset_audit_dialog.py" line="203"/>
         <source>Refresh</source>
-        <translation>Refresh</translation>
+        <translation type="vanished">Refresh</translation>
     </message>
     <message>
-        <location filename="../ui/dataset_audit_dialog.py" line="204"/>
         <source>Close</source>
-        <translation>Close</translation>
+        <translation type="vanished">Close</translation>
     </message>
 </context>
 <context>
@@ -422,17 +746,27 @@
 <context>
     <name>JobCenterDialog</name>
     <message>
-        <location filename="../ui/job_center.py" line="182"/>
+        <location filename="../ui/job_center.py" line="219"/>
         <source>Jobs could not be loaded.</source>
         <translation>Jobs could not be loaded.</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="220"/>
+        <location filename="../ui/job_center.py" line="248"/>
+        <source>Global</source>
+        <translation>Global</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="248"/>
+        <source>Source not recorded</source>
+        <translation>Source not recorded</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="269"/>
         <source>%1 jobs · %2 active · %3 failed</source>
         <translation>%1 jobs · %2 active · %3 failed</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="258"/>
+        <location filename="../ui/job_center.py" line="314"/>
         <source>Reference: %1
 Domain: %2
 Type: %3
@@ -449,156 +783,198 @@ Phase: %6
 Updated: %7</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="271"/>
+        <location filename="../ui/job_center.py" line="327"/>
         <source>
 Error: %1</source>
         <translation>
 Error: %1</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="272"/>
         <source>Job Details</source>
-        <translation>Job Details</translation>
+        <translation type="vanished">Job Details</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="276"/>
-        <location filename="../ui/job_center.py" line="308"/>
+        <location filename="../ui/job_center.py" line="329"/>
+        <source>
+Started: {time}</source>
+        <translation>
+Started: {time}</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="331"/>
+        <source>
+Finished: {time}</source>
+        <translation>
+Finished: {time}</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="358"/>
+        <source>Task logs could not be loaded.</source>
+        <translation>Task logs could not be loaded.</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="376"/>
+        <location filename="../ui/job_center.py" line="415"/>
         <source>Knowledge</source>
         <translation>Knowledge</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="277"/>
-        <location filename="../ui/job_center.py" line="309"/>
+        <location filename="../ui/job_center.py" line="377"/>
+        <location filename="../ui/job_center.py" line="416"/>
         <source>Machine learning</source>
         <translation>Machine learning</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="282"/>
+        <location filename="../ui/job_center.py" line="382"/>
         <source>Queued</source>
         <translation>Queued</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="283"/>
+        <location filename="../ui/job_center.py" line="383"/>
         <source>Running</source>
         <translation>Running</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="284"/>
+        <location filename="../ui/job_center.py" line="384"/>
         <source>Succeeded</source>
         <translation>Succeeded</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="285"/>
+        <location filename="../ui/job_center.py" line="385"/>
         <source>Failed</source>
         <translation>Failed</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="286"/>
+        <location filename="../ui/job_center.py" line="386"/>
         <source>Cancelled</source>
         <translation>Cancelled</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="291"/>
+        <location filename="../ui/job_center.py" line="391"/>
         <source>Import</source>
         <translation>Import</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="292"/>
+        <location filename="../ui/job_center.py" line="392"/>
         <source>Content preparation</source>
         <translation>Content preparation</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="293"/>
+        <location filename="../ui/job_center.py" line="393"/>
         <source>Index build</source>
         <translation>Index build</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="294"/>
+        <location filename="../ui/job_center.py" line="394"/>
         <source>Model training</source>
         <translation>Model training</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="295"/>
+        <location filename="../ui/job_center.py" line="395"/>
         <source>Parameter tuning</source>
         <translation>Parameter tuning</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="296"/>
+        <location filename="../ui/job_center.py" line="396"/>
         <source>Evaluation</source>
         <translation>Evaluation</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="297"/>
+        <location filename="../ui/job_center.py" line="397"/>
         <source>Apply model</source>
         <translation>Apply model</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="305"/>
+        <location filename="../ui/job_center.py" line="404"/>
+        <source>Current conversation</source>
+        <translation>Current conversation</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="405"/>
+        <source>All conversations</source>
+        <translation>All conversations</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="412"/>
         <source>Jobs</source>
         <translation>Jobs</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="307"/>
+        <location filename="../ui/job_center.py" line="414"/>
         <source>All services</source>
         <translation>All services</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="311"/>
+        <location filename="../ui/job_center.py" line="418"/>
         <source>All statuses</source>
         <translation>All statuses</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="318"/>
+        <location filename="../ui/job_center.py" line="425"/>
         <source>Search jobs</source>
         <translation>Search jobs</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="321"/>
+        <location filename="../ui/job_center.py" line="428"/>
         <source>Service</source>
         <translation>Service</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="322"/>
+        <location filename="../ui/job_center.py" line="429"/>
         <source>Type</source>
         <translation>Type</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="323"/>
+        <location filename="../ui/job_center.py" line="430"/>
         <source>Target</source>
         <translation>Target</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="324"/>
+        <location filename="../ui/job_center.py" line="431"/>
         <source>Status</source>
         <translation>Status</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="325"/>
+        <location filename="../ui/job_center.py" line="432"/>
         <source>Updated</source>
         <translation>Updated</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="328"/>
-        <source>Details</source>
-        <translation>Details</translation>
+        <location filename="../ui/job_center.py" line="433"/>
+        <source>Conversation</source>
+        <translation>Conversation</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="329"/>
+        <location filename="../ui/job_center.py" line="436"/>
+        <source>Source conversation</source>
+        <translation>Source conversation</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="437"/>
+        <source>View outputs</source>
+        <translation>View outputs</translation>
+    </message>
+    <message>
+        <source>Details</source>
+        <translation type="vanished">Details</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_center.py" line="438"/>
         <source>Cancel</source>
         <translation>Cancel</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="330"/>
+        <location filename="../ui/job_center.py" line="439"/>
         <source>Refresh</source>
         <translation>Refresh</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="331"/>
+        <location filename="../ui/job_center.py" line="440"/>
         <source>Close</source>
         <translation>Close</translation>
     </message>
     <message>
-        <location filename="../ui/job_center.py" line="332"/>
+        <location filename="../ui/job_center.py" line="441"/>
         <source>Load more</source>
         <translation>Load more</translation>
     </message>
@@ -1615,16 +1991,17 @@ Trigger: %2</translation>
     </message>
     <message>
         <location filename="../ui/main_window.py" line="189"/>
-        <location filename="../ui/windows/auxiliary.py" line="114"/>
         <source>Jobs</source>
         <translation>Jobs</translation>
     </message>
     <message>
         <location filename="../ui/main_window.py" line="190"/>
-        <location filename="../ui/windows/auxiliary.py" line="141"/>
-        <location filename="../ui/windows/auxiliary.py" line="150"/>
+        <source>Audit Center</source>
+        <translation>Audit Center</translation>
+    </message>
+    <message>
         <source>Datasets</source>
-        <translation>Datasets</translation>
+        <translation type="vanished">Datasets</translation>
     </message>
     <message>
         <location filename="../ui/history/panel.py" line="222"/>
@@ -1638,53 +2015,50 @@ Trigger: %2</translation>
         <translation>New thread</translation>
     </message>
     <message>
-        <location filename="../ui/windows/auxiliary.py" line="95"/>
+        <location filename="../ui/windows/auxiliary.py" line="93"/>
         <source>Knowledge Workspace</source>
         <translation>Knowledge Workspace</translation>
     </message>
     <message>
-        <location filename="../ui/windows/auxiliary.py" line="96"/>
+        <location filename="../ui/windows/auxiliary.py" line="94"/>
         <source>Knowledge services are not available.</source>
         <translation>Knowledge services are not available.</translation>
     </message>
     <message>
-        <location filename="../ui/windows/auxiliary.py" line="115"/>
         <source>Job services are not available.</source>
-        <translation>Job services are not available.</translation>
+        <translation type="vanished">Job services are not available.</translation>
     </message>
     <message>
-        <location filename="../ui/windows/auxiliary.py" line="142"/>
         <source>Open a conversation to inspect its datasets.</source>
-        <translation>Open a conversation to inspect its datasets.</translation>
+        <translation type="vanished">Open a conversation to inspect its datasets.</translation>
     </message>
     <message>
-        <location filename="../ui/windows/auxiliary.py" line="151"/>
         <source>Dataset audit services are not available.</source>
-        <translation>Dataset audit services are not available.</translation>
+        <translation type="vanished">Dataset audit services are not available.</translation>
     </message>
     <message>
-        <location filename="../ui/chat_workspace.py" line="282"/>
+        <location filename="../ui/chat_workspace.py" line="279"/>
         <source>The selected source path is not a file.</source>
         <translation>The selected source path is not a file.</translation>
     </message>
     <message>
-        <location filename="../ui/chat_workspace.py" line="423"/>
-        <location filename="../ui/chat_workspace.py" line="440"/>
+        <location filename="../ui/chat_workspace.py" line="420"/>
+        <location filename="../ui/chat_workspace.py" line="437"/>
         <source>Opening link...</source>
         <translation>Opening link...</translation>
     </message>
     <message>
-        <location filename="../ui/chat_workspace.py" line="441"/>
+        <location filename="../ui/chat_workspace.py" line="438"/>
         <source>Open Link</source>
         <translation>Open Link</translation>
     </message>
     <message>
-        <location filename="../ui/chat_workspace.py" line="485"/>
+        <location filename="../ui/chat_workspace.py" line="478"/>
         <source>The submitted message is being prepared and cannot be stopped.</source>
         <translation>The submitted message is being prepared and cannot be stopped.</translation>
     </message>
     <message>
-        <location filename="../ui/chat_workspace.py" line="503"/>
+        <location filename="../ui/chat_workspace.py" line="496"/>
         <source>Stopped.</source>
         <translation>Stopped.</translation>
     </message>
@@ -2549,80 +2923,64 @@ Text vectors: %2</translation>
 <context>
     <name>ToolCallDetailView</name>
     <message>
-        <location filename="../ui/tool_call_detail_view.py" line="90"/>
-        <location filename="../ui/tool_call_detail_view.py" line="91"/>
         <source>Tool Call Details</source>
-        <translation>Tool Call Details</translation>
+        <translation type="vanished">Tool Call Details</translation>
     </message>
     <message>
-        <location filename="../ui/tool_call_detail_view.py" line="94"/>
         <source>Item</source>
-        <translation>Item</translation>
+        <translation type="vanished">Item</translation>
     </message>
     <message>
-        <location filename="../ui/tool_call_detail_view.py" line="95"/>
         <source>Status</source>
-        <translation>Status</translation>
+        <translation type="vanished">Status</translation>
     </message>
     <message>
-        <location filename="../ui/tool_call_detail_view.py" line="96"/>
         <source>Model</source>
-        <translation>Model</translation>
+        <translation type="vanished">Model</translation>
     </message>
     <message>
-        <location filename="../ui/tool_call_detail_view.py" line="97"/>
         <source>Started</source>
-        <translation>Started</translation>
+        <translation type="vanished">Started</translation>
     </message>
     <message>
-        <location filename="../ui/tool_call_detail_view.py" line="98"/>
         <source>Finished</source>
-        <translation>Finished</translation>
+        <translation type="vanished">Finished</translation>
     </message>
     <message>
-        <location filename="../ui/tool_call_detail_view.py" line="101"/>
         <source>Refresh</source>
-        <translation>Refresh</translation>
+        <translation type="vanished">Refresh</translation>
     </message>
     <message>
-        <location filename="../ui/tool_call_detail_view.py" line="102"/>
         <source>Open</source>
-        <translation>Open</translation>
+        <translation type="vanished">Open</translation>
     </message>
     <message>
-        <location filename="../ui/tool_call_detail_view.py" line="130"/>
         <source>Error</source>
-        <translation>Error</translation>
+        <translation type="vanished">Error</translation>
     </message>
     <message>
-        <location filename="../ui/tool_call_detail_view.py" line="159"/>
         <source>Ready</source>
-        <translation>Ready</translation>
+        <translation type="vanished">Ready</translation>
     </message>
     <message>
-        <location filename="../ui/tool_call_detail_view.py" line="159"/>
         <source>Not ready</source>
-        <translation>Not ready</translation>
+        <translation type="vanished">Not ready</translation>
     </message>
     <message>
-        <location filename="../ui/tool_call_detail_view.py" line="183"/>
         <source>{count} task(s) still running.</source>
-        <translation>{count} task(s) still running.</translation>
+        <translation type="vanished">{count} task(s) still running.</translation>
     </message>
     <message>
-        <location filename="../ui/tool_call_detail_view.py" line="187"/>
         <source>All tracked tasks are terminal.</source>
-        <translation>All tracked tasks are terminal.</translation>
+        <translation type="vanished">All tracked tasks are terminal.</translation>
     </message>
     <message>
-        <location filename="../ui/tool_call_detail_view.py" line="220"/>
         <source>Open Failed</source>
-        <translation>Open Failed</translation>
+        <translation type="vanished">Open Failed</translation>
     </message>
     <message>
-        <location filename="../ui/tool_call_detail_view.py" line="221"/>
         <source>Could not open artifact: {path}</source>
-        <translation>Could not open artifact: {path}</translation>
+        <translation type="vanished">Could not open artifact: {path}</translation>
     </message>
 </context>
 <context>
@@ -2873,22 +3231,20 @@ Text vectors: %2</translation>
         <translation>Cancelled model apply</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/widgets/items.py" line="129"/>
         <source>Details</source>
-        <translation>Details</translation>
+        <translation type="vanished">Details</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/widgets/items.py" line="130"/>
         <source>Open tool call details</source>
-        <translation>Open tool call details</translation>
+        <translation type="vanished">Open tool call details</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/widgets/items.py" line="137"/>
+        <location filename="../ui/conversation/widgets/items.py" line="118"/>
         <source>Hide result</source>
         <translation>Hide result</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/widgets/items.py" line="137"/>
+        <location filename="../ui/conversation/widgets/items.py" line="118"/>
         <source>Show result</source>
         <translation>Show result</translation>
     </message>

@@ -38,6 +38,7 @@ migration, observability, and recovery belong in
 
 | Contract | Dependent units | Failure if lost |
 | --- | --- | --- |
+| [审计中心与 Agent 解释](audit-center-contract.md) | UI、Agent、Dataset/ML/Artifact 服务与存储 | 解释覆盖领域事实、来源被误归属或产出失去可审计性。 |
 | [Storage ownership](storage-ownership.md) | Services, persistence, Agent, data, artifact, and ML | State and bytes acquire competing authorities or unsafe deletion behavior. |
 | [Artifact links](artifact-links.md) | Producing services, Agent Harness, Chatbot UI, LinkRouter, and ArtifactService | Dataset ids, artifact ids, or local paths become interchangeable and unsafe. |
 | [LLM conversation boundary](llm-conversation-boundary.md) | Chatbot UI, Agent Harness, LLMConversationService, providers, Tool implementations, and DatasetService | A reverse dependency, second writer, or persistent execution authority reappears. |

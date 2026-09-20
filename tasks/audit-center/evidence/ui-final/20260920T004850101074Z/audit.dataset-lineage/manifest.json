@@ -1,0 +1,55 @@
+{
+  "captured_at_utc": "2026-09-20T00:48:50.354441+00:00",
+  "files": [
+    {
+      "bytes": 173086,
+      "name": "tree.json"
+    },
+    {
+      "bytes": 48276,
+      "name": "actual.png",
+      "pixel_height": 740,
+      "pixel_width": 1100
+    }
+  ],
+  "policy": "synthetic",
+  "reason": "scenario-capture",
+  "redaction": {
+    "paths": "preserved",
+    "qt_log_max_bytes": 32768,
+    "qt_log_max_records": 200,
+    "widget_text": "omitted"
+  },
+  "render_environment": {
+    "device_pixel_ratio": 1.0,
+    "font": {
+      "exact_match": true,
+      "family": "Microsoft YaHei",
+      "italic": false,
+      "pixel_size": -1,
+      "point_size": 9.0,
+      "resolved_family": "Microsoft YaHei",
+      "resolved_point_size": 9.0,
+      "resolved_style_name": "Regular",
+      "resolved_weight": 400,
+      "style_name": "",
+      "weight": 400
+    },
+    "locale": "zh_CN",
+    "logical_dpi": 96.0,
+    "os": "Windows-10-10.0.19045-SP0",
+    "pyside": "6.11.1",
+    "python": "3.14.2",
+    "qpa": "offscreen",
+    "qt": "6.11.1",
+    "style": "fusion"
+  },
+  "root_geometry": {
+    "height": 740,
+    "width": 1100,
+    "x": 2,
+    "y": 30
+  },
+  "scenario_id": "audit.dataset-lineage",
+  "schema_version": 1
+}

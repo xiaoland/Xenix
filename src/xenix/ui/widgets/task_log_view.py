@@ -29,9 +29,13 @@ class TaskLogView(QFrame):
         if not logs:
             self._text.clear()
             return
-        self._text.setPlainText(
-            "\n".join(f"[{entry.timestamp}] {entry.level}: {entry.message}" for entry in logs)
-        )
+        text = "\n".join(f"[{entry.timestamp}] {entry.level}: {entry.message}" for entry in logs)
+        if self._text.toPlainText() == text:
+            return
+        scroll = self._text.verticalScrollBar()
+        previous, following = scroll.value(), scroll.value() == scroll.maximum()
+        self._text.setPlainText(text)
+        scroll.setValue(scroll.maximum() if following else previous)
 
     def clear(self) -> None:
         self._text.clear()

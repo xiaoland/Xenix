@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from .contracts import ScenarioSpec
+from .audit_scenarios import AUDIT_SCENARIOS
 from .feature_scenarios import build_history_populated, build_settings_provider_and_ocr
 from .scenarios import (
     build_chat_empty,
@@ -9,7 +10,7 @@ from .scenarios import (
 )
 
 
-_SCENARIOS = (
+_SCENARIOS = (*AUDIT_SCENARIOS,
     ScenarioSpec(
         id="main.history-populated",
         title="Populated history panel",

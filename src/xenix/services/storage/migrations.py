@@ -9,8 +9,9 @@ from sqlmodel import SQLModel
 from ...exceptions import ValidationError
 from . import models  # noqa: F401
 from .migration_v28 import migrate_v27_to_v28
+from .migration_v29 import migrate_v28_to_v29
 
-CURRENT_SCHEMA_VERSION = 28
+CURRENT_SCHEMA_VERSION = 29
 
 
 def get_user_version(engine: Engine) -> int:
@@ -2005,6 +2006,8 @@ def run_migrations(engine: Engine) -> int:
         current_version = migrate_v26_to_v27(engine)
     if current_version == 27:
         current_version = migrate_v27_to_v28(engine)
+    if current_version == 28:
+        current_version = migrate_v28_to_v29(engine)
     if current_version == CURRENT_SCHEMA_VERSION:
         return current_version
     raise ValidationError(

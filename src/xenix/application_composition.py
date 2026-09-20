@@ -126,13 +126,13 @@ def build_workbench_window(
     lifetime.add_cleanup("job scheduler", scheduler.shutdown)
 
     from .ui.conversation.execution import ThreadedSubmissionExecutor
-    from .ui.dataset_audit_dialog import DatasetAuditDialog
+    from .ui.audit_center import AuditCenterDialog
+    from .services.audit_service import AuditQueryService
     from .ui.history import HarnessHistoryAdapter
     from .ui.job_center import JobCenterDialog
     from .ui.knowledge_workspace import KnowledgeWorkspaceDialog
     from .ui.settings_dialog import SettingsDialog
     from .ui.software_update import SoftwareUpdateController
-    from .ui.tool_call_detail_view import ToolCallDetailView
     from .ui.windows.auxiliary import AuxiliaryWindowCoordinator
 
     def create_settings(owner: QWidget) -> SettingsDialog:
@@ -169,12 +169,13 @@ def build_workbench_window(
         return JobCenterDialog(
             job_query_service,
             scheduler=scheduler,
+            ml_service=agent_services.ml,
             parent=owner,
         )
 
-    def create_dataset_audit(owner: QWidget, thread_id: int) -> DatasetAuditDialog:
-        return DatasetAuditDialog(
-            harness=agent_services.harness,
+    def create_audit_center(owner: QWidget, thread_id: int | None) -> AuditCenterDialog:
+        return AuditCenterDialog(
+            service=AuditQueryService(context.session_factory),
             thread_id=thread_id,
             parent=owner,
         )
@@ -184,13 +185,8 @@ def build_workbench_window(
             owner,
             settings_factory=create_settings,
             knowledge_factory=create_knowledge,
-            detail_factory=lambda parent, task_ids: ToolCallDetailView(
-                ml_service=agent_services.ml,
-                task_ids=task_ids,
-                parent=parent,
-            ),
             job_center_factory=create_job_center,
-            dataset_audit_factory=create_dataset_audit,
+            audit_center_factory=create_audit_center,
             update_controller=(SoftwareUpdateController(owner, update_service) if update_service is not None else None),
         )
 

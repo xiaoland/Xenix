@@ -1,0 +1,55 @@
+{
+  "captured_at_utc": "2026-09-20T00:48:50.772782+00:00",
+  "files": [
+    {
+      "bytes": 210978,
+      "name": "tree.json"
+    },
+    {
+      "bytes": 16227,
+      "name": "actual.png",
+      "pixel_height": 720,
+      "pixel_width": 900
+    }
+  ],
+  "policy": "synthetic",
+  "reason": "scenario-capture",
+  "redaction": {
+    "paths": "preserved",
+    "qt_log_max_bytes": 32768,
+    "qt_log_max_records": 200,
+    "widget_text": "omitted"
+  },
+  "render_environment": {
+    "device_pixel_ratio": 1.0,
+    "font": {
+      "exact_match": true,
+      "family": "Segoe UI",
+      "italic": false,
+      "pixel_size": -1,
+      "point_size": 9.0,
+      "resolved_family": "Segoe UI",
+      "resolved_point_size": 9.0,
+      "resolved_style_name": "Regular",
+      "resolved_weight": 400,
+      "style_name": "",
+      "weight": 400
+    },
+    "locale": "en_US",
+    "logical_dpi": 96.0,
+    "os": "Windows-10-10.0.19045-SP0",
+    "pyside": "6.11.1",
+    "python": "3.14.2",
+    "qpa": "offscreen",
+    "qt": "6.11.1",
+    "style": "fusion"
+  },
+  "root_geometry": {
+    "height": 720,
+    "width": 900,
+    "x": 2,
+    "y": 2
+  },
+  "scenario_id": "chat.mixed-timeline",
+  "schema_version": 1
+}

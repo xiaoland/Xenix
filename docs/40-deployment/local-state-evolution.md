@@ -80,3 +80,5 @@ Distinguish these cases before acting:
 - **Restore:** replaces the active state with a consistent backup and requires post-startup data checks.
 
 Use [Runtime State](runtime-state.md) for backup sets, reset blast radius, restore order, and verification. Do not delete or overwrite the only failing database while diagnosing it.
+
+审计来源升级只沿已有创建工具调用和模型的明确评估关系回填会话；历史解释和未保存的参数保持缺失。升级在单个显式 SQLite 事务中执行，失败时保留升级前结构与版本；删除来源会话不会级联删除解释或产出。恢复操作仍按本节既有备份与恢复流程进行。

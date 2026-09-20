@@ -2,16 +2,14 @@
 
 from .auxiliary import (
     AuxiliaryWindowCoordinator,
-    DatasetAuditWindowFactory,
-    DetailWindowFactory,
+    AuditCenterWindowFactory,
     KnowledgeWindowFactory,
     SettingsWindowFactory,
 )
 
 __all__ = [
     "AuxiliaryWindowCoordinator",
-    "DatasetAuditWindowFactory",
-    "DetailWindowFactory",
+    "AuditCenterWindowFactory",
     "KnowledgeWindowFactory",
     "SettingsWindowFactory",
 ]

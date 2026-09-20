@@ -2,10 +2,14 @@ from __future__ import annotations
 
 from sqlmodel import Session, select
 
-from ..models import ArtifactRow
+from ..models import ArtifactRow, ArtifactDerivationRow
 
 
 class ArtifactRepository:
+    def create_derivation(self, session: Session, row: ArtifactDerivationRow) -> None:
+        session.add(row)
+        session.flush()
+
     def create(self, session: Session, row: ArtifactRow) -> ArtifactRow:
         session.add(row)
         session.flush()
@@ -19,6 +23,10 @@ class ArtifactRepository:
         row = self.get(session, artifact_id)
         if row is None:
             return False
+        derivation = session.get(ArtifactDerivationRow, artifact_id)
+        if derivation is not None:
+            session.delete(derivation)
+            session.flush()
         session.delete(row)
         session.flush()
         return True

@@ -60,11 +60,14 @@ class _KnowledgeWindow(QWidget):
         super().changeEvent(event)
 
 
-class _DetailWindow(QWidget):
-    pass
+class _AuditWindow(QWidget):
+    task_requested = Signal(int)
+    thread_requested = Signal(int)
+    artifact_requested = Signal(str)
 
+    def shutdown(self):
+        self.close()
 
-class _DatasetAuditWindow(QWidget):
     def __init__(self, parent: QWidget, thread_id: str) -> None:
         super().__init__(parent)
         self.thread_ids = [thread_id]
@@ -107,8 +110,7 @@ def test_lazily_creates_windows_wires_updates_and_preserves_parent(qtbot: QtBot)
     qtbot.addWidget(owner)
     settings: list[_SettingsWindow] = []
     knowledge: list[_KnowledgeWindow] = []
-    details: list[_DetailWindow] = []
-    dataset_audits: list[_DatasetAuditWindow] = []
+    dataset_audits: list[_AuditWindow] = []
     update = _UpdateController()
     coordinator = AuxiliaryWindowCoordinator(
         owner,
@@ -116,9 +118,8 @@ def test_lazily_creates_windows_wires_updates_and_preserves_parent(qtbot: QtBot)
         knowledge_factory=lambda parent, open_settings: knowledge.append(
             _KnowledgeWindow(parent, open_settings)
         ) or knowledge[-1],
-        detail_factory=lambda parent, _ids: details.append(_DetailWindow(parent)) or details[-1],
-        dataset_audit_factory=lambda parent, thread_id: dataset_audits.append(
-            _DatasetAuditWindow(parent, thread_id)
+        audit_center_factory=lambda parent, thread_id: dataset_audits.append(
+            _AuditWindow(parent, thread_id)
         )
         or dataset_audits[-1],
         update_controller=update,  # type: ignore[arg-type]
@@ -129,9 +130,10 @@ def test_lazily_creates_windows_wires_updates_and_preserves_parent(qtbot: QtBot)
     coordinator.show_settings()
     coordinator.show_settings(tab=SettingsTab.KNOWLEDGE_BASE)
     coordinator.show_knowledge()
-    coordinator.show_tool_call_detail(task_ids=[101])
-    coordinator.show_dataset_audit(thread_id=102)
-    coordinator.show_dataset_audit(thread_id=103)
+    coordinator.set_thread_id(102)
+    coordinator.show_audit()
+    coordinator.set_thread_id(103)
+    coordinator.show_audit()
 
     assert len(settings) == 1
     assert settings[0].parent() is owner
@@ -139,7 +141,6 @@ def test_lazily_creates_windows_wires_updates_and_preserves_parent(qtbot: QtBot)
     assert settings[0].update_active == [False]
     assert len(knowledge) == 1
     assert knowledge[0].parent() is owner
-    assert len(details) == 1
     assert len(dataset_audits) == 1
     assert dataset_audits[0].parent() is owner
     assert dataset_audits[0].thread_ids == [102, 103]
@@ -157,7 +158,6 @@ def test_retranslate_shutdown_and_post_shutdown_requests_are_safe(qtbot: QtBot) 
     qtbot.addWidget(owner)
     settings: list[_SettingsWindow] = []
     knowledge: list[_KnowledgeWindow] = []
-    details: list[_DetailWindow] = []
     update = _UpdateController()
     coordinator = AuxiliaryWindowCoordinator(
         owner,
@@ -165,18 +165,15 @@ def test_retranslate_shutdown_and_post_shutdown_requests_are_safe(qtbot: QtBot) 
         knowledge_factory=lambda parent, callback: knowledge.append(
             _KnowledgeWindow(parent, callback)
         ) or knowledge[-1],
-        detail_factory=lambda parent, _ids: details.append(_DetailWindow(parent)) or details[-1],
         update_controller=update,  # type: ignore[arg-type]
     )
     coordinator.show_settings()
     coordinator.show_knowledge()
-    coordinator.show_tool_call_detail(task_ids=[101])
     coordinator.retranslate_ui()
     coordinator.shutdown()
     coordinator.shutdown()
     coordinator.show_settings()
     coordinator.show_knowledge()
-    coordinator.show_tool_call_detail(task_ids=[104])
 
     assert settings[0].retranslate_calls == 1
     assert knowledge[0].retranslate_calls == 1
@@ -186,7 +183,7 @@ def test_retranslate_shutdown_and_post_shutdown_requests_are_safe(qtbot: QtBot) 
     assert update.shutdown_calls == 1
     update.operation_active_changed.emit(True)
     assert settings[0].update_active == [False]
-    assert len(settings) == len(knowledge) == len(details) == 1
+    assert len(settings) == len(knowledge) == 1
 
 
 def test_language_change_reaches_visible_parented_windows(qtbot: QtBot) -> None:
@@ -200,7 +197,6 @@ def test_language_change_reaches_visible_parented_windows(qtbot: QtBot) -> None:
         knowledge_factory=lambda parent, callback: knowledge.append(
             _KnowledgeWindow(parent, callback)
         ) or knowledge[-1],
-        detail_factory=lambda parent, _ids: _DetailWindow(parent),
     )
     owner.show()
     coordinator.show_settings()
@@ -220,7 +216,6 @@ def test_auto_check_is_coordinator_owned_and_stops_on_shutdown(qtbot: QtBot) -> 
         owner,
         settings_factory=lambda parent: _SettingsWindow(parent),
         knowledge_factory=None,
-        detail_factory=lambda parent, _ids: _DetailWindow(parent),
         update_controller=update,  # type: ignore[arg-type]
     )
 

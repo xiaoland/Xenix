@@ -30,7 +30,7 @@ supports, and what uncertainty remains.
 2. Ask Xenix to inspect, combine, clean, prepare, summarize, or visualize the
    registered data.
 3. When useful, define data roles and train, tune, or apply a reusable analyzer.
-4. Review explanations and derived-dataset lineage in the conversation, inspect the session's Datasets audit when provenance matters, and open generated datasets, charts, models, reports, and apply results as local artifacts.
+4. 在审计中心查看数据集、模型、训练和调参参数、图表、报告及应用结果；先阅读 Agent 的方法理由和结果解读，再按需检查来源与证据，并打开本地产出。解释缺失和证据缺失必须明确呈现。
 5. Configure supported LLM providers and choose the LLM model used by the next
    assistant response without changing sampling already in progress.
 6. Open the Knowledge Workspace, select or drop TXT, DOC/DOCX, PPT/PPTX, RTF, EPUB, ODT/ODP, PDF,
@@ -83,3 +83,5 @@ supports, and what uncertainty remains.
   the Agent may search; it is distinct from conversation attachments and Datasets.
 - **Knowledge Unit**: a bounded, source-located passage derived from the current
   canonical document and used as the atomic retrieval result.
+
+审计中心和任务中心均可选择当前会话或所有会话；任务中心集中呈现执行状态、日志与取消能力，审计中心集中呈现产出及解释，二者可按任务相互定位。训练工具消息不再提供专属详情窗口。

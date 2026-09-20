@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from ..audit_contracts import ExecutionOrigin
+
 from pathlib import Path
 
 
@@ -69,6 +71,15 @@ class ModelTools:
         self._ml_service = ml_service
         self._model_key_aliases = model_key_aliases
 
+
+    def _normalize_explanations(self, values: dict[str, str]) -> dict[str, str]:
+        explanations = {}
+        for name, explanation in values.items():
+            key = normalize_model_keys([name], self._model_key_aliases, field_name="explanations_by_model")[0]
+            if key in explanations:
+                raise ValidationError("Explain each selected model once; aliases must not duplicate a model.")
+            explanations[key] = explanation
+        return explanations
 
     def _model_metadata(
         self,
@@ -149,11 +160,15 @@ class ModelTools:
         )
         binding = self._ml_service.get_column_binding(binding_id)
         dataset_id = binding.dataset_id
+        explanations = self._normalize_explanations(input_data.explanations_by_model)
+        if set(explanations) != set(models):
+            raise ValidationError("explanations_by_model must explain every selected model exactly once.")
         created_task_ids: list[int] = []
         for model_key in models:
             _raise_if_cancelled(self._ml_service, context)
             created = self._ml_service.fit_with_evaluate(
                 FitWithEvaluateInput(
+                    origin=ExecutionOrigin(thread_id=context.thread_id, tool_call_message_id=context.tool_call_message_id, explanation=explanations[model_key], submitted_parameters=input_data.model_dump(mode="json", exclude_unset=True, exclude={"explanation", "explanations_by_model"})),
                     binding_id=binding_id,
                     run_name=input_data.run_name,
                     model_key=model_key,
@@ -194,11 +209,15 @@ class ModelTools:
         )
         binding = self._ml_service.get_column_binding(binding_id)
         dataset_id = binding.dataset_id
+        explanations = self._normalize_explanations(input_data.explanations_by_model)
+        if set(explanations) != set(normalized_grids):
+            raise ValidationError("explanations_by_model must explain every selected model exactly once.")
         created_task_ids: list[int] = []
         for model_key, grid in normalized_grids.items():
             _raise_if_cancelled(self._ml_service, context)
             created = self._ml_service.tune_with_evaluate(
                 TuneWithEvaluateInput(
+                    origin=ExecutionOrigin(thread_id=context.thread_id, tool_call_message_id=context.tool_call_message_id, explanation=explanations[model_key], submitted_parameters=input_data.model_dump(mode="json", exclude_unset=True, exclude={"explanation", "explanations_by_model"})),
                     binding_id=binding_id,
                     run_name=input_data.run_name,
                     model_key=model_key,
@@ -256,6 +275,7 @@ class ModelTools:
         _raise_if_cancelled(self._ml_service, context)
         resolved_input_sources = self._resolve_apply_input_sources(input_data.input_sources)
         apply_input = ApplyWithFilesInput(
+            origin=ExecutionOrigin(thread_id=context.thread_id, tool_call_message_id=context.tool_call_message_id, explanation=input_data.explanation, submitted_parameters=input_data.model_dump(mode="json", exclude_unset=True, exclude={"explanation", "explanations_by_model"})),
             trained_model_id=input_data.trained_model_id,
             input_sources=resolved_input_sources,
             input_rows=(

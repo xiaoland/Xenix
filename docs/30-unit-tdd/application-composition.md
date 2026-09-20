@@ -47,3 +47,5 @@ Expected validation, cancellation, and unavailable optional resources retain the
 Existing verification includes `tests/ui/test_exception_dialog.py` and the background-loading routes in `tests/ui/test_knowledge_background_loading.py`; source owns exact signatures and callback mechanics.
 
 Verification: `tests/runtime/test_application_lifetime.py`, `tests/runtime/test_lazy_services.py`, and the scheduler/Knowledge integration routes in the Job contract prove the local invariants. `tests/runtime/test_application_composition.py` starts the actual desktop graph in a separate Qt process and follows a local text file through scheduled import, derivation, index building, and retrieval. `pdm run smoke --isolated` exercises the broader desktop integration; after changing import paths, run the packaged gate to cover frozen discovery and worker imports.
+
+审计中心由 Application Composition 注入 AuditQueryService，任务中心接收 JobQueryService、调度器及 ML 日志查询能力；AuxiliaryWindowCoordinator 连接任务、产出、来源会话与 Artifact URI 导航。ChatWorkspace 发出会话变化，主窗口只转发上下文和导航，不读取审计存储。

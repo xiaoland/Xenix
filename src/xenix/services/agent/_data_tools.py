@@ -98,13 +98,14 @@ class DataTools:
             summary="Integrated dataset created.",
             derivation=DatasetDerivationInput(
                 operation_name="data.integrate",
+                agent_explanation=input_data.explanation,
                 inputs=[
                     DatasetDerivationSourceInput(dataset_id=dataset.id)
                     for dataset in datasets
                 ],
                 parameters_payload=input_data.model_dump(
                     mode="json",
-                    exclude={"dataset_ids"},
+                    exclude={"dataset_ids", "explanation"},
                     exclude_none=True,
                 ),
             ),
@@ -173,12 +174,13 @@ class DataTools:
             ),
             derivation=DatasetDerivationInput(
                 operation_name="data.clean",
+                agent_explanation=input_data.explanation,
                 inputs=[
                     DatasetDerivationSourceInput(dataset_id=dataset.id, alias="input")
                 ],
                 parameters_payload=input_data.model_dump(
                     mode="json",
-                    exclude={"dataset_id"},
+                    exclude={"dataset_id", "explanation"},
                     exclude_none=True,
                 ),
             ),
@@ -251,6 +253,7 @@ class DataTools:
             summary=f"Tokenized dataset created. Rows: {row_count}.",
             derivation=DatasetDerivationInput(
                 operation_name="data.tokenize",
+                agent_explanation=input_data.explanation,
                 inputs=[
                     DatasetDerivationSourceInput(dataset_id=dataset.id, alias="input"),
                     *[
@@ -274,6 +277,7 @@ class DataTools:
                         "dataset_id",
                         "custom_dictionary_dataset_ids",
                         "stopword_dataset_ids",
+                        "explanation",
                     },
                     exclude_none=True,
                 ),
@@ -506,7 +510,7 @@ class DataTools:
                 "name": name,
                 "summary": summary,
                 "derivation": derivation.model_copy(
-                    update={"tool_call_message_id": context.tool_call_message_id}
+                    update={"tool_call_message_id": context.tool_call_message_id, "origin_thread_id": context.thread_id}
                 ).model_dump(mode="json"),
                 "derived_from_dataset_id": compatibility_parent_dataset_id,
                 "metadata_payload": dict(metadata_payload or {}),

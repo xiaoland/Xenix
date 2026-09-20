@@ -1,0 +1,42 @@
+{
+  "captured_scenarios": [
+    "audit.awaiting-interpretation",
+    "audit.chart-limits",
+    "audit.compact-zh",
+    "audit.dataset-lineage",
+    "audit.empty-and-error",
+    "audit.history-incomplete",
+    "audit.model-explained",
+    "audit.wide-en",
+    "centers.navigation",
+    "chat.empty",
+    "chat.mixed-timeline",
+    "chat.running-with-attachments",
+    "jobs.running-and-failed",
+    "jobs.session-and-global",
+    "main.history-populated",
+    "settings.provider-and-ocr"
+  ],
+  "expected_scenarios": [
+    "audit.awaiting-interpretation",
+    "audit.chart-limits",
+    "audit.compact-zh",
+    "audit.dataset-lineage",
+    "audit.empty-and-error",
+    "audit.history-incomplete",
+    "audit.model-explained",
+    "audit.wide-en",
+    "centers.navigation",
+    "chat.empty",
+    "chat.mixed-timeline",
+    "chat.running-with-attachments",
+    "jobs.running-and-failed",
+    "jobs.session-and-global",
+    "main.history-populated",
+    "settings.provider-and-ocr"
+  ],
+  "failures": [],
+  "reconciled": true,
+  "run_id": "20260920T004850101074Z",
+  "schema_version": 1
+}

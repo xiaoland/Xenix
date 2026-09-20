@@ -2,7 +2,7 @@
 
 ``ChatTimeline`` owns the message column, the scroll area, the scroll-to-bottom
 button, and the per-event widget registry.  It renders canonical Chatbot events
-and re-emits link/tool actions; it never reaches into the composer.
+and re-emits link activations; it never reaches into the composer.
 """
 
 from __future__ import annotations
@@ -38,7 +38,6 @@ _SCROLL_FOLLOW_THRESHOLD = 24
 class ChatTimeline(QWidget):
     service_link_activated = Signal(str)
     source_file_activated = Signal(str)
-    tool_action_requested = Signal(object)
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -202,7 +201,6 @@ class ChatTimeline(QWidget):
     def add_tool_event(self, event: ChatbotEvent, *, auto_scroll: bool = True) -> ToolCallItem:
         item = ToolCallItem(event, artifact_resolver=self._artifact_resolver, parent=self)
         item.link_activated.connect(self.service_link_activated.emit)
-        item.action_requested.connect(self.tool_action_requested.emit)
         item.set_available_width(self._message_column.width())
         self._message_layout.insertWidget(self._message_insert_index(), item)
         self._event_widgets_by_id[event.id] = item

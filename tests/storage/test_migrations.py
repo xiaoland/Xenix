@@ -25,8 +25,6 @@ from xenix.services.storage.models import (
     ArtifactKind,
     ArtifactRow,
     DatasetColumnBindingRow,
-    DatasetDerivationInputRow,
-    DatasetDerivationRow,
     JobDomain,
     JobRow,
     JobStatus,
@@ -168,13 +166,14 @@ def test_v25_to_v26_adds_dataset_derivation_tables(tmp_path: Path) -> None:
             "INSERT INTO dataset_derivation_input VALUES (?, ?, ?, ?, ?)",
             ("edge-1", "dataset-output", "dataset-input", 0, "input"),
         )
-    with Session(engine) as session:
-        derivation = session.get(DatasetDerivationRow, "dataset-output")
-        edge = session.get(DatasetDerivationInputRow, "edge-1")
-        assert derivation is not None
-        assert derivation.parameters_payload == {"sql": "SELECT 1"}
-        assert derivation.tool_call_message_id == "tool-call-1"
-        assert edge is not None and edge.input_position == 0
+    # This edge produces v26, not today's ORM contract. Current ORM readability
+    # is proved by the composed upgrade tests below.
+    with engine.connect() as connection:
+        derivation = connection.exec_driver_sql(
+            "SELECT parameters_payload, tool_call_message_id FROM dataset_derivation"
+        ).one()
+        assert derivation == ('{"sql":"SELECT 1"}', "tool-call-1")
+        assert connection.exec_driver_sql("SELECT input_position FROM dataset_derivation_input").scalar_one() == 0
 
 
 def test_v26_to_v27_adds_job_table_and_backfills_domain_authorities(tmp_path: Path) -> None:
