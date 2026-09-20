@@ -61,8 +61,8 @@ class MainWindow(QMainWindow):
         self._knowledge_button.clicked.connect(self._open_knowledge_workspace)
         self._jobs_button = QPushButton(parent=self)
         self._jobs_button.clicked.connect(self._open_jobs)
-        self._datasets_button = QPushButton(parent=self)
-        self._datasets_button.clicked.connect(self._open_dataset_audit)
+        self._audit_button = QPushButton(parent=self)
+        self._audit_button.clicked.connect(self._open_audit_center)
 
         self._history_panel = HistoryPanel(
             history_port,
@@ -80,13 +80,13 @@ class MainWindow(QMainWindow):
             current_locale=current_locale,
             history_panel=self._history_panel,
             thread_detail_view=self._thread_detail_view,
-            open_tool_call_detail=lambda task_ids: self._auxiliary_windows.show_tool_call_detail(
-                task_ids=task_ids
-            ),
             conversation_executor=conversation_executor,
             parent=self,
         )
 
+        self._chat_workspace.conversation_changed.connect(self._auxiliary_windows.set_thread_id)
+        self._auxiliary_windows.thread_requested.connect(self._chat_workspace.open_thread)
+        self._auxiliary_windows.artifact_requested.connect(self._chat_workspace.open_artifact)
         self._assign_semantic_identities()
         self.resize(1080, 760)
         self._setup_ui()
@@ -96,7 +96,7 @@ class MainWindow(QMainWindow):
     # Public delegations (Widget Lab and headed harness) ---------------------
 
     @property
-    def conversation_thread_id(self) -> str | None:
+    def conversation_thread_id(self) -> int | None:
         return self._chat_workspace.conversation_thread_id
 
     @property
@@ -124,11 +124,11 @@ class MainWindow(QMainWindow):
         self._settings_button.setMinimumWidth(96)
         self._knowledge_button.setMinimumWidth(112)
         self._jobs_button.setMinimumWidth(72)
-        self._datasets_button.setMinimumWidth(88)
+        self._audit_button.setMinimumWidth(88)
         header_layout.addWidget(self._title_label)
         header_layout.addStretch(1)
         header_layout.addWidget(self._jobs_button)
-        header_layout.addWidget(self._datasets_button)
+        header_layout.addWidget(self._audit_button)
         header_layout.addWidget(self._knowledge_button)
         header_layout.addWidget(self._settings_button)
         layout.addLayout(header_layout)
@@ -149,7 +149,7 @@ class MainWindow(QMainWindow):
         identify(self._settings_button, "main.header.settings")
         identify(self._knowledge_button, "main.header.knowledge")
         identify(self._jobs_button, "main.header.jobs")
-        identify(self._datasets_button, "main.header.datasets")
+        identify(self._audit_button, "main.header.audit")
 
     def _open_settings(
         self,
@@ -165,8 +165,8 @@ class MainWindow(QMainWindow):
     def _open_jobs(self) -> None:
         self._auxiliary_windows.show_jobs()
 
-    def _open_dataset_audit(self) -> None:
-        self._auxiliary_windows.show_dataset_audit(thread_id=self.conversation_thread_id)
+    def _open_audit_center(self) -> None:
+        self._auxiliary_windows.show_audit()
 
     def _reload_agent_provider(self) -> None:
         self._chat_workspace.sync_model_options()
@@ -187,7 +187,7 @@ class MainWindow(QMainWindow):
         self._settings_button.setText(self.tr("Settings"))
         self._knowledge_button.setText(self.tr("Knowledge"))
         self._jobs_button.setText(self.tr("Jobs"))
-        self._datasets_button.setText(self.tr("Datasets"))
+        self._audit_button.setText(self.tr("Audit Center"))
         self._history_panel.retranslate_ui()
         self._thread_detail_view.retranslate_ui()
         self._auxiliary_windows.retranslate_ui()

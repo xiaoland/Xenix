@@ -159,6 +159,9 @@ def build_headless_agent_services(
         paged_results_dir=paths.state / "paged_results",
     )
     register_knowledge_lookup_tool(llm_tools, knowledge)
+    from .audit_tools import register_audit_tools
+
+    register_audit_tools(llm_tools, session_factory)
     llm_tools.collect_garbage(max_age_seconds=7 * 24 * 60 * 60)
 
     skill_catalog = AgentSkillCatalog.from_default_catalog()

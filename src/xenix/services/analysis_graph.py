@@ -87,6 +87,7 @@ class GraphDatasetInput(SQLModel):
 
 
 class GraphDatasetResult(SQLModel):
+    effective_parameters: dict[str, Any] = Field(default_factory=dict)
     output_path: str
     graph_metadata: dict[str, Any] = Field(default_factory=dict)
 
@@ -182,6 +183,7 @@ class AnalysisGraphService:
 
         output_path = self._write_svg_output(svg=svg, dataset_name=dataset_name, suffix="vegalite")
         return GraphDatasetResult(
+            effective_parameters={key: value for key, value in prepared.spec.items() if key != "datasets"},
             output_path=str(output_path.resolve()),
             graph_metadata={
                 "renderer": "vl-convert-python",
@@ -219,8 +221,21 @@ class AnalysisGraphService:
                 "analysis.graph rendered SVG is too large. Reduce the canvas size, top_n, or font_size_range."
             )
 
+        font_path = self._resolve_wordcloud_font_path(prepared.contains_cjk)
         output_path = self._write_svg_output(svg=svg, dataset_name=dataset_name, suffix="wordcloud")
         return GraphDatasetResult(
+            effective_parameters={
+                "width": prepared.width, "height": prepared.height, "top_n": prepared.top_n,
+                "prefer_horizontal": prepared.prefer_horizontal,
+                "font_size_range": [prepared.min_font_size, prepared.max_font_size],
+                "color_mode": prepared.color_mode, "color_field": prepared.color_field,
+                "referenced_fields": prepared.referenced_fields,
+                "random_state": _WORDCLOUD_RANDOM_STATE, "margin": _WORDCLOUD_MARGIN,
+                "background_color": _WORDCLOUD_BACKGROUND_COLOR,
+                "collocations": False, "normalize_plurals": False,
+                "font": font_path.name if font_path is not None else None,
+                "colors": prepared.color_by_word,
+            },
             output_path=str(output_path.resolve()),
             graph_metadata={
                 "renderer": "wordcloud",

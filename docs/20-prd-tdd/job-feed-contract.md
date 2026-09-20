@@ -59,3 +59,8 @@ Service, status, and case-insensitive text filters combine before the display li
 ## Verification
 
 Scheduling and recovery behavior is covered by `tests/test_job_scheduler.py` and `tests/test_job_service.py`; Knowledge dispatch by `tests/test_knowledge_job_handlers.py`; the Job Center feed projection by `tests/runtime/test_job_center.py`. Persistence and backfill are covered by the migration tests under `tests/storage/`.
+
+## 会话范围与执行详情
+
+JobQueryService 接收显式 AuditScope，范围过滤先于状态、文本和分页过滤；当前会话只包含直接发起的任务及继承来源的自动评估，无当前会话时为空，全局 Knowledge 任务仅在所有会话中显示。
+JobCenterDialog 集中显示任务记录与日志，并通过任务身份导航到审计产出；会话范围的来源所有权和窗口生命周期详见[审计中心契约](audit-center-contract.md)。

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Any
 
 from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtGui import QFont, QPalette
@@ -10,7 +9,6 @@ from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
     QLabel,
-    QPushButton,
     QSizePolicy,
     QToolButton,
     QVBoxLayout,
@@ -38,7 +36,6 @@ from .text import AutoHeightTextBrowser
 
 class ToolCallItem(QFrame):
     link_activated = Signal(str)
-    action_requested = Signal(object)
 
     def __init__(
         self,
@@ -83,14 +80,8 @@ class ToolCallItem(QFrame):
         self._chevron_button.setIconSize(QSize(16, 16))
         self._chevron_button.clicked.connect(self._toggle_detail)
 
-        self._details_button = QPushButton()
-        self._details_button.setObjectName("chatToolCallActionButton")
-        self._details_button.setFixedHeight(24)
-        self._details_button.clicked.connect(self._request_details)
-
         header_layout.addWidget(self._icon_label, 0, Qt.AlignVCenter)
         header_layout.addWidget(self._summary_label, 1, Qt.AlignVCenter)
-        header_layout.addWidget(self._details_button, 0, Qt.AlignVCenter)
         header_layout.addWidget(self._chevron_button, 0, Qt.AlignVCenter)
         layout.addWidget(header)
 
@@ -116,18 +107,8 @@ class ToolCallItem(QFrame):
             role="chat.tool-call.toggle-details",
             item_reference=event.id,
         )
-        identify_repeated_item(
-            self._details_button,
-            role="chat.tool-call.open-details",
-            item_reference=event.id,
-        )
         self._icon_label.setPixmap(tool_icon(event.icon_key).pixmap(QSize(16, 16)))
         self._summary_label.setText(self._summary_text(event))
-        details_action = self._action_by_type("open_tool_call_detail")
-        self._details_button.setVisible(details_action is not None)
-        self._details_button.setEnabled(details_action is not None)
-        self._details_button.setText(self.tr("Details"))
-        self._details_button.setToolTip(self.tr("Open tool call details"))
         has_detail = bool(event.detail_blocks)
         self._chevron_button.setVisible(has_detail)
         self._chevron_button.setEnabled(has_detail)
@@ -157,17 +138,6 @@ class ToolCallItem(QFrame):
 
     def _handle_link_activated(self, url) -> None:
         self.link_activated.emit(url.toString())
-
-    def _action_by_type(self, action_type: str) -> dict[str, Any] | None:
-        for action in self._event.actions:
-            if action.get("type") == action_type:
-                return dict(action)
-        return None
-
-    def _request_details(self) -> None:
-        action = self._action_by_type("open_tool_call_detail")
-        if action is not None:
-            self.action_requested.emit(action)
 
     def _summary_text(self, event: ChatbotEvent) -> str:
         return translate_tool_summary(event.summary or "")

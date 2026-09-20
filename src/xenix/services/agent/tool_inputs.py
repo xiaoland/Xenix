@@ -20,6 +20,7 @@ from ..analysis_profile import (
     MAX_PROFILE_FIELD_LIMIT,
 )
 from ..knowledge_service import MAX_KNOWLEDGE_QUERY_CHARS
+from ..audit_contracts import ExplanationText
 
 
 RequiredString = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
@@ -34,6 +35,7 @@ class AgentToolInput(BaseModel):
 
 
 class DataIntegrateInput(AgentToolInput):
+    explanation: ExplanationText = Field(description="Explain the business purpose, important choices and limitations in the user's language. Saved with the output; interpret actual results afterwards with audit.explain.")
     dataset_ids: Annotated[list[PositiveInt], Field(min_length=2)]
     name: OptionalString | None = None
 
@@ -83,6 +85,7 @@ class WordCloudSpec(AgentToolInput):
 
 
 class AnalysisGraphInput(AgentToolInput):
+    explanation: ExplanationText = Field(description="Explain the business purpose, important choices and limitations in the user's language. Saved with the output; interpret actual results afterwards with audit.explain.")
     dataset_id: PositiveInt
     spec: dict[str, Any] | None = Field(
         default=None,
@@ -136,6 +139,7 @@ class CleaningOperationInput(AgentToolInput):
 
 
 class DataCleanInput(AgentToolInput):
+    explanation: ExplanationText = Field(description="Explain the business purpose, important choices and limitations in the user's language. Saved with the output; interpret actual results afterwards with audit.explain.")
     dataset_id: PositiveInt
     name: OptionalString | None = None
     operations: list[CleaningOperationInput] = Field(
@@ -149,6 +153,7 @@ class DataCleanMetadataInput(AgentToolInput):
 
 
 class DataTokenizeInput(AgentToolInput):
+    explanation: ExplanationText = Field(description="Explain the business purpose, important choices and limitations in the user's language. Saved with the output; interpret actual results afterwards with audit.explain.")
     dataset_id: PositiveInt
     name: OptionalString | None = None
     text_column: RequiredString | None = Field(
@@ -239,16 +244,7 @@ class DataTransformInput(AgentToolInput):
         description="names uses source headers; indexes uses c0, c1, ... in source-column order.",
     )
     name: OptionalString | None = None
-    explanation: (
-        Annotated[
-            str,
-            StringConstraints(strip_whitespace=True, max_length=2048),
-        ]
-        | None
-    ) = Field(
-        default=None,
-        description="Transformation rationale saved in the audit.",
-    )
+    explanation: ExplanationText = Field(description="Business rationale and important tradeoffs saved in the audit. Interpret actual results afterwards with audit.explain.")
 
 
 class RoleBindingInput(AgentToolInput):
@@ -306,6 +302,7 @@ class ModelMetadataInput(AgentToolInput):
 
 
 class ModelTrainInput(AgentToolInput):
+    explanations_by_model: dict[str, ExplanationText] = Field(description="One business explanation per selected model key, explaining why this model and important parameters fit the goal. Interpret results afterwards with audit.explain.")
     binding_id: PositiveInt = Field(description="Role binding returned by data.feature.select.")
     models: Annotated[list[RequiredString], Field(min_length=1)] = Field(
         description=(
@@ -320,6 +317,7 @@ class ModelTrainInput(AgentToolInput):
 
 
 class ModelHyperTrainInput(AgentToolInput):
+    explanations_by_model: dict[str, ExplanationText] = Field(description="One business explanation per selected model key, explaining why this model and important parameters fit the goal. Interpret results afterwards with audit.explain.")
     binding_id: PositiveInt = Field(description="Role binding returned by data.feature.select.")
     param_grids_by_model: Annotated[
         dict[str, dict[str, Any]],
@@ -339,6 +337,7 @@ class InlineApplyRowsInput(AgentToolInput):
 
 
 class ModelApplyInput(AgentToolInput):
+    explanation: ExplanationText = Field(description="Explain the business purpose, important choices and limitations in the user's language. Saved with the output; interpret actual results afterwards with audit.explain.")
     trained_model_id: PositiveInt
     input_sources: list[int | str] = Field(
         default_factory=list,

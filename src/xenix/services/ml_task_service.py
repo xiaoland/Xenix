@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from .audit_contracts import ExecutionOrigin
+
 import json
 import logging
 import shutil
@@ -97,6 +99,7 @@ ALLOWED_TRANSITIONS: dict[MLTaskStatus, set[MLTaskStatus]] = {
 
 
 class CreateMLTaskInput(SQLModel):
+    origin: ExecutionOrigin | None = None
     id: int | None = None
     project_id: int
     dataset_id: int | None = None
@@ -166,6 +169,10 @@ class MLTaskService:
             task_type=input_data.task_type,
             status=MLTaskStatus.PENDING,
             request_payload=dict(input_data.request_payload),
+            origin_thread_id=input_data.origin.thread_id if input_data.origin else None,
+            origin_tool_call_message_id=input_data.origin.tool_call_message_id if input_data.origin else None,
+            agent_explanation=input_data.origin.explanation if input_data.origin else None,
+            submitted_parameters=input_data.origin.submitted_parameters if input_data.origin else None,
             created_at=now,
             updated_at=now,
         )

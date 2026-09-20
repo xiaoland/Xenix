@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from ..analysis_graph import GraphDatasetInput
+from ..audit_contracts import ArtifactDerivation, AuditReference, ExecutionOrigin
 from ..analysis_profile import ProfileDatasetInput
 from ..artifact_service import (
     RegisterArtifactInput,
@@ -63,6 +64,10 @@ class AnalysisTools:
         spec_format = str(graph_metadata.get("spec_format") or "graph")
         artifact = self._artifact_service.register_artifact(
             RegisterArtifactInput(
+                derivation=ArtifactDerivation(operation="analysis.graph",
+                    origin=ExecutionOrigin(thread_id=context.thread_id, tool_call_message_id=context.tool_call_message_id, explanation=input_data.explanation, submitted_parameters=input_data.model_dump(mode="json", exclude_unset=True, exclude={"explanation"})),
+                    inputs=[AuditReference(kind="dataset", id=dataset.id)],
+                    effective_parameters=graph_result.effective_parameters),
                 kind=ArtifactKind.IMAGE,
                 title=title,
                 absolute_path=graph_result.output_path,

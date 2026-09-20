@@ -1,0 +1,4471 @@
+{
+  "layout": {
+    "class_name": "QVBoxLayout",
+    "geometry": {
+      "height": 740,
+      "width": 1100,
+      "x": 0,
+      "y": 0
+    },
+    "items": [
+      {
+        "alignment": 0,
+        "child_layout": {
+          "class_name": "QHBoxLayout",
+          "geometry": {
+            "height": 24,
+            "width": 1078,
+            "x": 11,
+            "y": 11
+          },
+          "items": [
+            {
+              "alignment": 0,
+              "kind": "widget",
+              "object_ref": "o1"
+            },
+            {
+              "alignment": 0,
+              "kind": "widget",
+              "object_ref": "o13"
+            },
+            {
+              "alignment": 0,
+              "kind": "widget",
+              "object_ref": "o14"
+            }
+          ],
+          "margins": {
+            "bottom": 0,
+            "left": 0,
+            "right": 0,
+            "top": 0
+          },
+          "object_ref": "o102",
+          "spacing": 6
+        },
+        "kind": "layout",
+        "object_ref": "o102"
+      },
+      {
+        "alignment": 0,
+        "kind": "widget",
+        "object_ref": "o15"
+      }
+    ],
+    "margins": {
+      "bottom": 11,
+      "left": 11,
+      "right": 11,
+      "top": 11
+    },
+    "object_ref": "o101",
+    "spacing": 6
+  },
+  "ownership": {
+    "children": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [],
+                "class_name": "QBoxLayout",
+                "layout": {
+                  "geometry": {
+                    "height": 0,
+                    "width": 0,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "margins": {
+                    "bottom": 0,
+                    "left": 0,
+                    "right": 0,
+                    "top": 0
+                  },
+                  "spacing": 0
+                },
+                "node_id": "o3",
+                "object_name": "",
+                "semantic_id": ""
+              },
+              {
+                "children": [
+                  {
+                    "children": [],
+                    "class_name": "QWidget",
+                    "node_id": "o5",
+                    "object_name": "qt_scrollarea_viewport",
+                    "semantic_id": "",
+                    "widget": {
+                      "enabled": true,
+                      "geometry": {
+                        "height": 478,
+                        "width": 638,
+                        "x": 1,
+                        "y": 1
+                      },
+                      "has_focus": false,
+                      "hidden": false,
+                      "horizontal_size_policy": "Preferred",
+                      "maximum_size": {
+                        "height": 16777215,
+                        "width": 16777215
+                      },
+                      "minimum_size": {
+                        "height": 0,
+                        "width": 0
+                      },
+                      "minimum_size_hint": {
+                        "height": -1,
+                        "width": -1
+                      },
+                      "size": {
+                        "height": 478,
+                        "width": 638
+                      },
+                      "size_hint": {
+                        "height": -1,
+                        "width": -1
+                      },
+                      "vertical_size_policy": "Preferred",
+                      "visible": false
+                    }
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [],
+                        "class_name": "QScrollBar",
+                        "node_id": "o7",
+                        "object_name": "",
+                        "semantic_id": "",
+                        "widget": {
+                          "enabled": true,
+                          "geometry": {
+                            "height": 30,
+                            "width": 100,
+                            "x": 0,
+                            "y": 0
+                          },
+                          "has_focus": false,
+                          "hidden": false,
+                          "horizontal_size_policy": "Minimum",
+                          "maximum_size": {
+                            "height": 16777215,
+                            "width": 16777215
+                          },
+                          "minimum_size": {
+                            "height": 0,
+                            "width": 0
+                          },
+                          "minimum_size_hint": {
+                            "height": -1,
+                            "width": -1
+                          },
+                          "size": {
+                            "height": 30,
+                            "width": 100
+                          },
+                          "size_hint": {
+                            "height": 14,
+                            "width": 54
+                          },
+                          "vertical_size_policy": "Fixed",
+                          "visible": false
+                        }
+                      },
+                      {
+                        "children": [],
+                        "class_name": "QBoxLayout",
+                        "layout": {
+                          "geometry": {
+                            "height": 0,
+                            "width": 0,
+                            "x": 0,
+                            "y": 0
+                          },
+                          "margins": {
+                            "bottom": 0,
+                            "left": 0,
+                            "right": 0,
+                            "top": 0
+                          },
+                          "spacing": 0
+                        },
+                        "node_id": "o8",
+                        "object_name": "",
+                        "semantic_id": ""
+                      }
+                    ],
+                    "class_name": "QWidget",
+                    "node_id": "o6",
+                    "object_name": "qt_scrollarea_hcontainer",
+                    "semantic_id": "",
+                    "widget": {
+                      "enabled": true,
+                      "geometry": {
+                        "height": 30,
+                        "width": 100,
+                        "x": 0,
+                        "y": 0
+                      },
+                      "has_focus": false,
+                      "hidden": true,
+                      "horizontal_size_policy": "Preferred",
+                      "maximum_size": {
+                        "height": 16777215,
+                        "width": 16777215
+                      },
+                      "minimum_size": {
+                        "height": 0,
+                        "width": 0
+                      },
+                      "minimum_size_hint": {
+                        "height": 14,
+                        "width": 54
+                      },
+                      "size": {
+                        "height": 30,
+                        "width": 100
+                      },
+                      "size_hint": {
+                        "height": 14,
+                        "width": 54
+                      },
+                      "vertical_size_policy": "Preferred",
+                      "visible": false
+                    }
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [],
+                        "class_name": "QScrollBar",
+                        "node_id": "o8",
+                        "object_name": "",
+                        "semantic_id": "",
+                        "widget": {
+                          "enabled": true,
+                          "geometry": {
+                            "height": 30,
+                            "width": 100,
+                            "x": 0,
+                            "y": 0
+                          },
+                          "has_focus": false,
+                          "hidden": false,
+                          "horizontal_size_policy": "Fixed",
+                          "maximum_size": {
+                            "height": 16777215,
+                            "width": 16777215
+                          },
+                          "minimum_size": {
+                            "height": 0,
+                            "width": 0
+                          },
+                          "minimum_size_hint": {
+                            "height": -1,
+                            "width": -1
+                          },
+                          "size": {
+                            "height": 30,
+                            "width": 100
+                          },
+                          "size_hint": {
+                            "height": 54,
+                            "width": 14
+                          },
+                          "vertical_size_policy": "Minimum",
+                          "visible": false
+                        }
+                      },
+                      {
+                        "children": [],
+                        "class_name": "QBoxLayout",
+                        "layout": {
+                          "geometry": {
+                            "height": 0,
+                            "width": 0,
+                            "x": 0,
+                            "y": 0
+                          },
+                          "margins": {
+                            "bottom": 0,
+                            "left": 0,
+                            "right": 0,
+                            "top": 0
+                          },
+                          "spacing": 0
+                        },
+                        "node_id": "o10",
+                        "object_name": "",
+                        "semantic_id": ""
+                      }
+                    ],
+                    "class_name": "QWidget",
+                    "node_id": "o9",
+                    "object_name": "qt_scrollarea_vcontainer",
+                    "semantic_id": "",
+                    "widget": {
+                      "enabled": true,
+                      "geometry": {
+                        "height": 30,
+                        "width": 100,
+                        "x": 0,
+                        "y": 0
+                      },
+                      "has_focus": false,
+                      "hidden": true,
+                      "horizontal_size_policy": "Preferred",
+                      "maximum_size": {
+                        "height": 16777215,
+                        "width": 16777215
+                      },
+                      "minimum_size": {
+                        "height": 0,
+                        "width": 0
+                      },
+                      "minimum_size_hint": {
+                        "height": 54,
+                        "width": 14
+                      },
+                      "size": {
+                        "height": 30,
+                        "width": 100
+                      },
+                      "size_hint": {
+                        "height": 54,
+                        "width": 14
+                      },
+                      "vertical_size_policy": "Preferred",
+                      "visible": false
+                    }
+                  }
+                ],
+                "class_name": "QListView",
+                "node_id": "o4",
+                "object_name": "",
+                "semantic_id": "",
+                "widget": {
+                  "enabled": true,
+                  "geometry": {
+                    "height": 480,
+                    "width": 640,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "has_focus": false,
+                  "hidden": false,
+                  "horizontal_size_policy": "Ignored",
+                  "maximum_size": {
+                    "height": 16777215,
+                    "width": 16777215
+                  },
+                  "minimum_size": {
+                    "height": 0,
+                    "width": 0
+                  },
+                  "minimum_size_hint": {
+                    "height": 68,
+                    "width": 68
+                  },
+                  "size": {
+                    "height": 480,
+                    "width": 640
+                  },
+                  "size_hint": {
+                    "height": 192,
+                    "width": 256
+                  },
+                  "vertical_size_policy": "Ignored",
+                  "visible": false
+                }
+              },
+              {
+                "children": [],
+                "class_name": "QWidget",
+                "node_id": "o11",
+                "object_name": "",
+                "semantic_id": "",
+                "widget": {
+                  "enabled": true,
+                  "geometry": {
+                    "height": 30,
+                    "width": 100,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "has_focus": false,
+                  "hidden": true,
+                  "horizontal_size_policy": "Minimum",
+                  "maximum_size": {
+                    "height": 16777215,
+                    "width": 16777215
+                  },
+                  "minimum_size": {
+                    "height": 0,
+                    "width": 0
+                  },
+                  "minimum_size_hint": {
+                    "height": -1,
+                    "width": -1
+                  },
+                  "size": {
+                    "height": 30,
+                    "width": 100
+                  },
+                  "size_hint": {
+                    "height": 10,
+                    "width": 20
+                  },
+                  "vertical_size_policy": "Fixed",
+                  "visible": false
+                }
+              },
+              {
+                "children": [],
+                "class_name": "QWidget",
+                "node_id": "o12",
+                "object_name": "",
+                "semantic_id": "",
+                "widget": {
+                  "enabled": true,
+                  "geometry": {
+                    "height": 30,
+                    "width": 100,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "has_focus": false,
+                  "hidden": true,
+                  "horizontal_size_policy": "Minimum",
+                  "maximum_size": {
+                    "height": 16777215,
+                    "width": 16777215
+                  },
+                  "minimum_size": {
+                    "height": 0,
+                    "width": 0
+                  },
+                  "minimum_size_hint": {
+                    "height": -1,
+                    "width": -1
+                  },
+                  "size": {
+                    "height": 30,
+                    "width": 100
+                  },
+                  "size_hint": {
+                    "height": 10,
+                    "width": 20
+                  },
+                  "vertical_size_policy": "Fixed",
+                  "visible": false
+                }
+              }
+            ],
+            "class_name": "QFrame",
+            "node_id": "o2",
+            "object_name": "",
+            "semantic_id": "",
+            "widget": {
+              "enabled": true,
+              "geometry": {
+                "height": 30,
+                "width": 100,
+                "x": 0,
+                "y": 0
+              },
+              "has_focus": false,
+              "hidden": true,
+              "horizontal_size_policy": "Preferred",
+              "maximum_size": {
+                "height": 16777215,
+                "width": 16777215
+              },
+              "minimum_size": {
+                "height": 0,
+                "width": 0
+              },
+              "minimum_size_hint": {
+                "height": 2,
+                "width": 2
+              },
+              "size": {
+                "height": 30,
+                "width": 100
+              },
+              "size_hint": {
+                "height": 2,
+                "width": 2
+              },
+              "vertical_size_policy": "Preferred",
+              "visible": false
+            }
+          }
+        ],
+        "class_name": "QComboBox",
+        "node_id": "o1",
+        "object_name": "",
+        "semantic_id": "audit.scope",
+        "widget": {
+          "current_index": 0,
+          "enabled": true,
+          "geometry": {
+            "height": 24,
+            "width": 151,
+            "x": 11,
+            "y": 11
+          },
+          "has_focus": true,
+          "hidden": false,
+          "horizontal_size_policy": "Preferred",
+          "maximum_size": {
+            "height": 16777215,
+            "width": 16777215
+          },
+          "minimum_size": {
+            "height": 0,
+            "width": 0
+          },
+          "minimum_size_hint": {
+            "height": 24,
+            "width": 151
+          },
+          "size": {
+            "height": 24,
+            "width": 151
+          },
+          "size_hint": {
+            "height": 24,
+            "width": 151
+          },
+          "vertical_size_policy": "Fixed",
+          "visible": true
+        }
+      },
+      {
+        "children": [],
+        "class_name": "QLabel",
+        "node_id": "o13",
+        "object_name": "",
+        "semantic_id": "",
+        "widget": {
+          "enabled": true,
+          "geometry": {
+            "height": 24,
+            "width": 835,
+            "x": 168,
+            "y": 11
+          },
+          "has_focus": false,
+          "hidden": false,
+          "horizontal_size_policy": "Preferred",
+          "maximum_size": {
+            "height": 16777215,
+            "width": 16777215
+          },
+          "minimum_size": {
+            "height": 0,
+            "width": 0
+          },
+          "minimum_size_hint": {
+            "height": 16,
+            "width": 84
+          },
+          "size": {
+            "height": 24,
+            "width": 835
+          },
+          "size_hint": {
+            "height": 16,
+            "width": 84
+          },
+          "vertical_size_policy": "Preferred",
+          "visible": true
+        }
+      },
+      {
+        "children": [],
+        "class_name": "QPushButton",
+        "node_id": "o14",
+        "object_name": "",
+        "semantic_id": "",
+        "widget": {
+          "checked": false,
+          "enabled": true,
+          "geometry": {
+            "height": 24,
+            "width": 80,
+            "x": 1009,
+            "y": 11
+          },
+          "has_focus": false,
+          "hidden": false,
+          "horizontal_size_policy": "Minimum",
+          "maximum_size": {
+            "height": 16777215,
+            "width": 16777215
+          },
+          "minimum_size": {
+            "height": 0,
+            "width": 0
+          },
+          "minimum_size_hint": {
+            "height": 24,
+            "width": 80
+          },
+          "size": {
+            "height": 24,
+            "width": 80
+          },
+          "size_hint": {
+            "height": 24,
+            "width": 80
+          },
+          "vertical_size_policy": "Fixed",
+          "visible": true
+        }
+      },
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [],
+                    "class_name": "QHBoxLayout",
+                    "layout": {
+                      "geometry": {
+                        "height": 0,
+                        "width": 773,
+                        "x": 9,
+                        "y": 9
+                      },
+                      "margins": {
+                        "bottom": 0,
+                        "left": 0,
+                        "right": 0,
+                        "top": 0
+                      },
+                      "spacing": 6
+                    },
+                    "node_id": "o18",
+                    "object_name": "",
+                    "semantic_id": ""
+                  },
+                  {
+                    "children": [],
+                    "class_name": "QHBoxLayout",
+                    "layout": {
+                      "geometry": {
+                        "height": 24,
+                        "width": 773,
+                        "x": 9,
+                        "y": 655
+                      },
+                      "margins": {
+                        "bottom": 0,
+                        "left": 0,
+                        "right": 0,
+                        "top": 0
+                      },
+                      "spacing": 6
+                    },
+                    "node_id": "o19",
+                    "object_name": "",
+                    "semantic_id": ""
+                  }
+                ],
+                "class_name": "QVBoxLayout",
+                "layout": {
+                  "geometry": {
+                    "height": 688,
+                    "width": 791,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "margins": {
+                    "bottom": 9,
+                    "left": 9,
+                    "right": 9,
+                    "top": 9
+                  },
+                  "spacing": 6
+                },
+                "node_id": "o17",
+                "object_name": "",
+                "semantic_id": ""
+              },
+              {
+                "children": [],
+                "class_name": "QPushButton",
+                "node_id": "o20",
+                "object_name": "",
+                "semantic_id": "",
+                "widget": {
+                  "checked": false,
+                  "enabled": true,
+                  "geometry": {
+                    "height": 30,
+                    "width": 100,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "has_focus": false,
+                  "hidden": true,
+                  "horizontal_size_policy": "Minimum",
+                  "maximum_size": {
+                    "height": 16777215,
+                    "width": 16777215
+                  },
+                  "minimum_size": {
+                    "height": 0,
+                    "width": 0
+                  },
+                  "minimum_size_hint": {
+                    "height": 24,
+                    "width": 80
+                  },
+                  "size": {
+                    "height": 30,
+                    "width": 100
+                  },
+                  "size_hint": {
+                    "height": 24,
+                    "width": 80
+                  },
+                  "vertical_size_policy": "Fixed",
+                  "visible": false
+                }
+              },
+              {
+                "children": [],
+                "class_name": "QPushButton",
+                "node_id": "o21",
+                "object_name": "",
+                "semantic_id": "",
+                "widget": {
+                  "checked": false,
+                  "enabled": true,
+                  "geometry": {
+                    "height": 30,
+                    "width": 100,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "has_focus": false,
+                  "hidden": true,
+                  "horizontal_size_policy": "Minimum",
+                  "maximum_size": {
+                    "height": 16777215,
+                    "width": 16777215
+                  },
+                  "minimum_size": {
+                    "height": 0,
+                    "width": 0
+                  },
+                  "minimum_size_hint": {
+                    "height": 24,
+                    "width": 86
+                  },
+                  "size": {
+                    "height": 30,
+                    "width": 100
+                  },
+                  "size_hint": {
+                    "height": 24,
+                    "width": 86
+                  },
+                  "vertical_size_policy": "Fixed",
+                  "visible": false
+                }
+              },
+              {
+                "children": [],
+                "class_name": "QLabel",
+                "node_id": "o22",
+                "object_name": "",
+                "semantic_id": "",
+                "widget": {
+                  "enabled": true,
+                  "geometry": {
+                    "height": 24,
+                    "width": 773,
+                    "x": 9,
+                    "y": 9
+                  },
+                  "has_focus": false,
+                  "hidden": false,
+                  "horizontal_size_policy": "Preferred",
+                  "maximum_size": {
+                    "height": 16777215,
+                    "width": 16777215
+                  },
+                  "minimum_size": {
+                    "height": 0,
+                    "width": 0
+                  },
+                  "minimum_size_hint": {
+                    "height": 24,
+                    "width": 18
+                  },
+                  "size": {
+                    "height": 24,
+                    "width": 773
+                  },
+                  "size_hint": {
+                    "height": 48,
+                    "width": 180
+                  },
+                  "vertical_size_policy": "Preferred",
+                  "visible": true
+                }
+              },
+              {
+                "children": [],
+                "class_name": "QLabel",
+                "node_id": "o23",
+                "object_name": "",
+                "semantic_id": "",
+                "widget": {
+                  "enabled": true,
+                  "geometry": {
+                    "height": 16,
+                    "width": 773,
+                    "x": 9,
+                    "y": 39
+                  },
+                  "has_focus": false,
+                  "hidden": false,
+                  "horizontal_size_policy": "Preferred",
+                  "maximum_size": {
+                    "height": 16777215,
+                    "width": 16777215
+                  },
+                  "minimum_size": {
+                    "height": 0,
+                    "width": 0
+                  },
+                  "minimum_size_hint": {
+                    "height": 16,
+                    "width": 34
+                  },
+                  "size": {
+                    "height": 16,
+                    "width": 773
+                  },
+                  "size_hint": {
+                    "height": 32,
+                    "width": 109
+                  },
+                  "vertical_size_policy": "Preferred",
+                  "visible": true
+                }
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "children": [],
+                            "class_name": "QWidget",
+                            "node_id": "o27",
+                            "object_name": "qt_scrollarea_viewport",
+                            "semantic_id": "",
+                            "widget": {
+                              "enabled": true,
+                              "geometry": {
+                                "height": 28,
+                                "width": 98,
+                                "x": 1,
+                                "y": 1
+                              },
+                              "has_focus": false,
+                              "hidden": false,
+                              "horizontal_size_policy": "Preferred",
+                              "maximum_size": {
+                                "height": 16777215,
+                                "width": 16777215
+                              },
+                              "minimum_size": {
+                                "height": 0,
+                                "width": 0
+                              },
+                              "minimum_size_hint": {
+                                "height": -1,
+                                "width": -1
+                              },
+                              "size": {
+                                "height": 28,
+                                "width": 98
+                              },
+                              "size_hint": {
+                                "height": -1,
+                                "width": -1
+                              },
+                              "vertical_size_policy": "Preferred",
+                              "visible": false
+                            }
+                          },
+                          {
+                            "children": [
+                              {
+                                "children": [],
+                                "class_name": "QScrollBar",
+                                "node_id": "o29",
+                                "object_name": "",
+                                "semantic_id": "",
+                                "widget": {
+                                  "enabled": true,
+                                  "geometry": {
+                                    "height": 30,
+                                    "width": 100,
+                                    "x": 0,
+                                    "y": 0
+                                  },
+                                  "has_focus": false,
+                                  "hidden": false,
+                                  "horizontal_size_policy": "Minimum",
+                                  "maximum_size": {
+                                    "height": 16777215,
+                                    "width": 16777215
+                                  },
+                                  "minimum_size": {
+                                    "height": 0,
+                                    "width": 0
+                                  },
+                                  "minimum_size_hint": {
+                                    "height": -1,
+                                    "width": -1
+                                  },
+                                  "size": {
+                                    "height": 30,
+                                    "width": 100
+                                  },
+                                  "size_hint": {
+                                    "height": 14,
+                                    "width": 54
+                                  },
+                                  "vertical_size_policy": "Fixed",
+                                  "visible": false
+                                }
+                              },
+                              {
+                                "children": [],
+                                "class_name": "QBoxLayout",
+                                "layout": {
+                                  "geometry": {
+                                    "height": 0,
+                                    "width": 0,
+                                    "x": 0,
+                                    "y": 0
+                                  },
+                                  "margins": {
+                                    "bottom": 0,
+                                    "left": 0,
+                                    "right": 0,
+                                    "top": 0
+                                  },
+                                  "spacing": 0
+                                },
+                                "node_id": "o30",
+                                "object_name": "",
+                                "semantic_id": ""
+                              }
+                            ],
+                            "class_name": "QWidget",
+                            "node_id": "o28",
+                            "object_name": "qt_scrollarea_hcontainer",
+                            "semantic_id": "",
+                            "widget": {
+                              "enabled": true,
+                              "geometry": {
+                                "height": 30,
+                                "width": 100,
+                                "x": 0,
+                                "y": 0
+                              },
+                              "has_focus": false,
+                              "hidden": true,
+                              "horizontal_size_policy": "Preferred",
+                              "maximum_size": {
+                                "height": 16777215,
+                                "width": 16777215
+                              },
+                              "minimum_size": {
+                                "height": 0,
+                                "width": 0
+                              },
+                              "minimum_size_hint": {
+                                "height": 14,
+                                "width": 54
+                              },
+                              "size": {
+                                "height": 30,
+                                "width": 100
+                              },
+                              "size_hint": {
+                                "height": 14,
+                                "width": 54
+                              },
+                              "vertical_size_policy": "Preferred",
+                              "visible": false
+                            }
+                          },
+                          {
+                            "children": [
+                              {
+                                "children": [],
+                                "class_name": "QScrollBar",
+                                "node_id": "o32",
+                                "object_name": "",
+                                "semantic_id": "",
+                                "widget": {
+                                  "enabled": true,
+                                  "geometry": {
+                                    "height": 30,
+                                    "width": 100,
+                                    "x": 0,
+                                    "y": 0
+                                  },
+                                  "has_focus": false,
+                                  "hidden": false,
+                                  "horizontal_size_policy": "Fixed",
+                                  "maximum_size": {
+                                    "height": 16777215,
+                                    "width": 16777215
+                                  },
+                                  "minimum_size": {
+                                    "height": 0,
+                                    "width": 0
+                                  },
+                                  "minimum_size_hint": {
+                                    "height": -1,
+                                    "width": -1
+                                  },
+                                  "size": {
+                                    "height": 30,
+                                    "width": 100
+                                  },
+                                  "size_hint": {
+                                    "height": 54,
+                                    "width": 14
+                                  },
+                                  "vertical_size_policy": "Minimum",
+                                  "visible": false
+                                }
+                              },
+                              {
+                                "children": [],
+                                "class_name": "QBoxLayout",
+                                "layout": {
+                                  "geometry": {
+                                    "height": 0,
+                                    "width": 0,
+                                    "x": 0,
+                                    "y": 0
+                                  },
+                                  "margins": {
+                                    "bottom": 0,
+                                    "left": 0,
+                                    "right": 0,
+                                    "top": 0
+                                  },
+                                  "spacing": 0
+                                },
+                                "node_id": "o30",
+                                "object_name": "",
+                                "semantic_id": ""
+                              }
+                            ],
+                            "class_name": "QWidget",
+                            "node_id": "o31",
+                            "object_name": "qt_scrollarea_vcontainer",
+                            "semantic_id": "",
+                            "widget": {
+                              "enabled": true,
+                              "geometry": {
+                                "height": 30,
+                                "width": 100,
+                                "x": 0,
+                                "y": 0
+                              },
+                              "has_focus": false,
+                              "hidden": true,
+                              "horizontal_size_policy": "Preferred",
+                              "maximum_size": {
+                                "height": 16777215,
+                                "width": 16777215
+                              },
+                              "minimum_size": {
+                                "height": 0,
+                                "width": 0
+                              },
+                              "minimum_size_hint": {
+                                "height": 54,
+                                "width": 14
+                              },
+                              "size": {
+                                "height": 30,
+                                "width": 100
+                              },
+                              "size_hint": {
+                                "height": 54,
+                                "width": 14
+                              },
+                              "vertical_size_policy": "Preferred",
+                              "visible": false
+                            }
+                          }
+                        ],
+                        "class_name": "QTextBrowser",
+                        "node_id": "o26",
+                        "object_name": "",
+                        "semantic_id": "",
+                        "widget": {
+                          "enabled": true,
+                          "geometry": {
+                            "height": 30,
+                            "width": 100,
+                            "x": 0,
+                            "y": 0
+                          },
+                          "has_focus": false,
+                          "hidden": true,
+                          "horizontal_size_policy": "Expanding",
+                          "maximum_size": {
+                            "height": 16777215,
+                            "width": 16777215
+                          },
+                          "minimum_size": {
+                            "height": 0,
+                            "width": 0
+                          },
+                          "minimum_size_hint": {
+                            "height": 70,
+                            "width": 70
+                          },
+                          "size": {
+                            "height": 30,
+                            "width": 100
+                          },
+                          "size_hint": {
+                            "height": 192,
+                            "width": 256
+                          },
+                          "vertical_size_policy": "Expanding",
+                          "visible": false
+                        }
+                      },
+                      {
+                        "children": [
+                          {
+                            "children": [],
+                            "class_name": "QWidget",
+                            "node_id": "o31",
+                            "object_name": "qt_scrollarea_viewport",
+                            "semantic_id": "",
+                            "widget": {
+                              "enabled": true,
+                              "geometry": {
+                                "height": 28,
+                                "width": 98,
+                                "x": 1,
+                                "y": 1
+                              },
+                              "has_focus": false,
+                              "hidden": false,
+                              "horizontal_size_policy": "Preferred",
+                              "maximum_size": {
+                                "height": 16777215,
+                                "width": 16777215
+                              },
+                              "minimum_size": {
+                                "height": 0,
+                                "width": 0
+                              },
+                              "minimum_size_hint": {
+                                "height": -1,
+                                "width": -1
+                              },
+                              "size": {
+                                "height": 28,
+                                "width": 98
+                              },
+                              "size_hint": {
+                                "height": -1,
+                                "width": -1
+                              },
+                              "vertical_size_policy": "Preferred",
+                              "visible": false
+                            }
+                          },
+                          {
+                            "children": [
+                              {
+                                "children": [],
+                                "class_name": "QScrollBar",
+                                "node_id": "o35",
+                                "object_name": "",
+                                "semantic_id": "",
+                                "widget": {
+                                  "enabled": true,
+                                  "geometry": {
+                                    "height": 30,
+                                    "width": 100,
+                                    "x": 0,
+                                    "y": 0
+                                  },
+                                  "has_focus": false,
+                                  "hidden": false,
+                                  "horizontal_size_policy": "Minimum",
+                                  "maximum_size": {
+                                    "height": 16777215,
+                                    "width": 16777215
+                                  },
+                                  "minimum_size": {
+                                    "height": 0,
+                                    "width": 0
+                                  },
+                                  "minimum_size_hint": {
+                                    "height": -1,
+                                    "width": -1
+                                  },
+                                  "size": {
+                                    "height": 30,
+                                    "width": 100
+                                  },
+                                  "size_hint": {
+                                    "height": 14,
+                                    "width": 54
+                                  },
+                                  "vertical_size_policy": "Fixed",
+                                  "visible": false
+                                }
+                              },
+                              {
+                                "children": [],
+                                "class_name": "QBoxLayout",
+                                "layout": {
+                                  "geometry": {
+                                    "height": 0,
+                                    "width": 0,
+                                    "x": 0,
+                                    "y": 0
+                                  },
+                                  "margins": {
+                                    "bottom": 0,
+                                    "left": 0,
+                                    "right": 0,
+                                    "top": 0
+                                  },
+                                  "spacing": 0
+                                },
+                                "node_id": "o36",
+                                "object_name": "",
+                                "semantic_id": ""
+                              }
+                            ],
+                            "class_name": "QWidget",
+                            "node_id": "o34",
+                            "object_name": "qt_scrollarea_hcontainer",
+                            "semantic_id": "",
+                            "widget": {
+                              "enabled": true,
+                              "geometry": {
+                                "height": 30,
+                                "width": 100,
+                                "x": 0,
+                                "y": 0
+                              },
+                              "has_focus": false,
+                              "hidden": true,
+                              "horizontal_size_policy": "Preferred",
+                              "maximum_size": {
+                                "height": 16777215,
+                                "width": 16777215
+                              },
+                              "minimum_size": {
+                                "height": 0,
+                                "width": 0
+                              },
+                              "minimum_size_hint": {
+                                "height": 14,
+                                "width": 54
+                              },
+                              "size": {
+                                "height": 30,
+                                "width": 100
+                              },
+                              "size_hint": {
+                                "height": 14,
+                                "width": 54
+                              },
+                              "vertical_size_policy": "Preferred",
+                              "visible": false
+                            }
+                          },
+                          {
+                            "children": [
+                              {
+                                "children": [],
+                                "class_name": "QScrollBar",
+                                "node_id": "o38",
+                                "object_name": "",
+                                "semantic_id": "",
+                                "widget": {
+                                  "enabled": true,
+                                  "geometry": {
+                                    "height": 30,
+                                    "width": 100,
+                                    "x": 0,
+                                    "y": 0
+                                  },
+                                  "has_focus": false,
+                                  "hidden": false,
+                                  "horizontal_size_policy": "Fixed",
+                                  "maximum_size": {
+                                    "height": 16777215,
+                                    "width": 16777215
+                                  },
+                                  "minimum_size": {
+                                    "height": 0,
+                                    "width": 0
+                                  },
+                                  "minimum_size_hint": {
+                                    "height": -1,
+                                    "width": -1
+                                  },
+                                  "size": {
+                                    "height": 30,
+                                    "width": 100
+                                  },
+                                  "size_hint": {
+                                    "height": 54,
+                                    "width": 14
+                                  },
+                                  "vertical_size_policy": "Minimum",
+                                  "visible": false
+                                }
+                              },
+                              {
+                                "children": [],
+                                "class_name": "QBoxLayout",
+                                "layout": {
+                                  "geometry": {
+                                    "height": 0,
+                                    "width": 0,
+                                    "x": 0,
+                                    "y": 0
+                                  },
+                                  "margins": {
+                                    "bottom": 0,
+                                    "left": 0,
+                                    "right": 0,
+                                    "top": 0
+                                  },
+                                  "spacing": 0
+                                },
+                                "node_id": "o35",
+                                "object_name": "",
+                                "semantic_id": ""
+                              }
+                            ],
+                            "class_name": "QWidget",
+                            "node_id": "o37",
+                            "object_name": "qt_scrollarea_vcontainer",
+                            "semantic_id": "",
+                            "widget": {
+                              "enabled": true,
+                              "geometry": {
+                                "height": 30,
+                                "width": 100,
+                                "x": 0,
+                                "y": 0
+                              },
+                              "has_focus": false,
+                              "hidden": true,
+                              "horizontal_size_policy": "Preferred",
+                              "maximum_size": {
+                                "height": 16777215,
+                                "width": 16777215
+                              },
+                              "minimum_size": {
+                                "height": 0,
+                                "width": 0
+                              },
+                              "minimum_size_hint": {
+                                "height": 54,
+                                "width": 14
+                              },
+                              "size": {
+                                "height": 30,
+                                "width": 100
+                              },
+                              "size_hint": {
+                                "height": 54,
+                                "width": 14
+                              },
+                              "vertical_size_policy": "Preferred",
+                              "visible": false
+                            }
+                          }
+                        ],
+                        "class_name": "QTextBrowser",
+                        "node_id": "o33",
+                        "object_name": "",
+                        "semantic_id": "",
+                        "widget": {
+                          "enabled": true,
+                          "geometry": {
+                            "height": 30,
+                            "width": 100,
+                            "x": 0,
+                            "y": 0
+                          },
+                          "has_focus": false,
+                          "hidden": true,
+                          "horizontal_size_policy": "Expanding",
+                          "maximum_size": {
+                            "height": 16777215,
+                            "width": 16777215
+                          },
+                          "minimum_size": {
+                            "height": 0,
+                            "width": 0
+                          },
+                          "minimum_size_hint": {
+                            "height": 70,
+                            "width": 70
+                          },
+                          "size": {
+                            "height": 30,
+                            "width": 100
+                          },
+                          "size_hint": {
+                            "height": 192,
+                            "width": 256
+                          },
+                          "vertical_size_policy": "Expanding",
+                          "visible": false
+                        }
+                      },
+                      {
+                        "children": [],
+                        "class_name": "QStackedLayout",
+                        "layout": {
+                          "geometry": {
+                            "height": 0,
+                            "width": 0,
+                            "x": 0,
+                            "y": 0
+                          },
+                          "margins": {
+                            "bottom": 9,
+                            "left": 9,
+                            "right": 9,
+                            "top": 9
+                          },
+                          "spacing": 6
+                        },
+                        "node_id": "o39",
+                        "object_name": "",
+                        "semantic_id": ""
+                      },
+                      {
+                        "children": [
+                          {
+                            "children": [],
+                            "class_name": "QWidget",
+                            "node_id": "o34",
+                            "object_name": "qt_scrollarea_viewport",
+                            "semantic_id": "",
+                            "widget": {
+                              "enabled": true,
+                              "geometry": {
+                                "height": 526,
+                                "width": 767,
+                                "x": 1,
+                                "y": 1
+                              },
+                              "has_focus": false,
+                              "hidden": false,
+                              "horizontal_size_policy": "Preferred",
+                              "maximum_size": {
+                                "height": 16777215,
+                                "width": 16777215
+                              },
+                              "minimum_size": {
+                                "height": 0,
+                                "width": 0
+                              },
+                              "minimum_size_hint": {
+                                "height": -1,
+                                "width": -1
+                              },
+                              "size": {
+                                "height": 526,
+                                "width": 767
+                              },
+                              "size_hint": {
+                                "height": -1,
+                                "width": -1
+                              },
+                              "vertical_size_policy": "Preferred",
+                              "visible": true
+                            }
+                          },
+                          {
+                            "children": [
+                              {
+                                "children": [],
+                                "class_name": "QScrollBar",
+                                "node_id": "o42",
+                                "object_name": "",
+                                "semantic_id": "",
+                                "widget": {
+                                  "enabled": true,
+                                  "geometry": {
+                                    "height": 30,
+                                    "width": 100,
+                                    "x": 0,
+                                    "y": 0
+                                  },
+                                  "has_focus": false,
+                                  "hidden": false,
+                                  "horizontal_size_policy": "Minimum",
+                                  "maximum_size": {
+                                    "height": 16777215,
+                                    "width": 16777215
+                                  },
+                                  "minimum_size": {
+                                    "height": 0,
+                                    "width": 0
+                                  },
+                                  "minimum_size_hint": {
+                                    "height": -1,
+                                    "width": -1
+                                  },
+                                  "size": {
+                                    "height": 30,
+                                    "width": 100
+                                  },
+                                  "size_hint": {
+                                    "height": 14,
+                                    "width": 54
+                                  },
+                                  "vertical_size_policy": "Fixed",
+                                  "visible": false
+                                }
+                              },
+                              {
+                                "children": [],
+                                "class_name": "QBoxLayout",
+                                "layout": {
+                                  "geometry": {
+                                    "height": 0,
+                                    "width": 0,
+                                    "x": 0,
+                                    "y": 0
+                                  },
+                                  "margins": {
+                                    "bottom": 0,
+                                    "left": 0,
+                                    "right": 0,
+                                    "top": 0
+                                  },
+                                  "spacing": 0
+                                },
+                                "node_id": "o43",
+                                "object_name": "",
+                                "semantic_id": ""
+                              }
+                            ],
+                            "class_name": "QWidget",
+                            "node_id": "o41",
+                            "object_name": "qt_scrollarea_hcontainer",
+                            "semantic_id": "",
+                            "widget": {
+                              "enabled": true,
+                              "geometry": {
+                                "height": 30,
+                                "width": 100,
+                                "x": 0,
+                                "y": 0
+                              },
+                              "has_focus": false,
+                              "hidden": true,
+                              "horizontal_size_policy": "Preferred",
+                              "maximum_size": {
+                                "height": 16777215,
+                                "width": 16777215
+                              },
+                              "minimum_size": {
+                                "height": 0,
+                                "width": 0
+                              },
+                              "minimum_size_hint": {
+                                "height": 14,
+                                "width": 54
+                              },
+                              "size": {
+                                "height": 30,
+                                "width": 100
+                              },
+                              "size_hint": {
+                                "height": 14,
+                                "width": 54
+                              },
+                              "vertical_size_policy": "Preferred",
+                              "visible": false
+                            }
+                          },
+                          {
+                            "children": [
+                              {
+                                "children": [],
+                                "class_name": "QScrollBar",
+                                "node_id": "o45",
+                                "object_name": "",
+                                "semantic_id": "",
+                                "widget": {
+                                  "enabled": true,
+                                  "geometry": {
+                                    "height": 30,
+                                    "width": 100,
+                                    "x": 0,
+                                    "y": 0
+                                  },
+                                  "has_focus": false,
+                                  "hidden": false,
+                                  "horizontal_size_policy": "Fixed",
+                                  "maximum_size": {
+                                    "height": 16777215,
+                                    "width": 16777215
+                                  },
+                                  "minimum_size": {
+                                    "height": 0,
+                                    "width": 0
+                                  },
+                                  "minimum_size_hint": {
+                                    "height": -1,
+                                    "width": -1
+                                  },
+                                  "size": {
+                                    "height": 30,
+                                    "width": 100
+                                  },
+                                  "size_hint": {
+                                    "height": 54,
+                                    "width": 14
+                                  },
+                                  "vertical_size_policy": "Minimum",
+                                  "visible": false
+                                }
+                              },
+                              {
+                                "children": [],
+                                "class_name": "QBoxLayout",
+                                "layout": {
+                                  "geometry": {
+                                    "height": 0,
+                                    "width": 0,
+                                    "x": 0,
+                                    "y": 0
+                                  },
+                                  "margins": {
+                                    "bottom": 0,
+                                    "left": 0,
+                                    "right": 0,
+                                    "top": 0
+                                  },
+                                  "spacing": 0
+                                },
+                                "node_id": "o43",
+                                "object_name": "",
+                                "semantic_id": ""
+                              }
+                            ],
+                            "class_name": "QWidget",
+                            "node_id": "o44",
+                            "object_name": "qt_scrollarea_vcontainer",
+                            "semantic_id": "",
+                            "widget": {
+                              "enabled": true,
+                              "geometry": {
+                                "height": 30,
+                                "width": 100,
+                                "x": 0,
+                                "y": 0
+                              },
+                              "has_focus": false,
+                              "hidden": true,
+                              "horizontal_size_policy": "Preferred",
+                              "maximum_size": {
+                                "height": 16777215,
+                                "width": 16777215
+                              },
+                              "minimum_size": {
+                                "height": 0,
+                                "width": 0
+                              },
+                              "minimum_size_hint": {
+                                "height": 54,
+                                "width": 14
+                              },
+                              "size": {
+                                "height": 30,
+                                "width": 100
+                              },
+                              "size_hint": {
+                                "height": 54,
+                                "width": 14
+                              },
+                              "vertical_size_policy": "Preferred",
+                              "visible": false
+                            }
+                          }
+                        ],
+                        "class_name": "QTextBrowser",
+                        "node_id": "o40",
+                        "object_name": "",
+                        "semantic_id": "audit.explanation",
+                        "widget": {
+                          "enabled": true,
+                          "geometry": {
+                            "height": 528,
+                            "width": 769,
+                            "x": 0,
+                            "y": 0
+                          },
+                          "has_focus": false,
+                          "hidden": false,
+                          "horizontal_size_policy": "Expanding",
+                          "maximum_size": {
+                            "height": 16777215,
+                            "width": 16777215
+                          },
+                          "minimum_size": {
+                            "height": 0,
+                            "width": 0
+                          },
+                          "minimum_size_hint": {
+                            "height": 70,
+                            "width": 70
+                          },
+                          "size": {
+                            "height": 528,
+                            "width": 769
+                          },
+                          "size_hint": {
+                            "height": 192,
+                            "width": 256
+                          },
+                          "vertical_size_policy": "Expanding",
+                          "visible": true
+                        }
+                      }
+                    ],
+                    "class_name": "QStackedWidget",
+                    "node_id": "o25",
+                    "object_name": "qt_tabwidget_stackedwidget",
+                    "semantic_id": "",
+                    "widget": {
+                      "enabled": true,
+                      "geometry": {
+                        "height": 528,
+                        "width": 769,
+                        "x": 2,
+                        "y": 28
+                      },
+                      "has_focus": false,
+                      "hidden": false,
+                      "horizontal_size_policy": "Preferred",
+                      "maximum_size": {
+                        "height": 16777215,
+                        "width": 16777215
+                      },
+                      "minimum_size": {
+                        "height": 0,
+                        "width": 0
+                      },
+                      "minimum_size_hint": {
+                        "height": 70,
+                        "width": 70
+                      },
+                      "size": {
+                        "height": 528,
+                        "width": 769
+                      },
+                      "size_hint": {
+                        "height": 192,
+                        "width": 256
+                      },
+                      "vertical_size_policy": "Preferred",
+                      "visible": true
+                    }
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [],
+                        "class_name": "QToolButton",
+                        "node_id": "o34",
+                        "object_name": "ScrollLeftButton",
+                        "semantic_id": "",
+                        "widget": {
+                          "checked": false,
+                          "enabled": false,
+                          "geometry": {
+                            "height": 30,
+                            "width": 16,
+                            "x": 69,
+                            "y": 0
+                          },
+                          "has_focus": false,
+                          "hidden": true,
+                          "horizontal_size_policy": "Fixed",
+                          "maximum_size": {
+                            "height": 16777215,
+                            "width": 16777215
+                          },
+                          "minimum_size": {
+                            "height": 0,
+                            "width": 0
+                          },
+                          "minimum_size_hint": {
+                            "height": 23,
+                            "width": 24
+                          },
+                          "size": {
+                            "height": 30,
+                            "width": 16
+                          },
+                          "size_hint": {
+                            "height": 23,
+                            "width": 24
+                          },
+                          "vertical_size_policy": "Fixed",
+                          "visible": false
+                        }
+                      },
+                      {
+                        "children": [],
+                        "class_name": "QToolButton",
+                        "node_id": "o47",
+                        "object_name": "ScrollRightButton",
+                        "semantic_id": "",
+                        "widget": {
+                          "checked": false,
+                          "enabled": false,
+                          "geometry": {
+                            "height": 30,
+                            "width": 16,
+                            "x": 84,
+                            "y": 0
+                          },
+                          "has_focus": false,
+                          "hidden": true,
+                          "horizontal_size_policy": "Fixed",
+                          "maximum_size": {
+                            "height": 16777215,
+                            "width": 16777215
+                          },
+                          "minimum_size": {
+                            "height": 0,
+                            "width": 0
+                          },
+                          "minimum_size_hint": {
+                            "height": 23,
+                            "width": 24
+                          },
+                          "size": {
+                            "height": 30,
+                            "width": 16
+                          },
+                          "size_hint": {
+                            "height": 23,
+                            "width": 24
+                          },
+                          "vertical_size_policy": "Fixed",
+                          "visible": false
+                        }
+                      }
+                    ],
+                    "class_name": "QTabBar",
+                    "node_id": "o46",
+                    "object_name": "qt_tabwidget_tabbar",
+                    "semantic_id": "",
+                    "widget": {
+                      "enabled": true,
+                      "geometry": {
+                        "height": 28,
+                        "width": 252,
+                        "x": 0,
+                        "y": 0
+                      },
+                      "has_focus": false,
+                      "hidden": false,
+                      "horizontal_size_policy": "Preferred",
+                      "maximum_size": {
+                        "height": 16777215,
+                        "width": 16777215
+                      },
+                      "minimum_size": {
+                        "height": 0,
+                        "width": 0
+                      },
+                      "minimum_size_hint": {
+                        "height": 28,
+                        "width": 123
+                      },
+                      "size": {
+                        "height": 28,
+                        "width": 252
+                      },
+                      "size_hint": {
+                        "height": 28,
+                        "width": 252
+                      },
+                      "vertical_size_policy": "Fixed",
+                      "visible": true
+                    }
+                  }
+                ],
+                "class_name": "QTabWidget",
+                "node_id": "o24",
+                "object_name": "",
+                "semantic_id": "",
+                "widget": {
+                  "enabled": true,
+                  "geometry": {
+                    "height": 558,
+                    "width": 773,
+                    "x": 9,
+                    "y": 61
+                  },
+                  "has_focus": false,
+                  "hidden": false,
+                  "horizontal_size_policy": "Expanding",
+                  "maximum_size": {
+                    "height": 16777215,
+                    "width": 16777215
+                  },
+                  "minimum_size": {
+                    "height": 0,
+                    "width": 0
+                  },
+                  "minimum_size_hint": {
+                    "height": 102,
+                    "width": 127
+                  },
+                  "size": {
+                    "height": 558,
+                    "width": 773
+                  },
+                  "size_hint": {
+                    "height": 224,
+                    "width": 260
+                  },
+                  "vertical_size_policy": "Expanding",
+                  "visible": true
+                }
+              },
+              {
+                "children": [],
+                "class_name": "QPushButton",
+                "node_id": "o48",
+                "object_name": "",
+                "semantic_id": "",
+                "widget": {
+                  "checked": false,
+                  "enabled": true,
+                  "geometry": {
+                    "height": 24,
+                    "width": 773,
+                    "x": 9,
+                    "y": 625
+                  },
+                  "has_focus": false,
+                  "hidden": false,
+                  "horizontal_size_policy": "Minimum",
+                  "maximum_size": {
+                    "height": 16777215,
+                    "width": 16777215
+                  },
+                  "minimum_size": {
+                    "height": 0,
+                    "width": 0
+                  },
+                  "minimum_size_hint": {
+                    "height": 24,
+                    "width": 146
+                  },
+                  "size": {
+                    "height": 24,
+                    "width": 773
+                  },
+                  "size_hint": {
+                    "height": 24,
+                    "width": 146
+                  },
+                  "vertical_size_policy": "Fixed",
+                  "visible": true
+                }
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [],
+                        "class_name": "QBoxLayout",
+                        "layout": {
+                          "geometry": {
+                            "height": 0,
+                            "width": 0,
+                            "x": 0,
+                            "y": 0
+                          },
+                          "margins": {
+                            "bottom": 0,
+                            "left": 0,
+                            "right": 0,
+                            "top": 0
+                          },
+                          "spacing": 0
+                        },
+                        "node_id": "o51",
+                        "object_name": "",
+                        "semantic_id": ""
+                      },
+                      {
+                        "children": [
+                          {
+                            "children": [],
+                            "class_name": "QWidget",
+                            "node_id": "o53",
+                            "object_name": "qt_scrollarea_viewport",
+                            "semantic_id": "",
+                            "widget": {
+                              "enabled": true,
+                              "geometry": {
+                                "height": 478,
+                                "width": 638,
+                                "x": 1,
+                                "y": 1
+                              },
+                              "has_focus": false,
+                              "hidden": false,
+                              "horizontal_size_policy": "Preferred",
+                              "maximum_size": {
+                                "height": 16777215,
+                                "width": 16777215
+                              },
+                              "minimum_size": {
+                                "height": 0,
+                                "width": 0
+                              },
+                              "minimum_size_hint": {
+                                "height": -1,
+                                "width": -1
+                              },
+                              "size": {
+                                "height": 478,
+                                "width": 638
+                              },
+                              "size_hint": {
+                                "height": -1,
+                                "width": -1
+                              },
+                              "vertical_size_policy": "Preferred",
+                              "visible": false
+                            }
+                          },
+                          {
+                            "children": [
+                              {
+                                "children": [],
+                                "class_name": "QScrollBar",
+                                "node_id": "o55",
+                                "object_name": "",
+                                "semantic_id": "",
+                                "widget": {
+                                  "enabled": true,
+                                  "geometry": {
+                                    "height": 30,
+                                    "width": 100,
+                                    "x": 0,
+                                    "y": 0
+                                  },
+                                  "has_focus": false,
+                                  "hidden": false,
+                                  "horizontal_size_policy": "Minimum",
+                                  "maximum_size": {
+                                    "height": 16777215,
+                                    "width": 16777215
+                                  },
+                                  "minimum_size": {
+                                    "height": 0,
+                                    "width": 0
+                                  },
+                                  "minimum_size_hint": {
+                                    "height": -1,
+                                    "width": -1
+                                  },
+                                  "size": {
+                                    "height": 30,
+                                    "width": 100
+                                  },
+                                  "size_hint": {
+                                    "height": 14,
+                                    "width": 54
+                                  },
+                                  "vertical_size_policy": "Fixed",
+                                  "visible": false
+                                }
+                              },
+                              {
+                                "children": [],
+                                "class_name": "QBoxLayout",
+                                "layout": {
+                                  "geometry": {
+                                    "height": 0,
+                                    "width": 0,
+                                    "x": 0,
+                                    "y": 0
+                                  },
+                                  "margins": {
+                                    "bottom": 0,
+                                    "left": 0,
+                                    "right": 0,
+                                    "top": 0
+                                  },
+                                  "spacing": 0
+                                },
+                                "node_id": "o56",
+                                "object_name": "",
+                                "semantic_id": ""
+                              }
+                            ],
+                            "class_name": "QWidget",
+                            "node_id": "o54",
+                            "object_name": "qt_scrollarea_hcontainer",
+                            "semantic_id": "",
+                            "widget": {
+                              "enabled": true,
+                              "geometry": {
+                                "height": 30,
+                                "width": 100,
+                                "x": 0,
+                                "y": 0
+                              },
+                              "has_focus": false,
+                              "hidden": true,
+                              "horizontal_size_policy": "Preferred",
+                              "maximum_size": {
+                                "height": 16777215,
+                                "width": 16777215
+                              },
+                              "minimum_size": {
+                                "height": 0,
+                                "width": 0
+                              },
+                              "minimum_size_hint": {
+                                "height": 14,
+                                "width": 54
+                              },
+                              "size": {
+                                "height": 30,
+                                "width": 100
+                              },
+                              "size_hint": {
+                                "height": 14,
+                                "width": 54
+                              },
+                              "vertical_size_policy": "Preferred",
+                              "visible": false
+                            }
+                          },
+                          {
+                            "children": [
+                              {
+                                "children": [],
+                                "class_name": "QScrollBar",
+                                "node_id": "o56",
+                                "object_name": "",
+                                "semantic_id": "",
+                                "widget": {
+                                  "enabled": true,
+                                  "geometry": {
+                                    "height": 30,
+                                    "width": 100,
+                                    "x": 0,
+                                    "y": 0
+                                  },
+                                  "has_focus": false,
+                                  "hidden": false,
+                                  "horizontal_size_policy": "Fixed",
+                                  "maximum_size": {
+                                    "height": 16777215,
+                                    "width": 16777215
+                                  },
+                                  "minimum_size": {
+                                    "height": 0,
+                                    "width": 0
+                                  },
+                                  "minimum_size_hint": {
+                                    "height": -1,
+                                    "width": -1
+                                  },
+                                  "size": {
+                                    "height": 30,
+                                    "width": 100
+                                  },
+                                  "size_hint": {
+                                    "height": 54,
+                                    "width": 14
+                                  },
+                                  "vertical_size_policy": "Minimum",
+                                  "visible": false
+                                }
+                              },
+                              {
+                                "children": [],
+                                "class_name": "QBoxLayout",
+                                "layout": {
+                                  "geometry": {
+                                    "height": 0,
+                                    "width": 0,
+                                    "x": 0,
+                                    "y": 0
+                                  },
+                                  "margins": {
+                                    "bottom": 0,
+                                    "left": 0,
+                                    "right": 0,
+                                    "top": 0
+                                  },
+                                  "spacing": 0
+                                },
+                                "node_id": "o58",
+                                "object_name": "",
+                                "semantic_id": ""
+                              }
+                            ],
+                            "class_name": "QWidget",
+                            "node_id": "o57",
+                            "object_name": "qt_scrollarea_vcontainer",
+                            "semantic_id": "",
+                            "widget": {
+                              "enabled": true,
+                              "geometry": {
+                                "height": 30,
+                                "width": 100,
+                                "x": 0,
+                                "y": 0
+                              },
+                              "has_focus": false,
+                              "hidden": true,
+                              "horizontal_size_policy": "Preferred",
+                              "maximum_size": {
+                                "height": 16777215,
+                                "width": 16777215
+                              },
+                              "minimum_size": {
+                                "height": 0,
+                                "width": 0
+                              },
+                              "minimum_size_hint": {
+                                "height": 54,
+                                "width": 14
+                              },
+                              "size": {
+                                "height": 30,
+                                "width": 100
+                              },
+                              "size_hint": {
+                                "height": 54,
+                                "width": 14
+                              },
+                              "vertical_size_policy": "Preferred",
+                              "visible": false
+                            }
+                          }
+                        ],
+                        "class_name": "QListView",
+                        "node_id": "o52",
+                        "object_name": "",
+                        "semantic_id": "",
+                        "widget": {
+                          "enabled": true,
+                          "geometry": {
+                            "height": 480,
+                            "width": 640,
+                            "x": 0,
+                            "y": 0
+                          },
+                          "has_focus": false,
+                          "hidden": false,
+                          "horizontal_size_policy": "Ignored",
+                          "maximum_size": {
+                            "height": 16777215,
+                            "width": 16777215
+                          },
+                          "minimum_size": {
+                            "height": 0,
+                            "width": 0
+                          },
+                          "minimum_size_hint": {
+                            "height": 68,
+                            "width": 68
+                          },
+                          "size": {
+                            "height": 480,
+                            "width": 640
+                          },
+                          "size_hint": {
+                            "height": 192,
+                            "width": 256
+                          },
+                          "vertical_size_policy": "Ignored",
+                          "visible": false
+                        }
+                      },
+                      {
+                        "children": [],
+                        "class_name": "QWidget",
+                        "node_id": "o59",
+                        "object_name": "",
+                        "semantic_id": "",
+                        "widget": {
+                          "enabled": true,
+                          "geometry": {
+                            "height": 30,
+                            "width": 100,
+                            "x": 0,
+                            "y": 0
+                          },
+                          "has_focus": false,
+                          "hidden": true,
+                          "horizontal_size_policy": "Minimum",
+                          "maximum_size": {
+                            "height": 16777215,
+                            "width": 16777215
+                          },
+                          "minimum_size": {
+                            "height": 0,
+                            "width": 0
+                          },
+                          "minimum_size_hint": {
+                            "height": -1,
+                            "width": -1
+                          },
+                          "size": {
+                            "height": 30,
+                            "width": 100
+                          },
+                          "size_hint": {
+                            "height": 10,
+                            "width": 20
+                          },
+                          "vertical_size_policy": "Fixed",
+                          "visible": false
+                        }
+                      },
+                      {
+                        "children": [],
+                        "class_name": "QWidget",
+                        "node_id": "o60",
+                        "object_name": "",
+                        "semantic_id": "",
+                        "widget": {
+                          "enabled": true,
+                          "geometry": {
+                            "height": 30,
+                            "width": 100,
+                            "x": 0,
+                            "y": 0
+                          },
+                          "has_focus": false,
+                          "hidden": true,
+                          "horizontal_size_policy": "Minimum",
+                          "maximum_size": {
+                            "height": 16777215,
+                            "width": 16777215
+                          },
+                          "minimum_size": {
+                            "height": 0,
+                            "width": 0
+                          },
+                          "minimum_size_hint": {
+                            "height": -1,
+                            "width": -1
+                          },
+                          "size": {
+                            "height": 30,
+                            "width": 100
+                          },
+                          "size_hint": {
+                            "height": 10,
+                            "width": 20
+                          },
+                          "vertical_size_policy": "Fixed",
+                          "visible": false
+                        }
+                      }
+                    ],
+                    "class_name": "QFrame",
+                    "node_id": "o50",
+                    "object_name": "",
+                    "semantic_id": "",
+                    "widget": {
+                      "enabled": true,
+                      "geometry": {
+                        "height": 30,
+                        "width": 100,
+                        "x": 0,
+                        "y": 0
+                      },
+                      "has_focus": false,
+                      "hidden": true,
+                      "horizontal_size_policy": "Preferred",
+                      "maximum_size": {
+                        "height": 16777215,
+                        "width": 16777215
+                      },
+                      "minimum_size": {
+                        "height": 0,
+                        "width": 0
+                      },
+                      "minimum_size_hint": {
+                        "height": 2,
+                        "width": 2
+                      },
+                      "size": {
+                        "height": 30,
+                        "width": 100
+                      },
+                      "size_hint": {
+                        "height": 2,
+                        "width": 2
+                      },
+                      "vertical_size_policy": "Preferred",
+                      "visible": false
+                    }
+                  }
+                ],
+                "class_name": "QComboBox",
+                "node_id": "o49",
+                "object_name": "",
+                "semantic_id": "",
+                "widget": {
+                  "current_index": 0,
+                  "enabled": true,
+                  "geometry": {
+                    "height": 24,
+                    "width": 189,
+                    "x": 9,
+                    "y": 655
+                  },
+                  "has_focus": false,
+                  "hidden": false,
+                  "horizontal_size_policy": "Preferred",
+                  "maximum_size": {
+                    "height": 16777215,
+                    "width": 16777215
+                  },
+                  "minimum_size": {
+                    "height": 0,
+                    "width": 0
+                  },
+                  "minimum_size_hint": {
+                    "height": 24,
+                    "width": 72
+                  },
+                  "size": {
+                    "height": 24,
+                    "width": 189
+                  },
+                  "size_hint": {
+                    "height": 24,
+                    "width": 72
+                  },
+                  "vertical_size_policy": "Fixed",
+                  "visible": true
+                }
+              },
+              {
+                "children": [],
+                "class_name": "QPushButton",
+                "node_id": "o61",
+                "object_name": "",
+                "semantic_id": "audit.open-artifact",
+                "widget": {
+                  "checked": false,
+                  "enabled": true,
+                  "geometry": {
+                    "height": 24,
+                    "width": 189,
+                    "x": 204,
+                    "y": 655
+                  },
+                  "has_focus": false,
+                  "hidden": false,
+                  "horizontal_size_policy": "Minimum",
+                  "maximum_size": {
+                    "height": 16777215,
+                    "width": 16777215
+                  },
+                  "minimum_size": {
+                    "height": 0,
+                    "width": 0
+                  },
+                  "minimum_size_hint": {
+                    "height": 24,
+                    "width": 80
+                  },
+                  "size": {
+                    "height": 24,
+                    "width": 189
+                  },
+                  "size_hint": {
+                    "height": 24,
+                    "width": 80
+                  },
+                  "vertical_size_policy": "Fixed",
+                  "visible": true
+                }
+              },
+              {
+                "children": [],
+                "class_name": "QPushButton",
+                "node_id": "o62",
+                "object_name": "",
+                "semantic_id": "",
+                "widget": {
+                  "checked": false,
+                  "enabled": true,
+                  "geometry": {
+                    "height": 24,
+                    "width": 188,
+                    "x": 399,
+                    "y": 655
+                  },
+                  "has_focus": false,
+                  "hidden": false,
+                  "horizontal_size_policy": "Minimum",
+                  "maximum_size": {
+                    "height": 16777215,
+                    "width": 16777215
+                  },
+                  "minimum_size": {
+                    "height": 0,
+                    "width": 0
+                  },
+                  "minimum_size_hint": {
+                    "height": 24,
+                    "width": 80
+                  },
+                  "size": {
+                    "height": 24,
+                    "width": 188
+                  },
+                  "size_hint": {
+                    "height": 24,
+                    "width": 80
+                  },
+                  "vertical_size_policy": "Fixed",
+                  "visible": true
+                }
+              },
+              {
+                "children": [],
+                "class_name": "QPushButton",
+                "node_id": "o63",
+                "object_name": "",
+                "semantic_id": "",
+                "widget": {
+                  "checked": false,
+                  "enabled": true,
+                  "geometry": {
+                    "height": 24,
+                    "width": 189,
+                    "x": 593,
+                    "y": 655
+                  },
+                  "has_focus": false,
+                  "hidden": false,
+                  "horizontal_size_policy": "Minimum",
+                  "maximum_size": {
+                    "height": 16777215,
+                    "width": 16777215
+                  },
+                  "minimum_size": {
+                    "height": 0,
+                    "width": 0
+                  },
+                  "minimum_size_hint": {
+                    "height": 24,
+                    "width": 80
+                  },
+                  "size": {
+                    "height": 24,
+                    "width": 189
+                  },
+                  "size_hint": {
+                    "height": 24,
+                    "width": 80
+                  },
+                  "vertical_size_policy": "Fixed",
+                  "visible": true
+                }
+              }
+            ],
+            "class_name": "QWidget",
+            "node_id": "o16",
+            "object_name": "",
+            "semantic_id": "",
+            "widget": {
+              "enabled": true,
+              "geometry": {
+                "height": 688,
+                "width": 791,
+                "x": 287,
+                "y": 0
+              },
+              "has_focus": false,
+              "hidden": false,
+              "horizontal_size_policy": "Preferred",
+              "maximum_size": {
+                "height": 16777215,
+                "width": 16777215
+              },
+              "minimum_size": {
+                "height": 0,
+                "width": 0
+              },
+              "minimum_size_hint": {
+                "height": 232,
+                "width": 348
+              },
+              "size": {
+                "height": 688,
+                "width": 791
+              },
+              "size_hint": {
+                "height": 354,
+                "width": 348
+              },
+              "vertical_size_policy": "Preferred",
+              "visible": true
+            }
+          },
+          {
+            "children": [
+              {
+                "children": [],
+                "class_name": "QVBoxLayout",
+                "layout": {
+                  "geometry": {
+                    "height": 688,
+                    "width": 283,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "margins": {
+                    "bottom": 9,
+                    "left": 9,
+                    "right": 9,
+                    "top": 9
+                  },
+                  "spacing": 6
+                },
+                "node_id": "o65",
+                "object_name": "",
+                "semantic_id": ""
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [],
+                        "class_name": "QBoxLayout",
+                        "layout": {
+                          "geometry": {
+                            "height": 0,
+                            "width": 0,
+                            "x": 0,
+                            "y": 0
+                          },
+                          "margins": {
+                            "bottom": 0,
+                            "left": 0,
+                            "right": 0,
+                            "top": 0
+                          },
+                          "spacing": 0
+                        },
+                        "node_id": "o68",
+                        "object_name": "",
+                        "semantic_id": ""
+                      },
+                      {
+                        "children": [
+                          {
+                            "children": [],
+                            "class_name": "QWidget",
+                            "node_id": "o70",
+                            "object_name": "qt_scrollarea_viewport",
+                            "semantic_id": "",
+                            "widget": {
+                              "enabled": true,
+                              "geometry": {
+                                "height": 478,
+                                "width": 638,
+                                "x": 1,
+                                "y": 1
+                              },
+                              "has_focus": false,
+                              "hidden": false,
+                              "horizontal_size_policy": "Preferred",
+                              "maximum_size": {
+                                "height": 16777215,
+                                "width": 16777215
+                              },
+                              "minimum_size": {
+                                "height": 0,
+                                "width": 0
+                              },
+                              "minimum_size_hint": {
+                                "height": -1,
+                                "width": -1
+                              },
+                              "size": {
+                                "height": 478,
+                                "width": 638
+                              },
+                              "size_hint": {
+                                "height": -1,
+                                "width": -1
+                              },
+                              "vertical_size_policy": "Preferred",
+                              "visible": false
+                            }
+                          },
+                          {
+                            "children": [
+                              {
+                                "children": [],
+                                "class_name": "QScrollBar",
+                                "node_id": "o72",
+                                "object_name": "",
+                                "semantic_id": "",
+                                "widget": {
+                                  "enabled": true,
+                                  "geometry": {
+                                    "height": 30,
+                                    "width": 100,
+                                    "x": 0,
+                                    "y": 0
+                                  },
+                                  "has_focus": false,
+                                  "hidden": false,
+                                  "horizontal_size_policy": "Minimum",
+                                  "maximum_size": {
+                                    "height": 16777215,
+                                    "width": 16777215
+                                  },
+                                  "minimum_size": {
+                                    "height": 0,
+                                    "width": 0
+                                  },
+                                  "minimum_size_hint": {
+                                    "height": -1,
+                                    "width": -1
+                                  },
+                                  "size": {
+                                    "height": 30,
+                                    "width": 100
+                                  },
+                                  "size_hint": {
+                                    "height": 14,
+                                    "width": 54
+                                  },
+                                  "vertical_size_policy": "Fixed",
+                                  "visible": false
+                                }
+                              },
+                              {
+                                "children": [],
+                                "class_name": "QBoxLayout",
+                                "layout": {
+                                  "geometry": {
+                                    "height": 0,
+                                    "width": 0,
+                                    "x": 0,
+                                    "y": 0
+                                  },
+                                  "margins": {
+                                    "bottom": 0,
+                                    "left": 0,
+                                    "right": 0,
+                                    "top": 0
+                                  },
+                                  "spacing": 0
+                                },
+                                "node_id": "o73",
+                                "object_name": "",
+                                "semantic_id": ""
+                              }
+                            ],
+                            "class_name": "QWidget",
+                            "node_id": "o71",
+                            "object_name": "qt_scrollarea_hcontainer",
+                            "semantic_id": "",
+                            "widget": {
+                              "enabled": true,
+                              "geometry": {
+                                "height": 30,
+                                "width": 100,
+                                "x": 0,
+                                "y": 0
+                              },
+                              "has_focus": false,
+                              "hidden": true,
+                              "horizontal_size_policy": "Preferred",
+                              "maximum_size": {
+                                "height": 16777215,
+                                "width": 16777215
+                              },
+                              "minimum_size": {
+                                "height": 0,
+                                "width": 0
+                              },
+                              "minimum_size_hint": {
+                                "height": 14,
+                                "width": 54
+                              },
+                              "size": {
+                                "height": 30,
+                                "width": 100
+                              },
+                              "size_hint": {
+                                "height": 14,
+                                "width": 54
+                              },
+                              "vertical_size_policy": "Preferred",
+                              "visible": false
+                            }
+                          },
+                          {
+                            "children": [
+                              {
+                                "children": [],
+                                "class_name": "QScrollBar",
+                                "node_id": "o73",
+                                "object_name": "",
+                                "semantic_id": "",
+                                "widget": {
+                                  "enabled": true,
+                                  "geometry": {
+                                    "height": 30,
+                                    "width": 100,
+                                    "x": 0,
+                                    "y": 0
+                                  },
+                                  "has_focus": false,
+                                  "hidden": false,
+                                  "horizontal_size_policy": "Fixed",
+                                  "maximum_size": {
+                                    "height": 16777215,
+                                    "width": 16777215
+                                  },
+                                  "minimum_size": {
+                                    "height": 0,
+                                    "width": 0
+                                  },
+                                  "minimum_size_hint": {
+                                    "height": -1,
+                                    "width": -1
+                                  },
+                                  "size": {
+                                    "height": 30,
+                                    "width": 100
+                                  },
+                                  "size_hint": {
+                                    "height": 54,
+                                    "width": 14
+                                  },
+                                  "vertical_size_policy": "Minimum",
+                                  "visible": false
+                                }
+                              },
+                              {
+                                "children": [],
+                                "class_name": "QBoxLayout",
+                                "layout": {
+                                  "geometry": {
+                                    "height": 0,
+                                    "width": 0,
+                                    "x": 0,
+                                    "y": 0
+                                  },
+                                  "margins": {
+                                    "bottom": 0,
+                                    "left": 0,
+                                    "right": 0,
+                                    "top": 0
+                                  },
+                                  "spacing": 0
+                                },
+                                "node_id": "o75",
+                                "object_name": "",
+                                "semantic_id": ""
+                              }
+                            ],
+                            "class_name": "QWidget",
+                            "node_id": "o74",
+                            "object_name": "qt_scrollarea_vcontainer",
+                            "semantic_id": "",
+                            "widget": {
+                              "enabled": true,
+                              "geometry": {
+                                "height": 30,
+                                "width": 100,
+                                "x": 0,
+                                "y": 0
+                              },
+                              "has_focus": false,
+                              "hidden": true,
+                              "horizontal_size_policy": "Preferred",
+                              "maximum_size": {
+                                "height": 16777215,
+                                "width": 16777215
+                              },
+                              "minimum_size": {
+                                "height": 0,
+                                "width": 0
+                              },
+                              "minimum_size_hint": {
+                                "height": 54,
+                                "width": 14
+                              },
+                              "size": {
+                                "height": 30,
+                                "width": 100
+                              },
+                              "size_hint": {
+                                "height": 54,
+                                "width": 14
+                              },
+                              "vertical_size_policy": "Preferred",
+                              "visible": false
+                            }
+                          }
+                        ],
+                        "class_name": "QListView",
+                        "node_id": "o69",
+                        "object_name": "",
+                        "semantic_id": "",
+                        "widget": {
+                          "enabled": true,
+                          "geometry": {
+                            "height": 480,
+                            "width": 640,
+                            "x": 0,
+                            "y": 0
+                          },
+                          "has_focus": false,
+                          "hidden": false,
+                          "horizontal_size_policy": "Ignored",
+                          "maximum_size": {
+                            "height": 16777215,
+                            "width": 16777215
+                          },
+                          "minimum_size": {
+                            "height": 0,
+                            "width": 0
+                          },
+                          "minimum_size_hint": {
+                            "height": 68,
+                            "width": 68
+                          },
+                          "size": {
+                            "height": 480,
+                            "width": 640
+                          },
+                          "size_hint": {
+                            "height": 192,
+                            "width": 256
+                          },
+                          "vertical_size_policy": "Ignored",
+                          "visible": false
+                        }
+                      },
+                      {
+                        "children": [],
+                        "class_name": "QWidget",
+                        "node_id": "o76",
+                        "object_name": "",
+                        "semantic_id": "",
+                        "widget": {
+                          "enabled": true,
+                          "geometry": {
+                            "height": 30,
+                            "width": 100,
+                            "x": 0,
+                            "y": 0
+                          },
+                          "has_focus": false,
+                          "hidden": true,
+                          "horizontal_size_policy": "Minimum",
+                          "maximum_size": {
+                            "height": 16777215,
+                            "width": 16777215
+                          },
+                          "minimum_size": {
+                            "height": 0,
+                            "width": 0
+                          },
+                          "minimum_size_hint": {
+                            "height": -1,
+                            "width": -1
+                          },
+                          "size": {
+                            "height": 30,
+                            "width": 100
+                          },
+                          "size_hint": {
+                            "height": 10,
+                            "width": 20
+                          },
+                          "vertical_size_policy": "Fixed",
+                          "visible": false
+                        }
+                      },
+                      {
+                        "children": [],
+                        "class_name": "QWidget",
+                        "node_id": "o77",
+                        "object_name": "",
+                        "semantic_id": "",
+                        "widget": {
+                          "enabled": true,
+                          "geometry": {
+                            "height": 30,
+                            "width": 100,
+                            "x": 0,
+                            "y": 0
+                          },
+                          "has_focus": false,
+                          "hidden": true,
+                          "horizontal_size_policy": "Minimum",
+                          "maximum_size": {
+                            "height": 16777215,
+                            "width": 16777215
+                          },
+                          "minimum_size": {
+                            "height": 0,
+                            "width": 0
+                          },
+                          "minimum_size_hint": {
+                            "height": -1,
+                            "width": -1
+                          },
+                          "size": {
+                            "height": 30,
+                            "width": 100
+                          },
+                          "size_hint": {
+                            "height": 10,
+                            "width": 20
+                          },
+                          "vertical_size_policy": "Fixed",
+                          "visible": false
+                        }
+                      }
+                    ],
+                    "class_name": "QFrame",
+                    "node_id": "o67",
+                    "object_name": "",
+                    "semantic_id": "",
+                    "widget": {
+                      "enabled": true,
+                      "geometry": {
+                        "height": 30,
+                        "width": 100,
+                        "x": 0,
+                        "y": 0
+                      },
+                      "has_focus": false,
+                      "hidden": true,
+                      "horizontal_size_policy": "Preferred",
+                      "maximum_size": {
+                        "height": 16777215,
+                        "width": 16777215
+                      },
+                      "minimum_size": {
+                        "height": 0,
+                        "width": 0
+                      },
+                      "minimum_size_hint": {
+                        "height": 2,
+                        "width": 2
+                      },
+                      "size": {
+                        "height": 30,
+                        "width": 100
+                      },
+                      "size_hint": {
+                        "height": 2,
+                        "width": 2
+                      },
+                      "vertical_size_policy": "Preferred",
+                      "visible": false
+                    }
+                  }
+                ],
+                "class_name": "QComboBox",
+                "node_id": "o66",
+                "object_name": "",
+                "semantic_id": "",
+                "widget": {
+                  "current_index": 0,
+                  "enabled": true,
+                  "geometry": {
+                    "height": 24,
+                    "width": 265,
+                    "x": 9,
+                    "y": 9
+                  },
+                  "has_focus": false,
+                  "hidden": false,
+                  "horizontal_size_policy": "Preferred",
+                  "maximum_size": {
+                    "height": 16777215,
+                    "width": 16777215
+                  },
+                  "minimum_size": {
+                    "height": 0,
+                    "width": 0
+                  },
+                  "minimum_size_hint": {
+                    "height": 24,
+                    "width": 72
+                  },
+                  "size": {
+                    "height": 24,
+                    "width": 265
+                  },
+                  "size_hint": {
+                    "height": 24,
+                    "width": 132
+                  },
+                  "vertical_size_policy": "Fixed",
+                  "visible": true
+                }
+              },
+              {
+                "children": [
+                  {
+                    "children": [],
+                    "class_name": "QToolButton",
+                    "node_id": "o79",
+                    "object_name": "",
+                    "semantic_id": "",
+                    "widget": {
+                      "checked": false,
+                      "enabled": true,
+                      "geometry": {
+                        "height": 18,
+                        "width": 22,
+                        "x": 239,
+                        "y": 3
+                      },
+                      "has_focus": false,
+                      "hidden": true,
+                      "horizontal_size_policy": "Fixed",
+                      "maximum_size": {
+                        "height": 16777215,
+                        "width": 16777215
+                      },
+                      "minimum_size": {
+                        "height": 0,
+                        "width": 0
+                      },
+                      "minimum_size_hint": {
+                        "height": 23,
+                        "width": 24
+                      },
+                      "size": {
+                        "height": 18,
+                        "width": 22
+                      },
+                      "size_hint": {
+                        "height": 23,
+                        "width": 24
+                      },
+                      "vertical_size_policy": "Fixed",
+                      "visible": false
+                    }
+                  }
+                ],
+                "class_name": "QLineEdit",
+                "node_id": "o78",
+                "object_name": "",
+                "semantic_id": "",
+                "widget": {
+                  "enabled": true,
+                  "geometry": {
+                    "height": 24,
+                    "width": 265,
+                    "x": 9,
+                    "y": 39
+                  },
+                  "has_focus": false,
+                  "hidden": false,
+                  "horizontal_size_policy": "Expanding",
+                  "maximum_size": {
+                    "height": 16777215,
+                    "width": 16777215
+                  },
+                  "minimum_size": {
+                    "height": 0,
+                    "width": 0
+                  },
+                  "minimum_size_hint": {
+                    "height": 24,
+                    "width": 22
+                  },
+                  "size": {
+                    "height": 24,
+                    "width": 265
+                  },
+                  "size_hint": {
+                    "height": 24,
+                    "width": 108
+                  },
+                  "vertical_size_policy": "Fixed",
+                  "visible": true
+                }
+              },
+              {
+                "children": [
+                  {
+                    "children": [],
+                    "class_name": "QWidget",
+                    "node_id": "o79",
+                    "object_name": "qt_scrollarea_viewport",
+                    "semantic_id": "",
+                    "widget": {
+                      "enabled": true,
+                      "geometry": {
+                        "height": 608,
+                        "width": 263,
+                        "x": 1,
+                        "y": 1
+                      },
+                      "has_focus": false,
+                      "hidden": false,
+                      "horizontal_size_policy": "Preferred",
+                      "maximum_size": {
+                        "height": 16777215,
+                        "width": 16777215
+                      },
+                      "minimum_size": {
+                        "height": 0,
+                        "width": 0
+                      },
+                      "minimum_size_hint": {
+                        "height": -1,
+                        "width": -1
+                      },
+                      "size": {
+                        "height": 608,
+                        "width": 263
+                      },
+                      "size_hint": {
+                        "height": -1,
+                        "width": -1
+                      },
+                      "vertical_size_policy": "Preferred",
+                      "visible": true
+                    }
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [],
+                        "class_name": "QScrollBar",
+                        "node_id": "o82",
+                        "object_name": "",
+                        "semantic_id": "",
+                        "widget": {
+                          "enabled": true,
+                          "geometry": {
+                            "height": 30,
+                            "width": 100,
+                            "x": 0,
+                            "y": 0
+                          },
+                          "has_focus": false,
+                          "hidden": false,
+                          "horizontal_size_policy": "Minimum",
+                          "maximum_size": {
+                            "height": 16777215,
+                            "width": 16777215
+                          },
+                          "minimum_size": {
+                            "height": 0,
+                            "width": 0
+                          },
+                          "minimum_size_hint": {
+                            "height": -1,
+                            "width": -1
+                          },
+                          "size": {
+                            "height": 30,
+                            "width": 100
+                          },
+                          "size_hint": {
+                            "height": 14,
+                            "width": 54
+                          },
+                          "vertical_size_policy": "Fixed",
+                          "visible": false
+                        }
+                      },
+                      {
+                        "children": [],
+                        "class_name": "QBoxLayout",
+                        "layout": {
+                          "geometry": {
+                            "height": 0,
+                            "width": 0,
+                            "x": 0,
+                            "y": 0
+                          },
+                          "margins": {
+                            "bottom": 0,
+                            "left": 0,
+                            "right": 0,
+                            "top": 0
+                          },
+                          "spacing": 0
+                        },
+                        "node_id": "o83",
+                        "object_name": "",
+                        "semantic_id": ""
+                      }
+                    ],
+                    "class_name": "QWidget",
+                    "node_id": "o81",
+                    "object_name": "qt_scrollarea_hcontainer",
+                    "semantic_id": "",
+                    "widget": {
+                      "enabled": true,
+                      "geometry": {
+                        "height": 30,
+                        "width": 100,
+                        "x": 0,
+                        "y": 0
+                      },
+                      "has_focus": false,
+                      "hidden": true,
+                      "horizontal_size_policy": "Preferred",
+                      "maximum_size": {
+                        "height": 16777215,
+                        "width": 16777215
+                      },
+                      "minimum_size": {
+                        "height": 0,
+                        "width": 0
+                      },
+                      "minimum_size_hint": {
+                        "height": 14,
+                        "width": 54
+                      },
+                      "size": {
+                        "height": 30,
+                        "width": 100
+                      },
+                      "size_hint": {
+                        "height": 14,
+                        "width": 54
+                      },
+                      "vertical_size_policy": "Preferred",
+                      "visible": false
+                    }
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [],
+                        "class_name": "QScrollBar",
+                        "node_id": "o83",
+                        "object_name": "",
+                        "semantic_id": "",
+                        "widget": {
+                          "enabled": true,
+                          "geometry": {
+                            "height": 30,
+                            "width": 100,
+                            "x": 0,
+                            "y": 0
+                          },
+                          "has_focus": false,
+                          "hidden": false,
+                          "horizontal_size_policy": "Fixed",
+                          "maximum_size": {
+                            "height": 16777215,
+                            "width": 16777215
+                          },
+                          "minimum_size": {
+                            "height": 0,
+                            "width": 0
+                          },
+                          "minimum_size_hint": {
+                            "height": -1,
+                            "width": -1
+                          },
+                          "size": {
+                            "height": 30,
+                            "width": 100
+                          },
+                          "size_hint": {
+                            "height": 54,
+                            "width": 14
+                          },
+                          "vertical_size_policy": "Minimum",
+                          "visible": false
+                        }
+                      },
+                      {
+                        "children": [],
+                        "class_name": "QBoxLayout",
+                        "layout": {
+                          "geometry": {
+                            "height": 0,
+                            "width": 0,
+                            "x": 0,
+                            "y": 0
+                          },
+                          "margins": {
+                            "bottom": 0,
+                            "left": 0,
+                            "right": 0,
+                            "top": 0
+                          },
+                          "spacing": 0
+                        },
+                        "node_id": "o85",
+                        "object_name": "",
+                        "semantic_id": ""
+                      }
+                    ],
+                    "class_name": "QWidget",
+                    "node_id": "o84",
+                    "object_name": "qt_scrollarea_vcontainer",
+                    "semantic_id": "",
+                    "widget": {
+                      "enabled": true,
+                      "geometry": {
+                        "height": 30,
+                        "width": 100,
+                        "x": 0,
+                        "y": 0
+                      },
+                      "has_focus": false,
+                      "hidden": true,
+                      "horizontal_size_policy": "Preferred",
+                      "maximum_size": {
+                        "height": 16777215,
+                        "width": 16777215
+                      },
+                      "minimum_size": {
+                        "height": 0,
+                        "width": 0
+                      },
+                      "minimum_size_hint": {
+                        "height": 54,
+                        "width": 14
+                      },
+                      "size": {
+                        "height": 30,
+                        "width": 100
+                      },
+                      "size_hint": {
+                        "height": 54,
+                        "width": 14
+                      },
+                      "vertical_size_policy": "Preferred",
+                      "visible": false
+                    }
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [],
+                        "class_name": "QWidget",
+                        "node_id": "o85",
+                        "object_name": "qt_scrollarea_viewport",
+                        "semantic_id": "",
+                        "widget": {
+                          "enabled": true,
+                          "geometry": {
+                            "height": 608,
+                            "width": 0,
+                            "x": 0,
+                            "y": 0
+                          },
+                          "has_focus": false,
+                          "hidden": false,
+                          "horizontal_size_policy": "Preferred",
+                          "maximum_size": {
+                            "height": 16777215,
+                            "width": 16777215
+                          },
+                          "minimum_size": {
+                            "height": 0,
+                            "width": 0
+                          },
+                          "minimum_size_hint": {
+                            "height": -1,
+                            "width": -1
+                          },
+                          "size": {
+                            "height": 608,
+                            "width": 0
+                          },
+                          "size_hint": {
+                            "height": -1,
+                            "width": -1
+                          },
+                          "vertical_size_policy": "Preferred",
+                          "visible": false
+                        }
+                      },
+                      {
+                        "children": [
+                          {
+                            "children": [],
+                            "class_name": "QScrollBar",
+                            "node_id": "o88",
+                            "object_name": "",
+                            "semantic_id": "",
+                            "widget": {
+                              "enabled": true,
+                              "geometry": {
+                                "height": 30,
+                                "width": 100,
+                                "x": 0,
+                                "y": 0
+                              },
+                              "has_focus": false,
+                              "hidden": false,
+                              "horizontal_size_policy": "Minimum",
+                              "maximum_size": {
+                                "height": 16777215,
+                                "width": 16777215
+                              },
+                              "minimum_size": {
+                                "height": 0,
+                                "width": 0
+                              },
+                              "minimum_size_hint": {
+                                "height": -1,
+                                "width": -1
+                              },
+                              "size": {
+                                "height": 30,
+                                "width": 100
+                              },
+                              "size_hint": {
+                                "height": 14,
+                                "width": 54
+                              },
+                              "vertical_size_policy": "Fixed",
+                              "visible": false
+                            }
+                          },
+                          {
+                            "children": [],
+                            "class_name": "QBoxLayout",
+                            "layout": {
+                              "geometry": {
+                                "height": 0,
+                                "width": 0,
+                                "x": 0,
+                                "y": 0
+                              },
+                              "margins": {
+                                "bottom": 0,
+                                "left": 0,
+                                "right": 0,
+                                "top": 0
+                              },
+                              "spacing": 0
+                            },
+                            "node_id": "o89",
+                            "object_name": "",
+                            "semantic_id": ""
+                          }
+                        ],
+                        "class_name": "QWidget",
+                        "node_id": "o87",
+                        "object_name": "qt_scrollarea_hcontainer",
+                        "semantic_id": "",
+                        "widget": {
+                          "enabled": true,
+                          "geometry": {
+                            "height": 30,
+                            "width": 100,
+                            "x": 0,
+                            "y": 0
+                          },
+                          "has_focus": false,
+                          "hidden": true,
+                          "horizontal_size_policy": "Preferred",
+                          "maximum_size": {
+                            "height": 16777215,
+                            "width": 16777215
+                          },
+                          "minimum_size": {
+                            "height": 0,
+                            "width": 0
+                          },
+                          "minimum_size_hint": {
+                            "height": 14,
+                            "width": 54
+                          },
+                          "size": {
+                            "height": 30,
+                            "width": 100
+                          },
+                          "size_hint": {
+                            "height": 14,
+                            "width": 54
+                          },
+                          "vertical_size_policy": "Preferred",
+                          "visible": false
+                        }
+                      },
+                      {
+                        "children": [
+                          {
+                            "children": [],
+                            "class_name": "QScrollBar",
+                            "node_id": "o89",
+                            "object_name": "",
+                            "semantic_id": "",
+                            "widget": {
+                              "enabled": true,
+                              "geometry": {
+                                "height": 30,
+                                "width": 100,
+                                "x": 0,
+                                "y": 0
+                              },
+                              "has_focus": false,
+                              "hidden": false,
+                              "horizontal_size_policy": "Fixed",
+                              "maximum_size": {
+                                "height": 16777215,
+                                "width": 16777215
+                              },
+                              "minimum_size": {
+                                "height": 0,
+                                "width": 0
+                              },
+                              "minimum_size_hint": {
+                                "height": -1,
+                                "width": -1
+                              },
+                              "size": {
+                                "height": 30,
+                                "width": 100
+                              },
+                              "size_hint": {
+                                "height": 54,
+                                "width": 14
+                              },
+                              "vertical_size_policy": "Minimum",
+                              "visible": false
+                            }
+                          },
+                          {
+                            "children": [],
+                            "class_name": "QBoxLayout",
+                            "layout": {
+                              "geometry": {
+                                "height": 0,
+                                "width": 0,
+                                "x": 0,
+                                "y": 0
+                              },
+                              "margins": {
+                                "bottom": 0,
+                                "left": 0,
+                                "right": 0,
+                                "top": 0
+                              },
+                              "spacing": 0
+                            },
+                            "node_id": "o91",
+                            "object_name": "",
+                            "semantic_id": ""
+                          }
+                        ],
+                        "class_name": "QWidget",
+                        "node_id": "o90",
+                        "object_name": "qt_scrollarea_vcontainer",
+                        "semantic_id": "",
+                        "widget": {
+                          "enabled": true,
+                          "geometry": {
+                            "height": 30,
+                            "width": 100,
+                            "x": 0,
+                            "y": 0
+                          },
+                          "has_focus": false,
+                          "hidden": true,
+                          "horizontal_size_policy": "Preferred",
+                          "maximum_size": {
+                            "height": 16777215,
+                            "width": 16777215
+                          },
+                          "minimum_size": {
+                            "height": 0,
+                            "width": 0
+                          },
+                          "minimum_size_hint": {
+                            "height": 54,
+                            "width": 14
+                          },
+                          "size": {
+                            "height": 30,
+                            "width": 100
+                          },
+                          "size_hint": {
+                            "height": 54,
+                            "width": 14
+                          },
+                          "vertical_size_policy": "Preferred",
+                          "visible": false
+                        }
+                      }
+                    ],
+                    "class_name": "QHeaderView",
+                    "node_id": "o86",
+                    "object_name": "",
+                    "semantic_id": "",
+                    "widget": {
+                      "enabled": true,
+                      "geometry": {
+                        "height": 608,
+                        "width": 0,
+                        "x": 1,
+                        "y": 1
+                      },
+                      "has_focus": false,
+                      "hidden": true,
+                      "horizontal_size_policy": "Expanding",
+                      "maximum_size": {
+                        "height": 16777215,
+                        "width": 16777215
+                      },
+                      "minimum_size": {
+                        "height": 0,
+                        "width": 0
+                      },
+                      "minimum_size_hint": {
+                        "height": 68,
+                        "width": 68
+                      },
+                      "size": {
+                        "height": 608,
+                        "width": 0
+                      },
+                      "size_hint": {
+                        "height": 20,
+                        "width": 11
+                      },
+                      "vertical_size_policy": "Expanding",
+                      "visible": false
+                    }
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [],
+                        "class_name": "QWidget",
+                        "node_id": "o90",
+                        "object_name": "qt_scrollarea_viewport",
+                        "semantic_id": "",
+                        "widget": {
+                          "enabled": true,
+                          "geometry": {
+                            "height": 0,
+                            "width": 263,
+                            "x": 0,
+                            "y": 0
+                          },
+                          "has_focus": false,
+                          "hidden": false,
+                          "horizontal_size_policy": "Preferred",
+                          "maximum_size": {
+                            "height": 16777215,
+                            "width": 16777215
+                          },
+                          "minimum_size": {
+                            "height": 0,
+                            "width": 0
+                          },
+                          "minimum_size_hint": {
+                            "height": -1,
+                            "width": -1
+                          },
+                          "size": {
+                            "height": 0,
+                            "width": 263
+                          },
+                          "size_hint": {
+                            "height": -1,
+                            "width": -1
+                          },
+                          "vertical_size_policy": "Preferred",
+                          "visible": false
+                        }
+                      },
+                      {
+                        "children": [
+                          {
+                            "children": [],
+                            "class_name": "QScrollBar",
+                            "node_id": "o93",
+                            "object_name": "",
+                            "semantic_id": "",
+                            "widget": {
+                              "enabled": true,
+                              "geometry": {
+                                "height": 30,
+                                "width": 100,
+                                "x": 0,
+                                "y": 0
+                              },
+                              "has_focus": false,
+                              "hidden": false,
+                              "horizontal_size_policy": "Minimum",
+                              "maximum_size": {
+                                "height": 16777215,
+                                "width": 16777215
+                              },
+                              "minimum_size": {
+                                "height": 0,
+                                "width": 0
+                              },
+                              "minimum_size_hint": {
+                                "height": -1,
+                                "width": -1
+                              },
+                              "size": {
+                                "height": 30,
+                                "width": 100
+                              },
+                              "size_hint": {
+                                "height": 14,
+                                "width": 54
+                              },
+                              "vertical_size_policy": "Fixed",
+                              "visible": false
+                            }
+                          },
+                          {
+                            "children": [],
+                            "class_name": "QBoxLayout",
+                            "layout": {
+                              "geometry": {
+                                "height": 0,
+                                "width": 0,
+                                "x": 0,
+                                "y": 0
+                              },
+                              "margins": {
+                                "bottom": 0,
+                                "left": 0,
+                                "right": 0,
+                                "top": 0
+                              },
+                              "spacing": 0
+                            },
+                            "node_id": "o94",
+                            "object_name": "",
+                            "semantic_id": ""
+                          }
+                        ],
+                        "class_name": "QWidget",
+                        "node_id": "o89",
+                        "object_name": "qt_scrollarea_hcontainer",
+                        "semantic_id": "",
+                        "widget": {
+                          "enabled": true,
+                          "geometry": {
+                            "height": 30,
+                            "width": 100,
+                            "x": 0,
+                            "y": 0
+                          },
+                          "has_focus": false,
+                          "hidden": true,
+                          "horizontal_size_policy": "Preferred",
+                          "maximum_size": {
+                            "height": 16777215,
+                            "width": 16777215
+                          },
+                          "minimum_size": {
+                            "height": 0,
+                            "width": 0
+                          },
+                          "minimum_size_hint": {
+                            "height": 14,
+                            "width": 54
+                          },
+                          "size": {
+                            "height": 30,
+                            "width": 100
+                          },
+                          "size_hint": {
+                            "height": 14,
+                            "width": 54
+                          },
+                          "vertical_size_policy": "Preferred",
+                          "visible": false
+                        }
+                      },
+                      {
+                        "children": [
+                          {
+                            "children": [],
+                            "class_name": "QScrollBar",
+                            "node_id": "o94",
+                            "object_name": "",
+                            "semantic_id": "",
+                            "widget": {
+                              "enabled": true,
+                              "geometry": {
+                                "height": 30,
+                                "width": 100,
+                                "x": 0,
+                                "y": 0
+                              },
+                              "has_focus": false,
+                              "hidden": false,
+                              "horizontal_size_policy": "Fixed",
+                              "maximum_size": {
+                                "height": 16777215,
+                                "width": 16777215
+                              },
+                              "minimum_size": {
+                                "height": 0,
+                                "width": 0
+                              },
+                              "minimum_size_hint": {
+                                "height": -1,
+                                "width": -1
+                              },
+                              "size": {
+                                "height": 30,
+                                "width": 100
+                              },
+                              "size_hint": {
+                                "height": 54,
+                                "width": 14
+                              },
+                              "vertical_size_policy": "Minimum",
+                              "visible": false
+                            }
+                          },
+                          {
+                            "children": [],
+                            "class_name": "QBoxLayout",
+                            "layout": {
+                              "geometry": {
+                                "height": 0,
+                                "width": 0,
+                                "x": 0,
+                                "y": 0
+                              },
+                              "margins": {
+                                "bottom": 0,
+                                "left": 0,
+                                "right": 0,
+                                "top": 0
+                              },
+                              "spacing": 0
+                            },
+                            "node_id": "o96",
+                            "object_name": "",
+                            "semantic_id": ""
+                          }
+                        ],
+                        "class_name": "QWidget",
+                        "node_id": "o95",
+                        "object_name": "qt_scrollarea_vcontainer",
+                        "semantic_id": "",
+                        "widget": {
+                          "enabled": true,
+                          "geometry": {
+                            "height": 30,
+                            "width": 100,
+                            "x": 0,
+                            "y": 0
+                          },
+                          "has_focus": false,
+                          "hidden": true,
+                          "horizontal_size_policy": "Preferred",
+                          "maximum_size": {
+                            "height": 16777215,
+                            "width": 16777215
+                          },
+                          "minimum_size": {
+                            "height": 0,
+                            "width": 0
+                          },
+                          "minimum_size_hint": {
+                            "height": 54,
+                            "width": 14
+                          },
+                          "size": {
+                            "height": 30,
+                            "width": 100
+                          },
+                          "size_hint": {
+                            "height": 54,
+                            "width": 14
+                          },
+                          "vertical_size_policy": "Preferred",
+                          "visible": false
+                        }
+                      }
+                    ],
+                    "class_name": "QHeaderView",
+                    "node_id": "o92",
+                    "object_name": "",
+                    "semantic_id": "",
+                    "widget": {
+                      "enabled": true,
+                      "geometry": {
+                        "height": 0,
+                        "width": 263,
+                        "x": 1,
+                        "y": 1
+                      },
+                      "has_focus": false,
+                      "hidden": true,
+                      "horizontal_size_policy": "Expanding",
+                      "maximum_size": {
+                        "height": 16777215,
+                        "width": 16777215
+                      },
+                      "minimum_size": {
+                        "height": 0,
+                        "width": 0
+                      },
+                      "minimum_size_hint": {
+                        "height": 68,
+                        "width": 68
+                      },
+                      "size": {
+                        "height": 0,
+                        "width": 263
+                      },
+                      "size_hint": {
+                        "height": 20,
+                        "width": 11
+                      },
+                      "vertical_size_policy": "Expanding",
+                      "visible": false
+                    }
+                  },
+                  {
+                    "children": [],
+                    "class_name": "QAbstractButton",
+                    "node_id": "o97",
+                    "object_name": "qt_tableview_cornerbutton",
+                    "semantic_id": "",
+                    "widget": {
+                      "checked": false,
+                      "enabled": true,
+                      "geometry": {
+                        "height": 20,
+                        "width": 0,
+                        "x": 1,
+                        "y": 1
+                      },
+                      "has_focus": false,
+                      "hidden": true,
+                      "horizontal_size_policy": "Minimum",
+                      "maximum_size": {
+                        "height": 16777215,
+                        "width": 16777215
+                      },
+                      "minimum_size": {
+                        "height": 0,
+                        "width": 0
+                      },
+                      "minimum_size_hint": {
+                        "height": -1,
+                        "width": -1
+                      },
+                      "size": {
+                        "height": 20,
+                        "width": 0
+                      },
+                      "size_hint": {
+                        "height": -1,
+                        "width": -1
+                      },
+                      "vertical_size_policy": "Fixed",
+                      "visible": false
+                    }
+                  }
+                ],
+                "class_name": "QTableWidget",
+                "node_id": "o80",
+                "object_name": "",
+                "semantic_id": "audit.output.list",
+                "widget": {
+                  "enabled": true,
+                  "geometry": {
+                    "height": 610,
+                    "width": 265,
+                    "x": 9,
+                    "y": 69
+                  },
+                  "has_focus": false,
+                  "hidden": false,
+                  "horizontal_size_policy": "Expanding",
+                  "maximum_size": {
+                    "height": 16777215,
+                    "width": 16777215
+                  },
+                  "minimum_size": {
+                    "height": 0,
+                    "width": 0
+                  },
+                  "minimum_size_hint": {
+                    "height": 70,
+                    "width": 70
+                  },
+                  "size": {
+                    "height": 610,
+                    "width": 265
+                  },
+                  "size_hint": {
+                    "height": 192,
+                    "width": 256
+                  },
+                  "vertical_size_policy": "Expanding",
+                  "visible": true
+                }
+              },
+              {
+                "children": [],
+                "class_name": "QPushButton",
+                "node_id": "o98",
+                "object_name": "",
+                "semantic_id": "",
+                "widget": {
+                  "checked": false,
+                  "enabled": true,
+                  "geometry": {
+                    "height": 30,
+                    "width": 100,
+                    "x": 0,
+                    "y": 0
+                  },
+                  "has_focus": false,
+                  "hidden": true,
+                  "horizontal_size_policy": "Minimum",
+                  "maximum_size": {
+                    "height": 16777215,
+                    "width": 16777215
+                  },
+                  "minimum_size": {
+                    "height": 0,
+                    "width": 0
+                  },
+                  "minimum_size_hint": {
+                    "height": 24,
+                    "width": 80
+                  },
+                  "size": {
+                    "height": 30,
+                    "width": 100
+                  },
+                  "size_hint": {
+                    "height": 24,
+                    "width": 80
+                  },
+                  "vertical_size_policy": "Fixed",
+                  "visible": false
+                }
+              }
+            ],
+            "class_name": "QWidget",
+            "node_id": "o64",
+            "object_name": "",
+            "semantic_id": "",
+            "widget": {
+              "enabled": true,
+              "geometry": {
+                "height": 688,
+                "width": 283,
+                "x": 0,
+                "y": 0
+              },
+              "has_focus": false,
+              "hidden": false,
+              "horizontal_size_policy": "Preferred",
+              "maximum_size": {
+                "height": 16777215,
+                "width": 16777215
+              },
+              "minimum_size": {
+                "height": 0,
+                "width": 0
+              },
+              "minimum_size_hint": {
+                "height": 148,
+                "width": 90
+              },
+              "size": {
+                "height": 688,
+                "width": 283
+              },
+              "size_hint": {
+                "height": 270,
+                "width": 274
+              },
+              "vertical_size_policy": "Preferred",
+              "visible": true
+            }
+          },
+          {
+            "children": [],
+            "class_name": "QSplitterHandle",
+            "node_id": "o99",
+            "object_name": "qt_splithandle_",
+            "semantic_id": "",
+            "widget": {
+              "enabled": true,
+              "geometry": {
+                "height": 30,
+                "width": 100,
+                "x": 0,
+                "y": 0
+              },
+              "has_focus": false,
+              "hidden": true,
+              "horizontal_size_policy": "Preferred",
+              "maximum_size": {
+                "height": 16777215,
+                "width": 16777215
+              },
+              "minimum_size": {
+                "height": 0,
+                "width": 0
+              },
+              "minimum_size_hint": {
+                "height": -1,
+                "width": -1
+              },
+              "size": {
+                "height": 30,
+                "width": 100
+              },
+              "size_hint": {
+                "height": 4,
+                "width": 4
+              },
+              "vertical_size_policy": "Preferred",
+              "visible": false
+            }
+          },
+          {
+            "children": [],
+            "class_name": "QSplitterHandle",
+            "node_id": "o100",
+            "object_name": "qt_splithandle_",
+            "semantic_id": "",
+            "widget": {
+              "enabled": true,
+              "geometry": {
+                "height": 688,
+                "width": 4,
+                "x": 283,
+                "y": 0
+              },
+              "has_focus": false,
+              "hidden": false,
+              "horizontal_size_policy": "Preferred",
+              "maximum_size": {
+                "height": 16777215,
+                "width": 16777215
+              },
+              "minimum_size": {
+                "height": 0,
+                "width": 0
+              },
+              "minimum_size_hint": {
+                "height": -1,
+                "width": -1
+              },
+              "size": {
+                "height": 688,
+                "width": 4
+              },
+              "size_hint": {
+                "height": 4,
+                "width": 4
+              },
+              "vertical_size_policy": "Preferred",
+              "visible": true
+            }
+          }
+        ],
+        "class_name": "QSplitter",
+        "node_id": "o15",
+        "object_name": "",
+        "semantic_id": "",
+        "widget": {
+          "enabled": true,
+          "geometry": {
+            "height": 688,
+            "width": 1078,
+            "x": 11,
+            "y": 41
+          },
+          "has_focus": false,
+          "hidden": false,
+          "horizontal_size_policy": "Expanding",
+          "maximum_size": {
+            "height": 16777215,
+            "width": 16777215
+          },
+          "minimum_size": {
+            "height": 0,
+            "width": 0
+          },
+          "minimum_size_hint": {
+            "height": 232,
+            "width": 442
+          },
+          "size": {
+            "height": 688,
+            "width": 1078
+          },
+          "size_hint": {
+            "height": 354,
+            "width": 622
+          },
+          "vertical_size_policy": "Preferred",
+          "visible": true
+        }
+      },
+      {
+        "children": [
+          {
+            "children": [],
+            "class_name": "QHBoxLayout",
+            "layout": {
+              "geometry": {
+                "height": 24,
+                "width": 1078,
+                "x": 11,
+                "y": 11
+              },
+              "margins": {
+                "bottom": 0,
+                "left": 0,
+                "right": 0,
+                "top": 0
+              },
+              "spacing": 6
+            },
+            "node_id": "o102",
+            "object_name": "",
+            "semantic_id": ""
+          }
+        ],
+        "class_name": "QVBoxLayout",
+        "layout": {
+          "geometry": {
+            "height": 740,
+            "width": 1100,
+            "x": 0,
+            "y": 0
+          },
+          "margins": {
+            "bottom": 11,
+            "left": 11,
+            "right": 11,
+            "top": 11
+          },
+          "spacing": 6
+        },
+        "node_id": "o101",
+        "object_name": "",
+        "semantic_id": ""
+      }
+    ],
+    "class_name": "AuditCenterDialog",
+    "node_id": "o0",
+    "object_name": "",
+    "semantic_id": "",
+    "widget": {
+      "enabled": true,
+      "geometry": {
+        "height": 740,
+        "width": 1100,
+        "x": 2,
+        "y": 30
+      },
+      "has_focus": false,
+      "hidden": false,
+      "horizontal_size_policy": "Preferred",
+      "maximum_size": {
+        "height": 16777215,
+        "width": 16777215
+      },
+      "minimum_size": {
+        "height": 284,
+        "width": 464
+      },
+      "minimum_size_hint": {
+        "height": 284,
+        "width": 464
+      },
+      "size": {
+        "height": 740,
+        "width": 1100
+      },
+      "size_hint": {
+        "height": 406,
+        "width": 644
+      },
+      "vertical_size_policy": "Preferred",
+      "visible": true
+    }
+  },
+  "schema_version": 1
+}

@@ -13,6 +13,8 @@ from xenix.config import ensure_app_dirs, get_app_paths
 from xenix.exceptions import ValidationError
 from xenix.services.dataset_service import DatasetService, RegisterDatasetInput
 from xenix.services.ml.contracts import EvaluateTaskResult
+from xenix.services.audit_contracts import ExecutionOrigin
+from xenix.services.storage.models import ConversationThreadRow
 from xenix.services.ml_service import (
     ApplySourceInput,
     ApplyWithFilesInput,
@@ -118,11 +120,13 @@ def _fit(
     binding_id: str,
     model_key: str,
     params: dict[str, Any],
+    origin: ExecutionOrigin | None = None,
 ):
     task = ml.fit_with_evaluate(
         FitWithEvaluateInput(
             binding_id=binding_id,
             run_name="Clustering trustworthiness acceptance",
+            origin=origin,
             model_key=model_key,
             params=params,
         )
@@ -148,6 +152,11 @@ def test_kmeans_service_fit_evaluate_assignment_and_apply_lineage(
     training_source_digest = sha256(Path(training_dataset.source_path).read_bytes()).hexdigest()
     apply_source_digest = sha256(Path(apply_dataset.source_path).read_bytes()).hexdigest()
 
+    with storage.session_factory() as session:
+        conversation = ConversationThreadRow(title="Customer segments")
+        session.add(conversation)
+        session.commit()
+        origin = ExecutionOrigin(thread_id=conversation.id, explanation="Group customers by purchasing behavior to plan segment-specific campaigns.")
     binding = _binding(ml, training_dataset.id, "clustering.kmeans")
     completed_fit = _fit(
         ml,
@@ -155,6 +164,7 @@ def test_kmeans_service_fit_evaluate_assignment_and_apply_lineage(
         binding_id=binding.id,
         model_key="clustering.kmeans",
         params={"n_clusters": 3, "n_init": 20, "max_iter": 300, "random_state": 42},
+        origin=origin,
     )
     fit_payload = completed_fit.result_payload or {}
     assignment_dataset = datasets.get_dataset(fit_payload["result_dataset_id"])
@@ -186,6 +196,8 @@ def test_kmeans_service_fit_evaluate_assignment_and_apply_lineage(
     evaluation_task_id = _wait_for_evaluation_id(ml, trained_model.id)
     completed_evaluation = _wait_for_terminal(tasks, evaluation_task_id)
     assert completed_evaluation.status is MLTaskStatus.SUCCEEDED, completed_evaluation.error_summary
+    assert completed_fit.origin_thread_id == completed_evaluation.origin_thread_id == origin.thread_id
+    assert completed_evaluation.agent_explanation == origin.explanation
     evaluation = EvaluateTaskResult.model_validate(completed_evaluation.result_payload)
     assert evaluation.clustering_evaluation is not None
     assert evaluation.clustering_evaluation.quality.cluster_count == 3

@@ -103,7 +103,6 @@ class ThreadDetailView(QWidget):
     attachment_removed = Signal(str)
     service_link_activated = Signal(str)
     source_file_activated = Signal(str)
-    tool_action_requested = Signal(object)
     stop_requested = Signal()
     step_budget_continue_requested = Signal()
     step_budget_stop_requested = Signal()
@@ -126,7 +125,6 @@ class ThreadDetailView(QWidget):
         self.composer.model_selected.connect(self.model_selected.emit)
         self.timeline.service_link_activated.connect(self.service_link_activated.emit)
         self.timeline.source_file_activated.connect(self.source_file_activated.emit)
-        self.timeline.tool_action_requested.connect(self.tool_action_requested.emit)
 
         root = QVBoxLayout(self)
         root.setObjectName("threadDetailLayout")

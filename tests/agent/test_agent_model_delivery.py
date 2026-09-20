@@ -30,10 +30,10 @@ def test_completed_training_exposes_evaluation_report_without_an_extra_query(tun
     context = ToolExecutionContext(thread_id=107, tool_call_message_id=108)
     if tune:
         result = tools._model_hyper_train(ModelHyperTrainInput(
-            binding_id=110, param_grids_by_model={"regression.ridge": {"alpha": [1.0]}},
+            binding_id=110, explanations_by_model={"regression.ridge": "Use regularization to reduce overfitting."}, param_grids_by_model={"regression.ridge": {"alpha": [1.0]}},
         ), context)
     else:
-        result = tools._model_train(ModelTrainInput(binding_id=110, models=["regression.ridge"]), context)
+        result = tools._model_train(ModelTrainInput(binding_id=110, explanations_by_model={"regression.ridge": "Use regularization to reduce overfitting."}, models=["regression.ridge"]), context)
     assert any(item["uri"] == 'artifact://106' and item["ml_task_id"] == 105
                for item in result.value["artifacts"])
 
@@ -54,7 +54,7 @@ def test_apply_delivers_finalized_dataset_and_facts_without_task_query():
         get_task_details=lambda _id: SimpleNamespace(task=task, artifacts=[artifact]),
     )
     tools = ModelTools(paths=None, dataset_service=None, artifact_service=None, ml_service=ml, model_key_aliases={})
-    result = tools._model_apply(ModelApplyInput(trained_model_id=102, horizon=6),
+    result = tools._model_apply(ModelApplyInput(trained_model_id=102, horizon=6, explanation="Forecast six periods for replenishment planning."),
                                 ToolExecutionContext(thread_id=107, tool_call_message_id=108)).value
     assert result["result_dataset_id"] == 103
     assert result["result"]["result_dataset_id"] == result["result_dataset_id"]

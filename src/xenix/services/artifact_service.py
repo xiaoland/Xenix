@@ -14,7 +14,8 @@ from sqlmodel import Field, Session, SQLModel
 
 from ..exceptions import NotFoundError, ValidationError
 from ..observability import record_counter, start_span
-from .storage.models import ArtifactKind, ArtifactRow
+from .audit_contracts import ArtifactDerivation
+from .storage.models import ArtifactKind, ArtifactRow, ArtifactDerivationRow
 from .storage.repositories import ArtifactRepository
 
 
@@ -23,6 +24,7 @@ def _utc_now() -> datetime:
 
 
 class RegisterArtifactInput(SQLModel):
+    derivation: ArtifactDerivation | None = None
     model_config = ConfigDict(extra="forbid")
 
     title: str
@@ -114,7 +116,15 @@ class ArtifactService:
             ready_to_open=input_data.ready_to_open,
             created_at=_utc_now(),
         )
-        return self._artifacts.create(session, row)
+        row = self._artifacts.create(session, row)
+        if input_data.derivation is not None:
+            derivation = input_data.derivation
+            self._artifacts.create_derivation(session, ArtifactDerivationRow(
+                artifact_id=row.id, origin_thread_id=derivation.origin.thread_id,
+                origin_tool_call_message_id=derivation.origin.tool_call_message_id,
+                payload=derivation.model_dump(mode="json"),
+            ))
+        return row
 
     def unregister_artifact_in_session(
         self,

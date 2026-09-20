@@ -1,6 +1,6 @@
 # 线性实现计划与预演
 
-本轮只准备设计、验收、实现顺序和代码路径预演；不修改产品源码。状态：计划步骤尚未开始实现，预演与既有环境基线完成情况见文末。
+设计基线提交为 `749ce92` 后，按用户授权执行本计划；01–10 已完成，实际实现落点、验证证据及限制见[验收记录](results.md)。下方预演部分保留设计阶段的调查事实。
 
 ## 实现顺序
 
@@ -17,7 +17,7 @@
 | 07 Jobs UI 与 Lab | 扩展 JobCenterDialog 范围、会话标签、起止/输入摘要、错误/日志和产出导航；保留 scheduler 取消；增加 jobs.* Lab 场景和行为测试。 | 新任务详情已可替代旧状态/日志能力，生命周期和筛选后分页通过。 |
 | 08 装配与跨中心导航 | application_composition、agent/composition、MainWindow、ChatWorkspace、AuxiliaryWindowCoordinator 装配服务/工厂；显式通知会话变化，支持两中心定位与来源会话导航；替换 Datasets 主入口。 | centers.navigation、主窗会话切换/删除/新建、关闭清理、隔离 smoke 通过；无反向 service→UI 依赖。 |
 | 09 删除旧链路 | 删除 ToolCallDetailView、DetailWindowFactory、旧按钮/动作/注入 callback/专用样式与旧测试；保留通用 Tool 展开、Dataset 派生摘要及 model.task.query/stop。 | 生产代码检索无旧链路；替代路径日志、取消、打开 Artifact 回归通过，不能靠空实现保留兼容壳。 |
-| 10 收口 | 提取并完成双语翻译，compile/prepare；更新 durable owners、审计契约与索引；运行完整验收组合、生产场景捕获及 native/isolated 检查，按导入变化补打包验证。 | 验收结果、实际截图、剩余限制写回 packet；不提交 Git，除非另获明确指示。 |
+| 10 收口 | 提取并完成双语翻译，compile/prepare；更新 durable owners、审计契约与索引；运行完整验收组合、生产场景捕获及 native/isolated 检查，按导入变化补打包验证。 | 验收结果、实际截图、剩余限制写回 packet；用户于 2026-09-20 手动验收通过并明确授权提交、推送及 PR 合并，按 develop → main 和 Native CI 门禁完成交付。 |
 
 各步同步更新相关耐久文档的已实现契约，不将所有文档工作拖到最后一次性猜补；第 10 步只做一致性收口。中途失败先修当前出口，不累积多个未经验证的阶段。
 执行时若源码与本次预演不同，先复核受影响锚点；只有产品范围、解释语义、数据生命周期或验证成本发生实质变化才重新提出决策，普通文件拆分无需确认。

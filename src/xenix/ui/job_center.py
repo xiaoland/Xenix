@@ -12,15 +12,18 @@ from PySide6.QtWidgets import (
     QHeaderView,
     QLabel,
     QLineEdit,
-    QMessageBox,
     QPushButton,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
     QWidget,
+    QTextBrowser,
 )
 
 from ..exceptions import report_exception
+from ..services.audit_contracts import AuditScope
+from .async_read import AsyncRead
+from .widgets.task_log_view import TaskLogView
 from ..services.job_scheduler import JobScheduler
 from ..services.job_service import JobDomain, JobItem, JobQueryService, JobStatus
 
@@ -41,6 +44,7 @@ class _JobLoad(QRunnable):
         status: JobStatus | None,
         search: str,
         limit: int,
+        scope: AuditScope,
     ) -> None:
         super().__init__()
         self._service = service
@@ -49,6 +53,7 @@ class _JobLoad(QRunnable):
         self._status = status
         self._search = search
         self._limit = limit
+        self._scope = scope
         self.signals = _JobLoadSignals()
 
     def run(self) -> None:
@@ -58,6 +63,7 @@ class _JobLoad(QRunnable):
                 status=self._status,
                 search=self._search,
                 limit=self._limit,
+                scope=self._scope,
             )
         except Exception as exc:
             logging.getLogger(__name__).exception("Background read failed")
@@ -66,19 +72,30 @@ class _JobLoad(QRunnable):
 
 
 class JobCenterDialog(QDialog):
-    """Global, read-only view over background jobs owned by product services."""
+    """Scoped job state and logs; domain services retain execution authority."""
+
+    output_requested = Signal(int)
+    thread_requested = Signal(int)
 
     def __init__(
         self,
         service: JobQueryService,
         *,
         scheduler: JobScheduler | None = None,
+        ml_service=None,
+        thread_id: int | None = None,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
         self.setWindowModality(Qt.WindowModality.NonModal)
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, False)
         self._service = service
+        self._ml_service = ml_service
+        self._thread_id = thread_id
+        self._focus_reference: str | None = None
+        self._shown_reference: str | None = None
+        self._details_read = AsyncRead(self)
+        self._details_read.loaded.connect(self._details_loaded)
         self._scheduler = scheduler
         self._thread_pool = QThreadPool(self)
         self._generation = 0
@@ -88,6 +105,9 @@ class JobCenterDialog(QDialog):
         self._active = False
         self._shutdown = False
 
+        self._scope_filter = QComboBox(self)
+        self._scope_filter.setAccessibleIdentifier("jobs.scope")
+        self._scope_filter.currentIndexChanged.connect(self._filters_changed)
         self._domain_filter = QComboBox(self)
         self._domain_filter.currentIndexChanged.connect(self._filters_changed)
         self._status_filter = QComboBox(self)
@@ -96,7 +116,7 @@ class JobCenterDialog(QDialog):
         self._search.setClearButtonEnabled(True)
         self._search.textChanged.connect(self._filters_changed)
 
-        self._table = QTableWidget(0, 5, self)
+        self._table = QTableWidget(0, 6, self)
         self._table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self._table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self._table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
@@ -107,8 +127,6 @@ class JobCenterDialog(QDialog):
         self._table.itemDoubleClicked.connect(self._show_details)
 
         self._summary = QLabel(self)
-        self._details_button = QPushButton(self)
-        self._details_button.clicked.connect(self._show_details)
         self._cancel_button = QPushButton(self)
         self._cancel_button.clicked.connect(self._cancel_selected_job)
         self._refresh_button = QPushButton(self)
@@ -119,8 +137,18 @@ class JobCenterDialog(QDialog):
         self._load_more_button.clicked.connect(self._load_more)
         self._load_more_button.setVisible(False)
         self._table.itemSelectionChanged.connect(self._update_action_buttons)
+        self._table.itemSelectionChanged.connect(self._show_details)
+        self._detail = QTextBrowser(self)
+        self._detail.setMaximumHeight(130)
+        self._logs = TaskLogView(self)
+        self._logs.setMaximumHeight(160)
+        self._source_button = QPushButton(self)
+        self._source_button.clicked.connect(self._open_source)
+        self._outputs_button = QPushButton(self)
+        self._outputs_button.clicked.connect(self._open_outputs)
 
         filters = QHBoxLayout()
+        filters.addWidget(self._scope_filter)
         filters.addWidget(self._domain_filter)
         filters.addWidget(self._status_filter)
         filters.addWidget(self._search, 1)
@@ -128,15 +156,18 @@ class JobCenterDialog(QDialog):
         actions.addWidget(self._summary)
         actions.addWidget(self._load_more_button)
         actions.addStretch(1)
-        actions.addWidget(self._details_button)
+        actions.addWidget(self._source_button)
+        actions.addWidget(self._outputs_button)
         actions.addWidget(self._cancel_button)
         actions.addWidget(self._refresh_button)
         actions.addWidget(self._close_button)
         layout = QVBoxLayout(self)
         layout.addLayout(filters)
         layout.addWidget(self._table, 1)
+        layout.addWidget(self._detail)
+        layout.addWidget(self._logs)
         layout.addLayout(actions)
-        self.resize(860, 480)
+        self.resize(1100, 740)
         self.retranslate_ui()
 
         self._refresh_timer = QTimer(self)
@@ -156,6 +187,7 @@ class JobCenterDialog(QDialog):
             self._status_filter.currentData(),
             self._search.text(),
             self._limit + 1,
+            AuditScope(all_threads=bool(self._scope_filter.currentData()), thread_id=self._thread_id),
         )
         load.signals.finished.connect(self._on_loaded)
         self._load = load
@@ -168,6 +200,11 @@ class JobCenterDialog(QDialog):
 
     def _filters_changed(self, *_args: object) -> None:
         self._generation += 1
+        self._details_read.invalidate()
+        self._detail.clear()
+        self._logs.clear()
+        self._table.setRowCount(0)
+        self._update_action_buttons()
         self._limit = JOB_PAGE_SIZE
         self.refresh()
 
@@ -185,6 +222,8 @@ class JobCenterDialog(QDialog):
             report_exception(result)
             return
         elif isinstance(result, list):
+            if not self._refresh_timer.isActive():
+                self._refresh_timer.start()
             self._render_jobs(result)
             self._update_action_buttons()
         if self._load_pending:
@@ -193,8 +232,9 @@ class JobCenterDialog(QDialog):
 
     def _render_jobs(self, jobs: list[JobItem]) -> None:
         has_more = len(jobs) > self._limit
-        jobs = jobs[:self._limit]
-        selected = self._selected_reference()
+        jobs = jobs[: self._limit]
+        selected = self._focus_reference or self._selected_reference()
+        self._table.blockSignals(True)
         self._table.setRowCount(len(jobs))
         selected_row = -1
         for row_index, job in enumerate(jobs):
@@ -204,6 +244,8 @@ class JobCenterDialog(QDialog):
                 job.target,
                 self._translated_status(job.status),
                 job.updated_at.astimezone().strftime("%Y-%m-%d %H:%M"),
+                job.thread_title
+                or (self.tr("Global") if job.domain is JobDomain.KNOWLEDGE else self.tr("Source not recorded")),
             )
             for column, value in enumerate(values):
                 item = QTableWidgetItem(value)
@@ -214,6 +256,13 @@ class JobCenterDialog(QDialog):
                 selected_row = row_index
         if selected_row >= 0:
             self._table.selectRow(selected_row)
+        elif jobs:
+            self._table.selectRow(0)
+        self._table.blockSignals(False)
+        if selected_row >= 0:
+            self._focus_reference = None
+        self._update_action_buttons()
+        self._show_details()
         active_count = sum(job.active for job in jobs)
         failed_count = sum(job.status is JobStatus.FAILED for job in jobs)
         self._summary.setText(
@@ -243,6 +292,8 @@ class JobCenterDialog(QDialog):
                 job.raw_reference,
             ).can_cancel
         self._cancel_button.setEnabled(can_cancel)
+        self._source_button.setEnabled(bool(job and job.thread_id and job.thread_title))
+        self._outputs_button.setEnabled(bool(job and job.domain is JobDomain.ML))
 
     def _cancel_selected_job(self) -> None:
         job = self._selected_job()
@@ -254,7 +305,12 @@ class JobCenterDialog(QDialog):
     def _show_details(self, *_args: object) -> None:
         job = self._selected_job()
         if job is None:
+            self._detail.clear()
+            self._logs.clear()
             return
+        if self._shown_reference != job.reference:
+            self._logs.clear()
+        self._shown_reference = job.reference
         details = self.tr("Reference: %1\nDomain: %2\nType: %3\nTarget: %4\nStatus: %5\nPhase: %6\nUpdated: %7")
         values = (
             job.reference,
@@ -268,8 +324,52 @@ class JobCenterDialog(QDialog):
         for index, value in enumerate(values, 1):
             details = details.replace(f"%{index}", value)
         if job.error_summary:
-            details += self.tr("\nError: %1").replace("%1", job.error_summary)
-        QMessageBox.information(self, self.tr("Job Details"), details)
+            details = self.tr("\nError: %1").replace("%1", job.error_summary).strip() + "\n" + details
+        if job.started_at:
+            details += self.tr("\nStarted: {time}").format(time=job.started_at.astimezone().isoformat())
+        if job.finished_at:
+            details += self.tr("\nFinished: {time}").format(time=job.finished_at.astimezone().isoformat())
+        self._detail.setPlainText(details)
+        self._details_read.invalidate()
+        if job.domain is JobDomain.ML and self._ml_service is not None:
+            task_id = job.raw_reference
+            self._details_read.submit(lambda: self._ml_service.get_task_details(task_id))
+        else:
+            self._logs.clear()
+
+    def set_thread_id(self, thread_id: int | None) -> None:
+        self._thread_id = thread_id
+        if not self._scope_filter.currentData():
+            self._filters_changed()
+
+    def focus_task(self, task_id: int) -> None:
+        self._focus_reference = f"ml:{task_id}"
+        self._scope_filter.setCurrentIndex(1)
+        self._domain_filter.setCurrentIndex(0)
+        self._status_filter.setCurrentIndex(0)
+        self._search.setText(f"ml:{task_id}")
+        self.refresh()
+
+    def _details_loaded(self, result: object) -> None:
+        if not self._active:
+            return
+        if isinstance(result, Exception):
+            self._logs.clear()
+            self._detail.append(self.tr("Task logs could not be loaded."))
+            report_exception(result)
+        else:
+            self._logs.set_logs(result.logs)
+            self._outputs_button.setEnabled(bool(result.artifacts))
+
+    def _open_source(self) -> None:
+        job = self._selected_job()
+        if job and job.thread_id:
+            self.thread_requested.emit(job.thread_id)
+
+    def _open_outputs(self) -> None:
+        job = self._selected_job()
+        if job and job.domain is JobDomain.ML:
+            self.output_requested.emit(job.raw_reference)
 
     def _translated_domain(self, domain: JobDomain) -> str:
         return {
@@ -298,6 +398,13 @@ class JobCenterDialog(QDialog):
         }.get(kind, kind.replace("_", " "))
 
     def retranslate_ui(self) -> None:
+        scope = self._scope_filter.currentData()
+        blocker = QSignalBlocker(self._scope_filter)
+        self._scope_filter.clear()
+        self._scope_filter.addItem(self.tr("Current conversation"), False)
+        self._scope_filter.addItem(self.tr("All conversations"), True)
+        self._scope_filter.setCurrentIndex(1 if scope else 0)
+        blocker.unblock()
         selected_domain = self._domain_filter.currentData()
         selected_status = self._status_filter.currentData()
         domain_blocker = QSignalBlocker(self._domain_filter)
@@ -323,9 +430,11 @@ class JobCenterDialog(QDialog):
                 self.tr("Target"),
                 self.tr("Status"),
                 self.tr("Updated"),
+                self.tr("Conversation"),
             ]
         )
-        self._details_button.setText(self.tr("Details"))
+        self._source_button.setText(self.tr("Source conversation"))
+        self._outputs_button.setText(self.tr("View outputs"))
         self._cancel_button.setText(self.tr("Cancel"))
         self._refresh_button.setText(self.tr("Refresh"))
         self._close_button.setText(self.tr("Close"))
@@ -345,11 +454,15 @@ class JobCenterDialog(QDialog):
 
     def hideEvent(self, event: QHideEvent) -> None:
         self._active = False
+        self._generation += 1
+        self._details_read.invalidate()
         self._refresh_timer.stop()
         super().hideEvent(event)
 
     def closeEvent(self, event: QCloseEvent) -> None:
         self._active = False
+        self._generation += 1
+        self._details_read.invalidate()
         self._refresh_timer.stop()
         super().closeEvent(event)
 
@@ -366,6 +479,7 @@ class JobCenterDialog(QDialog):
         self._refresh_timer.stop()
         self._thread_pool.clear()
         self._thread_pool.waitForDone()
+        self._details_read.shutdown()
 
 
 __all__ = ["JOB_PAGE_SIZE", "JOB_POLL_INTERVAL_MS", "JobCenterDialog"]

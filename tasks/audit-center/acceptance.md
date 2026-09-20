@@ -1,6 +1,6 @@
 # 审计中心验收方案
 
-本文件定义未来实现的通过条件；本轮只运行现有基线，不将设计草图、合成截图或 scripted Agent 当成新功能已通过的证据。[实施顺序与实际预演](plan.md) 记录执行状态。
+本文件保留设计阶段的验收目标；[验收记录](results.md) 记录本轮实际执行和结果。脚本化 Agent 验证解释写入链路，合成截图验证生产 UI 布局，都不能代替真实模型业务判断质量。
 
 ## 验收组合
 
@@ -22,10 +22,10 @@
 
 ## UI Lab 场景目录
 
-下列 ID 均为拟新增，不是当前可运行命令；沿用 ScenarioSpec、ScenarioHandle、attach_scenario，同一工厂供 Gallery、Capture 和 pytest-qt 使用，禁止另写只用于截图的假窗口。
+下列 ID 均已注册，可通过 UI Lab 运行；沿用 ScenarioSpec、ScenarioHandle、attach_scenario，同一工厂供 Gallery、Capture 和 pytest-qt 使用，禁止另写只用于截图的假窗口。
 场景使用生产窗口/控件及窄的内存 query/command ports，不导入 application_composition，不创建数据库、运行目录、网络、LLM 或 ML worker；动作由记录端口接收，取消/打开只验证意图，不操作真实任务/文件。
 
-| 拟新增 ID | 合成状态 | 核心检查 |
+| 场景 ID | 合成状态 | 核心检查 |
 | --- | --- | --- |
 | audit.model-explained | 默认选中已有说明的模型，含基线和评估范围。 | 解释先于记录，重要局限可见，证据往返与文件动作。 |
 | audit.dataset-lineage | 多输入、别名、两级上游及来自另一会话的输入。 | 逐级展开、返回恢复、引用不扩大清单。 |
@@ -39,14 +39,14 @@
 | jobs.running-and-failed | 可取消任务、失败任务/日志、多个关联产出。 | 取消只发一次正确命令，错误可读，无产出时不误导航。 |
 | centers.navigation | 两个生产窗口挂在轻量协调器宿主，共用合成端口。 | 定位不偷偷改主会话，多产出过滤、返回、隐藏/关闭。 |
 
-除注明的尺寸外默认 1100×740；每个 ScenarioSpec 显式固定 locale、Fusion、Segoe UI 与字体大小，并先配置 render identity 再构建窗口。
+除注明的尺寸外默认 1100×740；每个 ScenarioSpec 显式固定 locale、Fusion 与字体大小；新增中心场景使用系统 Microsoft YaHei，避免 Windows 离屏环境缺少中文字体，并先配置 render identity 再构建窗口。
 readiness 使用“预期请求完成且可显示对象/状态已应用”的有界条件；不能一概 ready_immediately 后随机截取加载中。场景 cleanup 停止所有计时器/排队请求；qtbot 通过 before_close_func 清理，避免双重删除。
 错误场景的状态切换属于同一场景工厂的受控端口，pytest 逐态操作；捕获固定一个命名状态，额外错误截图作为该场景证据，不伪称单张图覆盖所有状态。
 
 ## 自动捕获与人工 UX 检查
 
 新增场景注册后先逐个运行 `pdm run ui-lab -- <scenario-id>` 检查操作，再执行 `pdm run ui-capture -- <scenario-id> --output ui-artifacts/audit-center`；场景名要替换为上表真实注册的 ID。
-最终执行 `pdm run ui-capture-all --output ui-artifacts/audit-center-final`，使用其输出的真实 run-dir 执行 `pdm run ui-capture-all --verify <run-dir>`，必须 expected == captured、无失败，每个场景都有 manifest.json、tree.json、actual.png。
+最终执行 `pdm run ui-capture-all --output ui-artifacts/audit-center-final`，使用其输出的真实 run-dir 执行 `pdm run ui-capture-all -- --output ui-artifacts/audit-center-final --verify <run-dir>`，必须 expected == captured、无失败，每个场景都有 manifest.json、tree.json、actual.png。
 截图验证不做像素相等断言；自动合同检查动作、范围、状态和资源清理，人工逐图检查文本裁切、对比、解释密度、局限可见性和表格可读性，不能用“文件已生成”代替 UX 通过。
 Windows 原生窗口另查焦点/激活、非模态行为、关闭清理及 100%/150% 缩放，缩放测试记录实际 DPR/逻辑 DPI，不能仅把截图放大声称验证 DPI。
 GammaRay 可用于重现这些场景的布局或对象生命周期故障，使用方式与兼容前提见 [UI 设计](ui-design.md)；它不替代 pytest、截图审查或原生窗口验证。

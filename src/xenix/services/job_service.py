@@ -8,7 +8,8 @@ from sqlmodel import Session, col, select
 
 from .job_status import knowledge_job_status, ml_job_status
 from .knowledge_task_query import KnowledgeTaskQueryService
-from .storage.models import DatasetRow, JobDomain, JobStatus, MLTaskRow
+from .storage.models import ConversationThreadRow, DatasetRow, JobDomain, JobStatus, MLTaskRow
+from .audit_contracts import AuditScope
 
 
 @dataclass(frozen=True)
@@ -24,6 +25,10 @@ class JobItem:
     phase: str
     updated_at: datetime
     error_summary: str | None = None
+    thread_id: int | None = None
+    thread_title: str | None = None
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
 
     @property
     def active(self) -> bool:
@@ -52,7 +57,10 @@ class JobQueryService:
         status: JobStatus | str | None = None,
         search: str = "",
         limit: int = 200,
+        scope: AuditScope | None = None,
     ) -> list[JobItem]:
+        if scope is not None and not scope.all_threads and scope.thread_id is None:
+            return []
         bounded_limit = max(1, int(limit))
         jobs: list[JobItem] = []
         if domain in {None, JobDomain.KNOWLEDGE}:
@@ -60,6 +68,8 @@ class JobQueryService:
         if domain in {None, JobDomain.ML}:
             jobs.extend(self._ml_jobs())
 
+        if scope is not None and not scope.all_threads:
+            jobs = [job for job in jobs if job.thread_id == scope.thread_id]
         normalized_search = search.strip().casefold()
         if status is not None:
             jobs = [job for job in jobs if job.status == status]
@@ -97,6 +107,7 @@ class JobQueryService:
                     .order_by(col(MLTaskRow.updated_at).desc(), col(MLTaskRow.id).desc())
                 )
             )
+            threads = {row.id: row.title for row in session.exec(select(ConversationThreadRow))}
             dataset_ids = {task.dataset_id for task in tasks if task.dataset_id}
             datasets = (
                 {
@@ -120,6 +131,8 @@ class JobQueryService:
                 phase=task.status.value,
                 updated_at=task.updated_at,
                 error_summary=task.error_summary,
+                thread_id=task.origin_thread_id, thread_title=(threads.get(task.origin_thread_id) or f"#{task.origin_thread_id}") if task.origin_thread_id in threads else None,
+                started_at=task.started_at, finished_at=task.finished_at,
             )
             for task in tasks
         ]

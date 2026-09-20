@@ -79,7 +79,6 @@ class ChatWorkspace(QObject):
         current_locale: Callable[[], str],
         history_panel: HistoryPanel,
         thread_detail_view: ThreadDetailView,
-        open_tool_call_detail: Callable[[list[str]], None],
         conversation_executor: SubmissionExecutor | None = None,
         parent: QObject | None = None,
     ) -> None:
@@ -91,7 +90,6 @@ class ChatWorkspace(QObject):
         self._current_locale = current_locale
         self._history_panel = history_panel
         self._thread_detail_view = thread_detail_view
-        self._open_tool_call_detail = open_tool_call_detail
         self._conversation = ConversationTurnController()
         self._conversation_executor = conversation_executor or ThreadedSubmissionExecutor(
             self._agent_harness_service.submit_user_turn_stream
@@ -108,7 +106,6 @@ class ChatWorkspace(QObject):
         self._thread_detail_view.model_selected.connect(self._update_thread_model)
         self._thread_detail_view.service_link_activated.connect(self._open_service_link)
         self._thread_detail_view.source_file_activated.connect(self._open_source_file)
-        self._thread_detail_view.tool_action_requested.connect(self._handle_tool_action)
         self._thread_detail_view.stop_requested.connect(self._request_harness_stop)
         self._history_panel.thread_open_requested.connect(self._open_history_thread)
         self._history_panel.new_thread_requested.connect(self._create_agent_thread)
@@ -465,18 +462,14 @@ class ChatWorkspace(QObject):
 
     # Tool actions and stop --------------------------------------------------
 
-    def _handle_tool_action(self, action: object) -> None:
-        if not isinstance(action, dict):
-            return
-        action_type = str(action.get("type") or "")
-        raw_task_ids = action.get("task_ids")
-        if not isinstance(raw_task_ids, list):
-            return
-        task_ids = [task_id for task_id in raw_task_ids if isinstance(task_id, int)]
-        if not task_ids:
-            return
-        if action_type == "open_tool_call_detail":
-            self._open_tool_call_detail(task_ids)
+    def open_thread(self, thread_id: int) -> None:
+        try:
+            self._open_history_thread(thread_id)
+        except XenixError as exc:
+            self._thread_detail_view.show_operation_error(str(exc))
+
+    def open_artifact(self, uri: str) -> None:
+        self._open_service_link(uri)
 
     def _request_harness_stop(self) -> None:
         disposition = self._conversation.stop_disposition()
@@ -519,8 +512,11 @@ class ChatWorkspace(QObject):
         self._sync_thread_model_picker(snapshot)
         self._thread_detail_view.render_events(self._agent_harness_service.project_chatbot_events(snapshot))
 
+    conversation_changed = Signal(object)
+
     def _select_conversation_thread(self, thread_id: int | None) -> None:
         self._conversation.select_thread(thread_id)
+        self.conversation_changed.emit(thread_id)
         self._submission_attachment_paths = ()
         self._thread_detail_view.clear_operation_notification()
         self._thread_detail_view.abort_composer_submission()

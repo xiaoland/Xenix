@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from .audit_contracts import ExecutionOrigin
+
 import difflib
 import hashlib
 import json
@@ -91,6 +93,7 @@ class CreateColumnBindingInput(SQLModel):
 
 
 class FitWithEvaluateInput(SQLModel):
+    origin: ExecutionOrigin | None = None
     binding_id: int
     run_name: str | None = None
     model_key: str
@@ -98,6 +101,7 @@ class FitWithEvaluateInput(SQLModel):
 
 
 class TuneWithEvaluateInput(SQLModel):
+    origin: ExecutionOrigin | None = None
     binding_id: int
     run_name: str | None = None
     model_key: str
@@ -127,6 +131,7 @@ class ApplySourceInput(SQLModel):
 
 
 class ApplyWithFilesInput(SQLModel):
+    origin: ExecutionOrigin | None = None
     trained_model_id: int
     input_files: list[str] = Field(default_factory=list)
     input_sources: list[ApplySourceInput] = Field(default_factory=list)
@@ -284,7 +289,7 @@ class MLService:
             ),
             trained_model_context=self._build_trained_model_context(context),
         )
-        return self._create_and_submit_task(context, MLTaskType.FIT, request)
+        return self._create_and_submit_task(context, MLTaskType.FIT, request, origin=input_data.origin)
 
     @staticmethod
     def _validate_model_runtime_admission(context: "_TrainingContext") -> None:
@@ -334,7 +339,7 @@ class MLService:
             ),
             trained_model_context=self._build_trained_model_context(context),
         )
-        return self._create_and_submit_task(context, MLTaskType.HYPERPARAMETER_TUNING, request)
+        return self._create_and_submit_task(context, MLTaskType.HYPERPARAMETER_TUNING, request, origin=input_data.origin)
 
     def bulk_tune_with_evaluate(self, input_data: BulkTuneWithEvaluateInput) -> list[MLTaskRow]:
         tasks: list[MLTaskRow] = []
@@ -542,7 +547,7 @@ class MLService:
             input_files=input_files,
             forecast_horizon=input_data.horizon,
         )
-        return self._create_task_from_request(MLTaskType.APPLY, request, auto_submit=True)
+        return self._create_task_from_request(MLTaskType.APPLY, request, auto_submit=True, origin=input_data.origin)
 
     def _handle_task_completion(self, task: MLTaskRow) -> None:
         if task.status is not MLTaskStatus.SUCCEEDED:
@@ -586,7 +591,11 @@ class MLService:
                 holdout_artifact_path=holdout_artifact_path,
             ),
         )
-        created = self._create_task_from_request(MLTaskType.EVALUATE, evaluate_request)
+        origin = (ExecutionOrigin(thread_id=task.origin_thread_id,
+            tool_call_message_id=task.origin_tool_call_message_id,
+            explanation=task.agent_explanation, submitted_parameters=task.submitted_parameters or {})
+            if task.origin_thread_id and task.agent_explanation else None)
+        created = self._create_task_from_request(MLTaskType.EVALUATE, evaluate_request, origin=origin)
         self._attach_evaluation_task_to_trained_model(trained_model_id, created.id)
         self._submit_ml_task(created)
 
@@ -745,8 +754,10 @@ class MLService:
         context: "_TrainingContext",
         task_type: MLTaskType,
         request: FitTaskRequest | HyperparameterTuningTaskRequest,
+        *,
+        origin: ExecutionOrigin | None = None,
     ) -> MLTaskRow:
-        created = self._create_task_from_request(task_type, request)
+        created = self._create_task_from_request(task_type, request, origin=origin)
         self._submit_ml_task(created)
         return created
 
@@ -756,10 +767,12 @@ class MLService:
         request: FitTaskRequest | HyperparameterTuningTaskRequest | EvaluateTaskRequest | ApplyTaskRequest,
         *,
         auto_submit: bool = False,
+        origin: ExecutionOrigin | None = None,
     ) -> MLTaskRow:
         created = self._ml_task_service.create_ml_task(
             CreateMLTaskInput(
                 id=request.task_id,
+                origin=origin,
                 project_id=request.project_id,
                 dataset_id=request.dataset_id,
                 task_type=task_type,

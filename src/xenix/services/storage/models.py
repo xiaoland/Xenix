@@ -17,6 +17,8 @@ Communicate in {interface_locale}, using plain business language. Follow the use
 
 Support factual claims and comparisons with computed results. Distinguish observations, estimates and assumptions; explain uncertainty relevant to the decision. Training results already include evaluation evidence. Deliver when the requested outputs and their supporting evidence are available.
 
+Before producing data, charts, or models, supply a concrete business-readable rationale in the tool explanation fields. After inspecting actual results, use audit.explain to save an interpretation with recorded evidence references for each delivered output. Explain what the result means, its limitations, and what the user can check; do not invent evidence or present Agent interpretations as verified facts. Use audit.list to find retained background outputs that still need interpretation.
+
 Dataset IDs identify data for tool input. Artifact IDs identify user-openable outputs: use [label](artifact://<artifact_id>) or ![alt](artifact://<artifact_id>) for an inline image. Use returned Artifact IDs or URIs; do not substitute Dataset IDs or filesystem paths.
 """
 
@@ -160,6 +162,7 @@ class DatasetDerivationRow(SQLModel, table=True):
         sa_column=Column(JSON, nullable=False),
     )
     agent_explanation: str | None = None
+    origin_thread_id: int | None = Field(default=None, index=True)
     # Tool execution happens before the staged ToolCall Message is committed,
     # so this is a stable future reference rather than an immediate FK.
     tool_call_message_id: int | None = Field(default=None, index=True)
@@ -236,6 +239,10 @@ class MLTaskRow(SQLModel, table=True):
 
     id: int = Field(sa_column=identity_column(primary_key=True))
     project_id: int = Field(foreign_key="project.id", index=True)
+    origin_thread_id: int | None = Field(default=None, index=True)
+    origin_tool_call_message_id: int | None = Field(default=None, index=True)
+    agent_explanation: str | None = None
+    submitted_parameters: dict[str, Any] | None = Field(default=None, sa_column=Column(JSON, nullable=True))
     dataset_id: int | None = Field(default=None, foreign_key="dataset.id", index=True)
     task_type: MLTaskType = Field(
         sa_column=Column(
@@ -442,6 +449,30 @@ class ArtifactRow(SQLModel, table=True):
         sa_column=Column(JSON, nullable=False),
     )
     ready_to_open: bool = True
+    created_at: datetime = Field(default_factory=utc_now)
+
+
+class ArtifactDerivationRow(SQLModel, table=True):
+    __tablename__ = "artifact_derivation"
+
+    artifact_id: int = Field(primary_key=True, foreign_key="artifact.id")
+    origin_thread_id: int = Field(index=True)
+    origin_tool_call_message_id: int | None = Field(default=None, index=True)
+    payload: dict[str, Any] = Field(sa_column=Column(JSON, nullable=False))
+
+
+class AuditExplanationRow(SQLModel, table=True):
+    """Append-only Agent annotations; references never own their target's lifecycle."""
+
+    __tablename__ = "audit_explanation"
+
+    id: int = Field(sa_column=identity_column(primary_key=True))
+    object_kind: str = Field(index=True)
+    object_id: int = Field(index=True)
+    thread_id: int = Field(index=True)
+    tool_call_message_id: int | None = None
+    text: str
+    evidence: list[dict[str, Any]] = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
     created_at: datetime = Field(default_factory=utc_now)
 
 

@@ -96,6 +96,7 @@ def test_clean_room_profile_and_whole_dataset_cleaning_workflow(
         arguments={
             "dataset_id": source_dataset.id,
             "name": "Support quality cleaned",
+            "explanation": "Remove duplicate tickets and fill missing values for descriptive quality analysis.",
             "operations": [
                 {"operation": "duplicate.exact_rows", "params": {"keep": "first"}},
                 {
