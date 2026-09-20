@@ -16,6 +16,8 @@
 - A historical target must already contain the supported release workflow and protocol. Because GitHub resolves a push workflow from the tagged ref, the local preflight is the rejection boundary for older pre-protocol commits.
 - Never move or delete a pushed release tag. Product corrections use a new version; transient infrastructure failures rerun the unchanged tag.
 
+When monitoring asynchronous workflows such as GitHub Actions, prefer a completion or failure notification when the environment supports one. Otherwise, wait at least 60 seconds between status checks, including checks through different commands or tools; use a longer interval for slow builds and uploads. Batch checks for independent active runs. Notify the user only when a phase changes, an actionable failure or approval requirement appears, or the workflow completes; an unchanged queued/running state is not a progress update. Workflow monitoring is separate from a build or transfer process's own diagnostic heartbeat.
+
 ## Development Commands
 
 - Python `3.14.2` is the project and packaged runtime.
