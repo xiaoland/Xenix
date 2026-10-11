@@ -1,13 +1,6 @@
 <div align="center">
 
-<img src="docs/assets/readme-hero.svg" width="100%" alt="Xenix Native：你的桌面 Data Agent。从业务问题出发，执行数据分析与机器学习任务。" />
-
-<br />
-
-**你的桌面 Data Agent，让数据分析从一句话开始。**
-
-面向业务与市场人员，能调用工具、执行分析并交付成果的数据智能体。<br />
-从一份 CSV / Excel 和一个业务问题出发，让 Agent 完成数据准备、可视化与机器学习任务。
+<img src="docs/assets/readme-hero.svg" width="100%" alt="Xenix Native：把数据分析，交给 Agent。无需编程，用对话驱动数据清洗、模型训练与结果解读。" />
 
 <br />
 
@@ -171,7 +164,7 @@ pdm run diagnostic-bundle
 
 <div align="center">
 
-**Xenix Native · 你的桌面 Data Agent。**
+**Xenix Native**
 
 基于 [GNU GPL v3](LICENSE) 许可发布。
 
