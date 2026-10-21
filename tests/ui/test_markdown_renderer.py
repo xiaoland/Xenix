@@ -1,4 +1,32 @@
+from html.parser import HTMLParser
+
+import pytest
+from PySide6.QtCore import QUrl
+
 from xenix.ui.markdown_renderer import render_chat_markdown
+
+
+@pytest.mark.parametrize("artifact_id", [69, 2**55 + 3])
+def test_result_links_keep_their_identity_through_qt(artifact_id: int) -> None:
+    from urllib.parse import urlsplit
+
+    targets = []
+
+    class Targets(HTMLParser):
+        def handle_starttag(self, tag, attrs):
+            targets.extend(value for key, value in attrs if key in {"href", "src"})
+
+    Targets().feed(render_chat_markdown(
+        f"![Chart](artifact://{artifact_id}?view=image) [Download](artifact://{artifact_id})",
+        inline_artifact_images=True,
+    ))
+
+    assert len(targets) == 3
+    for target in targets:
+        parsed = urlsplit(QUrl(target).toString())
+        assert parsed.scheme == "artifact"
+        assert int(parsed.netloc or parsed.path.lstrip("/")) == artifact_id
+        assert not parsed.query
 
 
 def test_markdown_table_can_follow_model_prose_without_a_blank_line() -> None:

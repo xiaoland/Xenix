@@ -30,6 +30,10 @@ The bootstrap path performs process-global Python and C-extension imports on the
 
 The black user-message bubble deliberately uses `UserMessageCard` plus `UserMessageBody` custom painting. Do not reintroduce a `QFrame.StyledPanel`, `QTextBrowser`, or `QAbstractScrollArea` background stack: on Windows their independent repaint paths can cover the black card or text during updates. Keep the card/body styles transparent and verify the black user-message bubble after changing this path.
 
+用户与助手的内嵌图片共用 `ArtifactPreviewDocument`；SVG 预览使用锁定图表依赖的 `svg_to_png` 文字引擎，避免 Qt SVG 对通用字体和样式的不同解析把图例挤出画布，原始文件保持不变。
+每个文档按当前屏幕密度缓存一份最大逻辑预览尺寸的源位图；窗口宽度改变时从源位图缩放，屏幕密度改变时重新生成源位图，避免拖动窗口反复转换 SVG 或累积缩小后的清晰度损失。
+`QTextDocument` 按 URL 缓存图片资源，仅改变文本宽度不会重新加载图片；尺寸或密度变化后必须更新当前文档的图片资源并触发布局，保留文档内容和选择状态。
+
 Splash resource collection belongs to [Packaging](../40-deployment/packaging.md).
 
 ## Error Reporting
