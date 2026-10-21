@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import secrets
 
-from PySide6.QtCore import QSize, Qt, Signal
-from PySide6.QtGui import QColor, QFont, QPainter, QPixmap, QTextDocument, QTextOption
+from PySide6.QtCore import QEvent, QSize, Qt, Signal
+from PySide6.QtGui import QColor, QFont, QPainter, QTextDocument, QTextOption
 from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
 
 from ...markdown_renderer import render_chat_markdown
 from ..presentation import ArtifactResolver, ChatbotBlock, render_content_blocks
-from .artifacts import _load_artifact_preview_pixmap
+from .artifacts import ArtifactPreviewDocument
 from .common import _propagate_geometry_change
 from .text import AutoHeightTextBrowser
 
@@ -45,19 +45,6 @@ class UserMessageCard(QWidget):
         super().paintEvent(event)
 
 
-class UserMessageDocument(QTextDocument):
-    def __init__(self, owner, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self._owner = owner
-
-    def loadResource(self, resource_type: int, name):  # type: ignore[override]
-        if resource_type == QTextDocument.ImageResource and name.scheme() == "artifact":
-            pixmap = self._owner.load_artifact_pixmap(name.toString())
-            if not pixmap.isNull():
-                return pixmap
-        return super().loadResource(resource_type, name)
-
-
 class UserMessageBody(QWidget):
     link_activated = Signal(str)
 
@@ -68,8 +55,12 @@ class UserMessageBody(QWidget):
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
-        self._artifact_resolver = artifact_resolver
-        self._document = UserMessageDocument(self, self)
+        self._document = ArtifactPreviewDocument(
+            artifact_resolver=artifact_resolver,
+            available_width=self.width(),
+            device_pixel_ratio=self.devicePixelRatioF(),
+            parent=self,
+        )
         self._document.setDefaultStyleSheet(USER_MESSAGE_DOCUMENT_STYLE_SHEET)
         self._document.setDocumentMargin(0)
         self._document.setDefaultFont(self.font())
@@ -84,14 +75,7 @@ class UserMessageBody(QWidget):
         return self._document
 
     def set_artifact_resolver(self, resolver: ArtifactResolver | None) -> None:
-        self._artifact_resolver = resolver
-
-    def load_artifact_pixmap(self, uri: str) -> QPixmap:
-        return _load_artifact_preview_pixmap(
-            self._artifact_resolver,
-            uri,
-            available_width=self.width(),
-        )
+        self._document.set_artifact_resolver(resolver)
 
     def setHtml(self, html: str) -> None:
         self._document.setHtml(html)
@@ -105,7 +89,20 @@ class UserMessageBody(QWidget):
 
     def resizeEvent(self, event) -> None:  # type: ignore[override]
         super().resizeEvent(event)
+        self._update_preview_context()
         self._sync_height()
+
+    def event(self, event) -> bool:  # type: ignore[override]
+        result = super().event(event)
+        if event.type() == QEvent.DevicePixelRatioChange:
+            self._update_preview_context()
+            self._sync_height()
+        return result
+
+    def _update_preview_context(self) -> None:
+        self._document.update_preview_context(
+            available_width=self.width(), device_pixel_ratio=self.devicePixelRatioF(),
+        )
 
     def paintEvent(self, event) -> None:  # type: ignore[override]
         painter = QPainter(self)

@@ -6,7 +6,7 @@ Public widget classes are re-exported here so callers keep importing from
 
 from .attachment import AttachmentChip
 from .items import ConnectionRetryItem, ToolCallItem, UsageOverviewItem
-from .message import ChatMessageBubble, UserMessageBody, UserMessageCard, UserMessageDocument
+from .message import ChatMessageBubble, UserMessageBody, UserMessageCard
 from .text import AutoGrowingTextEdit, AutoHeightTextBrowser
 
 __all__ = [
@@ -19,5 +19,4 @@ __all__ = [
     "UsageOverviewItem",
     "UserMessageBody",
     "UserMessageCard",
-    "UserMessageDocument",
 ]

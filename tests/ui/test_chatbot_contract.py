@@ -1,11 +1,86 @@
 from __future__ import annotations
 
 import pytest
+from PySide6.QtCore import QPoint, Qt, QUrl
+from PySide6.QtGui import QPixmap, QTextDocument
 from PySide6.QtWidgets import QToolButton
 from pytestqt.qtbot import QtBot
 
 from xenix.ui.chatbot import AttachmentChip, ComposerAttachmentStatus, ThreadDetailView
 from xenix.ui.semantic_identity import item_reference
+
+
+@pytest.mark.parametrize("author", ["You", "Xenix"])
+@pytest.mark.parametrize("image_format", ["svg", "png"])
+def test_result_image_resizes_and_opens_its_registered_file(
+    author, image_format, qtbot: QtBot, storage, tmp_path, monkeypatch,
+) -> None:
+    import vl_convert as vlc
+
+    from xenix.services.artifact_service import ArtifactService, RegisterArtifactInput
+    from xenix.services.link_router import LinkRouter
+    from xenix.ui.conversation.presentation import ChatbotBlock
+    from xenix.ui.conversation.widgets import ChatMessageBubble
+
+    svg = (
+        '<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="600" viewBox="0 0 1200 600">'
+        '<rect width="1200" height="600" fill="white"/>'
+        '<circle cx="550" cy="300" r="80" fill="#1f77b4"/>'
+        '<text x="1050" y="40" font-family="sans-serif" font-size="20">客户分群</text></svg>'
+    )
+    path = tmp_path / f"segments.{image_format}"
+    if image_format == "svg":
+        path.write_text(svg, encoding="utf-8")
+    else:
+        path.write_bytes(vlc.svg_to_png(svg))
+    artifacts = ArtifactService(storage.session_factory)
+    result = artifacts.register_artifact(RegisterArtifactInput(
+        title="Segments", absolute_path=str(path),
+        mime_type="image/svg+xml" if image_format == "svg" else "image/png",
+    ))
+    opened = []
+    monkeypatch.setattr("xenix.services.artifact_service._open_file_with_os", lambda target: opened.append(target) or True)
+    router = LinkRouter(artifact_service=artifacts)
+    bubble = ChatMessageBubble(
+        author=author,
+        blocks=[ChatbotBlock(type="text", text=f"![Segments](artifact://{result.id}?view=image)")],
+        artifact_resolver=artifacts.resolve_uri,
+    )
+    qtbot.addWidget(bubble)
+    bubble.link_activated.connect(router.activate)
+    bubble.resize(900, 500)
+    bubble.set_available_width(900)
+    bubble.show()
+    body = bubble._browser
+
+    def preview() -> QPixmap:
+        document = body.document()
+        fragment = document.begin().begin().fragment()
+        name = fragment.charFormat().toImageFormat().name()
+        image = document.resource(QTextDocument.ImageResource, QUrl(name))
+        assert isinstance(image, QPixmap) and not image.isNull()
+        return image
+
+    qtbot.waitUntil(lambda: preview().deviceIndependentSize().width() > 300)
+    wide_width = preview().deviceIndependentSize().width()
+    ratio = body.devicePixelRatioF()
+    assert preview().devicePixelRatioF() == ratio
+    assert preview().width() >= wide_width * ratio - 1
+    target = body.viewport() if hasattr(body, "viewport") else body
+    qtbot.mouseClick(target, Qt.LeftButton, pos=QPoint(20, 20))
+    assert opened == [path]
+
+    bubble.set_available_width(380)
+    bubble.resize(380, bubble.height())
+    qtbot.waitUntil(lambda: preview().deviceIndependentSize().width() < wide_width)
+    available_width = target.width()
+    assert preview().deviceIndependentSize().width() <= available_width - 24
+    assert body.height() >= int(body.document().size().height())
+
+    bubble.set_available_width(900)
+    bubble.resize(900, bubble.height())
+    qtbot.waitUntil(lambda: preview().deviceIndependentSize().width() == wide_width)
+    assert preview().devicePixelRatioF() == ratio
 
 
 def test_chat_shell_has_stable_unique_semantic_identities(qtbot: QtBot) -> None:

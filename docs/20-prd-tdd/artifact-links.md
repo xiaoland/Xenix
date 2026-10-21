@@ -47,6 +47,9 @@ producing service
 Markdown image syntax requests an inline image preview; an ordinary markdown link
 requests a normal openable artifact. Both retain the same artifact id authority.
 
+桌面 Markdown 在把 HTML 交给 Qt 前，将整数 authority 转为 `artifact:/42` 路径形式，避免 `QUrl` 把较小的整数改写为 IPv4 地址。
+这是 ArtifactService 已支持的界面传输形式；持久化内容和工具结果继续使用规范身份 `artifact://42`。
+
 ## Invariants
 
 - ArtifactService owns registration, readiness, URI resolution, and local file
@@ -64,3 +67,4 @@ requests a normal openable artifact. Both retain the same artifact id authority.
 ## Verification
 
 URI parsing and registration are covered by `tests/storage/test_storage_artifacts.py`; producing ML service paths and end-to-end Agent artifact links are covered under `tests/ml/` and `tests/e2e/agent_harness/`.
+`tests/ui/test_markdown_renderer.py` 和 `tests/ui/test_chatbot_contract.py` 验证经过 Qt 的身份保持、已注册文件的点击打开，以及用户与助手消息的图片尺寸和屏幕密度适配。

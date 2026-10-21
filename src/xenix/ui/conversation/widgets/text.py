@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QColor, QPalette, QPixmap, QTextDocument, QTextOption
+from PySide6.QtCore import QEvent, Qt, Signal
+from PySide6.QtGui import QColor, QPalette, QTextOption
 from PySide6.QtWidgets import (
     QPlainTextEdit,
     QSizePolicy,
@@ -12,7 +12,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..presentation import ArtifactResolver
-from .artifacts import _load_artifact_preview_pixmap
+from .artifacts import ArtifactPreviewDocument
 from .common import _propagate_geometry_change
 
 
@@ -24,7 +24,13 @@ class AutoHeightTextBrowser(QTextBrowser):
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
-        self._artifact_resolver = artifact_resolver
+        self._preview_document = ArtifactPreviewDocument(
+            artifact_resolver=artifact_resolver,
+            available_width=self.viewport().width(),
+            device_pixel_ratio=self.devicePixelRatioF(),
+            parent=self,
+        )
+        self.setDocument(self._preview_document)
         self.setAttribute(Qt.WA_TranslucentBackground, True)
         self.setAutoFillBackground(False)
         self.viewport().setAttribute(Qt.WA_TranslucentBackground, True)
@@ -43,21 +49,26 @@ class AutoHeightTextBrowser(QTextBrowser):
 
     def resizeEvent(self, event) -> None:  # type: ignore[override]
         super().resizeEvent(event)
-        self.document().setTextWidth(self.viewport().width())
+        self._update_preview_context()
         self._sync_height()
+
+    def event(self, event) -> bool:  # type: ignore[override]
+        result = super().event(event)
+        if event.type() == QEvent.DevicePixelRatioChange:
+            self._update_preview_context()
+            self._sync_height()
+        return result
 
     def wheelEvent(self, event) -> None:  # type: ignore[override]
         event.ignore()
 
     def set_artifact_resolver(self, resolver: ArtifactResolver | None) -> None:
-        self._artifact_resolver = resolver
+        self._preview_document.set_artifact_resolver(resolver)
 
-    def loadResource(self, resource_type: int, name):  # type: ignore[override]
-        if resource_type == QTextDocument.ImageResource and name.scheme() == "artifact":
-            pixmap = self._load_artifact_pixmap(name.toString())
-            if not pixmap.isNull():
-                return pixmap
-        return super().loadResource(resource_type, name)
+    def _update_preview_context(self) -> None:
+        self._preview_document.update_preview_context(
+            available_width=self.viewport().width(), device_pixel_ratio=self.devicePixelRatioF(),
+        )
 
     def _sync_height(self) -> None:
         self.document().setTextWidth(self.viewport().width())
@@ -68,13 +79,6 @@ class AutoHeightTextBrowser(QTextBrowser):
         self.verticalScrollBar().setValue(0)
         self.horizontalScrollBar().setValue(0)
         _propagate_geometry_change(self)
-
-    def _load_artifact_pixmap(self, uri: str) -> QPixmap:
-        return _load_artifact_preview_pixmap(
-            self._artifact_resolver,
-            uri,
-            available_width=self.viewport().width(),
-        )
 
 
 class AutoGrowingTextEdit(QPlainTextEdit):

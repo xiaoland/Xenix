@@ -90,6 +90,7 @@ def _table_cells(line: str) -> list[str]:
 
 
 def normalize_artifact_uri(uri: str) -> str:
+    """Adapt result links for Qt without treating decimal IDs as network hosts."""
     parts = urlsplit(uri)
     if parts.scheme != "artifact":
         return uri
@@ -101,6 +102,11 @@ def normalize_artifact_uri(uri: str) -> str:
             if key != "view"
         ]
     )
+    # QUrl interprets an integer authority such as artifact://69 as IPv4 and
+    # rewrites it to artifact://0.0.0.69. Keep canonical IDs intact in a path
+    # while the link travels through QTextDocument and Qt activation signals.
+    if parts.netloc.isdecimal() and not parts.path.strip("/"):
+        return urlunsplit((parts.scheme, "", f"/{parts.netloc}", query, parts.fragment))
     return urlunsplit((parts.scheme, parts.netloc, parts.path, query, parts.fragment))
 
 
