@@ -3,16 +3,8 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-from PySide6.QtCore import QLibraryInfo
+from qt_tools import resolve_qt_tool
 
-
-def _resolve_lupdate() -> Path:
-    command = Path(
-        QLibraryInfo.path(QLibraryInfo.LibraryPath.LibraryExecutablesPath)
-    ) / "lupdate.exe"
-    if not command.is_file():
-        raise SystemExit("lupdate is not available in the active PySide6 installation.")
-    return command
 
 
 def main() -> int:
@@ -22,7 +14,7 @@ def main() -> int:
     translations_root.mkdir(parents=True, exist_ok=True)
     source_files = [str(path) for path in sorted(source_root.rglob("*.py"))]
 
-    command = _resolve_lupdate()
+    command = resolve_qt_tool("lupdate")
 
     subprocess.run(
         [

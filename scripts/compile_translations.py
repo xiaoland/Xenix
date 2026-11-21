@@ -4,16 +4,8 @@ import subprocess
 import sys
 from pathlib import Path
 
-from PySide6.QtCore import QLibraryInfo
+from qt_tools import resolve_qt_tool
 
-
-def _resolve_lrelease() -> Path:
-    command = Path(
-        QLibraryInfo.path(QLibraryInfo.LibraryPath.LibraryExecutablesPath)
-    ) / "lrelease.exe"
-    if not command.is_file():
-        raise SystemExit("lrelease is not available in the active PySide6 installation.")
-    return command
 
 
 def _supported_translation_names(project_root: Path) -> frozenset[str]:
@@ -43,7 +35,7 @@ def main() -> int:
             + ", ".join(missing_names)
         )
 
-    command = _resolve_lrelease()
+    command = resolve_qt_tool("lrelease")
 
     for ts_path in ts_paths:
         qm_path = ts_path.with_suffix(".qm")
