@@ -1,6 +1,6 @@
 # 1.5 Release Notes — 1.5.1 Preparation
 
-This is the candidate release summary for changes since v1.4.0, not a publication announcement. Publication follows [Windows Distribution](windows-distribution.md); local preparation and evidence are tracked in the [closeout packet](../../tasks/minor-1-5-closeout/packet.md).
+This page records the 1.5.1 release preparation and changes since v1.4.0. See the [closeout archive](../../tasks/minor-1-5-closeout/packet.md) for the preparation and evidence at the time and [Windows Distribution](windows-distribution.md) for the current release procedure.
 
 ## User-visible changes
 

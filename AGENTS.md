@@ -25,7 +25,7 @@ Read the relevant owner and applicable subtree `AGENTS.md`; load further guidanc
 - Python `3.14.2`, PDM `2.26.6`, PySide6/Qt Widgets.
 - Install: `pdm sync --clean -G :all`, then `pdm run prepare`. Run: `pdm run dev`.
 - Focused verification: `pdm run pytest --direct <selectors>`; broad verification: `pdm run test` and `pdm run check`. Startup/runtime changes also use `pdm run smoke --isolated`. Packaging gates and verification selection are in CONTRIBUTING.
-- Diagnostics: `pdm run diagnostic-bundle`. Runtime defaults to `%LOCALAPPDATA%\Xenix`, overridden by `XENIX_APP_HOME`; inspect `state/xenix.db`, `logs/xenix.log`, and `config/` only within the authorized task.
+- Use `pdm run diagnostic-bundle` to create a local support archive. Resolve the active runtime home, including any `XENIX_APP_HOME` override, using [Runtime State](docs/40-deployment/runtime-state.md). Inspect `state/xenix.db`, `logs/xenix.log`, and `config/` only within the authorized task.
 
 ## Collaboration
 

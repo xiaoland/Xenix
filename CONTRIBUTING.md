@@ -22,6 +22,7 @@ When monitoring asynchronous workflows such as GitHub Actions, prefer a completi
 
 - Python `3.14.2` is the project and packaged runtime.
 - PDM `2.26.6` is the project workflow frontend; `pdm sync --clean -G :all` makes the project-local virtual environment match `pdm.lock`. Follow it with `pdm run prepare` to generate the ignored Skill catalog and compiled translations before a first static check.
+- Check `pdm --version` and `pdm run python -VV` against the CI versions above. Newer local PDM versions can run development commands. Use PDM `2.26.6` for any `pdm.lock` update.
 - `pdm run dev` runs the desktop application.
 - `pdm run test` prepares runtime resources and runs the complete offline acceptance portfolio in one process. Pass normal pytest selectors directly, for example `pdm run test tests/ml/test_data_cleaning_service.py -q`; `--direct` remains accepted for existing scripts but does not select a different runner.
 - `pdm run pytest --direct <pytest selectors/options>` runs a focused selection with the same isolated temporary-path setup.
@@ -32,7 +33,7 @@ When monitoring asynchronous workflows such as GitHub Actions, prefer a completi
 - `pdm run verify` runs static checks, the offline portfolio, and isolated desktop smoke in order. It does not invoke live provider benchmarks or release publication.
 - `pdm run smoke` runs the desktop application in smoke-test mode against the platform default home; combine with `--isolated` to use a fresh temp home.
 - `pdm run i18n-extract` and `pdm run i18n-compile` update Qt translations.
-- `pdm run package` builds the Windows bundle. Use `pdm run package --dist-dir dist/review` while another bundle is running, then `pdm run smoke-package --executable dist/review/xenix/xenix.exe` to verify that output.
+- `pdm run package` builds the Windows bundle. If a running bundle locks files in `dist/xenix`, use `pdm run package --dist-dir dist/review` to redirect the final output, then `pdm run smoke-package --executable dist/review/xenix/xenix.exe` to verify it. Run packaging serially within each checkout.
 - `pdm run smoke-package` verifies the packaged executable.
 - `pdm run diagnostic-bundle` creates a local support archive (logs, task logs, install id, database summaries) without the raw database.
 - `pdm run release-identity` verifies tag/version/promotion identity before pushing a release tag.

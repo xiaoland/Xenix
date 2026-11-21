@@ -1,0 +1,13 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Xenix",
+            "type": "debugpy",
+            "request": "launch",
+            // Run `pdm run prepare` first, or configure a local preLaunchTask for it.
+            "program": "${workspaceFolder}/scripts/run_dev.py",
+            "cwd": "${workspaceFolder}"
+        }
+    ]
+}

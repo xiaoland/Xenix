@@ -52,10 +52,6 @@ nul
 # Mock data
 .mock-data
 
-# IDE
-.vscode\tasks.json
-.vscode\launch.json
-
 # Temp
 .codex-test-tmp
 .pytest-tmp
