@@ -17,4 +17,6 @@ The operation sequence is observable: filtering before imputation changes the po
 
 Generated-dataset registration, lineage, and public Artifact finalization remain with the existing Dataset/Artifact service boundary. The cleaning engine cannot become another registry or mark a filesystem result as a registered Dataset.
 
-Verification: `tests/ml/test_data_cleaning_service.py` covers ordering, nullable rows, source preservation, spawned/inline feature preparation, and rejection of stale column indexes without partial output; `tests/ml/test_ml_foundation_profile_cleaning.py` covers the Agent Tool through registered finalization. Check metadata guidance at `tests/agent/test_agent_data_cleaning_guidance.py`.
+`tests/ml/test_data_cleaning_service.py` covers ordering, nullable rows, source preservation, spawned/inline feature preparation, and rejection of stale column indexes without partial output. `tests/ml/test_ml_foundation_profile_cleaning.py` covers the Agent Tool through registered finalization.
+
+For `data.clean.metadata`, see the [metadata catalog](../../src/xenix/services/cleaning/catalog.py) for returned content, the [Tool registry](../../src/xenix/services/agent/tools.py) for registration, and the [call adapter](../../src/xenix/services/agent/_data_tools.py) for how group filters reach the catalog.

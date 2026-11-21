@@ -120,7 +120,9 @@ Landed (committed on `develop`):
   3 genuinely shared leaf modules (`data_tokenization_contracts`, `dataset_inspection`,
   `tabular`) are imported from `services/` root.
 
-## Slice 13 summary
+## Slice 13 验收快照（当时结论）
+
+2026-11 维护轮次见 [tasks/maintainability-2026-11/packet.md](../maintainability-2026-11/packet.md)。
 
 All five categories landed (A–E). 14 commits, 197 passed, `pdm run check` green.
 Dependency topology audit confirmed: no storage→services reverse imports, no

@@ -43,7 +43,8 @@ Read the nearest `src/xenix/services/agent/AGENTS.md` before changing this loop.
 - Harness coordination and direct ToolResult/XTT continuity: `tests/agent/test_agent_harness_first_slice.py`.
 - Independent Skill reading and Tool activation: `tests/agent/test_agent_harness_first_slice.py`.
 - ToolResult paging: `tests/llm/test_tool_result_pagination.py`.
-- Conversation shell, callback gating, and Audit/Job Center presentation: `tests/ui/test_main_window_conversation.py`, `tests/ui/test_auxiliary_windows.py`, `tests/ui/test_chatbot_contract.py`, and `tests/ui_models/`.
+- Conversation shell, callback gating, and message presentation are covered by `tests/ui/test_main_window_conversation.py`, `tests/ui/test_auxiliary_windows.py`, `tests/ui/test_chatbot_contract.py`, and `tests/ui_models/`.
+- Audit Center and Job Center coverage is listed in the [Audit Center contract](../20-prd-tdd/audit-center-contract.md#验证入口).
 - Knowledge retrieval and the lookup Tool: `tests/knowledge/test_knowledge_retrieval.py` and `tests/knowledge/test_knowledge_lookup_tool.py`.
 - Canonical storage, migration, and bootstrap: `tests/storage/test_migrations.py`, `tests/storage/test_storage_bootstrap.py`, and `tests/storage/test_storage_artifacts.py`.
 - End-to-end Agent behavior (live, paid): `tests/e2e/agent_harness/`.

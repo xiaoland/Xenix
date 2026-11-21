@@ -2,9 +2,9 @@
 
 Task packets preserve historical reasoning and evidence. Old next-step statements are not current authorization; durable product and architecture truth belongs to [docs](../docs/index.md).
 
-## Current stage
+## 1.5.0 development closeout archive
 
-[1.5.0 development closeout](minor-1-5-closeout/packet.md) owns local cleanup, documentation consolidation and minor release preparation.
+The [1.5.0 development closeout](minor-1-5-closeout/packet.md) records local cleanup, documentation consolidation, and release preparation for that version. Current development and release procedures are in [Contributing](../CONTRIBUTING.md) and [Deployment](../docs/40-deployment/README.md).
 
 ## Closed benchmark stage — 2026-09-15
 
