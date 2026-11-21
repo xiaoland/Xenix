@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from collections.abc import Iterator
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -12,9 +13,18 @@ if TYPE_CHECKING:
 
 
 # Registration is global because pytest 9 forbids pytest_plugins in a nested
-# conftest. The plugin is inert unless a test explicitly requests ui_artifacts;
-# QPA selection remains scoped to tests/ui/conftest.py.
+# conftest. The plugin is inert unless a test explicitly requests ui_artifacts.
 pytest_plugins = ["pytester", "tests.ui.pytest_plugin"]
+
+
+@pytest.fixture(scope="session")
+def qapp_args(pytestconfig: pytest.Config) -> list[str]:
+    # Scope the default to pytest-qt's QApplication. The headed Agent Harness
+    # creates its own app, and native smoke explicitly selects the windows QPA.
+    args = [pytestconfig.getini("qt_qapp_name")]
+    if "QT_QPA_PLATFORM" not in os.environ:
+        args.extend(("-platform", "offscreen"))
+    return args
 
 
 @pytest.fixture

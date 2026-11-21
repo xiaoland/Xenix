@@ -5,6 +5,7 @@ import time
 from concurrent.futures import Future
 from pathlib import Path
 
+from PySide6.QtCore import QEvent
 from PySide6.QtWidgets import QApplication
 from pytestqt.qtbot import QtBot
 
@@ -161,42 +162,11 @@ def test_settings_dialog_discards_status_from_previous_activation(
 ) -> None:
     class SequencedIndexes:
         def __init__(self) -> None:
-            self.entered = (threading.Event(), threading.Event())
-            self.release = (threading.Event(), threading.Event())
-            self._lock = threading.Lock()
-            self.calls = 0
-            self.in_flight = 0
-            self.max_in_flight = 0
+            self.requests: list[Future[KnowledgeIndexOverview]] = []
 
         def request_status(self) -> Future[KnowledgeIndexOverview]:
             future: Future[KnowledgeIndexOverview] = Future()
-            with self._lock:
-                call_index = self.calls
-                self.calls += 1
-
-            def complete() -> None:
-                if not future.set_running_or_notify_cancel():
-                    return
-                with self._lock:
-                    self.in_flight += 1
-                    self.max_in_flight = max(self.max_in_flight, self.in_flight)
-                self.entered[call_index].set()
-                if not self.release[call_index].wait(timeout=3):
-                    future.set_exception(
-                        TimeoutError("Index status test release timed out.")
-                    )
-                    return
-                try:
-                    if call_index == 0:
-                        result = _overview("needs_attention", unit_count=0)
-                    else:
-                        result = _overview("ready", unit_count=67)
-                    future.set_result(result)
-                finally:
-                    with self._lock:
-                        self.in_flight -= 1
-
-            threading.Thread(target=complete, daemon=True).start()
+            self.requests.append(future)
             return future
 
     indexes = SequencedIndexes()
@@ -209,29 +179,34 @@ def test_settings_dialog_discards_status_from_previous_activation(
     qtbot.addWidget(dialog)
     try:
         dialog.show()
-        qtbot.waitUntil(indexes.entered[0].is_set, timeout=3_000)
+        qtbot.waitUntil(lambda: len(indexes.requests) == 1, timeout=3_000)
+        stale_request = indexes.requests[0]
+        assert stale_request.set_running_or_notify_cancel()
 
         dialog.hide()
-        qtbot.waitUntil(lambda: not dialog.isVisible(), timeout=3_000)
         dialog.show()
-        qtbot.waitUntil(dialog.isVisible, timeout=3_000)
-        assert indexes.calls == 1
+        qtbot.waitUntil(lambda: len(indexes.requests) == 2, timeout=3_000)
+        fresh_request = indexes.requests[1]
+        assert stale_request.running()
 
-        indexes.release[0].set()
-        qtbot.waitUntil(indexes.entered[1].is_set, timeout=3_000)
+        # The service runs reads one at a time. Deliver the obsolete result
+        # while the next request is still pending and flush its queued signal.
+        stale_request.set_result(_overview("needs_attention", unit_count=0))
+        QApplication.sendPostedEvents(dialog._index_status, QEvent.Type.MetaCall)
         assert dialog.tr("Needs attention") not in dialog._index_status._status_label.text()
         assert not dialog._index_status._rebuild_button.isEnabled()
 
-        indexes.release[1].set()
+        assert fresh_request.set_running_or_notify_cancel()
+        fresh_request.set_result(_overview("ready", unit_count=67))
         qtbot.waitUntil(dialog._index_status._rebuild_button.isEnabled, timeout=3_000)
-        assert indexes.calls == 2
-        assert indexes.max_in_flight == 1
+        assert len(indexes.requests) == 2
         assert dialog.tr("Ready") in dialog._index_status._status_label.text()
     finally:
-        for release in indexes.release:
-            release.set()
         dialog.close()
         dialog.shutdown()
+        for request in indexes.requests:
+            if request.running():
+                request.set_result(_overview("ready", unit_count=67))
 
 
 def test_settings_dialog_shutdown_does_not_wait_for_running_index_status(

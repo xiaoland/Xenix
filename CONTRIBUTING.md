@@ -62,6 +62,7 @@ Use the smallest verification set that proves the affected contract. Run `pdm ru
 
 Coordinate concurrency with events/barriers and use `JobScheduler.wait_idle(timeout)` when the assertion needs the completed scheduling outcome. Worker entry alone does not mean its terminal database write is visible. A timeout bounds a stuck test; it must not substitute for arranging the tested ordering. The runner reserves a new temporary root for every invocation, including repeated calls from the same process, and preserves explicit `--basetemp` arguments.
 
+On non-Windows development machines, `pdm run pytest --direct tests/ui -q` uses the platform default font with a warning when a declared font is unavailable, while deterministic `ui-capture` and `ui-capture-all` still require every scenario's declared font as provided by the Windows capture environment.
 
 ## Qt Widget Lab
 
