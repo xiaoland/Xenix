@@ -219,6 +219,12 @@ def test_auto_check_is_coordinator_owned_and_stops_on_shutdown(qtbot: QtBot) -> 
         update_controller=update,  # type: ignore[arg-type]
     )
 
+    timer = coordinator._auto_check_timer
+    assert timer.isActive()
+    timer.start(0)
     qtbot.waitUntil(lambda: update.auto_check_calls == 1, timeout=2_000)
+
+    timer.start(0)
     coordinator.shutdown()
+    assert not timer.isActive()
     assert update.auto_check_calls == 1

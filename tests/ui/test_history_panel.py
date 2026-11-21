@@ -79,7 +79,7 @@ def test_late_title_completion_after_shutdown_has_no_service_effect(qtbot: QtBot
     panel._start_title(102)
     panel.shutdown()
     callbacks["succeeded"]("Late")
-    qtbot.wait(10)
+    QApplication.sendPostedEvents(panel, QEvent.Type.MetaCall)
     assert port.renamed == []
 
 
@@ -102,7 +102,7 @@ def test_delete_invalidates_late_title_completion(qtbot: QtBot, monkeypatch) -> 
     )
     panel._delete(102)
     callbacks["succeeded"]("Late")
-    qtbot.wait(10)
+    QApplication.sendPostedEvents(panel, QEvent.Type.MetaCall)
     assert port.deleted == [102]
     assert port.renamed == []
 
