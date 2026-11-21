@@ -1,11 +1,21 @@
 """Public audit tools: read domain evidence and append attributed interpretations."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any, cast
+
 from pydantic import Field
 
 from ..audit_contracts import AuditReference, AuditScope, ExplanationText
 from ..audit_service import AuditExplanationService, AuditQueryService
 from ..llm.tool_protocol import AgentTool, ToolExecutionContext, ToolSuccess
 from .tool_inputs import AgentToolInput
+
+if TYPE_CHECKING:
+    from sqlalchemy.orm import sessionmaker
+    from sqlmodel import Session
+
+    from ..llm.tool_registry import AgentToolRegistry
 
 
 class AuditListInput(AgentToolInput):
@@ -26,7 +36,7 @@ class AuditExplainInput(AgentToolInput):
     evidence: list[AuditReference] = Field(min_length=1)
 
 
-def register_audit_tools(registry, session_factory) -> None:
+def register_audit_tools(registry: AgentToolRegistry, session_factory: sessionmaker[Session]) -> None:
     query = AuditQueryService(session_factory)
     writer = AuditExplanationService(session_factory)
 
@@ -82,4 +92,4 @@ def register_audit_tools(registry, session_factory) -> None:
             description="After inspecting completed results, save a business-readable interpretation with recorded evidence and limitations for each delivered output. Append corrections without overwriting history; never invent metrics. A pre-execution rationale alone is not a result interpretation.",
         ),
     ):
-        registry.register(tool)
+        registry.register(cast("AgentTool[Any]", tool))

@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from sqlmodel import Session, select
+from sqlmodel import Session, col, select
 
 from ..models import MLTaskArtifactRow, MLTaskRow, MLTaskStatus
 
@@ -22,7 +22,7 @@ class MLTaskRepository:
         statement = (
             select(MLTaskRow)
             .where(MLTaskRow.dataset_id == dataset_id)
-            .order_by(MLTaskRow.created_at)
+            .order_by(col(MLTaskRow.created_at))
         )
         return list(session.exec(statement))
 
@@ -111,6 +111,6 @@ class MLTaskRepository:
         statement = (
             select(MLTaskArtifactRow)
             .where(MLTaskArtifactRow.ml_task_id == ml_task_id)
-            .order_by(MLTaskArtifactRow.created_at)
+            .order_by(col(MLTaskArtifactRow.created_at))
         )
         return list(session.exec(statement))

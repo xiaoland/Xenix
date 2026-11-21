@@ -212,12 +212,6 @@ def _app_paths_from_payload(payload: dict[str, str]) -> AppPaths:
     )
 
 
-def _optional_string(value: object) -> str | None:
-    if isinstance(value, str) and value.strip():
-        return value
-    return None
-
-
 def _worker_exception(result: dict[str, Any]) -> Exception:
     message = str(result.get("message") or "Preprocessing worker failed.")
     if result.get("error_type") == "ValidationError":

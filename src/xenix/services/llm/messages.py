@@ -168,14 +168,6 @@ class MessageBlock:
         raise ValidationError(f"Unsupported message content block type '{block_type}'.")
 
 
-def _optional_bool(value: Any) -> bool | None:
-    if value is None:
-        return None
-    if not isinstance(value, bool):
-        raise ValidationError("Message block presentation hint must be a boolean.")
-    return value
-
-
 @dataclass(frozen=True)
 class TextBlock(MessageBlock):
     text: str
