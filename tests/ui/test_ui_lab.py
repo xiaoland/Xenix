@@ -5,14 +5,17 @@ import os
 import subprocess
 import sys
 from dataclasses import replace
+from functools import cache
 from pathlib import Path
 
 import pytest
 
 from PySide6.QtCore import QEvent
+from PySide6.QtGui import QFontInfo
 from PySide6.QtWidgets import QApplication, QWidget
 from pytestqt.qtbot import QtBot
 
+from scripts.ui_lab.contracts import ScenarioSpec
 from scripts.ui_lab.driver import configure_scenario_application
 from scripts.ui_lab.registry import get_scenario, list_scenarios
 from tests.ui.pytest_plugin import UiArtifactRegistry
@@ -23,10 +26,58 @@ from xenix.ui.semantic_identity import item_reference
 
 
 SCENARIO_IDS = tuple(scenario.id for scenario in list_scenarios())
+BATCH_CAPTURE_IDS = ("chat.empty", "chat.mixed-timeline")
 
 
-def _build_scenario(qapp: QApplication, qtbot: QtBot, scenario_id: str):
-    scenario, handle = attach_scenario(qapp, qtbot, scenario_id)
+def _capture_fonts_available(*scenario_ids: str) -> bool:
+    return all(
+        _capture_font_available(scenario.style_name, scenario.font_family, scenario.font_point_size)
+        for scenario in map(get_scenario, scenario_ids)
+    )
+
+
+@cache
+def _capture_font_available(style: str, family: str, point_size: int) -> bool:
+    # skipif runs before qapp. Probe once per render setting in the capture QPA.
+    probe = """
+import sys
+from PySide6.QtWidgets import QApplication
+from scripts.ui_lab.driver import _scenario_font
+
+style, family, point_size = sys.argv[1:]
+app = QApplication([])
+app.setStyle(style)
+try:
+    _scenario_font(family, int(point_size))
+except RuntimeError:
+    print("unavailable")
+else:
+    print("available")
+"""
+    result = subprocess.run(
+        [sys.executable, "-c", probe, style, family, str(point_size)],
+        capture_output=True,
+        text=True,
+        env={"QT_QPA_PLATFORM": "offscreen", **os.environ},
+    )
+    assert result.returncode == 0, result.stderr
+    status = result.stdout.splitlines()[-1]
+    assert status in {"available", "unavailable"}, result.stdout
+    return status == "available"
+
+
+@pytest.fixture()
+def synthetic_capture_spec(qapp: QApplication, monkeypatch) -> ScenarioSpec:
+    from scripts.ui_lab import capture_all as capture_all_module
+
+    # Exercise real capture for batch bookkeeping with a locally declared font.
+    spec = replace(get_scenario("chat.empty"), font_family=QFontInfo(qapp.font()).family())
+    monkeypatch.setattr(capture_all_module, "list_scenarios", lambda: (spec,))
+    return spec
+
+
+def _build_scenario(qapp: QApplication, qtbot: QtBot, scenario_id: str, *, strict_font: bool = False):
+    scenario, handle = attach_scenario(qapp, qtbot, scenario_id, strict_font=strict_font)
     handle.root.resize(scenario.viewport_width, scenario.viewport_height)
     handle.root.show()
     qtbot.waitUntil(lambda: handle.root.isVisible() and handle.readiness())
@@ -56,11 +107,8 @@ def test_cli_lists_registered_scenarios() -> None:
 
 def test_missing_scenario_font_fails_instead_of_silently_capturing_icon_glyphs(qapp) -> None:
     scenario = get_scenario("chat.empty")
-    try:
-        with pytest.raises(RuntimeError, match="capture requires the declared text font"):
-            configure_scenario_application(qapp, replace(scenario, font_family="Xenix Missing Test Font"))
-    finally:
-        configure_scenario_application(qapp, scenario)
+    with pytest.raises(RuntimeError, match="capture requires the declared text font"):
+        configure_scenario_application(qapp, replace(scenario, font_family="Xenix Missing Test Font"))
 
 
 def test_all_scenarios_build_without_runtime_services_or_state(
@@ -139,12 +187,16 @@ def test_running_scenario_exposes_stop_contract(qapp: QApplication, qtbot: QtBot
     handle.cleanup()
 
 
+@pytest.mark.skipif(
+    "not _capture_fonts_available('chat.mixed-timeline')",
+    reason="Render identity and viewport assertions require the declared scenario font",
+)
 def test_synthetic_scenario_capture_emits_structured_artifacts(
     qapp: QApplication,
     qtbot: QtBot,
     tmp_path,
 ) -> None:
-    scenario, handle = _build_scenario(qapp, qtbot, "chat.mixed-timeline")
+    scenario, handle = _build_scenario(qapp, qtbot, "chat.mixed-timeline", strict_font=True)
     destination = tmp_path / scenario.id
 
     manifest = capture_ui_artifacts(
@@ -167,6 +219,10 @@ def test_synthetic_scenario_capture_emits_structured_artifacts(
     handle.cleanup()
 
 
+@pytest.mark.skipif(
+    "not _capture_fonts_available(*BATCH_CAPTURE_IDS)",
+    reason="Strict batch CLI success requires the declared fonts for the selected registry scenarios",
+)
 def test_batch_capture_cli_reconciles_registry_scenarios(tmp_path) -> None:
     output = tmp_path / "artifacts"
     result = subprocess.run(
@@ -176,10 +232,8 @@ def test_batch_capture_cli_reconciles_registry_scenarios(tmp_path) -> None:
             "scripts.ui_lab.capture_all",
             "--output",
             str(output),
-            "--scenario",
-            "chat.empty",
-            "--scenario",
-            "chat.mixed-timeline",
+            "--scenario", BATCH_CAPTURE_IDS[0],
+            "--scenario", BATCH_CAPTURE_IDS[1],
         ],
         check=False,
         capture_output=True,
@@ -189,20 +243,22 @@ def test_batch_capture_cli_reconciles_registry_scenarios(tmp_path) -> None:
     assert result.returncode == 0, result.stderr
     payload = json.loads(result.stdout)
     assert payload["reconciled"] is True
-    assert set(payload["captured_scenarios"]) == {"chat.empty", "chat.mixed-timeline"}
+    assert set(payload["captured_scenarios"]) == set(BATCH_CAPTURE_IDS)
     run_dir = output / payload["run_id"]
     assert (run_dir / "chat.empty" / "manifest.json").is_file()
     assert (run_dir / "chat.mixed-timeline" / "actual.png").is_file()
     assert (run_dir / "batch.json").is_file()
 
 
-def test_batch_capture_aggregates_build_failure_with_stage_manifest(qapp, tmp_path, monkeypatch) -> None:
+def test_batch_capture_aggregates_build_failure_with_stage_manifest(
+    synthetic_capture_spec: ScenarioSpec, tmp_path, monkeypatch
+) -> None:
     from scripts.ui_lab import capture_all as capture_all_module
 
     def broken(_context):
         raise RuntimeError("synthetic build failure")
 
-    broken_spec = replace(list_scenarios()[0], build=broken)
+    broken_spec = replace(synthetic_capture_spec, build=broken)
     monkeypatch.setattr(capture_all_module, "list_scenarios", lambda: (broken_spec,))
 
     batch = capture_all_module.capture_all_scenarios(tmp_path / "artifacts", [broken_spec.id])
@@ -248,28 +304,26 @@ def test_batch_capture_aggregates_configure_failure_with_stage_manifest(qapp, tm
     assert manifest["stage"] == "configure"
 
 
-def test_batch_capture_prune_runs_removes_prior_runs(qapp, tmp_path, monkeypatch) -> None:
+def test_batch_capture_prune_runs_removes_prior_runs(synthetic_capture_spec: ScenarioSpec, tmp_path) -> None:
     from scripts.ui_lab import capture_all as capture_all_module
 
-    monkeypatch.setattr(capture_all_module, "list_scenarios", lambda: (get_scenario("chat.empty"),))
     output = tmp_path / "artifacts"
 
-    first = capture_all_module.capture_all_scenarios(output, ["chat.empty"])
+    first = capture_all_module.capture_all_scenarios(output, [synthetic_capture_spec.id])
     assert (output / first["run_id"] / "batch.json").is_file()
 
-    second = capture_all_module.capture_all_scenarios(output, ["chat.empty"], prune_runs=True)
+    second = capture_all_module.capture_all_scenarios(output, [synthetic_capture_spec.id], prune_runs=True)
 
     assert not (output / first["run_id"]).exists()
     assert (output / second["run_id"] / "batch.json").is_file()
 
 
-def test_prune_runs_only_removes_xenix_run_dirs(qapp, tmp_path, monkeypatch) -> None:
+def test_prune_runs_only_removes_xenix_run_dirs(synthetic_capture_spec: ScenarioSpec, tmp_path) -> None:
     from scripts.ui_lab import capture_all as capture_all_module
 
-    monkeypatch.setattr(capture_all_module, "list_scenarios", lambda: (get_scenario("chat.empty"),))
     output = tmp_path / "artifacts"
 
-    batch = capture_all_module.capture_all_scenarios(output, ["chat.empty"])
+    batch = capture_all_module.capture_all_scenarios(output, [synthetic_capture_spec.id])
     genuine = output / batch["run_id"]
 
     matching_name = output / "20200101T000000000000Z"
@@ -307,34 +361,36 @@ def test_prune_runs_refuses_dangerous_roots() -> None:
         capture_all_module.prune_run_directories(Path.home())
 
 
-def test_capture_verifier_reports_missing_artifacts(qapp, tmp_path, monkeypatch) -> None:
+def test_capture_verifier_reports_missing_artifacts(synthetic_capture_spec: ScenarioSpec, tmp_path) -> None:
     from scripts.ui_lab import capture_all as capture_all_module
 
-    monkeypatch.setattr(capture_all_module, "list_scenarios", lambda: (get_scenario("chat.empty"),))
     output = tmp_path / "artifacts"
-    batch = capture_all_module.capture_all_scenarios(output, ["chat.empty"])
+    scenario_id = synthetic_capture_spec.id
+    batch = capture_all_module.capture_all_scenarios(output, [scenario_id])
     run_dir = output / batch["run_id"]
 
     report = capture_all_module.verify_captured_artifacts(run_dir)
     assert report["complete"] is True
     assert report["reconciled"] is True
     assert report["failures"] == []
-    assert report["scenarios"]["chat.empty"]["complete"] is True
+    assert report["scenarios"][scenario_id]["complete"] is True
 
-    (run_dir / "chat.empty" / "actual.png").unlink()
+    (run_dir / scenario_id / "actual.png").unlink()
     report = capture_all_module.verify_captured_artifacts(run_dir)
     assert report["complete"] is False
-    assert report["scenarios"]["chat.empty"]["missing"] == ["actual.png"]
+    assert report["scenarios"][scenario_id]["missing"] == ["actual.png"]
 
 
-def test_capture_verifier_rejects_unreconciled_batch(qapp, tmp_path, monkeypatch) -> None:
+def test_capture_verifier_rejects_unreconciled_batch(
+    synthetic_capture_spec: ScenarioSpec, tmp_path, monkeypatch
+) -> None:
     """Verifier must report incomplete when expected != captured or failures exist."""
     from scripts.ui_lab import capture_all as capture_all_module
 
     def broken(_context):
         raise RuntimeError("synthetic build failure")
 
-    broken_spec = replace(list_scenarios()[0], build=broken)
+    broken_spec = replace(synthetic_capture_spec, build=broken)
     monkeypatch.setattr(capture_all_module, "list_scenarios", lambda: (broken_spec,))
 
     output = tmp_path / "artifacts"

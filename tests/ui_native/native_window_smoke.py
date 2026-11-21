@@ -21,7 +21,7 @@ def test_native_chat_window_expose_focus_dialog_and_user_bubble(
     ui_artifacts: UiArtifactRegistry,
 ) -> None:
     assert QApplication.platformName() == "windows"
-    scenario, handle = attach_scenario(qapp, qtbot, "chat.mixed-timeline")
+    scenario, handle = attach_scenario(qapp, qtbot, "chat.mixed-timeline", strict_font=True)
     view = handle.root
     assert isinstance(view, ThreadDetailView)
     ui_artifacts.register(view, name="chat-native-window")

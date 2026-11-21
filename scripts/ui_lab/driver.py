@@ -1,9 +1,11 @@
 from __future__ import annotations
 
-from collections.abc import Callable
 import os
-from pathlib import Path
 import sys
+import warnings
+from collections.abc import Callable
+from functools import cache
+from pathlib import Path
 
 from PySide6.QtCore import QEventLoop, QLocale, QTimer
 from PySide6.QtGui import QFont, QFontDatabase, QFontInfo, QRawFont
@@ -13,21 +15,44 @@ from shiboken6 import isValid
 from .contracts import ScenarioSpec
 
 
-def configure_scenario_application(app: QApplication, scenario: ScenarioSpec) -> None:
-    """Apply the render identity declared by a scenario before construction."""
+def configure_scenario_application(
+    app: QApplication, scenario: ScenarioSpec, *, strict_font: bool = True
+) -> None:
+    """Apply the scenario's render settings before construction."""
     app.setStyle(scenario.style_name)
-    _ensure_scenario_font(scenario.font_family)
-    app.setFont(QFont(scenario.font_family, scenario.font_point_size))
-    resolved = QFontInfo(app.font())
-    raw_font = QRawFont.fromFont(app.font())
-    if resolved.family().casefold() != scenario.font_family.casefold() or not all(
+    try:
+        font = _scenario_font(scenario.font_family, scenario.font_point_size)
+    except RuntimeError:
+        if strict_font:
+            raise
+        font = QFontDatabase.systemFont(QFontDatabase.SystemFont.GeneralFont)
+        _warn_scenario_font_fallback()
+    app.setFont(font)
+    QLocale.setDefault(QLocale(scenario.locale_name))
+
+
+@cache
+def _warn_scenario_font_fallback() -> None:
+    warnings.warn(
+        "A declared UI scenario font is unavailable. Widget contracts use the platform default font. "
+        "Deterministic capture requires the declared font.",
+        stacklevel=2,
+    )
+
+
+def _scenario_font(family: str, point_size: int) -> QFont:
+    _ensure_scenario_font(family)
+    font = QFont(family, point_size)
+    resolved = QFontInfo(font)
+    raw_font = QRawFont.fromFont(font)
+    if resolved.family().casefold() != family.casefold() or not all(
         raw_font.supportsCharacter(ord(character)) for character in "AaZz0123"
     ):
         raise RuntimeError(
-            f"Scenario font {scenario.font_family!r} resolved to {resolved.family()!r}; "
+            f"Scenario font {family!r} resolved to {resolved.family()!r}; "
             "capture requires the declared text font, not a fallback."
         )
-    QLocale.setDefault(QLocale(scenario.locale_name))
+    return font
 
 
 def _ensure_scenario_font(family: str) -> None:

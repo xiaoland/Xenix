@@ -12,10 +12,10 @@ from scripts.ui_lab.driver import configure_scenario_application
 from scripts.ui_lab.registry import get_scenario
 
 
-def attach_scenario(qapp, qtbot, scenario_id: str) -> tuple[ScenarioSpec, ScenarioHandle]:
+def attach_scenario(qapp, qtbot, scenario_id: str, *, strict_font: bool = False) -> tuple[ScenarioSpec, ScenarioHandle]:
     """Build a scenario, hand root deletion to qtbot, and stop tasks first."""
     scenario = get_scenario(scenario_id)
-    configure_scenario_application(qapp, scenario)
+    configure_scenario_application(qapp, scenario, strict_font=strict_font)
     handle = scenario.build(ScenarioContext(qapp))
     qtbot.addWidget(handle.root, before_close_func=lambda _root: handle.cleanup())
     return scenario, handle
