@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 import pandas as pd
 from pydantic import BaseModel
-from sklearn.feature_extraction.text import TfidfVectorizer
 
 from ....exceptions import ValidationError
 from ...data_tokenization_contracts import TextPreparationInput
@@ -324,17 +323,6 @@ def _write_apply_output(task_dir: Path, file_name: str, frames: list[pd.DataFram
     output_path = output_dir / file_name
     pd.concat(frames, ignore_index=True).to_csv(output_path, index=False)
     return output_path
-
-
-def _tfidf_vectorizer(*, max_features: int, ngram_max: int) -> TfidfVectorizer:
-    return TfidfVectorizer(
-        tokenizer=str.split,
-        preprocessor=None,
-        token_pattern=None,
-        lowercase=False,
-        max_features=max_features,
-        ngram_range=(1, ngram_max),
-    )
 
 
 def _top_terms_from_centers(
