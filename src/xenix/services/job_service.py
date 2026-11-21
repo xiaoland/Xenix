@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from typing import cast
 
 from sqlalchemy.orm import sessionmaker
 from sqlmodel import Session, col, select
@@ -87,7 +88,8 @@ class JobQueryService:
         return [
             JobItem(
                 reference=f"knowledge:{task.reference}",
-                raw_reference=(task.import_id if task.kind == "import" else task.owner_id),
+                # Import items always carry their import row's primary key, even when retry belongs to a derivation.
+                raw_reference=cast(int, task.import_id) if task.kind == "import" else task.owner_id,
                 domain=JobDomain.KNOWLEDGE,
                 kind=task.kind,
                 target=task.target,

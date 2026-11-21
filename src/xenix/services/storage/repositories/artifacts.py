@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from sqlmodel import Session, select
+from sqlmodel import Session, col, select
 
-from ..models import ArtifactRow, ArtifactDerivationRow
+from ..models import ArtifactDerivationRow, ArtifactKind, ArtifactRow
 
 
 class ArtifactRepository:
@@ -31,10 +31,10 @@ class ArtifactRepository:
         session.flush()
         return True
 
-    def list_by_kind(self, session: Session, kind) -> list[ArtifactRow]:
+    def list_by_kind(self, session: Session, kind: ArtifactKind) -> list[ArtifactRow]:
         statement = (
             select(ArtifactRow)
             .where(ArtifactRow.kind == kind)
-            .order_by(ArtifactRow.created_at.desc())
+            .order_by(col(ArtifactRow.created_at).desc())
         )
         return list(session.exec(statement))
