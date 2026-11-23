@@ -5,12 +5,13 @@ from datetime import datetime
 from typing import cast
 
 from sqlalchemy.orm import sessionmaker
-from sqlmodel import Session, col, select
+from sqlmodel import Session
 
+from .audit_contracts import AuditScope
 from .job_status import knowledge_job_status, ml_job_status
 from .knowledge_task_query import KnowledgeTaskQueryService
-from .storage.models import ConversationThreadRow, DatasetRow, JobDomain, JobStatus, MLTaskRow
-from .audit_contracts import AuditScope
+from .storage.models import JobDomain, JobStatus
+from .storage.repositories.ml_tasks import MLTaskRepository
 
 
 @dataclass(frozen=True)
@@ -50,6 +51,7 @@ class JobQueryService:
     ) -> None:
         self._session_factory = session_factory
         self._knowledge_tasks = knowledge_tasks or KnowledgeTaskQueryService(session_factory)
+        self._ml_tasks = MLTaskRepository()
 
     def list_jobs(
         self,
@@ -60,17 +62,18 @@ class JobQueryService:
         limit: int = 200,
         scope: AuditScope | None = None,
     ) -> list[JobItem]:
-        if scope is not None and not scope.all_threads and scope.thread_id is None:
+        current_thread_only = scope is not None and not scope.all_threads
+        thread_id = scope.thread_id if scope is not None and current_thread_only else None
+        if current_thread_only and thread_id is None:
             return []
         bounded_limit = max(1, int(limit))
         jobs: list[JobItem] = []
-        if domain in {None, JobDomain.KNOWLEDGE}:
+        # Knowledge tasks belong to a library, with no conversation provenance.
+        if not current_thread_only and domain in {None, JobDomain.KNOWLEDGE}:
             jobs.extend(self._knowledge_jobs())
         if domain in {None, JobDomain.ML}:
-            jobs.extend(self._ml_jobs())
+            jobs.extend(self._ml_jobs(thread_id))
 
-        if scope is not None and not scope.all_threads:
-            jobs = [job for job in jobs if job.thread_id == scope.thread_id]
         normalized_search = search.strip().casefold()
         if status is not None:
             jobs = [job for job in jobs if job.status == status]
@@ -101,24 +104,9 @@ class JobQueryService:
             for task in self._knowledge_tasks.list_tasks(limit=None)
         ]
 
-    def _ml_jobs(self) -> list[JobItem]:
+    def _ml_jobs(self, thread_id: int | None) -> list[JobItem]:
         with self._session_factory() as session:
-            tasks = list(
-                session.exec(
-                    select(MLTaskRow)
-                    .order_by(col(MLTaskRow.updated_at).desc(), col(MLTaskRow.id).desc())
-                )
-            )
-            threads = {row.id: row.title for row in session.exec(select(ConversationThreadRow))}
-            dataset_ids = {task.dataset_id for task in tasks if task.dataset_id}
-            datasets = (
-                {
-                    row.id: row.name
-                    for row in session.exec(select(DatasetRow).where(col(DatasetRow.id).in_(dataset_ids)))
-                }
-                if dataset_ids
-                else {}
-            )
+            tasks = self._ml_tasks.list_for_job_feed(session, origin_thread_id=thread_id)
 
         return [
             JobItem(
@@ -127,16 +115,19 @@ class JobQueryService:
                 domain=JobDomain.ML,
                 kind=task.task_type.value,
                 target=(
-                    datasets.get(task.dataset_id, str(task.dataset_id)) if task.dataset_id is not None else str(task.project_id)
+                    dataset_name if dataset_name is not None
+                    else str(task.dataset_id if task.dataset_id is not None else task.project_id)
                 ),
                 status=ml_job_status(task.status.value),
                 phase=task.status.value,
                 updated_at=task.updated_at,
                 error_summary=task.error_summary,
-                thread_id=task.origin_thread_id, thread_title=(threads.get(task.origin_thread_id) or f"#{task.origin_thread_id}") if task.origin_thread_id in threads else None,
-                started_at=task.started_at, finished_at=task.finished_at,
+                thread_id=task.origin_thread_id,
+                thread_title=(title or f"#{joined_thread_id}") if joined_thread_id is not None else None,
+                started_at=task.started_at,
+                finished_at=task.finished_at,
             )
-            for task in tasks
+            for task, dataset_name, joined_thread_id, title in tasks
         ]
 
 

@@ -2,11 +2,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Protocol
 
-from sqlmodel import Session, col, select
-
 from .job_scheduler import JobCapabilities, JobOutcome
 from .job_status import knowledge_job_status
-from .storage.models import JobDomain, JobRow, JobStatus, utc_now
+from .storage.models import JobDomain, JobRow
 
 if TYPE_CHECKING:
     from .knowledge_derivation_service import KnowledgeDerivationService
@@ -22,62 +20,6 @@ class KnowledgeJobService(Protocol):
     def job_outcome(self, reference: int) -> tuple[str, str | None]: ...
 
 
-def _reconcile(
-    session: "Session",
-    jobs: list[JobRow],
-    requeue_refs: list[int],
-    *,
-    kind: str,
-) -> list[int]:
-    """Reconcile persisted JobRows with the domain's requeue decision.
-
-    Running rows for requeued units return to queued; newly materialized domain
-    units (e.g. a derivation job created during recovery) get a fresh JobRow.
-    """
-    requeue = set(requeue_refs)
-    existing_jobs = {job.reference: job for job in jobs}
-    missing = requeue - existing_jobs.keys()
-    if missing:
-        # A prior routing failure can leave a terminal JobRow while the domain
-        # still owns queued work. Reuse its durable identity when the domain
-        # explicitly requests replay instead of violating the unique constraint.
-        existing_jobs.update(
-            {
-                job.reference: job
-                for job in session.exec(
-                    select(JobRow).where(
-                        JobRow.domain == JobDomain.KNOWLEDGE,
-                        JobRow.kind == kind,
-                        col(JobRow.reference).in_(missing),
-                    )
-                )
-            }
-        )
-    for job in existing_jobs.values():
-        if job.reference in requeue:
-            job.status = JobStatus.QUEUED
-            job.started_at = None
-            job.finished_at = None
-            job.error_summary = None
-            job.updated_at = utc_now()
-            session.add(job)
-    for reference in requeue_refs:
-        if reference not in existing_jobs:
-            now = utc_now()
-            session.add(
-                JobRow(
-                    domain=JobDomain.KNOWLEDGE,
-                    kind=kind,
-                    reference=reference,
-                    status=JobStatus.QUEUED,
-                    phase="queued",
-                    created_at=now,
-                    updated_at=now,
-                )
-            )
-    return requeue_refs
-
-
 class _KnowledgeHandler:
     domain = JobDomain.KNOWLEDGE
     concurrency_limit = 1
@@ -88,13 +30,8 @@ class _KnowledgeHandler:
     def __init__(self, service: KnowledgeJobService) -> None:
         self._service = service
 
-    def recover(self, session: "Session", jobs: list[JobRow]) -> list[int]:
-        return _reconcile(
-            session,
-            jobs,
-            self._service.recover_pending(),
-            kind=self.kind,
-        )
+    def recover(self) -> list[int]:
+        return self._service.recover_pending()
 
     def run(self, job: JobRow) -> JobOutcome:
         self._service.run_unit(job.reference)
