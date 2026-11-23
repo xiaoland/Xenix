@@ -107,7 +107,7 @@ def test_job_center_reads_knowledge_and_ml_logs_through_the_same_view(qtbot, sto
         knowledge_logs=store,
     )
     monkeypatch.setattr(service, "_knowledge_jobs", lambda: [knowledge])
-    monkeypatch.setattr(service, "_ml_jobs", lambda: [ml])
+    monkeypatch.setattr(service, "_ml_jobs", lambda _: [ml])
     dialog = JobCenterDialog(service, read_details=details.read)
     qtbot.addWidget(dialog)
     log_text = dialog._logs._text.toPlainText
