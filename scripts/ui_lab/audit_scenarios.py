@@ -7,7 +7,6 @@ from pathlib import Path
 
 from PySide6.QtCore import QTranslator
 from PySide6.QtWidgets import QApplication
-from types import SimpleNamespace
 
 from xenix.services.audit_contracts import (
     AuditDetail,
@@ -18,6 +17,7 @@ from xenix.services.audit_contracts import (
     AuditSummary,
 )
 from xenix.services.job_service import JobDomain, JobItem, JobStatus
+from xenix.services.job_detail_query import JobDetails
 from xenix.services.ml.contracts import TaskLogEntry
 from xenix.ui.audit_center import AuditCenterDialog
 from xenix.ui.job_center import JobCenterDialog
@@ -212,14 +212,16 @@ class SyntheticJobs:
             and search.casefold() in f"{item.reference} {item.target}".casefold()
         ][:limit]
 
-    def get_task_details(self, task_id):
-        return SimpleNamespace(
+    def read_details(self, job):
+        return JobDetails(
             logs=[
                 TaskLogEntry(
-                    timestamp=NOW.isoformat(), level="INFO", message=f"Task {task_id}: 已读取数据并记录执行参数。"
+                    timestamp=NOW.isoformat(), level="INFO",
+                    message=("Source snapshot recorded." if job.domain == JobDomain.KNOWLEDGE
+                             else f"Task {job.raw_reference}: 已读取数据并记录执行参数。"),
                 )
             ],
-            artifacts=[111] if task_id == 103 else [],
+            has_outputs=job.domain == JobDomain.ML and job.raw_reference == 103,
         )
 
 
@@ -250,7 +252,7 @@ def build_audit(_context, *, variant):
 
 def build_jobs(_context, *, variant):
     service = SyntheticJobs()
-    dialog = JobCenterDialog(service, ml_service=service, thread_id=201)
+    dialog = JobCenterDialog(service, read_details=service.read_details, thread_id=201)
     if variant == "running-and-failed":
         dialog._focus_reference = "ml:106"
     if variant == "session-and-global":
@@ -298,7 +300,7 @@ def build_navigation(_context):
     from xenix.ui.windows.auxiliary import AuxiliaryWindowCoordinator
 
     service = SyntheticJobs()
-    root = JobCenterDialog(service, ml_service=service, thread_id=201)
+    root = JobCenterDialog(service, read_details=service.read_details, thread_id=201)
     coordinator = AuxiliaryWindowCoordinator(
         root,
         settings_factory=lambda owner: None,

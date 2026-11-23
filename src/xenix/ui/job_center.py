@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 
 from PySide6.QtCore import QEvent, QObject, QRunnable, QSignalBlocker, Qt, QThreadPool, QTimer, Signal
 from PySide6.QtGui import QCloseEvent, QHideEvent, QShowEvent
@@ -22,6 +23,7 @@ from PySide6.QtWidgets import (
 
 from ..exceptions import report_exception
 from ..services.audit_contracts import AuditScope
+from ..services.job_detail_query import JobDetails
 from .async_read import AsyncRead
 from .widgets.task_log_view import TaskLogView
 from ..services.job_scheduler import JobScheduler
@@ -82,7 +84,7 @@ class JobCenterDialog(QDialog):
         service: JobQueryService,
         *,
         scheduler: JobScheduler | None = None,
-        ml_service=None,
+        read_details: Callable[[JobItem], JobDetails] | None = None,
         thread_id: int | None = None,
         parent: QWidget | None = None,
     ) -> None:
@@ -90,7 +92,7 @@ class JobCenterDialog(QDialog):
         self.setWindowModality(Qt.WindowModality.NonModal)
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, False)
         self._service = service
-        self._ml_service = ml_service
+        self._read_details = read_details
         self._thread_id = thread_id
         self._focus_reference: str | None = None
         self._shown_reference: str | None = None
@@ -303,6 +305,7 @@ class JobCenterDialog(QDialog):
         self.refresh()
 
     def _show_details(self, *_args: object) -> None:
+        self._details_read.invalidate()
         job = self._selected_job()
         if job is None:
             self._detail.clear()
@@ -330,10 +333,9 @@ class JobCenterDialog(QDialog):
         if job.finished_at:
             details += self.tr("\nFinished: {time}").format(time=job.finished_at.astimezone().isoformat())
         self._detail.setPlainText(details)
-        self._details_read.invalidate()
-        if job.domain is JobDomain.ML and self._ml_service is not None:
-            task_id = job.raw_reference
-            self._details_read.submit(lambda: self._ml_service.get_task_details(task_id))
+        read_details = self._read_details
+        if read_details is not None:
+            self._details_read.submit(lambda: read_details(job))
         else:
             self._logs.clear()
 
@@ -356,10 +358,11 @@ class JobCenterDialog(QDialog):
         if isinstance(result, Exception):
             self._logs.clear()
             self._detail.append(self.tr("Task logs could not be loaded."))
+            self._refresh_timer.stop()
             report_exception(result)
-        else:
+        elif isinstance(result, JobDetails):
             self._logs.set_logs(result.logs)
-            self._outputs_button.setEnabled(bool(result.artifacts))
+            self._outputs_button.setEnabled(result.has_outputs)
 
     def _open_source(self) -> None:
         job = self._selected_job()

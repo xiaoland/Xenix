@@ -707,6 +707,13 @@ class KnowledgeRepository:
     ) -> KnowledgeDerivationRow | None:
         return session.get(KnowledgeDerivationRow, derivation_id)
 
+    def list_import_derivation_ids(self, session: Session, import_id: int) -> list[int]:
+        return list(session.exec(
+            select(KnowledgeDerivationRow.id)
+            .where(KnowledgeDerivationRow.import_id == import_id)
+            .order_by(KnowledgeDerivationRow.attempt_number, KnowledgeDerivationRow.id)
+        ))
+
     def list_derivations(
         self,
         session: Session,

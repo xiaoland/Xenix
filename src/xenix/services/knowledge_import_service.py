@@ -179,13 +179,14 @@ class KnowledgeImportService:
         corpus_changed_notifier: Callable[[str], object] | None = None,
         start_worker: bool = True,
         scheduler: JobScheduler | None = None,
+        task_logs: KnowledgeTaskLogStore | None = None,
     ) -> None:
         self._paths = paths
         self._session_factory = session_factory
         self._artifacts = artifact_service
         self._knowledge_repo = knowledge_repository
         self._store = KnowledgeContentStore(paths)
-        self._task_logs = KnowledgeTaskLogStore(paths)
+        self._task_logs = task_logs if task_logs is not None else KnowledgeTaskLogStore(paths)
         self._probe = FileProbe()
         self._worker_runner = worker_runner or LocalKnowledgeImportWorkerRunner()
         self._canonical_ready_notifier = canonical_ready_notifier

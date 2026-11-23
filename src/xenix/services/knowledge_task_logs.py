@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 import shutil
@@ -12,8 +13,9 @@ from typing import Any
 
 from ..config import AppPaths
 from ..exceptions import ValidationError
-from .storage.layout import knowledge_import_logs_path, knowledge_import_task_root
+from .storage.layout import knowledge_import_task_root, knowledge_task_logs_path
 
+LOGGER = logging.getLogger(__name__)
 _TASK_ID = re.compile(r"[0-9a-f]{32}\Z")
 _TOKEN = re.compile(r"[a-z0-9_.-]{1,80}\Z")
 _LEVELS = frozenset({"debug", "info", "warning", "error"})
@@ -43,13 +45,14 @@ class KnowledgeTaskLogStore:
 
     def append(
         self,
-        import_id: int,
+        task_id: int,
         *,
         phase: str,
         event_code: str,
         level: str = "info",
+        kind: str = "import",
     ) -> None:
-        _require_task_id(import_id)
+        _require_task_id(task_id)
         normalized_phase = _require_token(phase, "phase")
         normalized_code = _require_token(event_code, "event code")
         normalized_level = level.casefold().strip()
@@ -73,10 +76,9 @@ class KnowledgeTaskLogStore:
         )
         if len(encoded) > _MAX_LOG_LINE_BYTES:
             raise ValueError("Knowledge task log event is too large.")
-        path = knowledge_import_logs_path(self._paths, import_id)
+        path = knowledge_task_logs_path(self._paths, kind, task_id)
         with self._lock:
-            task_root = knowledge_import_task_root(self._paths, import_id)
-            task_root.mkdir(parents=True, exist_ok=True)
+            path.parent.mkdir(parents=True, exist_ok=True)
             current_size = path.stat().st_size if path.exists() else 0
             if current_size + len(encoded) > _MAX_LOG_BYTES:
                 return
@@ -84,9 +86,18 @@ class KnowledgeTaskLogStore:
                 stream.write(encoded)
                 stream.flush()
 
-    def read(self, import_id: int) -> tuple[KnowledgeTaskLogEntry, ...]:
-        _require_task_id(import_id)
-        path = knowledge_import_logs_path(self._paths, import_id)
+    def record(
+        self, task_id: int, *, kind: str, phase: str, event_code: str, level: str = "info",
+    ) -> None:
+        """Record diagnostics without interrupting the task when the disk write fails."""
+        try:
+            self.append(task_id, kind=kind, phase=phase, event_code=event_code, level=level)
+        except OSError:
+            LOGGER.exception("Knowledge task log write failed for %s:%s", kind, task_id)
+
+    def read(self, task_id: int, *, kind: str = "import") -> tuple[KnowledgeTaskLogEntry, ...]:
+        _require_task_id(task_id)
+        path = knowledge_task_logs_path(self._paths, kind, task_id)
         with self._lock:
             if not path.is_file():
                 return ()
@@ -96,9 +107,10 @@ class KnowledgeTaskLogStore:
                     raise ValueError("log size")
                 entries = _read_entries(path)
             except (OSError, UnicodeError, ValueError, json.JSONDecodeError) as exc:
+                log_kind = "import" if kind == "import" else "task"
                 raise ValidationError(
-                    "Knowledge import log could not be read safely.",
-                    error_code="knowledge_import_log_invalid",
+                    f"Knowledge {log_kind} log could not be read safely.",
+                    error_code=f"knowledge_{log_kind}_log_invalid",
                 ) from exc
         return tuple(entries[-_MAX_RETURNED_EVENTS:])
 
