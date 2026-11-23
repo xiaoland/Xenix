@@ -1,21 +1,28 @@
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
+
 import pytest
+from sqlalchemy import event
 from sqlmodel import select
 
 from xenix.exceptions import ValidationError
+from xenix.services import audit_service
 from xenix.services.artifact_service import ArtifactService, RegisterArtifactInput
 from xenix.services.audit_contracts import ArtifactDerivation, AuditReference, AuditScope, ExecutionOrigin
 from xenix.services.audit_service import AuditExplanationService, AuditQueryService
 from xenix.services.job_service import JobQueryService
 from xenix.services.storage.models import (
     ArtifactKind,
+    ArtifactRow,
     AuditExplanationRow,
     ConversationThreadRow,
     ConversationMessageRow,
     ConversationMessageKind,
     DatasetRow,
     DatasetSourceFormat,
+    MLTaskArtifactKind,
+    MLTaskArtifactRow,
     MLTaskRow,
     MLTaskStatus,
     MLTaskType,
@@ -165,6 +172,10 @@ def test_artifact_origin_survives_missing_tool_result_and_deleted_conversation(s
         session.delete(session.get(ConversationThreadRow, 201))
         session.commit()
         assert len(list(session.exec(select(AuditExplanationRow)))) == 1
+    [item] = query.list_outputs(AuditScope(all_threads=True))
+    assert item.thread_id == 201
+    assert not item.thread_available
+    assert item.interpretation_available
     path.unlink()
     detail = query.get_detail(ref)
     assert not detail.summary.thread_available
@@ -188,9 +199,10 @@ def test_reused_model_explanation_is_attributed_to_new_conversation(storage, rec
         )
         session.commit()
     query = AuditQueryService(storage.session_factory)
-    items = query.list_outputs(AuditScope(thread_id=202))
-    assert items[0].membership == "referenced"
-    assert items[0].thread_id == 201
+    [item] = query.list_outputs(AuditScope(thread_id=202))
+    assert item.reference == recorded_model
+    assert item.membership == "referenced"
+    assert item.thread_id == 201
     AuditExplanationService(storage.session_factory).explain(
         recorded_model,
         text="For this purchasing plan, allow a buffer of 12 units; seasonality is untested.",
@@ -204,6 +216,99 @@ def test_reused_model_explanation_is_attributed_to_new_conversation(storage, rec
     assert {
         job.raw_reference for job in JobQueryService(storage.session_factory).list_jobs(scope=AuditScope(thread_id=202))
     } == {106}
+
+
+def test_list_applies_filters_before_paging_and_keeps_the_reference_key_order(storage, recorded_model, monkeypatch):
+    tie = datetime(2025, 1, 2, tzinfo=timezone.utc)
+    older = tie - timedelta(days=1)
+    with storage.session_factory() as session:
+        model = session.get(TrainedModelRow, recorded_model.id)
+        model.created_at = tie
+        model.metadata_payload = {**model.metadata_payload, "run_name": "", "display_name": "Straße forecast"}
+        session.get(DatasetRow, 102).created_at = older - timedelta(days=1)
+        session.add(MLTaskRow(
+            id=107, project_id=101, dataset_id=102, task_type=MLTaskType.APPLY,
+            status=MLTaskStatus.SUCCEEDED, origin_thread_id=201,
+        ))
+        session.flush()
+        session.add(DatasetRow(id=850, project_id=101, name="Predictions", source_path="apply.csv",
+                               ml_task_id=107, created_at=tie))
+        session.add_all([
+            ArtifactRow(id=9, kind=ArtifactKind.REPORT, title="Task report", absolute_path="/report", created_at=tie),
+            ArtifactRow(id=10, kind=ArtifactKind.IMAGE, title="Tied chart", absolute_path="/chart", created_at=tie),
+            ArtifactRow(id=11, kind=ArtifactKind.MODEL, title="Model file", absolute_path="/model", created_at=tie),
+            ArtifactRow(id=12, kind=ArtifactKind.DATASET, title="Dataset file", absolute_path="/dataset",
+                        metadata_payload={"dataset_id": 102}, created_at=tie),
+            ArtifactRow(id=301, kind=ArtifactKind.IMAGE, title="Straße detail", absolute_path="/old", created_at=older),
+            ArtifactRow(id=999, kind=ArtifactKind.IMAGE, title="Latest", absolute_path="/latest",
+                        created_at=tie + timedelta(microseconds=1)),
+        ])
+        session.flush()
+        session.add_all([
+            MLTaskArtifactRow(id=450, ml_task_id=103, artifact_id=9, artifact_kind=MLTaskArtifactKind.TRAINING_REPORT,
+                              absolute_path="/report"),
+            MLTaskArtifactRow(id=451, ml_task_id=106, artifact_id=9, artifact_kind=MLTaskArtifactKind.TRAINING_REPORT,
+                              absolute_path="/report"),
+            MLTaskArtifactRow(id=452, ml_task_id=103, artifact_id=11, artifact_kind=MLTaskArtifactKind.MODEL,
+                              absolute_path="/model"),
+            ConversationMessageRow(
+                id=302, thread_id=202, sequence_index=0, kind=ConversationMessageKind.TOOL_CALL,
+                tool_id="model.task", arguments_payload={"ml_task_id": 103},
+            ),
+        ])
+        # Older databases can contain ISO datetime text with an explicit offset.
+        session.connection().exec_driver_sql(
+            "UPDATE artifact SET created_at = ? WHERE id = 10", ("2025-01-02T01:00:00+01:00",),
+        )
+        session.commit()
+
+    query = AuditQueryService(storage.session_factory)
+    scope = AuditScope(all_threads=True)
+
+    def keys(scope=scope, **kwargs):
+        return [item.reference.key for item in query.list_outputs(scope, **kwargs)]
+
+    expected = ["artifact:999", "model:105", "dataset:850", "artifact:9", "artifact:10", "artifact:301", "dataset:102"]
+    assert keys() == expected
+    assert keys(limit=2) + keys(limit=2, offset=2) + keys(offset=4) == expected
+    assert keys(offset=len(expected)) == []
+    assert keys(limit=0, offset=-1) == expected[:1]
+    assert keys(limit=2**63) == expected
+    assert keys(offset=2**63) == []
+    assert keys(task_id=2**63) == []
+    assert keys(category="application", task_id=107) == ["dataset:850"]
+    assert keys(category="report", task_id=103) == ["artifact:9"]
+    assert keys(category="report", task_id=106) == []
+    assert keys(search="  STRASSE  ", limit=1) == ["model:105"]
+    assert keys(search="  STRASSE  ", category="chart", limit=1) == ["artifact:301"]
+    assert keys(search="ARTIFACT:301", limit=1) == ["artifact:301"]
+    assert keys(search="%", limit=1) == []
+    assert keys(AuditScope(thread_id=201)) == ["model:105", "dataset:850", "artifact:9"]
+    referenced = query.list_outputs(AuditScope(thread_id=202))
+    assert [(item.reference.key, item.membership, item.thread_id) for item in referenced] == [
+        ("model:105", "referenced", 201), ("artifact:9", "referenced", 201),
+    ]
+    assert [file.artifact_id for file in query.get_detail(AuditReference(kind="artifact", id=11)).files] == [9, 11]
+
+    projected, statements = [], []
+    original = audit_service._summary
+
+    def project(catalog, reference, **kwargs):
+        projected.append(reference.key)
+        return original(catalog, reference, **kwargs)
+
+    def capture(_connection, _cursor, statement, _parameters, _context, _many):
+        statements.append(statement)
+
+    monkeypatch.setattr(audit_service, "_summary", project)
+    event.listen(storage.engine, "before_cursor_execute", capture)
+    try:
+        assert keys(limit=1, offset=3) == ["artifact:9"]
+    finally:
+        event.remove(storage.engine, "before_cursor_execute", capture)
+    assert projected == ["artifact:9"]
+    [statement] = statements
+    assert {"UNION", "LIMIT", "OFFSET"} <= set(statement.split())
 
 
 def test_public_audit_tools_save_interpretation_with_validated_evidence(storage, recorded_model):
