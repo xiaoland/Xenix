@@ -263,15 +263,16 @@ class ChatComposer(QWidget):
         self._model_picker.blockSignals(False)
         self._sync_composer_controls_enabled()
 
-    def set_selected_fq_model_key(self, fq_model_key: str | None) -> None:
+    def set_selected_fq_model_key(self, fq_model_key: str | None) -> bool:
         if not fq_model_key:
-            return
+            return False
         index = self._model_picker.findData(fq_model_key)
         if index < 0:
-            return
+            return False
         self._model_picker.blockSignals(True)
         self._model_picker.setCurrentIndex(index)
         self._model_picker.blockSignals(False)
+        return True
 
     def selected_fq_model_key(self) -> str:
         value = self._model_picker.currentData()

@@ -2802,11 +2802,6 @@ Text vectors: %2</source>
         <translation type="vanished">此提供商由部署管理，无法在此处移除。</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="344"/>
-        <source>Built into packaged app</source>
-        <translation>已内置于打包应用</translation>
-    </message>
-    <message>
         <location filename="../ui/settings/provider.py" line="394"/>
         <source>None</source>
         <translation>无</translation>

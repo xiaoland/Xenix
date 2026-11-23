@@ -31,8 +31,7 @@ supports, and what uncertainty remains.
    registered data.
 3. When useful, define data roles and train, tune, or apply a reusable analyzer.
 4. 在审计中心查看数据集、模型、训练和调参参数、图表、报告及应用结果；先阅读 Agent 的方法理由和结果解读，再按需检查来源与证据，并打开本地产出。解释缺失和证据缺失必须明确呈现。
-5. Configure supported LLM providers and choose the LLM model used by the next
-   assistant response without changing sampling already in progress.
+5. Configure a supported LLM provider with your own credentials before using chat. Choose the model for the next assistant response without changing sampling already in progress.
 6. Open the Knowledge Workspace, select or drop TXT, DOC/DOCX, PPT/PPTX, RTF, EPUB, ODT/ODP, PDF,
    JPEG, or PNG material, and let the Agent apply relevant saved knowledge through
    source-linked lookup.

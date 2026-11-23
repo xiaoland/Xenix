@@ -17,7 +17,8 @@ jobs:
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: "3.14.2"
-      - run: python -m pip install pdm==2.26.6
+      # PDM 2.26.6 needs the Hishel 1.x storage API and Unearth's httpx client.
+      - run: python -m pip install pdm==2.26.6 "hishel<2" "unearth<0.19"
       - name: Synchronize locked environment
         run: pdm sync --clean -G :all
       - name: Prepare generated runtime resources

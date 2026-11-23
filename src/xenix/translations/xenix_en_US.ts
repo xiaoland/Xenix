@@ -2613,11 +2613,6 @@ Text vectors: %2</translation>
         <translation type="vanished">This provider is managed by a deployment and cannot be removed here.</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="344"/>
-        <source>Built into packaged app</source>
-        <translation>Built into packaged app</translation>
-    </message>
-    <message>
         <location filename="../ui/settings/provider.py" line="394"/>
         <source>None</source>
         <translation>None</translation>

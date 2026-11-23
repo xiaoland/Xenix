@@ -340,10 +340,6 @@ def main() -> int:
         _write_generated_release_config(project_root, release_config)
         print(f"Embedding app version: {app_version}")
         print(f"Embedding build commit: {build_commit}")
-        if release_config.trial_llm_api_key:
-            print("Embedding packaged trial LLM provider: enabled")
-        else:
-            print("Embedding packaged trial LLM provider: disabled")
         if release_config.trial_lock_days > 0:
             print(f"Embedding startup trial lock: {release_config.trial_lock_days} day(s)")
         else:

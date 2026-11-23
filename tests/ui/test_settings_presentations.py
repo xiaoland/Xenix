@@ -1,13 +1,18 @@
 from __future__ import annotations
 
+import json
+
+import pytest
 from PySide6.QtCore import QCoreApplication, QEvent, QTranslator
 from PySide6.QtWidgets import QApplication, QMessageBox
 from pytestqt.qtbot import QtBot
 
 from xenix.services.llm import (
+    DEFAULT_FQ_MODEL_KEY,
     LLMProviderConfig,
+    LLMService,
     LLMSettings,
-    PACKAGED_TRIAL_SECRET_SOURCE,
+    LLMSettingsService,
 )
 from xenix.services.paddle_ocr_service import PaddleOcrState, PaddleOcrStatus
 from xenix.ui.settings.ocr import OcrSettings
@@ -95,41 +100,62 @@ def test_provider_switch_with_invalid_draft_warns_and_preserves_input(
     assert editor._provider_key_input.text() == ""
 
 
-def test_provider_editor_masks_packaged_trial_secret_and_rejects_invalid_draft(
+@pytest.mark.parametrize("has_custom_provider", [False, True])
+def test_provider_editor_upgrades_saved_trial_settings(
     qapp: QApplication,
     qtbot: QtBot,
-    monkeypatch,
+    app_paths,
+    has_custom_provider: bool,
 ) -> None:
-    editor = ProviderSettingsEditor(
-        LLMSettings(
-            providers=[
-                LLMProviderConfig(
-                    key="trial",
-                    display_name="Trial",
-                    base_url="https://trial.example.test",
-                    api_key="not-persisted",
-                    models=["trial-model"],
-                    dialect_config={"secret_source": PACKAGED_TRIAL_SECRET_SOURCE},
-                )
-            ]
-        )
+    service = LLMSettingsService(app_paths)
+    legacy_provider = {
+        "key": "renamed",
+        "display_name": "Trial",
+        "base_url": "https://trial.example.test",
+        "models": ["old-model"],
+        "dialect_config": {"secret_source": "packaged_trial"},
+    }
+    providers = [legacy_provider]
+    if has_custom_provider:
+        providers.append({
+            "key": "trial",
+            "display_name": "My provider",
+            "base_url": "https://custom.example.test",
+            "api_key": "custom-key",
+            "models": ["custom-model"],
+        })
+    title_model = "trial/custom-model" if has_custom_provider else ""
+    service.settings_path.write_text(
+        json.dumps({
+            "providers": providers,
+            "default_fq_model_key": "renamed/old-model",
+            "turn_completion_guard_fq_model_key": "renamed/old-model",
+            "thread_title_fq_model_key": title_model,
+            "retry_attempts": 3,
+        }),
+        encoding="utf-8",
     )
+    assert [option.fq_model_key for option in LLMService(service).model_options()] == [
+        title_model or DEFAULT_FQ_MODEL_KEY
+    ]
+    editor = ProviderSettingsEditor(service.load())
     qtbot.addWidget(editor)
-    assert editor._provider_base_url_input.isReadOnly()
-    assert editor._provider_api_key_input.isReadOnly()
-    assert editor._provider_api_key_input.placeholderText() == "Built into packaged app"
-
-    editor._provider_api_key_input.setText("attempted-secret")
-    saved = editor.current_settings()
-    assert saved.providers[0].base_url == "https://trial.example.test"
-    assert saved.providers[0].api_key == ""
-
-    warnings: list[tuple[object, ...]] = []
-    monkeypatch.setattr(QMessageBox, "warning", lambda *args: warnings.append(args))
-    editor._provider_key_input.setText("")
-    editor._add_provider()
     assert editor._provider_selector.count() == 1
-    assert warnings and "Provider key cannot be empty" in str(warnings[0][-1])
+    assert editor._provider_api_key_input.text() == ("custom-key" if has_custom_provider else "")
+    assert not editor._provider_base_url_input.isReadOnly()
+    assert not editor._provider_api_key_input.isReadOnly()
+    editor._provider_base_url_input.setText("https://configured.example.test")
+    editor._provider_api_key_input.setText("edited-key")
+    service.save(editor.current_settings())
+
+    saved = service.load()
+    assert "packaged_trial" not in service.settings_path.read_text(encoding="utf-8")
+    assert saved.default_fq_model_key == (title_model or DEFAULT_FQ_MODEL_KEY)
+    assert saved.turn_completion_guard_fq_model_key == ""
+    assert saved.thread_title_fq_model_key == title_model
+    assert saved.retry_attempts == 3
+    assert saved.providers[0].base_url == "https://configured.example.test"
+    assert saved.providers[0].api_key == "edited-key"
 
 
 def test_provider_retranslation_refreshes_model_labels_without_losing_draft(

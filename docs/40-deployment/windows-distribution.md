@@ -166,18 +166,13 @@ owner-approved cadence and immediately after suspected disclosure.
 
 Required values:
 
-- secrets: `ALIYUN_ACCESS_KEY_ID`, `ALIYUN_ACCESS_KEY_SECRET`,
-  `XENIX_TRIAL_LLM_API_KEY`, `XENIX_TRIAL_LOCK_STATE_SECRET`;
-- variables: `OSS_ENDPOINT`, `OSS_BUCKET`, `RELEASES_OSS_PUBLIC_URL`,
-  `XENIX_TRIAL_LLM_BASE_URL`, `XENIX_TRIAL_LLM_MODEL`,
-  `XENIX_TRIAL_LOCK_DAYS`, and `XENIX_TRIAL_PURCHASE_URL`;
+- Secrets include `ALIYUN_ACCESS_KEY_ID`, `ALIYUN_ACCESS_KEY_SECRET`, and `XENIX_TRIAL_LOCK_STATE_SECRET`.
+- Variables include `OSS_ENDPOINT`, `OSS_BUCKET`, `RELEASES_OSS_PUBLIC_URL`, `XENIX_TRIAL_LOCK_DAYS`, and `XENIX_TRIAL_PURCHASE_URL`.
 - optional `XENIX_OTEL_*`, `OTEL_SDK_DISABLED`, and `OTEL_EXPORTER_*`
   values/secrets.
 
 `RELEASES_OSS_PUBLIC_URL` is the native HTTPS bucket URL ending in `/published`.
-The client feed and stable Setup URLs derive from it. Build-time trial credentials
-and OTLP headers embedded in the package are extractable; they are not client-side
-secrets.
+The client feed and stable Setup URLs derive from it. The trial lock state secret and OTLP headers embedded in the package are extractable.
 
 ## Time and Evidence Budget
 
