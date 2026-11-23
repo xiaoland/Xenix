@@ -9,9 +9,6 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validat
 
 
 RELEASES_OSS_PUBLIC_URL_ENV = "RELEASES_OSS_PUBLIC_URL"
-TRIAL_LLM_BASE_URL_ENV = "XENIX_TRIAL_LLM_BASE_URL"
-TRIAL_LLM_API_KEY_ENV = "XENIX_TRIAL_LLM_API_KEY"
-TRIAL_LLM_MODEL_ENV = "XENIX_TRIAL_LLM_MODEL"
 TRIAL_LOCK_DAYS_ENV = "XENIX_TRIAL_LOCK_DAYS"
 TRIAL_LOCK_STATE_SECRET_ENV = "XENIX_TRIAL_LOCK_STATE_SECRET"
 TRIAL_PURCHASE_URL_ENV = "XENIX_TRIAL_PURCHASE_URL"
@@ -41,9 +38,6 @@ class ReleaseConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     releases_oss_public_url: str = ""
-    trial_llm_base_url: str = "https://api.openai.com"
-    trial_llm_api_key: str = ""
-    trial_llm_model: str = "gpt-4o-mini"
     trial_lock_days: int = Field(default=0, ge=0)
     trial_lock_state_secret: str = ""
     trial_lock_build_id: str = "development"
@@ -52,7 +46,6 @@ class ReleaseConfig(BaseModel):
 
     @field_validator(
         "releases_oss_public_url",
-        "trial_llm_base_url",
         "trial_purchase_url",
         mode="before",
     )
@@ -61,8 +54,6 @@ class ReleaseConfig(BaseModel):
         return _normalized_http_url(str(value or ""), name=info.field_name or "URL")
 
     @field_validator(
-        "trial_llm_api_key",
-        "trial_llm_model",
         "trial_lock_state_secret",
         "trial_lock_build_id",
         mode="before",
@@ -138,9 +129,6 @@ class ReleaseConfig(BaseModel):
 
         config = cls(
             releases_oss_public_url=values.get(RELEASES_OSS_PUBLIC_URL_ENV, ""),
-            trial_llm_base_url=values.get(TRIAL_LLM_BASE_URL_ENV, "https://api.openai.com"),
-            trial_llm_api_key=values.get(TRIAL_LLM_API_KEY_ENV, ""),
-            trial_llm_model=values.get(TRIAL_LLM_MODEL_ENV, "gpt-4o-mini"),
             trial_lock_days=trial_lock_days,
             trial_lock_state_secret=values.get(TRIAL_LOCK_STATE_SECRET_ENV, ""),
             trial_lock_build_id=build_commit,
@@ -167,9 +155,6 @@ class ReleaseConfig(BaseModel):
     ) -> None:
         if release_build:
             required = (
-                TRIAL_LLM_BASE_URL_ENV,
-                TRIAL_LLM_API_KEY_ENV,
-                TRIAL_LLM_MODEL_ENV,
                 TRIAL_LOCK_DAYS_ENV,
                 TRIAL_LOCK_STATE_SECRET_ENV,
                 TRIAL_PURCHASE_URL_ENV,
@@ -179,12 +164,8 @@ class ReleaseConfig(BaseModel):
                 raise ValueError(f"Formal release build is missing required setting(s): {', '.join(missing)}")
             if self.trial_lock_days <= 0:
                 raise ValueError(f"Formal release builds require a positive {TRIAL_LOCK_DAYS_ENV}.")
-            for name, value in (
-                (TRIAL_LLM_BASE_URL_ENV, self.trial_llm_base_url),
-                (TRIAL_PURCHASE_URL_ENV, self.trial_purchase_url),
-            ):
-                if urlsplit(value).scheme != "https":
-                    raise ValueError(f"Formal release builds require HTTPS for {name}.")
+            if urlsplit(self.trial_purchase_url).scheme != "https":
+                raise ValueError(f"Formal release builds require HTTPS for {TRIAL_PURCHASE_URL_ENV}.")
         if public_release_build:
             if not self.releases_oss_public_url:
                 raise ValueError(f"Public release builds require {RELEASES_OSS_PUBLIC_URL_ENV}.")

@@ -10,7 +10,6 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 from ...config import AppPaths
 from ...exceptions import NotFoundError, ValidationError
-from ...release_config import load_release_config
 from .providers import (
     LLMRequestMetadata,
     LLMRetryEvent,
@@ -27,11 +26,6 @@ SETTINGS_FILE_NAME = "agent_settings.json"
 DEFAULT_PROVIDER_KEY = "openai"
 DEFAULT_MODEL_KEY = "gpt-4o-mini"
 DEFAULT_FQ_MODEL_KEY = f"{DEFAULT_PROVIDER_KEY}/{DEFAULT_MODEL_KEY}"
-TRIAL_PROVIDER_KEY = "trial"
-TRIAL_PROVIDER_DISPLAY_NAME = "Trial"
-PACKAGED_TRIAL_SECRET_SOURCE = "packaged_trial"
-TRIAL_LLM_BASE_URL_FALLBACK = "https://api.openai.com"
-TRIAL_LLM_MODEL_FALLBACK = DEFAULT_MODEL_KEY
 
 
 class LLMDialect(StrEnum):
@@ -83,16 +77,6 @@ class LLMProviderConfig(BaseModel):
         return models
 
 
-class PackagedTrialLLMConfig(BaseModel):
-    base_url: str
-    api_key: str
-    model: str
-
-    @property
-    def enabled(self) -> bool:
-        return bool(self.api_key.strip())
-
-
 class LLMModelRef(BaseModel):
     provider_key: str
     model_key: str
@@ -103,29 +87,6 @@ class LLMModelOption(BaseModel):
     provider_key: str
     model_key: str
     label: str
-
-
-def default_llm_settings() -> "LLMSettings":
-    trial_config = load_packaged_trial_llm_config()
-    if trial_config.enabled:
-        return LLMSettings(
-            providers=[
-                LLMProviderConfig(
-                    key=TRIAL_PROVIDER_KEY,
-                    display_name=TRIAL_PROVIDER_DISPLAY_NAME,
-                    dialect=LLMDialect.OPENAI_COMPATIBLE,
-                    base_url=trial_config.base_url,
-                    api_key="",
-                    models=[trial_config.model],
-                    dialect_config={"secret_source": PACKAGED_TRIAL_SECRET_SOURCE},
-                )
-            ],
-            default_fq_model_key=LLMService.fq_model_key(TRIAL_PROVIDER_KEY, trial_config.model),
-        )
-    return LLMSettings(
-        providers=[LLMProviderConfig()],
-        default_fq_model_key=DEFAULT_FQ_MODEL_KEY,
-    )
 
 
 class LLMSettings(BaseModel):
@@ -148,6 +109,16 @@ class LLMSettings(BaseModel):
 
     @model_validator(mode="after")
     def _validate_model_references(self) -> LLMSettings:
+        # Older settings may still contain the provider supplied by the installer.
+        # Its key was editable, so identify it by the persisted source marker.
+        providers: list[LLMProviderConfig] = []
+        retired_models: set[str] = set()
+        for provider in self.providers:
+            if provider.dialect_config.get("secret_source") == "packaged_trial":
+                retired_models.update(LLMService.fq_model_key(provider.key, model) for model in provider.models)
+            else:
+                providers.append(provider)
+        self.providers = providers
         if not self.providers:
             self.providers = [LLMProviderConfig()]
 
@@ -173,7 +144,9 @@ class LLMSettings(BaseModel):
         ):
             fq_model_key = getattr(self, field_name)
             if fq_model_key and fq_model_key not in available:
-                raise ValueError(f"{field_name} does not match a configured provider model.")
+                if fq_model_key not in retired_models:
+                    raise ValueError(f"{field_name} does not match a configured provider model.")
+                setattr(self, field_name, "")
         return self
 
 
@@ -214,15 +187,14 @@ class LLMSettingsService:
 
     def load(self) -> LLMSettings:
         if not self._settings_path.exists():
-            return default_llm_settings()
+            return LLMSettings()
         payload = json.loads(self._settings_path.read_text(encoding="utf-8"))
         return LLMSettings.model_validate(payload)
 
     def save(self, settings: LLMSettings) -> None:
         self._settings_path.parent.mkdir(parents=True, exist_ok=True)
-        sanitized = sanitize_settings_for_save(settings)
         self._settings_path.write_text(
-            sanitized.model_dump_json(indent=2),
+            settings.model_dump_json(indent=2),
             encoding="utf-8",
         )
 
@@ -349,18 +321,6 @@ class LLMService:
         if provider_config.dialect is not LLMDialect.OPENAI_COMPATIBLE:
             raise ValidationError(
                 f"LLM dialect '{provider_config.dialect.value}' is not supported yet."
-            )
-        trial_config = load_packaged_trial_llm_config()
-        if provider_config.dialect_config.get("secret_source") == PACKAGED_TRIAL_SECRET_SOURCE:
-            if not trial_config.enabled:
-                raise ValidationError("Packaged trial LLM provider is not available in this build.")
-            return OpenAICompatibleChatProvider(
-                provider_key=provider_config.key,
-                base_url=trial_config.base_url,
-                api_key=trial_config.api_key,
-                model=ref.model_key,
-                timeout_seconds=provider_config.timeout_seconds,
-                streaming_enabled=provider_config.streaming_enabled,
             )
         return OpenAICompatibleChatProvider(
             provider_key=provider_config.key,
@@ -495,32 +455,6 @@ class LLMService:
             if provider.key == provider_key:
                 return provider
         raise NotFoundError(f"LLM provider '{provider_key}' was not found.")
-
-
-def load_packaged_trial_llm_config() -> PackagedTrialLLMConfig:
-    release_config = load_release_config()
-    return PackagedTrialLLMConfig(
-        base_url=release_config.trial_llm_base_url or TRIAL_LLM_BASE_URL_FALLBACK,
-        api_key=release_config.trial_llm_api_key,
-        model=release_config.trial_llm_model or TRIAL_LLM_MODEL_FALLBACK,
-    )
-
-
-def sanitize_settings_for_save(settings: LLMSettings) -> LLMSettings:
-    """Strip the packaged trial secret before persisting settings.
-
-    The packaged trial API key is embedded in the release config and must never be
-    copied into the writable agent_settings.json. Only the trial provider is
-    sanitized; user-entered provider keys are the user's own credential and are
-    persisted as entered.
-    """
-    providers: list[LLMProviderConfig] = []
-    for provider in settings.providers:
-        if provider.dialect_config.get("secret_source") == PACKAGED_TRIAL_SECRET_SOURCE:
-            providers.append(provider.model_copy(update={"api_key": ""}))
-            continue
-        providers.append(provider)
-    return settings.model_copy(update={"providers": providers}, deep=True)
 
 
 def _legacy_payload_to_settings(payload: dict[str, Any]) -> dict[str, Any]:

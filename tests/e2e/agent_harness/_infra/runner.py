@@ -1481,7 +1481,7 @@ def _model_setup_error(settings: LLMSettings, model_key: str) -> str | None:
             continue
         if requested_model not in provider.models:
             return "invalid_model"
-        if not provider.api_key.strip() and not provider.dialect_config.get("secret_source"):
+        if not provider.api_key.strip():
             return "missing_credentials"
         return None
     return "invalid_model"

@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from typing import Callable
 from unittest.mock import Mock
 
+from PySide6.QtCore import Qt
 from pytestqt.qtbot import QtBot
 
 from tests.ui.pytest_plugin import UiArtifactRegistry
@@ -23,6 +24,7 @@ from xenix.services.agent.chatbot_events import (
     ChatbotEventStatus,
     build_thinking_chatbot_event,
 )
+from xenix.services.llm import FrozenLLMSettingsSource, LLMProviderConfig, LLMService, LLMSettings
 from xenix.ui.main_window import MainWindow
 from xenix.ui.history import HarnessHistoryAdapter
 from xenix.ui.windows.auxiliary import AuxiliaryWindowCoordinator
@@ -82,10 +84,10 @@ def _text_event(event_id: int, text: str) -> ChatbotEvent:
     )
 
 
-def _window(qtbot: QtBot, ui_artifacts: UiArtifactRegistry, tmp_path):
+def _window(qtbot: QtBot, ui_artifacts: UiArtifactRegistry, tmp_path, *, llm_service=None):
     executor = _ControlledExecutor()
     harness = _Harness()
-    llm = SimpleNamespace(model_options=lambda: [], default_fq_model_key=lambda: None)
+    llm = llm_service or SimpleNamespace(model_options=lambda: [], default_fq_model_key=lambda: None)
     window = MainWindow(
         current_locale=lambda: "en_US",
         agent_harness_service=harness,
@@ -120,6 +122,31 @@ def test_main_window_exposes_dataset_audit_entry(qtbot: QtBot, ui_artifacts, tmp
     assert window._audit_button.isVisible()
     assert window._audit_button.text() == window.tr("Audit Center")
     assert window._audit_button.accessibleIdentifier() == "main.header.audit"
+
+
+def test_opening_old_trial_thread_sends_with_current_default_model(qtbot: QtBot, ui_artifacts, tmp_path) -> None:
+    settings = LLMSettings(
+        providers=[LLMProviderConfig(key="custom", models=["first", "preferred"])],
+        default_fq_model_key="custom/preferred",
+    )
+    llm_service = LLMService(FrozenLLMSettingsSource(settings))
+    window, harness, executor = _window(qtbot, ui_artifacts, tmp_path, llm_service=llm_service)
+    harness.snapshots[102].thread.selected_fq_model_key = "custom/first"
+    harness.snapshots[101].thread.selected_fq_model_key = "trial/old-model"
+    composer = window._thread_detail_view.composer
+
+    window._history_panel.open_thread(102)
+    assert composer.selected_fq_model_key() == "custom/first"
+    window._history_panel.open_thread(101)
+    assert composer.selected_fq_model_key() == "custom/preferred"
+    window._chat_workspace.sync_model_options()
+    assert composer.selected_fq_model_key() == "custom/preferred"
+    composer.editor.setPlainText("Continue the analysis")
+    qtbot.mouseClick(composer.send_button, Qt.MouseButton.LeftButton)
+
+    submission = executor.submissions[0].submission
+    assert submission.thread_id == 101
+    assert submission.fq_model_key == "custom/preferred"
 
 
 def test_pre_ack_failure_preserves_composer_for_retry(qtbot: QtBot, ui_artifacts, tmp_path) -> None:

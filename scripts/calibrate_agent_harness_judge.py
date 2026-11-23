@@ -50,10 +50,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         if configured_provider is None:
             raise JudgeCalibrationError("calibration_judge_model_invalid")
-        if (
-            not configured_provider.api_key.strip()
-            and not configured_provider.dialect_config.get("secret_source")
-        ):
+        if not configured_provider.api_key.strip():
             raise JudgeCalibrationError("calibration_judge_credentials_missing")
         report = run_judge_calibration(
             suite_symbol=suite_symbol,

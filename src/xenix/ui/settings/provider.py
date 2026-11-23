@@ -20,7 +20,6 @@ from PySide6.QtWidgets import (
 )
 
 from ...services.llm import (
-    PACKAGED_TRIAL_SECRET_SOURCE,
     LLMDialect,
     LLMModelOption,
     LLMProviderConfig,
@@ -170,7 +169,6 @@ class ProviderSettingsEditor(QWidget):
         self._provider_dialect_selector.setItemText(
             0, QCoreApplication.translate("SettingsDialog", "OpenAI-compatible")
         )
-        self._refresh_provider_field_state()
         self._refresh_model_selectors(
             default_key=self._llm_default_model_selector.currentData(),
             guard_key=self._llm_guard_model_selector.currentData(),
@@ -286,7 +284,6 @@ class ProviderSettingsEditor(QWidget):
         self._provider_models_input.setPlainText("\n".join(provider.models))
         self._provider_timeout_input.setValue(provider.timeout_seconds)
         self._provider_streaming_checkbox.setChecked(provider.streaming_enabled)
-        self._apply_provider_field_state(provider)
         self._active_provider_index = provider_index
         self._loading_provider = False
 
@@ -297,13 +294,12 @@ class ProviderSettingsEditor(QWidget):
         if not 0 <= index < len(self._provider_configs):
             return
         current = self._provider_configs[index]
-        packaged_trial = self._is_packaged_trial_provider(current)
         self._provider_configs[index] = LLMProviderConfig(
             key=self._provider_key_input.text().strip(),
             display_name=self._provider_name_input.text().strip(),
             dialect=LLMDialect(str(self._provider_dialect_selector.currentData())),
-            base_url=current.base_url if packaged_trial else self._provider_base_url_input.text().strip(),
-            api_key="" if packaged_trial else self._provider_api_key_input.text(),
+            base_url=self._provider_base_url_input.text().strip(),
+            api_key=self._provider_api_key_input.text(),
             models=self._model_lines(),
             timeout_seconds=self._provider_timeout_input.value(),
             streaming_enabled=self._provider_streaming_checkbox.isChecked(),
@@ -312,8 +308,6 @@ class ProviderSettingsEditor(QWidget):
         provider = self._provider_configs[index]
         self._provider_selector.setItemText(index, provider.display_name or provider.key)
         self._provider_selector.setItemData(index, provider.key)
-        if index == self._provider_selector.currentIndex():
-            self._apply_provider_field_state(provider)
 
     def _on_models_text_changed(self) -> None:
         """Keep the global model selectors in sync with the edited models list.
@@ -330,23 +324,6 @@ class ProviderSettingsEditor(QWidget):
         except PydanticValidationError:
             return
         self._refresh_model_selectors_preserving_selection()
-
-    def _refresh_provider_field_state(self) -> None:
-        index = self._provider_selector.currentIndex()
-        if 0 <= index < len(self._provider_configs):
-            self._apply_provider_field_state(self._provider_configs[index])
-
-    def _apply_provider_field_state(self, provider: LLMProviderConfig) -> None:
-        packaged_trial = self._is_packaged_trial_provider(provider)
-        self._provider_base_url_input.setReadOnly(packaged_trial)
-        self._provider_api_key_input.setReadOnly(packaged_trial)
-        self._provider_api_key_input.setPlaceholderText(
-            QCoreApplication.translate("SettingsDialog", "Built into packaged app") if packaged_trial else ""
-        )
-
-    @staticmethod
-    def _is_packaged_trial_provider(provider: LLMProviderConfig) -> bool:
-        return provider.dialect_config.get("secret_source") == PACKAGED_TRIAL_SECRET_SOURCE
 
     def _refresh_model_selectors(
         self, *, default_key: object | None = None, guard_key: object | None = None, title_key: object | None = None

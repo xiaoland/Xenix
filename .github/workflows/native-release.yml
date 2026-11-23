@@ -61,9 +61,6 @@ jobs:
       XENIX_PROMOTION_PR: ${{ needs.preflight.outputs.promotion_pr }}
       XENIX_BUILD_COMMIT: ${{ needs.preflight.outputs.commit }}
       RELEASES_OSS_PUBLIC_URL: ${{ vars.RELEASES_OSS_PUBLIC_URL }}
-      XENIX_TRIAL_LLM_BASE_URL: ${{ vars.XENIX_TRIAL_LLM_BASE_URL }}
-      XENIX_TRIAL_LLM_API_KEY: ${{ secrets.XENIX_TRIAL_LLM_API_KEY }}
-      XENIX_TRIAL_LLM_MODEL: ${{ vars.XENIX_TRIAL_LLM_MODEL }}
       XENIX_TRIAL_LOCK_DAYS: ${{ vars.XENIX_TRIAL_LOCK_DAYS }}
       XENIX_TRIAL_LOCK_STATE_SECRET: ${{ secrets.XENIX_TRIAL_LOCK_STATE_SECRET }}
       XENIX_TRIAL_PURCHASE_URL: ${{ vars.XENIX_TRIAL_PURCHASE_URL }}

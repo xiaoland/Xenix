@@ -201,8 +201,8 @@ class ThreadDetailView(QWidget):
             selected_fq_model_key=selected_fq_model_key,
         )
 
-    def set_selected_fq_model_key(self, fq_model_key: str | None) -> None:
-        self.composer.set_selected_fq_model_key(fq_model_key)
+    def set_selected_fq_model_key(self, fq_model_key: str | None) -> bool:
+        return self.composer.set_selected_fq_model_key(fq_model_key)
 
     def selected_fq_model_key(self) -> str:
         return self.composer.selected_fq_model_key()

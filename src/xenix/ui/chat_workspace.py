@@ -149,10 +149,9 @@ class ChatWorkspace(QObject):
             except Exception as exc:
                 report_exception(exc)
                 selected = None
-        self._thread_detail_view.set_model_options(
-            options,
-            selected_fq_model_key=selected or self._llm_service.default_fq_model_key(),
-        )
+        if not any(key == selected for key, _ in options):
+            selected = self._llm_service.default_fq_model_key()
+        self._thread_detail_view.set_model_options(options, selected_fq_model_key=selected)
 
     def retranslate_ui(self) -> None:
         self._retranslate_service_link_progress()
@@ -167,8 +166,8 @@ class ChatWorkspace(QObject):
     # Model picker -----------------------------------------------------------
 
     def _sync_thread_model_picker(self, snapshot: ConversationSnapshot) -> None:
-        selected = snapshot.thread.selected_fq_model_key or self._llm_service.default_fq_model_key()
-        self._thread_detail_view.set_selected_fq_model_key(selected)
+        if not self._thread_detail_view.set_selected_fq_model_key(snapshot.thread.selected_fq_model_key):
+            self._thread_detail_view.set_selected_fq_model_key(self._llm_service.default_fq_model_key())
 
     def _update_thread_model(self, fq_model_key: str) -> None:
         if self.conversation_thread_id is None:
