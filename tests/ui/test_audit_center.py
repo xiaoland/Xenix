@@ -1,5 +1,7 @@
+import logging
 from threading import Event
 
+import pytest
 from PySide6.QtCore import QUrl
 from PySide6.QtWidgets import QWidget
 
@@ -10,7 +12,8 @@ from xenix.ui.async_read import AsyncRead
 from xenix.ui.audit_center import AuditCenterDialog
 
 
-def test_read_channel_coalesces_and_discards_late_results(qtbot):
+@pytest.mark.parametrize("fails", [False, True])
+def test_read_channel_coalesces_and_discards_late_results(qtbot, caplog, fails):
     owner = QWidget()
     qtbot.addWidget(owner)
     channel = AsyncRead(owner)
@@ -21,6 +24,8 @@ def test_read_channel_coalesces_and_discards_late_results(qtbot):
     def slow():
         entered.set()
         release.wait(3)
+        if fails:
+            raise RuntimeError("superseded read failed")
         return "old"
 
     try:
@@ -31,9 +36,40 @@ def test_read_channel_coalesces_and_discards_late_results(qtbot):
         release.set()
         qtbot.waitUntil(lambda: delivered == ["current"])
         assert executed == []
+        records = [record for record in caplog.records if record.name == "xenix.ui.async_read"]
+        if fails:
+            assert len(records) == 1
+            assert records[0].levelno == logging.ERROR
+            assert records[0].exc_info[2] is not None
+            assert str(records[0].exc_info[1]) == "superseded read failed"
+        else:
+            assert records == []
     finally:
         release.set()
         channel.shutdown()
+
+
+def test_read_channel_shutdown_logs_failure_before_returning(qtbot, caplog):
+    owner = QWidget()
+    qtbot.addWidget(owner)
+    channel = AsyncRead(owner)
+    entered, release = Event(), Event()
+    delivered = []
+    channel.loaded.connect(delivered.append)
+
+    def read():
+        entered.set()
+        release.wait(3)
+        raise RuntimeError("closing read failed")
+
+    try:
+        channel.submit(read)
+        qtbot.waitUntil(entered.is_set)
+    finally:
+        release.set()
+        channel.shutdown()
+    assert delivered == []
+    assert caplog.text.count("RuntimeError: closing read failed") == 1
 
 
 def test_explanation_evidence_back_and_missing_file(qtbot):

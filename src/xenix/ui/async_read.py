@@ -1,8 +1,15 @@
 """One UI-owned read channel with stale-delivery suppression and explicit cleanup."""
 
+import logging
 from collections.abc import Callable
 
 from PySide6.QtCore import QObject, QRunnable, QThreadPool, Signal
+
+LOGGER = logging.getLogger(__name__)
+
+
+def _log_stale_failure(error: Exception) -> None:
+    LOGGER.error("Discarded background read failed", exc_info=(type(error), error, error.__traceback__))
 
 
 class _Signals(QObject):
@@ -15,11 +22,13 @@ class _Read(QRunnable):
         self.generation = generation
         self.read = read
         self.signals = _Signals()
+        self.failure: Exception | None = None
 
     def run(self) -> None:
         try:
             result = self.read()
         except Exception as exc:
+            self.failure = exc
             result = exc
         self.signals.finished.emit(self.generation, result)
 
@@ -61,8 +70,12 @@ class AsyncRead(QObject):
 
     def _finished(self, generation: int, result: object) -> None:
         self._running = None
-        if not self._closed and generation == self._generation:
+        if self._closed:
+            return
+        if generation == self._generation:
             self.loaded.emit(result)
+        elif isinstance(result, Exception):
+            _log_stale_failure(result)
         if not self._closed and self._pending is not None and self._running is None:
             pending = self._pending
             self._pending = None
@@ -72,4 +85,7 @@ class AsyncRead(QObject):
         self._closed = True
         self.invalidate()
         self._pool.waitForDone()
+        # The queued completion may disappear when the owner is destroyed.
+        if self._running is not None and self._running.failure is not None:
+            _log_stale_failure(self._running.failure)
         self._running = None
