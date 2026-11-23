@@ -8,9 +8,10 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from sqlalchemy.orm import sessionmaker
-from sqlmodel import Session, col, select
+from sqlmodel import Session
 
 from .storage.models import JobDomain, JobRow, JobStatus, utc_now
+from .storage.repositories.jobs import JobRepository
 
 
 @dataclass(frozen=True)
@@ -42,8 +43,8 @@ class JobHandler(Protocol):
     @property
     def concurrency_limit(self) -> int: ...
 
-    def recover(self, session: Session, jobs: list[JobRow]) -> list[int]:
-        """Reconcile queued/running jobs after restart; return references to dispatch."""
+    def recover(self) -> list[int]:
+        """Finish domain recovery and return references that need to be replayed."""
         ...
 
     def run(self, job: JobRow) -> JobOutcome:
@@ -72,6 +73,7 @@ class JobScheduler:
         handlers: Iterable[JobHandler],
     ) -> None:
         self._session_factory = session_factory
+        self._jobs = JobRepository()
         self._handlers: dict[tuple[JobDomain, str | None], JobHandler] = {}
         self._lock = threading.Condition()
         self._stop = threading.Event()
@@ -136,12 +138,7 @@ class JobScheduler:
                 raise RuntimeError("Cannot enqueue work after scheduler shutdown.")
             if self._handler_for(domain, kind) is None:
                 raise ValueError(f"No job handler registered for {domain.value!r}/{kind!r}.")
-            existing = session.exec(
-                select(JobRow).where(
-                    JobRow.domain == domain,
-                    JobRow.reference == reference,
-                )
-            ).first()
+            existing = self._jobs.find(session, domain, reference)
             if existing is not None:
                 if existing.kind != kind:
                     raise ValueError("A job reference cannot change its kind.")
@@ -156,7 +153,7 @@ class JobScheduler:
                 created_at=utc_now(),
                 updated_at=utc_now(),
             )
-            session.add(job)
+            self._jobs.save(session, job)
             session.commit()
             self._armed.add((domain, reference))
             self._lock.notify_all()
@@ -165,7 +162,7 @@ class JobScheduler:
     def capabilities(self, domain: JobDomain, reference: int) -> JobCapabilities:
         """Return the management capabilities for a specific job."""
         with self._session_factory() as session:
-            job = self._find(session, domain, reference)
+            job = self._jobs.find(session, domain, reference)
             if job is None:
                 return JobCapabilities()
             handler = self._handler_for(domain, job.kind)
@@ -174,7 +171,7 @@ class JobScheduler:
     def request_cancel(self, domain: JobDomain, reference: int) -> None:
         """Cancel a queued or running job through its domain handler."""
         with self._lock, self._session_factory() as session:
-            job = self._find(session, domain, reference)
+            job = self._jobs.find(session, domain, reference)
             if job is None or job.status in _TERMINAL_STATUSES:
                 return
             handler = self._handler_for(domain, job.kind)
@@ -184,7 +181,7 @@ class JobScheduler:
                 job.status = JobStatus.CANCELLED
                 job.updated_at = utc_now()
                 job.finished_at = utc_now()
-                session.add(job)
+                self._jobs.save(session, job)
             session.commit()
             self._armed.discard((domain, reference))
             self._lock.notify_all()
@@ -219,17 +216,39 @@ class JobScheduler:
             LOGGER.warning("Job workers still running at shutdown: %s", pending)
 
     def _recover_handler(self, handler: JobHandler) -> None:
+        references = list(dict.fromkeys(handler.recover()))
+        if not references:
+            return
+        domain, kind = handler.domain, handler.kind
         with self._session_factory() as session:
-            statement = select(JobRow).where(
-                JobRow.domain == handler.domain,
-                col(JobRow.status).in_([JobStatus.QUEUED, JobStatus.RUNNING]),
-            )
-            if handler.kind is not None:
-                statement = statement.where(JobRow.kind == handler.kind)
-            jobs = list(session.exec(statement))
-            requeue = handler.recover(session, jobs)
+            existing = self._jobs.find_by_references(session, domain, references)
+            for reference in references:
+                job = existing.get(reference)
+                now = utc_now()
+                if job is None:
+                    if kind is None:
+                        raise ValueError("A new recovery reference requires a job kind.")
+                    job = JobRow(
+                        domain=domain,
+                        kind=kind,
+                        reference=reference,
+                        status=JobStatus.QUEUED,
+                        created_at=now,
+                        updated_at=now,
+                    )
+                else:
+                    if kind is not None and job.kind != kind:
+                        raise ValueError("A job reference cannot change its kind.")
+                    # Domain recovery can replay a terminal scheduling attempt.
+                    # Keep its identity and original FIFO position.
+                    job.status = JobStatus.QUEUED
+                    job.started_at = None
+                    job.finished_at = None
+                    job.error_summary = None
+                    job.updated_at = now
+                self._jobs.save(session, job)
             session.commit()
-        self._armed.update((handler.domain, reference) for reference in requeue)
+        self._armed.update((domain, reference) for reference in references)
 
     def _dispatch_loop(self) -> None:
         # Test and wait under the same condition: enqueue/finish cannot lose a
@@ -264,21 +283,12 @@ class JobScheduler:
             references = [reference for armed_domain, reference in self._armed if armed_domain == domain]
             if not references:
                 return None
-            row = session.exec(
-                select(JobRow)
-                .where(
-                    JobRow.domain == domain,
-                    JobRow.status == JobStatus.QUEUED,
-                    col(JobRow.reference).in_(references),
-                )
-                .order_by(col(JobRow.created_at), col(JobRow.id))
-                .limit(1)
-            ).first()
+            row = self._jobs.next_queued(session, domain, references)
             if row is not None:
                 row.status = JobStatus.RUNNING
                 row.started_at = utc_now()
                 row.updated_at = utc_now()
-                session.add(row)
+                self._jobs.save(session, row)
                 session.commit()
                 self._armed.discard((domain, row.reference))
                 return row
@@ -304,7 +314,7 @@ class JobScheduler:
     ) -> None:
         try:
             with self._session_factory() as session:
-                job = self._find(session, domain, reference)
+                job = self._jobs.find(session, domain, reference)
                 if job is None:
                     return
             try:
@@ -315,14 +325,14 @@ class JobScheduler:
                 LOGGER.exception("Job handler failed: %s/%s", domain.value, reference)
                 outcome = JobOutcome(status=JobStatus.FAILED, error_summary=str(exc))
             with self._session_factory() as session:
-                job = self._find(session, domain, reference)
+                job = self._jobs.find(session, domain, reference)
                 if job is None:
                     return
                 job.status = outcome.status
                 job.error_summary = outcome.error_summary
                 job.finished_at = utc_now()
                 job.updated_at = utc_now()
-                session.add(job)
+                self._jobs.save(session, job)
                 session.commit()
         except Exception:
             LOGGER.exception("Unable to persist job outcome: %s/%s", domain.value, reference)
@@ -334,19 +344,6 @@ class JobScheduler:
 
     def _handler_for(self, domain: JobDomain, kind: str) -> JobHandler | None:
         return self._handlers.get((domain, kind)) or self._handlers.get((domain, None))
-
-    @staticmethod
-    def _find(
-        session: Session,
-        domain: JobDomain,
-        reference: int,
-    ) -> JobRow | None:
-        return session.exec(
-            select(JobRow).where(
-                JobRow.domain == domain,
-                JobRow.reference == reference,
-            )
-        ).first()
 
 
 __all__ = [

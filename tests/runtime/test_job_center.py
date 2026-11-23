@@ -42,7 +42,7 @@ def test_job_center_filters_status_domain_and_search_through_qt(qtbot, storage, 
         _job_item(), reference="knowledge:failed", domain=JobDomain.KNOWLEDGE,
         status=JobStatus.FAILED, target="Policy.pdf",
     )
-    monkeypatch.setattr(service, "_ml_jobs", lambda: jobs)
+    monkeypatch.setattr(service, "_ml_jobs", lambda _thread_id: jobs)
     monkeypatch.setattr(service, "_knowledge_jobs", lambda: [knowledge])
     dialog = JobCenterDialog(service)
     qtbot.addWidget(dialog)

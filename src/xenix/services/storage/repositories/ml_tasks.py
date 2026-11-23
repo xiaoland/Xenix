@@ -3,9 +3,10 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
+from sqlalchemy.orm import load_only
 from sqlmodel import Session, col, select
 
-from ..models import MLTaskArtifactRow, MLTaskRow, MLTaskStatus
+from ..models import ConversationThreadRow, DatasetRow, MLTaskArtifactRow, MLTaskRow, MLTaskStatus
 
 
 class MLTaskRepository:
@@ -24,6 +25,36 @@ class MLTaskRepository:
             .where(MLTaskRow.dataset_id == dataset_id)
             .order_by(col(MLTaskRow.created_at))
         )
+        return list(session.exec(statement))
+
+    def list_for_job_feed(
+        self, session: Session, *, origin_thread_id: int | None
+    ) -> list[tuple[MLTaskRow, str | None, int | None, str | None]]:
+        """Load the list fields, dataset name, and surviving conversation identity/title."""
+        statement = (
+            select(
+                MLTaskRow, col(DatasetRow.name), col(ConversationThreadRow.id), col(ConversationThreadRow.title)
+            )
+            .options(
+                load_only(
+                    col(MLTaskRow.id),
+                    col(MLTaskRow.project_id),
+                    col(MLTaskRow.origin_thread_id),
+                    col(MLTaskRow.dataset_id),
+                    col(MLTaskRow.task_type),
+                    col(MLTaskRow.status),
+                    col(MLTaskRow.error_summary),
+                    col(MLTaskRow.updated_at),
+                    col(MLTaskRow.started_at),
+                    col(MLTaskRow.finished_at),
+                    raiseload=True,
+                )
+            )
+            .outerjoin(DatasetRow, col(MLTaskRow.dataset_id) == col(DatasetRow.id))
+            .outerjoin(ConversationThreadRow, col(MLTaskRow.origin_thread_id) == col(ConversationThreadRow.id))
+        )
+        if origin_thread_id is not None:
+            statement = statement.where(MLTaskRow.origin_thread_id == origin_thread_id)
         return list(session.exec(statement))
 
     def update_status(

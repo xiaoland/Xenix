@@ -34,7 +34,7 @@ queued -> cancelled
 
 Restart semantics are domain-specific, not a global rule:
 
-- **Knowledge** replays: a handler's `recover` resets its persisted running rows to queued and materializes a fresh `JobRow` for any domain unit that surfaced during recovery, so queued and running Knowledge work survives an application restart.
+- **Knowledge** replays: a handler completes domain recovery and returns the references to replay. The scheduler resets existing scheduling rows to queued or creates missing `JobRow` entries, commits them, then arms them for dispatch. Replayed rows retain their original FIFO position.
 - If Knowledge recovery explicitly identifies pending domain work whose existing scheduling row is terminal (for example after an earlier routing failure), reuse that row and reset its scheduling outcome before replay. Domain recovery is the authority to replay; terminal rows are not independently resubmitted by the scheduler.
 - **ML** is a permanent orphan: queued and running ML jobs are never auto-requeued or redispatched after a restart. They retain their persisted status for observation and require an explicit new domain request; startup is not permission to resume them.
 

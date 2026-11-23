@@ -11,11 +11,12 @@ from xenix.services.storage.models import JobDomain, JobRow, JobStatus, utc_now
 
 
 class FakeHandler:
-    def __init__(self, domain=JobDomain.ML, *, kind=None, replay=False):
+    def __init__(self, domain=JobDomain.ML, *, kind=None, replay=False, replay_references=None):
         self.domain = domain
         self.kind = kind
         self.concurrency_limit = 1
         self.replay = replay
+        self.replay_references = replay_references or []
         self.runs = []
         self.cancels = []
         self.recovered_jobs = []
@@ -24,14 +25,11 @@ class FakeHandler:
         self.release.set()
         self.error = None
 
-    def recover(self, session, jobs):
-        self.recovered_jobs = [job.reference for job in jobs]
-        if not self.replay:
-            return []
-        for job in jobs:
-            job.status = JobStatus.QUEUED
-            session.add(job)
-        return list(self.recovered_jobs)
+    def recover(self):
+        if self.replay:
+            self.recovered_jobs = list(self.replay_references)
+            return self.recovered_jobs
+        return []
 
     def run(self, job):
         self.runs.append(job.reference)
@@ -126,8 +124,8 @@ def test_cancel_running_work_persists_outcome_before_idle(storage, scheduler_fac
 
 def test_recovery_routes_only_owned_kinds_and_preserves_ml_orphans(storage, scheduler_factory):
     ml = FakeHandler()
-    imports = FakeHandler(JobDomain.KNOWLEDGE, kind="import", replay=True)
-    index = FakeHandler(JobDomain.KNOWLEDGE, kind="index_build", replay=True)
+    imports = FakeHandler(JobDomain.KNOWLEDGE, kind="import", replay=True, replay_references=["import-old"])
+    index = FakeHandler(JobDomain.KNOWLEDGE, kind="index_build", replay=True, replay_references=["index-old"])
     with storage.session_factory() as session:
         session.add_all(
             [
