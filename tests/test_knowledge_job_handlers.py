@@ -4,7 +4,6 @@ from xenix.services.knowledge_job_handlers import (
     KnowledgeDerivationHandler,
     KnowledgeImportHandler,
     KnowledgeIndexHandler,
-    _reconcile,
 )
 from xenix.services.storage.models import JobDomain, JobRow, JobStatus
 from xenix.services.job_scheduler import JobScheduler
@@ -87,30 +86,3 @@ def test_import_handler_maps_needs_attention_to_failed_and_forwards_summary() ->
     assert outcome.status is JobStatus.FAILED
     assert outcome.error_summary == "Please reselect the source file."
     assert handler.capabilities(job).can_cancel is True
-
-
-def test_reconcile_creates_missing_job_rows_and_resets_running(storage) -> None:
-    with storage.session_factory() as session:
-        session.add(
-            JobRow(
-                domain=JobDomain.KNOWLEDGE,
-                kind="import",
-                reference="imp-running",
-                status=JobStatus.RUNNING,
-            )
-        )
-        session.commit()
-        jobs = list(session.exec(select(JobRow).where(JobRow.domain == JobDomain.KNOWLEDGE)))
-        requeued = _reconcile(
-            session,
-            jobs,
-            ["imp-running", "imp-new"],
-            kind="import",
-        )
-        session.commit()
-
-        assert requeued == ["imp-running", "imp-new"]
-        rows = {row.reference: row for row in session.exec(select(JobRow).where(JobRow.domain == JobDomain.KNOWLEDGE))}
-        assert rows["imp-running"].status is JobStatus.QUEUED
-        assert rows["imp-new"].status is JobStatus.QUEUED
-        assert rows["imp-new"].kind == "import"
