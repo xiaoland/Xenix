@@ -6,7 +6,7 @@ import pytest
 from sqlalchemy import event
 from sqlmodel import select
 
-from xenix.exceptions import ValidationError
+from xenix.exceptions import NotFoundError, ValidationError
 from xenix.services import audit_service
 from xenix.services.artifact_service import ArtifactService, RegisterArtifactInput
 from xenix.services.audit_contracts import ArtifactDerivation, AuditReference, AuditScope, ExecutionOrigin
@@ -203,19 +203,62 @@ def test_reused_model_explanation_is_attributed_to_new_conversation(storage, rec
     assert item.reference == recorded_model
     assert item.membership == "referenced"
     assert item.thread_id == 201
-    AuditExplanationService(storage.session_factory).explain(
+    writer = AuditExplanationService(storage.session_factory)
+    reused = writer.explain(
         recorded_model,
         text="For this purchasing plan, allow a buffer of 12 units; seasonality is untested.",
         evidence=[AuditReference(kind="task", id=104)],
         thread_id=202,
         tool_call_message_id=None,
     )
+    original = writer.explain(
+        recorded_model, text="The held-out error for the original forecast was 12 units.",
+        evidence=[recorded_model], thread_id=201, tool_call_message_id=None,
+    )
     detail = query.get_detail(recorded_model, thread_id=202)
-    assert detail.explanations[0].thread_id == 202
+    assert [(item.id, item.thread_id) for item in detail.explanations] == [(reused, 202), (original, 201)]
+    assert [item.id for item in query.get_detail(recorded_model).explanations] == [original, reused]
     assert detail.summary.thread_id == 201
     assert {
         job.raw_reference for job in JobQueryService(storage.session_factory).list_jobs(scope=AuditScope(thread_id=202))
     } == {106}
+
+
+def test_explanation_requires_existing_objects_and_preserves_evidence_scope(storage, recorded_model):
+    report = AuditReference(kind="artifact", id=901)
+    missing = AuditReference(kind="artifact", id=902)
+    with storage.session_factory() as session:
+        session.add_all([
+            MLTaskRow(id=107, project_id=101, dataset_id=102, task_type=MLTaskType.FIT,
+                      status=MLTaskStatus.SUCCEEDED, origin_thread_id=201),
+            ArtifactRow(id=report.id, kind=ArtifactKind.REPORT, title="Other training report", absolute_path="/report"),
+        ])
+        session.flush()
+        session.add_all([
+            MLTaskArtifactRow(id=450, ml_task_id=107, artifact_id=report.id, absolute_path="/report",
+                              artifact_kind=MLTaskArtifactKind.TRAINING_REPORT),
+            ConversationMessageRow(
+                id=302, thread_id=202, sequence_index=0, kind=ConversationMessageKind.TOOL_CALL,
+                tool_id="model.task", arguments_payload={"task_ids": [103, 107], "artifact_id": missing.id},
+            ),
+        ])
+        session.commit()
+
+    writer = AuditExplanationService(storage.session_factory)
+    context = {"text": "Review the recorded results.", "thread_id": 202, "tool_call_message_id": None}
+    with pytest.raises(NotFoundError, match=missing.key):
+        writer.explain(missing, evidence=[missing], **context)
+    with pytest.raises(NotFoundError, match=missing.key):
+        writer.explain(recorded_model, evidence=[recorded_model, missing], **context)
+    with pytest.raises(ValidationError, match="recorded supporting evidence"):
+        writer.explain(recorded_model, evidence=[report], **context)
+    with storage.session_factory() as session:
+        assert session.exec(select(AuditExplanationRow)).first() is None
+
+    # A task reference admits its outputs as targets within the new conversation.
+    annotation = writer.explain(report, evidence=[report], **context)
+    [saved] = AuditQueryService(storage.session_factory).get_detail(report, thread_id=202).explanations
+    assert (saved.id, saved.thread_id, saved.evidence) == (annotation, 202, [report])
 
 
 def test_list_applies_filters_before_paging_and_keeps_the_reference_key_order(storage, recorded_model, monkeypatch):

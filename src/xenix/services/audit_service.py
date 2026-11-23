@@ -20,10 +20,11 @@ from .audit_contracts import (
     AuditSummary,
     ExplanationText,
 )
-from .storage.models import ArtifactRow, AuditExplanationRow, DatasetRow, TrainedModelRow
+from .storage.models import ArtifactRow, AuditExplanationRow, DatasetRow, MLTaskStatus, TrainedModelRow
 from .storage.repositories.audit import AuditCatalog, AuditRepository
 
 if TYPE_CHECKING:
+    from sqlalchemy.engine import Row
     from sqlalchemy.orm import sessionmaker
     from sqlmodel import Session
 
@@ -32,10 +33,24 @@ def _utc(value: datetime) -> datetime:
     return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
 
 
-def _summary(catalog: AuditCatalog, reference: AuditReference, *, membership: str = "generated") -> AuditSummary:
+def _require_audit_row(catalog: AuditCatalog, reference: AuditReference) -> Row[Any]:
     row = catalog.summaries.get((reference.kind, reference.id))
     if row is None:
         raise NotFoundError(f"Audit object '{reference.key}' was not found.")
+    return row
+
+
+def _directly_associated(
+    reference: AuditReference,
+    origin_thread_id: int | None,
+    thread_id: int,
+    references: set[tuple[str, int]],
+) -> bool:
+    return origin_thread_id == thread_id or (reference.kind, reference.id) in references
+
+
+def _summary(catalog: AuditCatalog, reference: AuditReference, *, membership: str = "generated") -> AuditSummary:
+    row = _require_audit_row(catalog, reference)
     return AuditSummary(
         reference=reference,
         title=row.title,
@@ -246,15 +261,14 @@ class AuditExplanationService:
             if not self._repository.thread_exists(session, thread_id):
                 raise NotFoundError("The authoring conversation no longer exists.")
             catalog = self._repository.catalog(session, reference=reference)
-            summary = _summary(catalog, reference)
+            target = _require_audit_row(catalog, reference)
             references = self._repository.thread_references(session, thread_id)
             if (
-                summary.thread_id != thread_id
-                and (reference.kind, reference.id) not in references
-                and ("task", summary.task_id) not in references
+                not _directly_associated(reference, target.thread_id, thread_id, references)
+                and ("task", target.task_id) not in references
             ):
                 raise ValidationError(f"'{reference.key}' is not associated with this conversation.")
-            if summary.status in {"pending", "running"}:
+            if target.status in {MLTaskStatus.PENDING, MLTaskStatus.RUNNING}:
                 raise ValidationError("Wait for this task to finish before interpreting its result.")
             # A reused model grants access to its recorded supporting evidence, not
             # to unrelated objects that happen to share its original conversation.
@@ -263,12 +277,12 @@ class AuditExplanationService:
                 *(ref for ref, _ in _input_references(catalog, reference, _artifact_record(catalog))),
                 *(AuditReference(kind="artifact", id=file.id) for file in catalog.files),
             }
-            if summary.task_id:
-                allowed.add(AuditReference(kind="task", id=summary.task_id))
+            if target.task_id:
+                allowed.add(AuditReference(kind="task", id=target.task_id))
             self._repository.load_summaries(session, catalog, evidence)
             for ref in evidence:
-                item = _summary(catalog, ref)
-                if ref not in allowed and item.thread_id != thread_id and (ref.kind, ref.id) not in references:
+                item = _require_audit_row(catalog, ref)
+                if ref not in allowed and not _directly_associated(ref, item.thread_id, thread_id, references):
                     raise ValidationError(f"'{ref.key}' is not recorded supporting evidence for this conversation.")
             row = self._repository.append_explanation(
                 session,
