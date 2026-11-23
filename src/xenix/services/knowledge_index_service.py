@@ -26,6 +26,7 @@ from .storage.repositories.knowledge import KnowledgeRepository
 
 if TYPE_CHECKING:
     from .job_scheduler import JobScheduler
+    from .knowledge_task_logs import KnowledgeTaskLogStore
 
 _STOP = object()
 LOGGER = logging.getLogger(__name__)
@@ -73,6 +74,7 @@ class KnowledgeIndexService:
         embedding_settings_source: EmbeddingSettingsSource,
         start_worker: bool = True,
         scheduler: JobScheduler | None = None,
+        task_logs: KnowledgeTaskLogStore | None = None,
     ) -> None:
         self._session_factory = session_factory
         self._semantic = semantic_service
@@ -80,6 +82,7 @@ class KnowledgeIndexService:
         self._embedding_settings = embedding_settings_source
         self._repository = KnowledgeRepository()
         self._scheduler = scheduler
+        self._task_logs = task_logs
         self._queue: queue.Queue[str | object] = queue.Queue()
         self._status_executor = ThreadPoolExecutor(
             max_workers=1,
@@ -338,6 +341,7 @@ class KnowledgeIndexService:
                 kinds = tuple(row.index_kinds_payload)
                 library_id = row.library_id
                 trigger = row.trigger
+        self._record_event(task_id, "starting", "index_build_started")
         try:
             if KnowledgeIndexKind.KEYWORD.value in kinds:
                 self._set_phase(task_id, "rebuilding_keyword")
@@ -378,7 +382,7 @@ class KnowledgeIndexService:
                 row.updated_at = utc_now()
                 self._repository.save_index_task(session, row)
                 session.commit()
-                return _task_view(row)
+                result = _task_view(row)
         except Exception as exc:
             code, summary = _safe_task_failure(exc)
             with self._session_factory() as session:
@@ -392,7 +396,11 @@ class KnowledgeIndexService:
                 row.updated_at = utc_now()
                 self._repository.save_index_task(session, row)
                 session.commit()
-                return _task_view(row)
+                result = _task_view(row)
+            self._record_event(task_id, "failed", "index_build_failed", level="error")
+        else:
+            self._record_event(task_id, "completed", "index_build_finished")
+        return result
 
     def shutdown(self, *, timeout: float = 15.0) -> None:
         deadline = time.monotonic() + max(0.0, timeout)
@@ -427,6 +435,11 @@ class KnowledgeIndexService:
             row.updated_at = utc_now()
             self._repository.save_index_task(session, row)
             session.commit()
+        self._record_event(task_id, phase, "index_phase_started")
+
+    def _record_event(self, task_id: int, phase: str, event_code: str, *, level: str = "info") -> None:
+        if self._task_logs is not None:
+            self._task_logs.record(task_id, kind="index_build", phase=phase, event_code=event_code, level=level)
 
     def _worker_main(self) -> None:
         while not self._stop.is_set():

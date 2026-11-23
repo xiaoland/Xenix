@@ -59,6 +59,13 @@ def knowledge_import_logs_path(paths: AppPaths, import_id: int) -> Path:
     return knowledge_import_task_root(paths, import_id) / "logs.jsonl"
 
 
+def knowledge_task_logs_path(paths: AppPaths, kind: str, task_id: int) -> Path:
+    if kind == "import":
+        return knowledge_import_logs_path(paths, task_id)
+    directory = {"content_preparation": "derivations", "index_build": "index-builds"}[kind]
+    return knowledge_tasks_root(paths) / directory / str(task_id) / "logs.jsonl"
+
+
 def ml_task_parent_root(paths: AppPaths) -> Path:
     return paths.artifacts / "ml-tasks"
 

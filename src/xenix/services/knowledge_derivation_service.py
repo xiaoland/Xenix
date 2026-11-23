@@ -18,6 +18,7 @@ from .knowledge_service import (
     bound_knowledge_units,
     prepare_knowledge_search_text,
 )
+from .knowledge_task_logs import KnowledgeTaskLogStore
 from .storage.knowledge_projection import (
     RETRIEVAL_PROJECTION_VERSION,
     retrieval_content_fingerprint,
@@ -67,9 +68,11 @@ class KnowledgeDerivationService:
         retrieval_ready_notifier: Callable[[str], object] | None = None,
         start_worker: bool = True,
         scheduler: JobScheduler | None = None,
+        task_logs: KnowledgeTaskLogStore | None = None,
     ) -> None:
         self._session_factory = session_factory
         self._store = KnowledgeContentStore(paths)
+        self._task_logs = task_logs if task_logs is not None else KnowledgeTaskLogStore(paths)
         self._repository = KnowledgeRepository()
         self._retrieval_ready_notifier = retrieval_ready_notifier
         self._scheduler = scheduler
@@ -230,6 +233,9 @@ class KnowledgeDerivationService:
             session.commit()
             generation_id = job.canonical_generation_id
 
+        self._task_logs.record(
+            job_id, kind="content_preparation", phase="reading_canonical", event_code="derivation_started",
+        )
         with self._session_factory() as session:
             generation = session.get(KnowledgeCanonicalGenerationRow, generation_id)
             if generation is None:
@@ -260,6 +266,9 @@ class KnowledgeDerivationService:
             report_exception(exc)
             return self._record_failure(job_id, "knowledge_derivation_failed")
 
+        self._task_logs.record(
+            job_id, kind="content_preparation", phase="publishing_retrieval", event_code="canonical_read",
+        )
         with self._session_factory() as session:
             job = session.get(KnowledgeDerivationRow, job_id)
             generation = session.get(KnowledgeCanonicalGenerationRow, generation_id)
@@ -274,6 +283,9 @@ class KnowledgeDerivationService:
                 job.updated_at = utc_now()
                 session.add(job)
                 session.commit()
+                self._task_logs.record(
+                    job_id, kind="content_preparation", phase="superseded", event_code="generation_superseded",
+                )
                 return DerivationResult(job.id, document.id, generation.id, False, 0)
 
             rows = [
@@ -308,6 +320,7 @@ class KnowledgeDerivationService:
             session.add(document)
             job.status = "succeeded"
             job.phase = "completed" if rows else "no_text_projection"
+            phase = job.phase
             job.error_code = None
             job.error_summary = None
             job.retryable = False
@@ -322,6 +335,9 @@ class KnowledgeDerivationService:
                 len(rows),
             )
             library_id = document.library_id
+        self._task_logs.record(
+            job_id, kind="content_preparation", phase=phase, event_code="derivation_finished",
+        )
         if self._retrieval_ready_notifier is not None:
             try:
                 self._retrieval_ready_notifier(library_id)
@@ -452,7 +468,11 @@ class KnowledgeDerivationService:
                 document.updated_at = now
                 session.add(document)
             session.commit()
-            return DerivationResult(job.id, job.document_id, job.canonical_generation_id, False, 0)
+            result = DerivationResult(job.id, job.document_id, job.canonical_generation_id, False, 0)
+        self._task_logs.record(
+            job_id, kind="content_preparation", phase="failed", event_code=error_code, level="error",
+        )
+        return result
 
 
 def _knowledge_units(document: Any) -> list[KnowledgeUnitInput]:
