@@ -62,7 +62,8 @@ def test_application_knowledge_handlers_coexist_and_recover_their_own_work(stora
             }
             assert all(row.status is JobStatus.SUCCEEDED for row in rows)
             assert next(row for row in rows if row.reference == "source").id == original_job_id
-        assert scheduler.capabilities(JobDomain.KNOWLEDGE, "source").can_view_log
+        for reference in ("source", "content", "search"):
+            assert scheduler.capabilities(JobDomain.KNOWLEDGE, reference).can_view_log
         assert not scheduler.capabilities(JobDomain.KNOWLEDGE, "search").can_cancel
     finally:
         scheduler.shutdown()

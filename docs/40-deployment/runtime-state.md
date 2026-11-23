@@ -22,11 +22,7 @@ Treat its contents by ownership:
   preserve with SQLite;
 - `artifacts/knowledge/staging/` and `.import-trash/`: app-owned publication and
   startup-reclamation areas; do not sweep them manually while Xenix owns the home;
-- `artifacts/knowledge/tasks/imports/<attempt-id>/logs.jsonl`: bounded content-free
-  import lifecycle events. Inspect through the Knowledge Workspace `Task queue`;
-  absence of document text, source paths, passwords, credentials, and raw exceptions
-  is intentional. Worker results retain only outcome, failure stage, and a safe
-  diagnostic code;
+- `artifacts/knowledge/tasks/{imports,derivations,index-builds}/<task-id>/logs.jsonl`: bounded content-free lifecycle events. Inspect the task in Job Center under All conversations. Import logs also remain available from the Knowledge Workspace `Task queue`. Events contain timestamps, phases, levels, and safe diagnostic codes. Earlier content preparation and index tasks may have no event file;
 - Knowledge vector generations: rebuildable derived indexes whose readiness is owned by SQLite metadata;
 - `cache/knowledge-ocr/`: optional native Paddle Inference OCR generations, explicit
   model packs, downloads/staging, and the small atomic active-generation pointer;
@@ -41,7 +37,7 @@ Inspect evidence by symptom:
 | startup or persistence failure | application log, active database, schema/migration error |
 | provider behavior | Agent settings and application log; never copy credentials into a report |
 | ML worker failure | worker settings, task log, local/remote validation result |
-| Knowledge import failure | Workspace `Task queue` state and its View Log event timeline; application log for coordinator/runtime diagnostics |
+| Knowledge task failure | Job Center task status, error, and event timeline. Check the application log for coordinator/runtime diagnostics |
 | local OCR setup or repair failure | Knowledge Settings typed setup reason, then the application log and the app-owned OCR staging/generation manifests; do not copy raw document content into support evidence |
 | missing dataset, model, or report | database registration plus referenced app-owned file |
 | semantic Knowledge lookup failure | Knowledge Settings index state/task error, then vector-generation metadata and its contained derived index; do not alter canonical objects |
@@ -98,9 +94,7 @@ Embedding save may enqueue a job after explicit confirmation. `Needs rebuild` ke
 keyword use available; `Needs attention` directs the user to retry rather than
 making Lance or a task row a content authority.
 
-The Workspace `Task queue` is a bounded read model over import, content-preparation,
-and index-task owners. It does not make those task rows interchangeable. Import logs
-remain import-owned; index build detail and retry remain index-service-owned.
+The Workspace `Task queue` is a bounded read model over import, content-preparation, and index-task owners. The originating service records its task events, and the index service owns index detail and retry.
 
 Local OCR setup downloads only the immutable artifact named by the catalog embedded
 in the installed Xenix build. It verifies the outer size/digest, safe archive shape,

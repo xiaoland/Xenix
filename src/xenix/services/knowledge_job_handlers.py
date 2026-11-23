@@ -83,7 +83,6 @@ class _KnowledgeHandler:
     concurrency_limit = 1
     kind: str
     _can_cancel = False
-    _can_view_log = False
 
     def __init__(self, service: KnowledgeJobService) -> None:
         self._service = service
@@ -107,14 +106,13 @@ class _KnowledgeHandler:
     def capabilities(self, job: JobRow) -> JobCapabilities:
         return JobCapabilities(
             can_cancel=self._can_cancel,
-            can_view_log=self._can_view_log,
+            can_view_log=True,
         )
 
 
 class KnowledgeImportHandler(_KnowledgeHandler):
     kind = "import"
     _can_cancel = True
-    _can_view_log = True
 
     def __init__(self, service: "KnowledgeImportService") -> None:
         super().__init__(service)

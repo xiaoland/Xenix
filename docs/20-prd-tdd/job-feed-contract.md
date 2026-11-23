@@ -64,3 +64,4 @@ Scheduling and recovery behavior is covered by `tests/test_job_scheduler.py` and
 
 JobQueryService 接收显式 AuditScope，范围过滤先于状态、文本和分页过滤；当前会话只包含直接发起的任务及继承来源的自动评估，无当前会话时为空，全局 Knowledge 任务仅在所有会话中显示。
 JobCenterDialog 集中显示任务记录与日志，并通过任务身份导航到审计产出；会话范围的来源所有权和窗口生命周期详见[审计中心契约](audit-center-contract.md)。
+所有会话范围内，导入、内容准备和索引重建与 ML 任务共用一个日志面板。导入行按时间显示本次导入及关联内容准备的事件。Knowledge 保留其任务事件记录，ML 保留其执行日志，日志查询投影统一提供时间戳、级别和消息。

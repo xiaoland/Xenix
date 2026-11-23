@@ -20,11 +20,13 @@ from .i18n import TranslationManager
 from .observability import LLM_USAGE_JOURNAL_FILE_NAME, LocalLLMUsageObservability
 from .services.agent.composition import build_headless_agent_services
 from .services.embedding_service import EmbeddingSettingsService
+from .services.job_detail_query import JobDetailQueryService
 from .services.job_service import JobQueryService
 from .services.knowledge_derivation_service import KnowledgeDerivationService
 from .services.knowledge_document_lifecycle_service import KnowledgeDocumentLifecycleService
 from .services.knowledge_import_service import KnowledgeImportService
 from .services.knowledge_index_service import KnowledgeIndexService
+from .services.knowledge_task_logs import KnowledgeTaskLogStore
 from .services.knowledge_task_query import KnowledgeTaskQueryService
 from .services.knowledge_workspace_service import KnowledgeWorkspaceService
 from .services.link_router import LinkRouter
@@ -70,12 +72,14 @@ def build_workbench_window(
 
     update_service = UpdateService(paths, database_path(paths))
     paddle_ocr_deployment = PaddleOcrDeploymentService(paths)
+    knowledge_task_logs = KnowledgeTaskLogStore(paths)
     knowledge_index_service = KnowledgeIndexService(
         session_factory=context.session_factory,
         semantic_service=agent_services.knowledge_semantic,
         embedding_service=agent_services.embedding,
         embedding_settings_source=embedding_settings_service,
         scheduler=scheduler,
+        task_logs=knowledge_task_logs,
     )
     lifetime.add_cleanup("knowledge_index_service", knowledge_index_service.shutdown)
     knowledge_derivation_service = KnowledgeDerivationService(
@@ -83,6 +87,7 @@ def build_workbench_window(
         session_factory=context.session_factory,
         retrieval_ready_notifier=knowledge_index_service.notify_corpus_changed,
         scheduler=scheduler,
+        task_logs=knowledge_task_logs,
     )
     lifetime.add_cleanup("knowledge_derivation_service", knowledge_derivation_service.shutdown)
     knowledge_import_service = KnowledgeImportService(
@@ -93,6 +98,7 @@ def build_workbench_window(
         canonical_ready_notifier=knowledge_derivation_service.enqueue_generation,
         corpus_changed_notifier=knowledge_index_service.notify_corpus_changed,
         scheduler=scheduler,
+        task_logs=knowledge_task_logs,
     )
     lifetime.add_cleanup("knowledge_import_service", knowledge_import_service.shutdown)
     knowledge_document_lifecycle_service = KnowledgeDocumentLifecycleService(
@@ -103,6 +109,11 @@ def build_workbench_window(
     job_query_service = JobQueryService(
         context.session_factory,
         knowledge_task_query_service,
+    )
+    job_details = JobDetailQueryService(
+        context.session_factory,
+        read_ml_details=lambda task_id: agent_services.ml.get_task_details(task_id),
+        knowledge_logs=knowledge_task_logs,
     )
     knowledge_workspace_service = KnowledgeWorkspaceService(
         knowledge_service=agent_services.knowledge,
@@ -169,7 +180,7 @@ def build_workbench_window(
         return JobCenterDialog(
             job_query_service,
             scheduler=scheduler,
-            ml_service=agent_services.ml,
+            read_details=job_details.read,
             parent=owner,
         )
 
