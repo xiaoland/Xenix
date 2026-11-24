@@ -1,5 +1,6 @@
 from threading import Event
 
+import pytest
 from PySide6.QtCore import QUrl
 from PySide6.QtWidgets import QWidget
 
@@ -63,6 +64,7 @@ def test_explanation_evidence_back_and_missing_file(qtbot):
         dialog.shutdown()
 
 
+@pytest.mark.ui_capture
 def test_center_navigation_routes_through_production_coordinator(qapp, qtbot):
     _spec, handle = attach_scenario(qapp, qtbot, "centers.navigation")
     jobs = handle.root

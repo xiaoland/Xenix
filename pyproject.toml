@@ -82,6 +82,7 @@ release-build = { composite = ["build-knowledge-ocr", "package", "smoke-package"
 release-publish = "python scripts/publish_oss_release.py"
 pytest = { composite = ["prepare", "python scripts/run_pytest.py {args}"] }
 test = { composite = ["prepare", "python scripts/run_pytest.py {args}"] }
+test-fast = { composite = ["prepare", "python scripts/run_pytest.py -m 'not slow and not ui_capture' {args}"] }
 test-affected = { composite = ["prepare", "python scripts/run_pytest.py --testmon {args}"], env = { COVERAGE_CORE = "pytrace" } }
 list-affected = { composite = ["prepare", "python scripts/run_pytest.py --testmon --collect-only {args}"], env = { COVERAGE_CORE = "pytrace" } }
 benchmark-agent-harness = "python scripts/run_agent_harness_benchmark.py"
@@ -102,6 +103,8 @@ pythonpath = ["src", "."]
 testpaths = ["tests"]
 qt_api = "pyside6"
 markers = [
+    "slow: heavy end-to-end training or subprocess acceptance test excluded from test-fast",
+    "ui_capture: Windows pixel/font-exact UI Lab capture contract test",
     "agent_harness_live: explicit real-provider Agent Harness benchmark case",
 ]
 

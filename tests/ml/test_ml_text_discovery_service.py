@@ -14,6 +14,7 @@ from typing import Any
 import pandas as pd
 import pytest
 
+
 from xenix.config import ensure_app_dirs, get_app_paths
 from xenix.exceptions import ValidationError
 from xenix.services.artifact_service import ArtifactService, build_artifact_uri
@@ -31,6 +32,8 @@ from xenix.services.ml_task_service import MLTaskService
 from xenix.services.storage import StorageBootstrapService
 from xenix.services.storage.models import MLTaskArtifactKind, MLTaskStatus
 from xenix.services.ml.trained_model_metadata import parse_trained_model_metadata
+
+pytestmark = pytest.mark.slow
 
 
 FIXTURE_ROOT = FIXTURES_ROOT / "ml_text_discovery"

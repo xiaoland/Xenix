@@ -24,6 +24,7 @@ When monitoring asynchronous workflows such as GitHub Actions, prefer a completi
 - PDM `2.26.6` is the project workflow frontend; `pdm sync --clean -G :all` makes the project-local virtual environment match `pdm.lock`. Follow it with `pdm run prepare` to generate the ignored Skill catalog and compiled translations before a first static check.
 - `pdm run dev` runs the desktop application.
 - `pdm run test` prepares runtime resources and runs the complete offline acceptance portfolio in one process. Pass normal pytest selectors directly, for example `pdm run test tests/ml/test_data_cleaning_service.py -q`; `--direct` remains accepted for existing scripts but does not select a different runner.
+- `pdm run test-fast` runs the fast behavioral verification tier (`-m "not slow and not ui_capture"`), covering unit, boundary, contract, service, and pure Qt UI behavioral checks while deferring heavy ML training, subprocess acceptance, and Windows pixel-capture tests to `pdm run test`.
 - `pdm run pytest --direct <pytest selectors/options>` runs a focused selection with the same isolated temporary-path setup.
 - `pdm run test-affected` runs only the offline tests affected by source changes via `pytest-testmon`'s coverage-based selection: the first run builds the `.testmondata` baseline (running everything), and later runs re-run only affected tests. `pdm run list-affected` lists the affected set without running. It is a developer aid and never narrows CI.
 - `pdm run lint` runs Ruff over source, tests, and scripts.

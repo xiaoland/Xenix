@@ -9,6 +9,7 @@ from typing import Any
 import pandas as pd
 import pytest
 
+
 from xenix.config import ensure_app_dirs, get_app_paths
 from xenix.services.artifact_service import ArtifactService, build_artifact_uri
 from xenix.services.dataset_inspection import InspectDatasetInput
@@ -25,6 +26,8 @@ from xenix.services.ml_task_service import MLTaskService
 from xenix.services.storage import StorageBootstrapService
 from xenix.services.storage.models import MLTaskArtifactKind, MLTaskStatus
 from xenix.services.ml.trained_model_metadata import parse_trained_model_metadata
+
+pytestmark = pytest.mark.slow
 
 FIXTURE = FIXTURES_ROOT / "ml_cf_service" / "weekly_panel_v1.csv"
 

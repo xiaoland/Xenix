@@ -80,3 +80,31 @@ def test_source_modules_stay_under_size_ceiling() -> None:
     assert not oversized, (
         f"Source modules must stay <= {_MAX_SOURCE_MODULE_LINES} lines:\n" + "\n".join(oversized)
     )
+
+
+def test_tests_do_not_import_private_agent_tool_modules() -> None:
+    forbidden = (
+        "xenix.services.agent._model_tools",
+        "xenix.services.agent._analysis_tools",
+        "xenix.services.agent._data_tools",
+    )
+    tests_root = PROJECT_ROOT / "tests"
+    violations: list[str] = []
+    for path in sorted(tests_root.rglob("*.py")):
+        if "e2e" in path.parts:
+            continue
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                names = [alias.name for alias in node.names]
+            elif isinstance(node, ast.ImportFrom) and node.module:
+                names = [node.module]
+            else:
+                continue
+            for name in names:
+                if any(name == root or name.startswith(f"{root}.") for root in forbidden):
+                    violations.append(f"{path.relative_to(PROJECT_ROOT)} -> {name}")
+    assert not violations, (
+        "Tests must invoke agent tools through the public registry/builder instead of private tool modules:\n"
+        + "\n".join(violations)
+    )

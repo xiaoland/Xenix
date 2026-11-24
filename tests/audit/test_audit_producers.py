@@ -79,22 +79,31 @@ def test_wordcloud_records_actual_options(app_paths, tmp_path):
 
 
 def test_scripted_harness_creates_interprets_and_reopens_actual_chart(storage, app_paths, tmp_path):
+    from types import SimpleNamespace
+
     from xenix.services.agent import AgentHarnessService, SubmitUserTurnInput
-    from xenix.services.agent._analysis_tools import AnalysisTools
     from xenix.services.agent.audit_tools import register_audit_tools
     from xenix.services.agent.tool_catalog import AgentToolCatalog
-    from xenix.services.agent.tool_inputs import AnalysisGraphInput
+    from xenix.services.agent.tools import build_agent_tools
     from xenix.services.artifact_service import ArtifactService
     from xenix.services.llm import AgentToolRegistry, LLMConversationService, ProviderResponse, ProviderToolCall
-    from xenix.services.llm.tool_protocol import AgentTool
 
     source = tmp_path / "sales.csv"
     source.write_text("region,sales\nnorth,12\nsouth,15\n")
     datasets = DatasetService(storage.session_factory, app_paths)
     dataset = datasets.register_dataset(RegisterDatasetInput(source_path=str(source), name="Sales"))
     registry = AgentToolRegistry(paged_results_dir=tmp_path / "pages")
-    tools = AnalysisTools(dataset_service=datasets, artifact_service=ArtifactService(storage.session_factory), analysis_profile_service=None, analysis_graph_service=AnalysisGraphService(app_paths), ml_service=None)
-    registry.register(AgentTool(name="analysis.graph", provider_name="analysis_graph", description="Draw a chart", input_model=AnalysisGraphInput, implementation=tools._analysis_graph))
+    for tool in build_agent_tools(
+        paths=app_paths,
+        dataset_service=datasets,
+        data_cleaning_service=SimpleNamespace(),  # type: ignore[arg-type]
+        data_transform_service=SimpleNamespace(),  # type: ignore[arg-type]
+        ml_service=SimpleNamespace(),  # type: ignore[arg-type]
+        artifact_service=ArtifactService(storage.session_factory),
+        analysis_graph_service=AnalysisGraphService(app_paths),
+    ):
+        if tool.name == "analysis.graph":
+            registry.register(tool)
     register_audit_tools(registry, storage.session_factory)
     catalog = AgentToolCatalog(registry.list_specs())
     registry.register(catalog.activation_tool())

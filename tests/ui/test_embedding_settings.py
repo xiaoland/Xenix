@@ -64,14 +64,21 @@ def test_embedding_model_change_requires_user_confirmation_before_rebuild(
     )
     qtbot.addWidget(dialog)
 
+    from PySide6.QtCore import Qt
+    from PySide6.QtWidgets import QLineEdit, QPushButton
+    from tests.support.ui_queries import find_control
+
+    model_input = find_control(dialog, "settings.embedding.model", QLineEdit)
+    save_button = find_control(dialog, "settings.save", QPushButton)
+
     try:
         monkeypatch.setattr(
             dialog,
             "_confirm_embedding_compatibility_change",
             lambda: "rebuild",
         )
-        dialog._embedding_settings._model_input.setText("meaning-v2")
-        dialog._save_agent_settings()
+        model_input.setText("meaning-v2")
+        qtbot.mouseClick(save_button, Qt.MouseButton.LeftButton)
 
         assert embeddings.load().model == "meaning-v2"
         assert indexes.enqueued == [(("text_vector",), "settings_change")]
@@ -81,8 +88,8 @@ def test_embedding_model_change_requires_user_confirmation_before_rebuild(
             "_confirm_embedding_compatibility_change",
             lambda: "cancel",
         )
-        dialog._embedding_settings._model_input.setText("meaning-v3")
-        dialog._save_agent_settings()
+        model_input.setText("meaning-v3")
+        qtbot.mouseClick(save_button, Qt.MouseButton.LeftButton)
 
         assert embeddings.load().model == "meaning-v2"
         assert indexes.enqueued == [(("text_vector",), "settings_change")]

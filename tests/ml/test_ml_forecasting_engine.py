@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+
 from xenix.exceptions import ValidationError
 from xenix.services.ml.contracts import (
     ApplyModelPayload,
@@ -31,6 +32,8 @@ from xenix.services.ml.models.forecasting import (
     fit_full_history,
 )
 from xenix.services.ml.types import EvaluationKind
+
+pytestmark = pytest.mark.slow
 
 FIXTURE_ROOT = FIXTURES_ROOT / "ml_cf_service"
 WEEKLY_PANEL = FIXTURE_ROOT / "weekly_panel_v1.csv"

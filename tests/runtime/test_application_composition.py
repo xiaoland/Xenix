@@ -1,4 +1,6 @@
 """Exercise desktop wiring in a separate Qt process with real local services."""
+import pytest
+
 
 import os
 from pathlib import Path
@@ -7,6 +9,8 @@ import sys
 import textwrap
 
 from tests.support.paths import PROJECT_ROOT
+
+pytestmark = pytest.mark.slow
 
 
 def test_desktop_import_reaches_keyword_retrieval_through_all_job_kinds(app_paths, tmp_path: Path):

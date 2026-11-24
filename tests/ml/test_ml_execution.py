@@ -9,6 +9,7 @@ from typing import Any
 import polars as pl
 import pytest
 
+
 from xenix.config import ensure_app_dirs, get_app_paths
 from xenix.exceptions import ValidationError
 from xenix.services.dataset_service import DatasetService, RegisterDatasetInput
@@ -29,6 +30,8 @@ from xenix.services.storage.models import (
     MLTaskStatus,
 )
 from xenix.services.ml.trained_model_metadata import parse_trained_model_metadata
+
+pytestmark = pytest.mark.slow
 
 _FIXTURE_ROOT = FIXTURES_ROOT / "ml_foundation"
 _TRAIN_FIXTURE = _FIXTURE_ROOT / "grouped_lifecycle_v1.csv"

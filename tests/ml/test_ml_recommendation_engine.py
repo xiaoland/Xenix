@@ -8,6 +8,7 @@ import joblib
 import pandas as pd
 import pytest
 
+
 from xenix.exceptions import ValidationError
 from xenix.services.ml.contracts import (
     ApplyInputFile,
@@ -32,6 +33,8 @@ from xenix.services.ml.recommendation_evidence import (
 )
 from xenix.services.ml.preparation import dataset_snapshot_digest
 from xenix.services.ml.types import EvaluationKind
+
+pytestmark = pytest.mark.slow
 
 
 CONFIG = RecommendationEngineConfig(

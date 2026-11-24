@@ -13,6 +13,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+
 from xenix.config import ensure_app_dirs, get_app_paths
 from xenix.services.artifact_service import ArtifactService, build_artifact_uri
 from xenix.services.dataset_service import DatasetService, RegisterDatasetInput
@@ -29,6 +30,8 @@ from xenix.services.ml_task_service import MLTaskService
 from xenix.services.storage import StorageBootstrapService
 from xenix.services.storage.models import MLTaskArtifactKind, MLTaskStatus
 from xenix.services.ml.trained_model_metadata import parse_trained_model_metadata
+
+pytestmark = pytest.mark.slow
 
 
 FIXTURES = FIXTURES_ROOT / "ml_recommendation"
