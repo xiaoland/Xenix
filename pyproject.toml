@@ -179,6 +179,13 @@ files = [
     "src/xenix/ui/diagnostics/capture.py",
     "src/xenix/ui/diagnostics/schema.py",
     "src/xenix/ui/diagnostics/snapshot.py",
+    "src/xenix/services/analysis_graph/svg.py",
+    "src/xenix/services/knowledge_pipeline/contracts.py",
+    "src/xenix/services/knowledge_pipeline/routing.py",
+    "src/xenix/services/knowledge_pipeline/text_decoding.py",
+    "src/xenix/services/paddle_ocr/contracts.py",
+    "src/xenix/services/storage/migrations/_helpers.py",
+    "src/xenix/services/storage/migrations/runner.py",
     "src/xenix/ui/layout_debug.py",
 ]
 plugins = ["pydantic.mypy"]

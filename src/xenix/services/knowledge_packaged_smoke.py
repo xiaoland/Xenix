@@ -24,7 +24,7 @@ from .knowledge_import_service import KnowledgeImportService
 from .knowledge_import_worker import read_worker_result
 from .knowledge_service import KnowledgeService
 from .knowledge_vector_store import KnowledgeVectorRecord, LanceKnowledgeVectorStore
-from .paddle_ocr_service import (
+from .paddle_ocr import (
     PaddleOcrDeploymentService,
     PaddleOcrState,
     ReleasePaddleOcrBundleSource,

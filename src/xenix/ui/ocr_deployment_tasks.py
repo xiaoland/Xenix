@@ -7,7 +7,7 @@ from typing import Protocol
 from PySide6.QtCore import QObject, QRunnable, Signal
 
 from ..exceptions import ValidationError, report_exception
-from ..services.paddle_ocr_service import (
+from ..services.paddle_ocr import (
     PaddleOcrState,
     PaddleOcrStatus,
 )

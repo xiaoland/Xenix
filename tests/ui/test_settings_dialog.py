@@ -14,7 +14,7 @@ from xenix.services.embedding_service import EmbeddingSettingsService
 from xenix.services.knowledge_index_service import KnowledgeIndexOverview
 from xenix.services.llm import LLMService, LLMSettingsService
 from xenix.services.ml.worker_settings import MLWorkerSettingsService
-from xenix.ui.settings_dialog import SettingsDialog
+from xenix.ui.settings import SettingsDialog
 
 
 def _overview(state: str, *, unit_count: int) -> KnowledgeIndexOverview:

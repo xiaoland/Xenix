@@ -34,7 +34,7 @@ from ...services.llm import (
     LLMSettingsService,
 )
 from ...services.ml.worker_settings import MLWorkerSettingsService
-from ...services.paddle_ocr_service import PaddleOcrDeploymentService
+from ...services.paddle_ocr import PaddleOcrDeploymentService
 from ...services.update_service import UpdateService
 from ..about_dialog import AboutDialog
 from ..semantic_identity import identify

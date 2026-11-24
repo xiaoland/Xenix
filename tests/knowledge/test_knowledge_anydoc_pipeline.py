@@ -14,6 +14,8 @@ from xenix.services.knowledge_pipeline import (
     FileProbe,
     NormalizedSource,
     ParserRouter,
+)
+from xenix.services.knowledge_pipeline.parsing import (
     _anydoc_convert,
     _bounded_markdown_lines,
     _markdown_to_docling_document,

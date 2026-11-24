@@ -12,7 +12,7 @@ from xenix.services.embedding_service import (
 )
 from xenix.services.llm import LLMService, LLMSettingsService
 from xenix.services.ml.worker_settings import MLWorkerSettingsService
-from xenix.ui.settings_dialog import SettingsDialog
+from xenix.ui.settings import SettingsDialog
 
 
 def test_embedding_model_change_requires_user_confirmation_before_rebuild(

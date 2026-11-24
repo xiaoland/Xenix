@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from ..audit_center import AuditCenterDialog
     from ..job_center import JobCenterDialog
     from ..knowledge_workspace import KnowledgeWorkspaceDialog
-    from ..settings_dialog import SettingsDialog
+    from ..settings import SettingsDialog
     from ..software_update import SoftwareUpdateController
 
 

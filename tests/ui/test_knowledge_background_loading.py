@@ -12,7 +12,7 @@ from xenix.services.knowledge_workspace_service import (
     KnowledgeWorkspaceDocumentsState,
     KnowledgeWorkspaceStatus,
 )
-from xenix.services.paddle_ocr_service import PaddleOcrState, PaddleOcrStatus
+from xenix.services.paddle_ocr import PaddleOcrState, PaddleOcrStatus
 from xenix.ui.knowledge_index_ui import KnowledgeIndexRebuildDialog
 from xenix.ui.knowledge_workspace.workspace_dialog import KnowledgeWorkspaceDialog
 from xenix.ui.knowledge_workspace.task_queue_dialog import KnowledgeTaskQueueDialog
