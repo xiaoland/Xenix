@@ -8,4 +8,4 @@ Lint/type-check caches and obsolete review bundles are reproducible output. Befo
 
 Local runtime homes, original mock data, managed artifacts, provider configuration, the active virtual environment and release manifests are separate from caches. Follow their owning lifecycle or backup procedure instead of deleting them during a generic workspace sweep. A dirty Git tree and disk usage measure different things; ignored local data can be large while a tracked checkout is clean.
 
-Close task packets with an explicit stage status and preserve original evidence paths. Promote current principles into their durable document owner, retain uncertainty in the task archive and mark release notes as preparation until publication. Prior-version review bundles are evidence for tested functionality, not final release artifacts.
+Promote durable product, architecture, and operational decisions into their owning document under `docs/` before closing a task, and remove finished volatile task packets instead of referencing them from deployment runbooks. Prior-version review bundles are evidence for tested functionality, not final release artifacts.
