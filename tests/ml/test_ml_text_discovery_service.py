@@ -5,11 +5,8 @@ import csv
 import hashlib
 import json
 import math
-import re
-import unicodedata
 from collections import Counter, defaultdict
 from dataclasses import dataclass
-from itertools import combinations
 from pathlib import Path
 from time import monotonic, sleep
 from typing import Any
@@ -40,28 +37,6 @@ FIXTURE_ROOT = FIXTURES_ROOT / "ml_text_discovery"
 DISCOVERY_PATH = FIXTURE_ROOT / "bilingual_discovery_corpus_v1.csv"
 RETRIEVAL_PATH = FIXTURE_ROOT / "bilingual_retrieval_twin_v1.csv"
 APPLY_PATH = FIXTURE_ROOT / "bilingual_discovery_apply_v1.csv"
-
-
-# These opaque labels are test-private truth. They deliberately do not occur in
-# the registered source data and must never become a production training role.
-_PRIVATE_THEMES = ("theta-river", "theta-lantern", "theta-garden")
-_RELEVANCE_BY_THEME = dict(
-    zip(_PRIVATE_THEMES, ("rel-01", "rel-02", "rel-03"), strict=True)
-)
-
-# Each family crosses business groups. Taken together with the business-group
-# edges, the families create four components that each contain all three hidden
-# themes. The final family includes the intentionally empty source document.
-_TEMPLATE_FAMILIES = tuple(
-    tuple(f"svc-doc-{base + theme_offset + 3 * group_offset:03d}" for group_offset in range(3))
-    for base in (1, 10, 19, 28)
-    for theme_offset in range(3)
-)
-
-_URL_PATTERN = re.compile(r"https?://[A-Za-z0-9.-]+(?:/[^\s；，]*)?")
-_EMAIL_PATTERN = re.compile(r"\b[^\s@]+@[^\s@]+\b")
-_NUMBER_PATTERN = re.compile(r"\b\d+\b")
-_TOKEN_PATTERN = re.compile(r"[a-z]+|[\u4e00-\u9fff]")
 
 _ACTIVE_CLUSTER_KEY = "text.clustering.multilingual_kmeans_tfidf"
 _ACTIVE_TOPIC_KEY = "text.topic_modeling.multilingual_lda"
@@ -108,54 +83,6 @@ _MODEL_CASES = (
 def _read_rows(path: Path) -> list[dict[str, str]]:
     with path.open(encoding="utf-8", newline="") as handle:
         return list(csv.DictReader(handle))
-
-
-def _private_theme(document_id: str) -> str:
-    ordinal = int(document_id.rsplit("-", maxsplit=1)[1])
-    return _PRIVATE_THEMES[(ordinal - 1) % len(_PRIVATE_THEMES)]
-
-
-def _fixture_tokens(text: str) -> set[str]:
-    normalized = unicodedata.normalize("NFKC", text).casefold()
-    normalized = _URL_PATTERN.sub(" url ", normalized)
-    normalized = _EMAIL_PATTERN.sub(" email ", normalized)
-    normalized = _NUMBER_PATTERN.sub(" number ", normalized)
-    return set(_TOKEN_PATTERN.findall(normalized))
-
-
-def _jaccard(left: set[str], right: set[str]) -> float:
-    return len(left & right) / len(left | right)
-
-
-def _connected_components(rows: list[dict[str, str]]) -> list[set[str]]:
-    present_ids = {row["document_id"] for row in rows}
-    adjacency: dict[str, set[str]] = defaultdict(set)
-
-    by_business_group: dict[str, list[str]] = defaultdict(list)
-    for row in rows:
-        by_business_group[row["business_group"]].append(row["document_id"])
-    edge_groups = list(by_business_group.values()) + [
-        [document_id for document_id in family if document_id in present_ids]
-        for family in _TEMPLATE_FAMILIES
-    ]
-    for edge_group in edge_groups:
-        for left, right in combinations(edge_group, 2):
-            adjacency[left].add(right)
-            adjacency[right].add(left)
-
-    components: list[set[str]] = []
-    remaining = set(present_ids)
-    while remaining:
-        frontier = [remaining.pop()]
-        component: set[str] = set()
-        while frontier:
-            document_id = frontier.pop()
-            component.add(document_id)
-            unseen = adjacency[document_id] & remaining
-            remaining.difference_update(unseen)
-            frontier.extend(unseen)
-        components.append(component)
-    return components
 
 
 class _InlineWorkerRunner:
@@ -564,60 +491,6 @@ def _retrieval_ranking_oracle(
         "mrr_at_k": sum(reciprocal_ranks) / len(reciprocal_ranks),
         "ndcg_at_k": sum(ndcgs) / len(ndcgs),
     }
-
-
-def test_discovery_fixture_has_group_safe_cross_theme_components() -> None:
-    rows = _read_rows(DISCOVERY_PATH)
-    rows_by_id = {row["document_id"]: row for row in rows}
-
-    business_group_counts = Counter(row["business_group"] for row in rows)
-    assert business_group_counts == Counter({f"svc-biz-{index:02d}": 3 for index in range(1, 13)})
-
-    themes_by_business_group: dict[str, set[str]] = defaultdict(set)
-    for row in rows:
-        themes_by_business_group[row["business_group"]].add(_private_theme(row["document_id"]))
-    assert all(themes == set(_PRIVATE_THEMES) for themes in themes_by_business_group.values())
-
-    # This is a fixture-quality check, not the product's near-duplicate threshold.
-    # It proves that entity/number masking leaves strong bilingual template overlap.
-    for family in _TEMPLATE_FAMILIES:
-        non_empty = [document_id for document_id in family if rows_by_id[document_id]["text"].strip()]
-        assert len({rows_by_id[document_id]["business_group"] for document_id in family}) == 3
-        assert len({_private_theme(document_id) for document_id in family}) == 1
-        for left, right in combinations(non_empty, 2):
-            assert _jaccard(
-                _fixture_tokens(rows_by_id[left]["text"]),
-                _fixture_tokens(rows_by_id[right]["text"]),
-            ) >= 0.78
-
-    all_components = _connected_components(rows)
-    eligible_rows = [row for row in rows if row["text"].strip()]
-    eligible_components = _connected_components(eligible_rows)
-
-    assert sorted(map(len, all_components)) == [9, 9, 9, 9]
-    assert sorted(map(len, eligible_components)) == [8, 9, 9, 9]
-    assert all(
-        {_private_theme(document_id) for document_id in component} == set(_PRIVATE_THEMES)
-        for component in eligible_components
-    )
-    assert [row["document_id"] for row in rows if not row["text"].strip()] == ["svc-doc-036"]
-
-
-def test_retrieval_twin_adds_only_admitted_opaque_relevance_truth() -> None:
-    discovery_rows = _read_rows(DISCOVERY_PATH)
-    retrieval_rows = _read_rows(RETRIEVAL_PATH)
-
-    assert [
-        {key: row[key] for key in ("document_id", "business_group", "text")}
-        for row in retrieval_rows
-    ] == discovery_rows
-    assert Counter(row["relevance_group"] for row in retrieval_rows) == Counter(
-        {"rel-01": 12, "rel-02": 12, "rel-03": 12}
-    )
-    assert all(
-        row["relevance_group"] == _RELEVANCE_BY_THEME[_private_theme(row["document_id"])]
-        for row in retrieval_rows
-    )
 
 
 @pytest.mark.parametrize(

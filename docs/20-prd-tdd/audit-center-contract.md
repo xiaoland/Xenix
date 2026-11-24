@@ -34,6 +34,6 @@ Application Composition 构造查询服务与窗口工厂，AuxiliaryWindowCoord
 
 ## 验证入口
 
-`tests/test_audit_service.py` 验证范围、证据、解释版本、跨会话复用与文件/会话丢失；`tests/storage/test_audit_migration.py` 验证前向升级、当前 ORM 读取及事务回滚。
-`tests/ui/test_audit_center.py` 与 `tests/runtime/test_job_center.py` 验证异步代次、筛选、取消和中心导航；`scripts/ui_lab/audit_scenarios.py` 用合成证据驱动生产控件，覆盖中英文、紧凑布局、未解读、历史缺失、截断图表和任务失败状态。
+`tests/audit/test_audit_service.py` 验证范围、证据、解释版本、跨会话复用与文件/会话丢失；`tests/storage/test_audit_migration.py` 验证前向升级、当前 ORM 读取及事务回滚。
+`tests/ui/test_audit_center.py` 与 `tests/ui/test_job_center.py` 验证异步代次、筛选、取消和中心导航；`scripts/ui_lab/audit_scenarios.py` 用合成证据驱动生产控件，覆盖中英文、紧凑布局、未解读、历史缺失、截断图表和任务失败状态。
 自动化验证保存的是结构与交互契约，不证明某次真实 Agent 解读的业务判断正确；该判断仍需要对照本次任务证据。

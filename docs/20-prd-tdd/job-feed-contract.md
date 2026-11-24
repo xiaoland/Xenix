@@ -58,7 +58,7 @@ Service, status, and case-insensitive text filters combine before the display li
 
 ## Verification
 
-Scheduling and recovery behavior is covered by `tests/test_job_scheduler.py` and `tests/test_job_service.py`; Knowledge dispatch by `tests/test_knowledge_job_handlers.py`; the Job Center feed projection by `tests/runtime/test_job_center.py`. Persistence and backfill are covered by the migration tests under `tests/storage/`.
+Scheduling and recovery behavior is covered by `tests/runtime/test_job_scheduler.py` and `tests/runtime/test_job_service.py`; Knowledge dispatch by `tests/knowledge/test_knowledge_job_handlers.py`; the Job Center feed projection by `tests/ui/test_job_center.py`. Persistence and backfill are covered by the migration tests under `tests/storage/`.
 
 ## 会话范围与执行详情
 

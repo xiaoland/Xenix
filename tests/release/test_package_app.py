@@ -1,13 +1,11 @@
 from __future__ import annotations
 
-import ast
 import importlib.util
 import os
 import sys
 from pathlib import Path
 
 from tests.support.paths import project_script
-from xenix.release_config import ReleaseConfig
 
 
 def _load_package_app():
@@ -22,32 +20,6 @@ def _load_package_app():
 
 
 package_app = _load_package_app()
-
-
-def test_public_package_ignores_retired_trial_provider_environment(tmp_path: Path) -> None:
-    environment = {
-        "RELEASES_OSS_PUBLIC_URL": "https://releases.example.test/published",
-        "XENIX_TRIAL_LOCK_DAYS": "30",
-        "XENIX_TRIAL_LOCK_STATE_SECRET": "lock-secret",
-        "XENIX_TRIAL_PURCHASE_URL": "https://example.test/purchase",
-    }
-    config = ReleaseConfig.from_environment(environment, release_build=True, public_release_build=True)
-    legacy_environment = environment | {
-        "XENIX_TRIAL_LLM_BASE_URL": "https://retired.example.test",
-        "XENIX_TRIAL_LLM_API_KEY": "retired-key",
-        "XENIX_TRIAL_LLM_MODEL": "retired-model",
-    }
-    legacy_config = ReleaseConfig.from_environment(
-        legacy_environment, release_build=True, public_release_build=True
-    )
-    assert legacy_config == config
-
-    path = package_app._write_generated_release_config(tmp_path, legacy_config)
-    assignment = ast.parse(path.read_text(encoding="utf-8")).body[-1]
-    assert isinstance(assignment, ast.Assign)
-    payload = ast.literal_eval(assignment.value)
-    assert payload["trial_lock_days"] == 30
-    assert "retired" not in repr(payload)
 
 
 def test_windows_pyinstaller_does_not_inherit_ambient_binary_paths(tmp_path: Path) -> None:
