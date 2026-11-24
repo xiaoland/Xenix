@@ -1,18 +1,26 @@
 from __future__ import annotations
 
 import subprocess
+import sys
 from pathlib import Path
 
 from PySide6.QtCore import QLibraryInfo
 
 
 def _resolve_lupdate() -> Path:
-    command = Path(
-        QLibraryInfo.path(QLibraryInfo.LibraryPath.LibraryExecutablesPath)
-    ) / "lupdate.exe"
-    if not command.is_file():
-        raise SystemExit("lupdate is not available in the active PySide6 installation.")
-    return command
+    import PySide6
+
+    names = ("lupdate.exe", "lupdate") if sys.platform == "win32" else ("lupdate", "lupdate.exe")
+    search_dirs = (
+        Path(QLibraryInfo.path(QLibraryInfo.LibraryPath.LibraryExecutablesPath)),
+        Path(PySide6.__file__).resolve().parent,
+    )
+    for directory in search_dirs:
+        for name in names:
+            candidate = directory / name
+            if candidate.is_file():
+                return candidate
+    raise SystemExit("lupdate is not available in the active PySide6 installation.")
 
 
 def main() -> int:

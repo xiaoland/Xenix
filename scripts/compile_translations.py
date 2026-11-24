@@ -8,12 +8,19 @@ from PySide6.QtCore import QLibraryInfo
 
 
 def _resolve_lrelease() -> Path:
-    command = Path(
-        QLibraryInfo.path(QLibraryInfo.LibraryPath.LibraryExecutablesPath)
-    ) / "lrelease.exe"
-    if not command.is_file():
-        raise SystemExit("lrelease is not available in the active PySide6 installation.")
-    return command
+    import PySide6
+
+    names = ("lrelease.exe", "lrelease") if sys.platform == "win32" else ("lrelease", "lrelease.exe")
+    search_dirs = (
+        Path(QLibraryInfo.path(QLibraryInfo.LibraryPath.LibraryExecutablesPath)),
+        Path(PySide6.__file__).resolve().parent,
+    )
+    for directory in search_dirs:
+        for name in names:
+            candidate = directory / name
+            if candidate.is_file():
+                return candidate
+    raise SystemExit("lrelease is not available in the active PySide6 installation.")
 
 
 def _supported_translation_names(project_root: Path) -> frozenset[str]:

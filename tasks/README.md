@@ -2,17 +2,13 @@
 
 Task packets preserve historical reasoning and evidence. Old next-step statements are not current authorization; durable product and architecture truth belongs to [docs](../docs/index.md).
 
-## Current stage
+## Archive status
 
-[1.5.0 development closeout](minor-1-5-closeout/packet.md) owns local cleanup, documentation consolidation and minor release preparation.
+All existing directories under `tasks/` are closed historical packets and evidence snapshots from v1.2–v1.6 development; none represents an active workstream unless a new user request explicitly reopens one.
 
-## Closed benchmark stage — 2026-09-15
+- [Audit center & 1.6.0 acceptance](audit-center/results.md): closed 2026-09-20; durable contracts live in [audit-center-contract.md](../docs/20-prd-tdd/audit-center-contract.md) and [release-1.6.md](../docs/40-deployment/release-1.6.md).
+- [1.5.0 development closeout](minor-1-5-closeout/packet.md): closed historical release closeout referenced by [release-1.5.md](../docs/40-deployment/release-1.5.md).
+- [Architecture refactor](architecture-refactor/README.md) & [maintainability optimization](maintainability-optimization/packet.md): completed structural refactor records.
+- Closed benchmark stage (2026-09-15): the user ended benchmark optimization after text classification changes were committed as `24edc1b`. Historical results remain intact across [text-classification-strategies](text-classification-strategies/packet.md), [harness-confirmation-diagnosis](harness-confirmation-diagnosis/packet.md), [harness-delivery-diagnosis](harness-delivery-diagnosis/packet.md), and [harness-benchmark-full-run](harness-benchmark-full-run/packet.md); closure does not mean all cases passed.
 
-The user ended benchmark optimization and related failure investigation after text classification changes were committed as 24edc1b. Historical results remain intact; closure does not mean all cases passed. Do not resume experiments or repairs from an old packet's next-step text without a new request.
-
-- [Latest implementation and targeted acceptance](text-classification-strategies/packet.md): 28/30 routing predictions correct; two semantic errors and high decision cost remain recorded.
-- [Confirmation diagnosis](harness-confirmation-diagnosis/packet.md): the original restock timeout has no proven blocking stack; local successful runs do not establish its root cause.
-- [Delivery and explanation diagnosis](harness-delivery-diagnosis/packet.md): historical evidence and reasoning; later implementations have dedicated packets.
-- [Full-run ledger](harness-benchmark-full-run/packet.md): dated attempts and corrections, not current full-suite acceptance.
-
-Other directories retain their original paths so historical links remain valid. Generated runtime data, provider configuration and full local reports remain outside this tracked archive.
+Historical directories retain their original paths so cross-packet links and release-note references remain valid. Generated runtime data, provider configuration, and full local reports remain outside this tracked archive.
