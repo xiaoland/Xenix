@@ -1,102 +1,48 @@
 from __future__ import annotations
 
 import gc
-import json
-import logging
 import math
-import os
-import re
-import shutil
-import time
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
-from dataclasses import dataclass
-from enum import StrEnum
-from hashlib import sha256
 from pathlib import Path, PurePosixPath
-from threading import Lock, RLock
 from uuid import uuid4
 
-from ..config import AppPaths
-from ..exceptions import ValidationError, report_exception
-from .storage.layout import (
+from ...config import AppPaths
+from ...exceptions import report_exception
+from ..storage.layout import (
     knowledge_indexes_root,
     knowledge_root,
     knowledge_staging_root,
 )
-
-_TABLE_NAME = "units"
-_MANIFEST_FILE_NAME = "manifest.json"
-_MANIFEST_SCHEMA_VERSION = 2
-_MAX_MANIFEST_BYTES = 4_096
-_MANIFEST_KEYS = frozenset(
-    {
-        "schema_version",
-        "generation_id",
-        "corpus_fingerprint",
-        "profile_fingerprint",
-        "dimensions",
-        "unit_count",
-        "unit_ids_sha256",
-    }
+from .contracts import (
+    TABLE_NAME,
+    TRASH_DIRECTORY_NAME,
+    TRASH_TOKEN_PATTERN,
+    VECTOR_STAGE_PREFIX,
+    KnowledgeVectorGenerationState,
+    KnowledgeVectorRecord,
+    KnowledgeVectorStoreError,
+    lifecycle_for,
 )
-_GENERATION_ID_PATTERN = re.compile(r"^[1-9][0-9]*$")
-_SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
-_MAX_FINGERPRINT_CHARACTERS = 256
-_VECTOR_STAGE_PREFIX = "vector-"
-_TRASH_DIRECTORY_NAME = ".vector-trash"
-_TRASH_TOKEN_PATTERN = re.compile(
-    r"^vector-(?:generation|stage)-[A-Za-z0-9_-]{1,80}-[0-9a-f]{32}$"
+from .filesystem import (
+    assert_within,
+    discard_exception_traceback,
+    is_link_like,
+    remove_path_with_retries,
+    replace_with_retries,
 )
-_WINDOWS_SHARING_VIOLATIONS = frozenset({5, 32, 33})
-_WINDOWS_REPARSE_POINT = 0x0400
-_SHARING_RETRY_DELAYS = (0.02, 0.08)
-
-
-class _VectorLifecycle:
-    def __init__(self) -> None:
-        self._lock = RLock()
-
-    @contextmanager
-    def hold(self) -> Iterator[None]:
-        with self._lock:
-            yield
-
-
-_LIFECYCLES_GUARD = Lock()
-_LIFECYCLES: dict[str, _VectorLifecycle] = {}
-
-
-def _lifecycle_for(root: Path) -> _VectorLifecycle:
-    key = os.path.normcase(str(root.resolve()))
-    with _LIFECYCLES_GUARD:
-        lifecycle = _LIFECYCLES.get(key)
-        if lifecycle is None:
-            lifecycle = _VectorLifecycle()
-            _LIFECYCLES[key] = lifecycle
-        return lifecycle
-
-
-class KnowledgeVectorStoreError(ValidationError):
-    def __init__(self, message: str = "Knowledge vector storage is unavailable.") -> None:
-        super().__init__(
-            message,
-            error_code="knowledge_vector_store_unavailable",
-            retryable=True,
-        )
-
-
-@dataclass(frozen=True)
-class KnowledgeVectorRecord:
-    unit_id: int
-    vector: tuple[float, ...]
-
-
-class KnowledgeVectorGenerationState(StrEnum):
-    USABLE = "usable"
-    MISSING = "missing"
-    CORRUPT = "corrupt"
-    UNSAFE = "unsafe"
+from .manifest import (
+    manifest_payload,
+    read_manifest,
+    unit_ids_digest,
+    validate_generation_id,
+    validated_fingerprint,
+    validated_positive_int,
+    validated_records,
+    validated_unit_ids,
+    validated_vector,
+    write_manifest,
+)
 
 
 class LanceKnowledgeVectorStore:
@@ -106,8 +52,8 @@ class LanceKnowledgeVectorStore:
         self._knowledge_root = knowledge_root(paths)
         self._indexes_root = knowledge_indexes_root(paths)
         self._staging_root = knowledge_staging_root(paths)
-        self._trash_root = self._indexes_root / _TRASH_DIRECTORY_NAME
-        self._lifecycle = _lifecycle_for(self._knowledge_root)
+        self._trash_root = self._indexes_root / TRASH_DIRECTORY_NAME
+        self._lifecycle = lifecycle_for(self._knowledge_root)
 
     @contextmanager
     def lifecycle(self) -> Iterator[None]:
@@ -144,23 +90,23 @@ class LanceKnowledgeVectorStore:
         corpus_fingerprint: str,
         profile_fingerprint: str,
     ) -> str:
-        self._validate_generation_id(generation_id)
-        corpus_fingerprint = self._validated_fingerprint(corpus_fingerprint)
-        profile_fingerprint = self._validated_fingerprint(profile_fingerprint)
-        dimensions = self._validated_positive_int(dimensions)
-        normalized = self._validated_records(records, dimensions=dimensions)
+        validate_generation_id(generation_id)
+        corpus_fingerprint = validated_fingerprint(corpus_fingerprint)
+        profile_fingerprint = validated_fingerprint(profile_fingerprint)
+        dimensions = validated_positive_int(dimensions)
+        normalized = validated_records(records, dimensions=dimensions)
         unit_ids = [record.unit_id for record in normalized]
         stage = self._staging_root / f"vector-{generation_id}"
         final = self._indexes_root / str(generation_id)
         stage_created = False
         try:
-            self._assert_within(stage, self._staging_root)
-            self._assert_within(final, self._indexes_root)
+            assert_within(stage, self._staging_root)
+            assert_within(final, self._indexes_root)
             if (
                 stage.exists()
-                or self._is_link_like(stage)
+                or is_link_like(stage)
                 or final.exists()
-                or self._is_link_like(final)
+                or is_link_like(final)
             ):
                 raise KnowledgeVectorStoreError()
             self._staging_root.mkdir(parents=True, exist_ok=True)
@@ -169,7 +115,7 @@ class LanceKnowledgeVectorStore:
             stage.mkdir(parents=False)
             stage_created = True
             self._write_lance_table(stage, normalized, dimensions=dimensions)
-            self._write_manifest(
+            write_manifest(
                 stage,
                 generation_id=generation_id,
                 corpus_fingerprint=corpus_fingerprint,
@@ -179,7 +125,7 @@ class LanceKnowledgeVectorStore:
             )
             if not self._generation_matches(
                 stage,
-                expected_manifest=self._manifest_payload(
+                expected_manifest=manifest_payload(
                     generation_id=generation_id,
                     corpus_fingerprint=corpus_fingerprint,
                     profile_fingerprint=profile_fingerprint,
@@ -189,7 +135,7 @@ class LanceKnowledgeVectorStore:
                 expected_unit_ids=unit_ids,
             ):
                 raise KnowledgeVectorStoreError()
-            if not self._replace_with_retries(stage, final):
+            if not replace_with_retries(stage, final):
                 raise KnowledgeVectorStoreError()
         except Exception as exc:
             if stage_created:
@@ -236,16 +182,12 @@ class LanceKnowledgeVectorStore:
         expected_dimensions: int,
     ) -> bool:
         try:
-            self._validate_generation_id(expected_generation_id)
-            expected_corpus_fingerprint = self._validated_fingerprint(
-                expected_corpus_fingerprint
-            )
-            expected_profile_fingerprint = self._validated_fingerprint(
-                expected_profile_fingerprint
-            )
-            expected_count = self._validated_positive_int(expected_count)
-            expected_dimensions = self._validated_positive_int(expected_dimensions)
-            unit_ids = self._validated_unit_ids(expected_unit_ids)
+            validate_generation_id(expected_generation_id)
+            expected_corpus_fingerprint = validated_fingerprint(expected_corpus_fingerprint)
+            expected_profile_fingerprint = validated_fingerprint(expected_profile_fingerprint)
+            expected_count = validated_positive_int(expected_count)
+            expected_dimensions = validated_positive_int(expected_dimensions)
+            unit_ids = validated_unit_ids(expected_unit_ids)
             if len(unit_ids) != expected_count:
                 return False
             expected_relative_path = f"indexes/{expected_generation_id}"
@@ -254,7 +196,7 @@ class LanceKnowledgeVectorStore:
             path = self._resolve_generation_path(relative_path)
             return self._generation_matches(
                 path,
-                expected_manifest=self._manifest_payload(
+                expected_manifest=manifest_payload(
                     generation_id=expected_generation_id,
                     corpus_fingerprint=expected_corpus_fingerprint,
                     profile_fingerprint=expected_profile_fingerprint,
@@ -290,7 +232,7 @@ class LanceKnowledgeVectorStore:
     ) -> list[int]:
         if limit < 1:
             raise KnowledgeVectorStoreError()
-        vector = self._validated_vector(query_vector)
+        vector = validated_vector(query_vector)
         database = None
         table = None
         query = None
@@ -303,7 +245,7 @@ class LanceKnowledgeVectorStore:
 
             path = self._resolve_generation_path(relative_path)
             database = lancedb.connect(str(path))
-            table = database.open_table(_TABLE_NAME)
+            table = database.open_table(TABLE_NAME)
             query = table.search(list(vector))
             query = query.distance_type("cosine")
             query = query.select(["unit_id", "_distance"])
@@ -313,7 +255,7 @@ class LanceKnowledgeVectorStore:
             unit_ids = [int(value) for value in unit_id_column.to_pylist()]
         except Exception as exc:
             failed = True
-            self._discard_exception_traceback(exc)
+            discard_exception_traceback(exc)
         finally:
             unit_id_column = None
             result = None
@@ -345,7 +287,7 @@ class LanceKnowledgeVectorStore:
                 )
             except KnowledgeVectorStoreError:
                 return KnowledgeVectorGenerationState.UNSAFE
-            if self._is_link_like(path):
+            if is_link_like(path):
                 return KnowledgeVectorGenerationState.UNSAFE
             if not path.exists():
                 return KnowledgeVectorGenerationState.MISSING
@@ -381,16 +323,16 @@ class LanceKnowledgeVectorStore:
             except OSError as exc:
                 raise KnowledgeVectorStoreError() from exc
             for child in children:
-                if child.name == _TRASH_DIRECTORY_NAME or self._is_link_like(child):
+                if child.name == TRASH_DIRECTORY_NAME or is_link_like(child):
                     continue
                 try:
-                    self._validate_generation_id(child.name)
+                    validate_generation_id(child.name)
                 except KnowledgeVectorStoreError:
                     continue
                 if not child.is_dir():
                     continue
                 try:
-                    manifest = self._read_manifest(child)
+                    manifest = read_manifest(child)
                 except (KnowledgeVectorStoreError, OSError):
                     continue
                 if str(manifest["generation_id"]) == child.name:
@@ -410,7 +352,7 @@ class LanceKnowledgeVectorStore:
                 relative_path,
                 expected_generation_id=expected_generation_id,
             )
-            if self._is_link_like(path):
+            if is_link_like(path):
                 raise KnowledgeVectorStoreError()
             if not path.exists():
                 return None
@@ -458,13 +400,13 @@ class LanceKnowledgeVectorStore:
             tokens: list[str] = []
             for child in children:
                 if (
-                    not child.name.startswith(_VECTOR_STAGE_PREFIX)
-                    or self._is_link_like(child)
+                    not child.name.startswith(VECTOR_STAGE_PREFIX)
+                    or is_link_like(child)
                 ):
                     continue
-                generation_id = child.name.removeprefix(_VECTOR_STAGE_PREFIX)
+                generation_id = child.name.removeprefix(VECTOR_STAGE_PREFIX)
                 try:
-                    self._validate_generation_id(generation_id)
+                    validate_generation_id(generation_id)
                     if not child.is_dir() or child.stat().st_mtime > stale_before:
                         continue
                     token = self._quarantine_path(
@@ -480,10 +422,10 @@ class LanceKnowledgeVectorStore:
 
     def list_quarantined(self) -> tuple[str, ...]:
         with self.lifecycle():
-            if self._is_link_like(self._trash_root) or not self._trash_root.is_dir():
+            if is_link_like(self._trash_root) or not self._trash_root.is_dir():
                 return ()
             try:
-                self._assert_within(self._trash_root, self._indexes_root)
+                assert_within(self._trash_root, self._indexes_root)
                 children = tuple(self._trash_root.iterdir())
             except (KnowledgeVectorStoreError, OSError):
                 return ()
@@ -491,26 +433,26 @@ class LanceKnowledgeVectorStore:
                 sorted(
                     child.name
                     for child in children
-                    if _TRASH_TOKEN_PATTERN.fullmatch(child.name)
-                    and not self._is_link_like(child)
+                    if TRASH_TOKEN_PATTERN.fullmatch(child.name)
+                    and not is_link_like(child)
                 )
             )
 
     def delete_quarantined(self, token: str) -> bool:
         """Best-effort deletion; a sharing violation leaves private trash retryable."""
 
-        if not _TRASH_TOKEN_PATTERN.fullmatch(str(token)):
+        if not TRASH_TOKEN_PATTERN.fullmatch(str(token)):
             raise KnowledgeVectorStoreError()
         with self.lifecycle():
-            if self._is_link_like(self._trash_root):
+            if is_link_like(self._trash_root):
                 return False
             path = self._trash_root / token
             try:
-                self._assert_within(self._trash_root, self._indexes_root)
-                self._assert_within(path, self._trash_root)
+                assert_within(self._trash_root, self._indexes_root)
+                assert_within(path, self._trash_root)
             except KnowledgeVectorStoreError:
                 return False
-            return self._remove_path_with_retries(path, best_effort=True)
+            return remove_path_with_retries(path, best_effort=True)
 
     def _write_lance_table(
         self,
@@ -546,12 +488,12 @@ class LanceKnowledgeVectorStore:
                 schema=schema,
             )
             database = lancedb.connect(str(path))
-            table = database.create_table(_TABLE_NAME, data=payload, mode="create")
+            table = database.create_table(TABLE_NAME, data=payload, mode="create")
             if table.count_rows() != len(records):
                 raise KnowledgeVectorStoreError()
         except Exception as exc:
             failed = True
-            self._discard_exception_traceback(exc)
+            discard_exception_traceback(exc)
         finally:
             table = None
             database = None
@@ -570,9 +512,8 @@ class LanceKnowledgeVectorStore:
     ) -> bool:
         if not path.is_dir():
             return False
-        if self._read_manifest(path) != expected_manifest:
+        if read_manifest(path) != expected_manifest:
             return False
-
         return self._read_generation_unit_ids(
             path,
             expected_count=int(expected_manifest["unit_count"]),
@@ -589,16 +530,12 @@ class LanceKnowledgeVectorStore:
         expected_count: int,
         expected_dimensions: int,
     ) -> bool:
-        self._validate_generation_id(expected_generation_id)
-        expected_corpus_fingerprint = self._validated_fingerprint(
-            expected_corpus_fingerprint
-        )
-        expected_profile_fingerprint = self._validated_fingerprint(
-            expected_profile_fingerprint
-        )
-        expected_count = self._validated_positive_int(expected_count)
-        expected_dimensions = self._validated_positive_int(expected_dimensions)
-        manifest = self._read_manifest(path)
+        validate_generation_id(expected_generation_id)
+        expected_corpus_fingerprint = validated_fingerprint(expected_corpus_fingerprint)
+        expected_profile_fingerprint = validated_fingerprint(expected_profile_fingerprint)
+        expected_count = validated_positive_int(expected_count)
+        expected_dimensions = validated_positive_int(expected_dimensions)
+        manifest = read_manifest(path)
         if (
             manifest["generation_id"] != expected_generation_id
             or manifest["corpus_fingerprint"] != expected_corpus_fingerprint
@@ -612,7 +549,7 @@ class LanceKnowledgeVectorStore:
             expected_count=expected_count,
             expected_dimensions=expected_dimensions,
         )
-        return manifest["unit_ids_sha256"] == self._unit_ids_digest(unit_ids)
+        return manifest["unit_ids_sha256"] == unit_ids_digest(unit_ids)
 
     def _read_generation_unit_ids(
         self,
@@ -621,7 +558,6 @@ class LanceKnowledgeVectorStore:
         expected_count: int,
         expected_dimensions: int,
     ) -> list[int]:
-
         database = None
         table = None
         schema = None
@@ -635,13 +571,12 @@ class LanceKnowledgeVectorStore:
             import lancedb
 
             database = lancedb.connect(str(path))
-            table = database.open_table(_TABLE_NAME)
+            table = database.open_table(TABLE_NAME)
             schema = table.schema
             vector_type = schema.field("vector").type
             if (
                 table.count_rows() != expected_count
-                or getattr(vector_type, "list_size", None)
-                != expected_dimensions
+                or getattr(vector_type, "list_size", None) != expected_dimensions
             ):
                 raise KnowledgeVectorStoreError()
             else:
@@ -653,10 +588,10 @@ class LanceKnowledgeVectorStore:
                 actual_unit_ids = [int(value) for value in unit_id_column.to_pylist()]
                 if len(actual_unit_ids) != expected_count:
                     raise KnowledgeVectorStoreError()
-                actual_unit_ids = self._validated_unit_ids(actual_unit_ids)
+                actual_unit_ids = validated_unit_ids(actual_unit_ids)
         except Exception as exc:
             failed = True
-            self._discard_exception_traceback(exc)
+            discard_exception_traceback(exc)
         finally:
             unit_id_column = None
             payload = None
@@ -669,102 +604,6 @@ class LanceKnowledgeVectorStore:
         if failed:
             raise KnowledgeVectorStoreError() from None
         return actual_unit_ids
-
-    def _write_manifest(
-        self,
-        path: Path,
-        *,
-        generation_id: int,
-        corpus_fingerprint: str,
-        profile_fingerprint: str,
-        dimensions: int,
-        unit_ids: Sequence[int],
-    ) -> None:
-        payload = self._manifest_payload(
-            generation_id=generation_id,
-            corpus_fingerprint=corpus_fingerprint,
-            profile_fingerprint=profile_fingerprint,
-            dimensions=dimensions,
-            unit_ids=unit_ids,
-        )
-        encoded = json.dumps(
-            payload,
-            ensure_ascii=True,
-            sort_keys=True,
-            separators=(",", ":"),
-        ).encode("utf-8")
-        if not encoded or len(encoded) > _MAX_MANIFEST_BYTES:
-            raise KnowledgeVectorStoreError()
-        manifest_path = path / _MANIFEST_FILE_NAME
-        self._assert_within(manifest_path, path)
-        with manifest_path.open("xb") as handle:
-            handle.write(encoded)
-            handle.flush()
-            os.fsync(handle.fileno())
-
-    def _read_manifest(self, path: Path) -> dict[str, object]:
-        manifest_path = path / _MANIFEST_FILE_NAME
-        self._assert_within(manifest_path, path)
-        if self._is_link_like(manifest_path) or not manifest_path.is_file():
-            raise KnowledgeVectorStoreError()
-        with manifest_path.open("rb") as handle:
-            encoded = handle.read(_MAX_MANIFEST_BYTES + 1)
-        if not encoded or len(encoded) > _MAX_MANIFEST_BYTES:
-            raise KnowledgeVectorStoreError()
-        try:
-            payload = json.loads(encoded.decode("utf-8"))
-        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-            raise KnowledgeVectorStoreError() from exc
-        if not isinstance(payload, dict) or set(payload) != _MANIFEST_KEYS:
-            raise KnowledgeVectorStoreError()
-        if (
-            type(payload["schema_version"]) is not int
-            or payload["schema_version"] != _MANIFEST_SCHEMA_VERSION
-            or type(payload["generation_id"]) is not int
-            or type(payload["corpus_fingerprint"]) is not str
-            or type(payload["profile_fingerprint"]) is not str
-            or type(payload["dimensions"]) is not int
-            or type(payload["unit_count"]) is not int
-            or type(payload["unit_ids_sha256"]) is not str
-        ):
-            raise KnowledgeVectorStoreError()
-        self._validate_generation_id(payload["generation_id"])
-        self._validated_fingerprint(payload["corpus_fingerprint"])
-        self._validated_fingerprint(payload["profile_fingerprint"])
-        self._validated_positive_int(payload["dimensions"])
-        self._validated_positive_int(payload["unit_count"])
-        if not _SHA256_PATTERN.fullmatch(payload["unit_ids_sha256"]):
-            raise KnowledgeVectorStoreError()
-        return payload
-
-    @classmethod
-    def _manifest_payload(
-        cls,
-        *,
-        generation_id: int,
-        corpus_fingerprint: str,
-        profile_fingerprint: str,
-        dimensions: int,
-        unit_ids: Sequence[int],
-    ) -> dict[str, object]:
-        return {
-            "schema_version": _MANIFEST_SCHEMA_VERSION,
-            "generation_id": generation_id,
-            "corpus_fingerprint": corpus_fingerprint,
-            "profile_fingerprint": profile_fingerprint,
-            "dimensions": dimensions,
-            "unit_count": len(unit_ids),
-            "unit_ids_sha256": cls._unit_ids_digest(unit_ids),
-        }
-
-    @staticmethod
-    def _unit_ids_digest(unit_ids: Sequence[int]) -> str:
-        digest = sha256(b"xenix.knowledge.unit-ids.v1\0")
-        for unit_id in unit_ids:
-            encoded = str(unit_id).encode("ascii")
-            digest.update(len(encoded).to_bytes(8, "big"))
-            digest.update(encoded)
-        return digest.hexdigest()
 
     def _resolve_generation_path(self, value: str) -> Path:
         if type(value) is not str:
@@ -779,11 +618,11 @@ class LanceKnowledgeVectorStore:
             or relative.parts[0] != "indexes"
         ):
             raise KnowledgeVectorStoreError()
-        self._validate_generation_id(relative.parts[1])
+        validate_generation_id(relative.parts[1])
         path = self._knowledge_root.joinpath(*relative.parts)
-        if self._is_link_like(path):
+        if is_link_like(path):
             raise KnowledgeVectorStoreError()
-        self._assert_within(path, self._indexes_root)
+        assert_within(path, self._indexes_root)
         return path
 
     def _strict_generation_path(
@@ -792,114 +631,25 @@ class LanceKnowledgeVectorStore:
         *,
         expected_generation_id: int,
     ) -> Path:
-        self._validate_generation_id(expected_generation_id)
+        validate_generation_id(expected_generation_id)
         if value != f"indexes/{expected_generation_id}":
             raise KnowledgeVectorStoreError()
         return self._resolve_generation_path(value)
 
-    @staticmethod
-    def _validate_generation_id(value: int | str) -> None:
-        if not _GENERATION_ID_PATTERN.fullmatch(str(value)):
-            raise KnowledgeVectorStoreError()
-
-    @staticmethod
-    def _validated_fingerprint(value: str) -> str:
-        if (
-            type(value) is not str
-            or not 1 <= len(value) <= _MAX_FINGERPRINT_CHARACTERS
-            or any(
-                ord(character) < 0x21 or ord(character) > 0x7E
-                for character in value
-            )
-        ):
-            raise KnowledgeVectorStoreError()
-        return value
-
-    @staticmethod
-    def _validated_positive_int(value: int) -> int:
-        if type(value) is not int or value < 1:
-            raise KnowledgeVectorStoreError()
-        return value
-
-    @staticmethod
-    def _discard_exception_traceback(exc: Exception) -> None:
-        """Drop frames that may otherwise retain native Lance/Arrow handles."""
-        logging.getLogger(__name__).error(
-            "Knowledge vector operation failed", exc_info=(type(exc), exc, exc.__traceback__),
-        )
-        exc.__traceback__ = None
-        exc.__cause__ = None
-        exc.__context__ = None
-
-    @staticmethod
-    def _validated_unit_ids(values: Sequence[int]) -> list[int]:
-        if isinstance(values, (str, bytes)):
-            raise KnowledgeVectorStoreError()
-        normalized: list[int] = []
-        seen: set[int] = set()
-        for value in values:
-            unit_id = value
-            if type(unit_id) is not int or unit_id < 1 or unit_id in seen:
-                raise KnowledgeVectorStoreError()
-            seen.add(unit_id)
-            normalized.append(unit_id)
-        if not normalized:
-            raise KnowledgeVectorStoreError()
-        return normalized
-
-    @classmethod
-    def _validated_records(
-        cls,
-        records: Sequence[KnowledgeVectorRecord],
-        *,
-        dimensions: int,
-    ) -> list[KnowledgeVectorRecord]:
-        if dimensions < 1 or not records:
-            raise KnowledgeVectorStoreError()
-        normalized: list[KnowledgeVectorRecord] = []
-        seen: set[int] = set()
-        for record in records:
-            unit_id = record.unit_id
-            if type(unit_id) is not int or unit_id < 1 or unit_id in seen:
-                raise KnowledgeVectorStoreError()
-            vector = cls._validated_vector(record.vector)
-            if len(vector) != dimensions:
-                raise KnowledgeVectorStoreError()
-            seen.add(unit_id)
-            normalized.append(KnowledgeVectorRecord(unit_id=unit_id, vector=vector))
-        return normalized
-
-    @staticmethod
-    def _validated_vector(values: Sequence[float]) -> tuple[float, ...]:
-        try:
-            vector = tuple(float(value) for value in values)
-        except (TypeError, ValueError) as exc:
-            raise KnowledgeVectorStoreError() from exc
-        if not vector or not all(math.isfinite(value) for value in vector):
-            raise KnowledgeVectorStoreError()
-        return vector
-
-    @staticmethod
-    def _assert_within(path: Path, root: Path) -> None:
-        resolved_root = root.resolve()
-        resolved_path = path.resolve()
-        if resolved_path == resolved_root or not resolved_path.is_relative_to(resolved_root):
-            raise KnowledgeVectorStoreError()
-
     def _validate_storage_topology(self) -> None:
         try:
-            knowledge_root = self._knowledge_root.resolve()
+            resolved_knowledge_root = self._knowledge_root.resolve()
             expected_roots = (
-                (self._indexes_root, knowledge_root / "indexes"),
-                (self._staging_root, knowledge_root / "staging"),
+                (self._indexes_root, resolved_knowledge_root / "indexes"),
+                (self._staging_root, resolved_knowledge_root / "staging"),
                 (
                     self._trash_root,
-                    knowledge_root / "indexes" / _TRASH_DIRECTORY_NAME,
+                    resolved_knowledge_root / "indexes" / TRASH_DIRECTORY_NAME,
                 ),
             )
             for path, expected in expected_roots:
                 if (
-                    self._is_link_like(path)
+                    is_link_like(path)
                     or path.resolve() != expected
                     or (path.exists() and not path.is_dir())
                 ):
@@ -909,102 +659,36 @@ class LanceKnowledgeVectorStore:
         except (OSError, RuntimeError) as exc:
             raise KnowledgeVectorStoreError() from exc
 
-    @staticmethod
-    def _is_link_like(path: Path) -> bool:
-        is_junction = getattr(path, "is_junction", None)
-        if path.is_symlink() or bool(is_junction and is_junction()):
-            return True
-        if os.name != "nt":
-            return False
-        try:
-            attributes = int(getattr(path.lstat(), "st_file_attributes", 0))
-        except FileNotFoundError:
-            return False
-        return bool(attributes & _WINDOWS_REPARSE_POINT)
-
     def _quarantine_path(
         self,
         path: Path,
         *,
         owned_root: Path,
         kind: str,
-        identity: str,
+        identity: int | str,
     ) -> str:
         if kind not in {"generation", "stage"}:
             raise KnowledgeVectorStoreError()
-        self._validate_generation_id(identity)
-        if self._is_link_like(path):
+        validate_generation_id(identity)
+        if is_link_like(path):
             raise KnowledgeVectorStoreError()
-        self._assert_within(path, owned_root)
+        assert_within(path, owned_root)
         try:
             self._indexes_root.mkdir(parents=True, exist_ok=True)
             self._trash_root.mkdir(parents=False, exist_ok=True)
         except OSError as exc:
             raise KnowledgeVectorStoreError() from exc
         self._validate_storage_topology()
-        if self._is_link_like(self._trash_root) or not self._trash_root.is_dir():
+        if is_link_like(self._trash_root) or not self._trash_root.is_dir():
             raise KnowledgeVectorStoreError()
-        self._assert_within(self._trash_root, self._indexes_root)
+        assert_within(self._trash_root, self._indexes_root)
         token = f"vector-{kind}-{identity}-{uuid4().hex}"
         target = self._trash_root / token
-        self._assert_within(target, self._trash_root)
-        if not self._replace_with_retries(path, target):
+        assert_within(target, self._trash_root)
+        if not replace_with_retries(path, target):
             raise KnowledgeVectorStoreError()
         return token
 
-    @classmethod
-    def _replace_with_retries(cls, source: Path, target: Path) -> bool:
-        for attempt in range(len(_SHARING_RETRY_DELAYS) + 1):
-            try:
-                os.replace(source, target)
-                return True
-            except FileNotFoundError:
-                if not source.exists() and not cls._is_link_like(source):
-                    return False
-                raise KnowledgeVectorStoreError() from None
-            except OSError as exc:
-                if not cls._is_windows_sharing_violation(exc):
-                    raise KnowledgeVectorStoreError() from None
-                cls._discard_exception_traceback(exc)
-                if attempt >= len(_SHARING_RETRY_DELAYS):
-                    raise KnowledgeVectorStoreError() from None
-                gc.collect()
-                time.sleep(_SHARING_RETRY_DELAYS[attempt])
-        return False
-
-    @classmethod
-    def _remove_path_with_retries(cls, path: Path, *, best_effort: bool) -> bool:
-        for attempt in range(len(_SHARING_RETRY_DELAYS) + 1):
-            try:
-                if cls._is_link_like(path):
-                    return False
-                if path.is_dir():
-                    shutil.rmtree(path)
-                elif path.is_file():
-                    path.unlink()
-                else:
-                    return True
-                return True
-            except FileNotFoundError:
-                return True
-            except OSError as exc:
-                retryable = cls._is_windows_sharing_violation(exc)
-                cls._discard_exception_traceback(exc)
-                if not retryable or attempt >= len(_SHARING_RETRY_DELAYS):
-                    if best_effort:
-                        return False
-                    raise KnowledgeVectorStoreError() from None
-                gc.collect()
-                time.sleep(_SHARING_RETRY_DELAYS[attempt])
-        return False
-
-    @staticmethod
-    def _is_windows_sharing_violation(exc: OSError) -> bool:
-        return (
-            getattr(exc, "winerror", None) in _WINDOWS_SHARING_VIOLATIONS
-            or isinstance(exc, PermissionError)
-        )
-
     def _remove_staging_tree(self, path: Path) -> None:
-        self._assert_within(path, self._staging_root)
-        self._remove_path_with_retries(path, best_effort=False)
+        assert_within(path, self._staging_root)
+        remove_path_with_retries(path, best_effort=False)

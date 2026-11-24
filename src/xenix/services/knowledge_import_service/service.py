@@ -1,12 +1,10 @@
 from __future__ import annotations
 
 import logging
-import os
 import queue
 import threading
 import time
 from collections.abc import Callable
-from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -14,21 +12,21 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import sessionmaker
 from sqlmodel import select
 
-from ..config import AppPaths
-from ..exceptions import ValidationError, report_exception
-from .artifact_service import ArtifactService, RegisterArtifactInput
-from .knowledge_canonical import CanonicalIdentity
-from .knowledge_content_store import (
+from ...config import AppPaths
+from ...exceptions import ValidationError, report_exception
+from ..artifact_service import ArtifactService
+from ..knowledge_canonical import CanonicalIdentity
+from ..knowledge_content_store import (
     CANONICAL_SCHEMA_VERSION,
     CanonicalBundleIdentity,
     KnowledgeContentStore,
 )
-from .knowledge_formats import SUPPORTED_KNOWLEDGE_SUFFIXES
-from .knowledge_import_storage_maintenance import (
+from ..knowledge_formats import SUPPORTED_KNOWLEDGE_SUFFIXES
+from ..knowledge_import_storage_maintenance import (
     KnowledgeImportStorageMaintenance,
     KnowledgeImportStorageMaintenanceError,
 )
-from .knowledge_import_worker import (
+from ..knowledge_import_worker import (
     KnowledgeImportWorkerCancelled,
     KnowledgeImportWorkerCrashed,
     KnowledgeImportWorkerEvent,
@@ -38,18 +36,11 @@ from .knowledge_import_worker import (
     KnowledgeImportWorkerTimedOut,
     LocalKnowledgeImportWorkerRunner,
 )
-from .knowledge_pipeline import (
-    MAX_SOURCE_BYTES,
-    FileProbe,
-    FileProbeResult,
-    FormatNormalizer,
-    ParserRouter,
-)
-from .knowledge_task_logs import KnowledgeTaskLogEntry, KnowledgeTaskLogStore
-from .storage.layout import knowledge_root
-from .storage.identity import reserve_ids
-from .storage.models import (
-    ArtifactKind,
+from ..knowledge_pipeline import MAX_SOURCE_BYTES, FileProbe, FileProbeResult
+from ..knowledge_task_logs import KnowledgeTaskLogEntry, KnowledgeTaskLogStore
+from ..storage.identity import reserve_ids
+from ..storage.layout import knowledge_root
+from ..storage.models import (
     ArtifactRow,
     JobDomain,
     KnowledgeCanonicalGenerationRow,
@@ -57,111 +48,23 @@ from .storage.models import (
     KnowledgeImportRow,
     utc_now,
 )
-from .storage.repositories import KnowledgeRepository
+from ..storage.repositories import KnowledgeRepository
+from .contracts import (
+    SAFE_IMPORT_ERRORS,
+    TERMINAL_IMPORT_STATUSES,
+    ImportCancelled,
+    KnowledgeImportReceipt,
+    KnowledgeImportResult,
+    KnowledgeImportView,
+    is_current_source_cas_reference,
+)
+from .snapshot import prepare_source_snapshot
 
 if TYPE_CHECKING:
-    from .job_scheduler import JobScheduler
+    from ..job_scheduler import JobScheduler
 
 _STOP = object()
 LOGGER = logging.getLogger(__name__)
-_TERMINAL_IMPORT_STATUSES = frozenset(
-    {"retrieval_ready", "canonical_ready", "needs_attention", "failed", "cancelled", "reused"}
-)
-_SAFE_IMPORT_ERRORS = {
-    "knowledge_password_required": "A password is required to continue this import.",
-    "knowledge_password_invalid": "The document password was not accepted.",
-    "knowledge_anydoc_dependency_failed": "The local document parser is unavailable.",
-    "knowledge_anydoc_conversion_failed": "The document could not be parsed.",
-    "knowledge_anydoc_malformed": "The document is malformed.",
-    "knowledge_anydoc_resource_limit": "The document exceeds parser resource limits.",
-    "knowledge_anydoc_unsupported": "The document uses unsupported features.",
-    "knowledge_anydoc_output_invalid": "The document parser returned invalid content.",
-    "knowledge_anydoc_output_limit": "The parsed document exceeds supported limits.",
-    "knowledge_package_invalid": "The document package is invalid.",
-    "knowledge_package_entry_limit": "The document package contains too many entries.",
-    "knowledge_package_entries_ambiguous": "The document package contains ambiguous entries.",
-    "knowledge_package_entry_encrypted": "The document package contains an unsupported encrypted entry.",
-    "knowledge_package_entry_unsafe": "The document package contains an unsafe entry.",
-    "knowledge_package_path_unsafe": "The document package contains an unsafe path.",
-    "knowledge_package_size_invalid": "The document package contains invalid size metadata.",
-    "knowledge_package_entry_too_large": "A document package entry is too large.",
-    "knowledge_package_expansion_limit": "The expanded document package is too large.",
-    "knowledge_package_compression_ratio": "The document package compression ratio is unsafe.",
-    "knowledge_format_unsupported": "This file type is not supported by the Knowledge Library.",
-    "knowledge_format_mismatch": "The file signature does not match its extension.",
-    "knowledge_pdf_invalid": "The PDF is structurally invalid.",
-    "knowledge_source_size_unsupported": "The file size is outside the supported range.",
-    "knowledge_text_encoding_unknown": "The TXT encoding could not be identified safely.",
-    "knowledge_text_encoding_invalid": "The TXT content is invalid for its encoding.",
-    "knowledge_text_controls_invalid": "The TXT file contains unsupported control characters.",
-    "knowledge_text_line_too_long": "The TXT file contains a line that is too long.",
-    "knowledge_docx_package_invalid": "The DOCX file is not a valid Office document.",
-    "knowledge_docx_entry_limit": "The DOCX package contains too many entries.",
-    "knowledge_docx_entries_ambiguous": "The DOCX package contains ambiguous entries.",
-    "knowledge_docx_entry_encrypted": "The DOCX package contains an unsupported encrypted entry.",
-    "knowledge_docx_entry_unsafe": "The DOCX package contains an unsafe entry.",
-    "knowledge_docx_path_unsafe": "The DOCX package contains an unsafe path.",
-    "knowledge_docx_size_invalid": "The DOCX package contains invalid size metadata.",
-    "knowledge_docx_entry_too_large": "The DOCX package contains an entry that is too large.",
-    "knowledge_docx_expansion_limit": "The expanded DOCX package is too large.",
-    "knowledge_docx_compression_ratio": "The DOCX package compression ratio is unsafe.",
-    "knowledge_pptx_package_invalid": "The PPTX file is not a valid Office document.",
-    "knowledge_pptx_entry_limit": "The PPTX package contains too many entries.",
-    "knowledge_pptx_entries_ambiguous": "The PPTX package contains ambiguous entries.",
-    "knowledge_pptx_entry_encrypted": "The PPTX package contains an unsupported encrypted entry.",
-    "knowledge_pptx_entry_unsafe": "The PPTX package contains an unsafe entry.",
-    "knowledge_pptx_path_unsafe": "The PPTX package contains an unsafe path.",
-    "knowledge_pptx_size_invalid": "The PPTX package contains invalid size metadata.",
-    "knowledge_pptx_entry_too_large": "The PPTX package contains an entry that is too large.",
-    "knowledge_pptx_expansion_limit": "The expanded PPTX package is too large.",
-    "knowledge_pptx_compression_ratio": "The PPTX package compression ratio is unsafe.",
-    "knowledge_docling_conversion_failed": "The document could not be parsed into canonical content.",
-    "knowledge_canonical_integrity_failed": "Canonical content failed integrity validation.",
-    "knowledge_source_integrity_failed": "The app-owned source snapshot failed integrity validation.",
-    "knowledge_source_reselection_required": "Select the source file again to retry this import.",
-    "knowledge_import_not_retryable": "This import attempt cannot be retried.",
-    "knowledge_import_cancelled": "The import was cancelled.",
-    "knowledge_import_worker_crashed": "The import worker stopped unexpectedly.",
-    "knowledge_import_worker_launch_failed": "The import worker could not be started.",
-    "knowledge_import_worker_timed_out": "The import worker exceeded the allowed execution time.",
-    "knowledge_import_failed": "The file could not be imported.",
-}
-
-
-@dataclass(frozen=True)
-class KnowledgeImportReceipt:
-    import_id: int
-    status: str
-    reused_existing: bool
-
-
-@dataclass(frozen=True)
-class KnowledgeImportResult:
-    import_id: int
-    document_id: int
-    source_artifact_id: int | None
-    source_sha256: str
-    canonical_path: str | None
-    canonical_generation_id: int | None
-    canonical_ready: bool
-    reused_existing: bool
-
-
-@dataclass(frozen=True)
-class KnowledgeImportView:
-    import_id: int
-    file_name: str
-    source_format: str
-    status: str
-    phase: str
-    attempt_number: int
-    document_id: int | None
-    canonical_generation_id: int | None
-    reused_existing: bool
-    error_code: str | None
-    error_summary: str | None
-    retryable: bool
-    cancel_requested: bool
 
 
 class KnowledgeImportService:
@@ -191,8 +94,8 @@ class KnowledgeImportService:
         self._canonical_ready_notifier = canonical_ready_notifier
         self._corpus_changed_notifier = corpus_changed_notifier
         self._scheduler = scheduler
-        self._queue: queue.Queue[str | object] = queue.Queue()
-        self._passwords: dict[str, str] = {}
+        self._queue: queue.Queue[int | object] = queue.Queue()
+        self._passwords: dict[int, str] = {}
         self._password_lock = threading.Lock()
         self._source_paths: dict[int, Path] = {}
         self._source_path_lock = threading.Lock()
@@ -381,14 +284,14 @@ class KnowledgeImportService:
     def cancel_import(self, import_id: int) -> bool:
         with self._session_factory() as session:
             row = self._knowledge_repo.get_import(session, import_id)
-            if row is None or row.status in _TERMINAL_IMPORT_STATUSES:
+            if row is None or row.status in TERMINAL_IMPORT_STATUSES:
                 return False
             row.cancel_requested = True
             if row.status == "queued":
                 row.status = "cancelled"
                 row.phase = "cancelled"
                 row.error_code = "knowledge_import_cancelled"
-                row.error_summary = _SAFE_IMPORT_ERRORS["knowledge_import_cancelled"]
+                row.error_summary = SAFE_IMPORT_ERRORS["knowledge_import_cancelled"]
                 row.retryable = True
             row.updated_at = utc_now()
             self._knowledge_repo.save_import(session, row)
@@ -500,31 +403,31 @@ class KnowledgeImportService:
                 )
                 return
             self._mark_import_cancelled(import_id)
-            raise _ImportCancelled from None
+            raise ImportCancelled from None
         except KnowledgeImportWorkerCrashed as exc:
             raise ValidationError(
-                _SAFE_IMPORT_ERRORS["knowledge_import_worker_crashed"],
+                SAFE_IMPORT_ERRORS["knowledge_import_worker_crashed"],
                 error_code="knowledge_import_worker_crashed",
                 retryable=True,
             ) from exc
         except KnowledgeImportWorkerLaunchFailed as exc:
             raise ValidationError(
-                _SAFE_IMPORT_ERRORS["knowledge_import_worker_launch_failed"],
+                SAFE_IMPORT_ERRORS["knowledge_import_worker_launch_failed"],
                 error_code="knowledge_import_worker_launch_failed",
                 retryable=True,
             ) from exc
         except KnowledgeImportWorkerTimedOut as exc:
             raise ValidationError(
-                _SAFE_IMPORT_ERRORS["knowledge_import_worker_timed_out"],
+                SAFE_IMPORT_ERRORS["knowledge_import_worker_timed_out"],
                 error_code="knowledge_import_worker_timed_out",
                 retryable=True,
             ) from exc
         if result.status != "succeeded":
             error_code = result.error_code or "knowledge_import_failed"
             raise ValidationError(
-                _SAFE_IMPORT_ERRORS.get(
+                SAFE_IMPORT_ERRORS.get(
                     error_code,
-                    _SAFE_IMPORT_ERRORS["knowledge_import_failed"],
+                    SAFE_IMPORT_ERRORS["knowledge_import_failed"],
                 ),
                 error_code=error_code,
                 retryable=result.retryable,
@@ -537,7 +440,7 @@ class KnowledgeImportService:
             or result.staged_relative_path is None
         ):
             raise ValidationError(
-                _SAFE_IMPORT_ERRORS["knowledge_canonical_integrity_failed"],
+                SAFE_IMPORT_ERRORS["knowledge_canonical_integrity_failed"],
                 error_code="knowledge_canonical_integrity_failed",
             )
         self._raise_if_cancelled(import_id)
@@ -665,154 +568,20 @@ class KnowledgeImportService:
         self,
         import_id: int,
     ) -> tuple[Path, FileProbeResult, dict[str, Any]] | None:
-        self._advance(import_id, status="running", phase="snapshot")
-        self._log_event(
+        return prepare_source_snapshot(
             import_id,
-            phase="snapshot",
-            event_code="source_snapshot_started",
+            session_factory=self._session_factory,
+            knowledge_repo=self._knowledge_repo,
+            artifacts=self._artifacts,
+            store=self._store,
+            probe=self._probe,
+            take_source_path=self._take_source_path,
+            advance=self._advance,
+            log_event=self._log_event,
+            raise_if_cancelled=self._raise_if_cancelled,
+            next_attempt_number=self._next_attempt_number,
+            corpus_changed_notifier=self._corpus_changed_notifier,
         )
-        with self._session_factory() as session:
-            row = self._knowledge_repo.get_import(session, import_id)
-            if row is None or row.status == "cancelled":
-                return None
-            artifact = session.get(ArtifactRow, row.source_artifact_id) if row.source_artifact_id else None
-            existing_artifact_path = Path(artifact.absolute_path) if artifact is not None else None
-            expected_sha256 = row.source_sha256
-
-        if artifact is None:
-            source_reference = self._take_source_path(import_id)
-            if source_reference is None:
-                raise ValidationError(
-                    "Select the source file again to retry this import.",
-                    error_code="knowledge_source_reselection_required",
-                    retryable=True,
-                )
-            self._raise_if_cancelled(import_id)
-            snapshot = self._store.snapshot_source(
-                source_reference,
-                maximum_bytes=MAX_SOURCE_BYTES,
-            )
-            authoritative = self._probe.probe(snapshot.path)
-            self._raise_if_cancelled(import_id)
-            with self._session_factory() as session:
-                row = self._knowledge_repo.get_import(session, import_id)
-                if row is None or row.status == "cancelled":
-                    return None
-                existing = self._knowledge_repo.get_document_by_source_sha256(
-                    session,
-                    library_id=row.library_id,
-                    source_sha256=snapshot.sha256,
-                    include_inactive=True,
-                )
-                if existing is not None:
-                    was_inactive = not existing.active
-                    if was_inactive:
-                        existing.active = True
-                        existing.updated_at = utc_now()
-                        session.add(existing)
-                    row.attempt_number = self._next_attempt_number(
-                        session,
-                        planned_document_id=existing.id,
-                        excluding_import_id=row.id,
-                    )
-                    row.status = "reused"
-                    row.phase = "completed"
-                    row.source_sha256 = snapshot.sha256
-                    row.source_format = authoritative.source_format
-                    row.planned_document_id = existing.id
-                    row.document_id = existing.id
-                    row.source_artifact_id = existing.source_artifact_id
-                    row.canonical_generation_id = existing.canonical_generation_id
-                    row.reused_existing = True
-                    row.retryable = False
-                    row.updated_at = utc_now()
-                    self._knowledge_repo.save_import(session, row)
-                    session.commit()
-                    self._log_event(
-                        import_id,
-                        phase="completed",
-                        event_code=(
-                            "document_reactivated"
-                            if was_inactive
-                            else "document_reused"
-                        ),
-                    )
-                    if was_inactive and self._corpus_changed_notifier is not None:
-                        try:
-                            self._corpus_changed_notifier(row.library_id)
-                        except Exception as exc:
-                            report_exception(exc)
-                            LOGGER.warning(
-                                "Knowledge index notification deferred to startup recovery",
-                                extra={
-                                    "event_name": (
-                                        "knowledge.index.notification_deferred"
-                                    )
-                                },
-                            )
-                    return None
-                artifact = self._artifacts.register_artifact_in_session(
-                    session,
-                    RegisterArtifactInput(
-                        title=row.original_file_name,
-                        absolute_path=str(snapshot.path),
-                        kind=ArtifactKind.FILE,
-                        mime_type=authoritative.media_type,
-                        metadata_payload={
-                            "knowledge_source_sha256": snapshot.sha256,
-                            "original_file_name": row.original_file_name,
-                            "source_format": authoritative.source_format,
-                        },
-                    ),
-                )
-                row.source_sha256 = snapshot.sha256
-                row.source_format = authoritative.source_format
-                row.source_artifact_id = artifact.id
-                row.phase = "probing"
-                row.updated_at = utc_now()
-                self._knowledge_repo.save_import(session, row)
-                session.commit()
-            self._log_event(
-                import_id,
-                phase="snapshot",
-                event_code="source_snapshot_published",
-            )
-            source_path = snapshot.path
-            probe = authoritative
-        else:
-            if expected_sha256 is None or existing_artifact_path is None:
-                raise ValidationError("Knowledge import identity is incomplete.")
-            source = self._store.verify_source_snapshot(
-                existing_artifact_path,
-                expected_sha256=expected_sha256,
-            )
-            source_path = source.path
-            probe = self._probe.probe(source_path)
-            self._log_event(
-                import_id,
-                phase="snapshot",
-                event_code="source_snapshot_verified",
-            )
-
-        self._advance(import_id, status="running", phase="probing")
-        self._log_event(import_id, phase="probing", event_code="source_probed")
-        with self._session_factory() as session:
-            row = self._knowledge_repo.get_import(session, import_id)
-            if row is None or row.status == "cancelled" or not row.source_artifact_id:
-                return None
-            identity_values = {
-                "library_id": row.library_id,
-                "document_id": row.planned_document_id,
-                "import_id": row.id,
-                "source_artifact_id": row.source_artifact_id,
-                "source_sha256": row.source_sha256,
-                "source_format": row.source_format,
-                "display_name": row.original_file_name,
-                "attempt_number": row.attempt_number,
-            }
-        if not identity_values["document_id"] or not identity_values["source_sha256"]:
-            raise ValidationError("Knowledge import identity is incomplete.")
-        return source_path, probe, identity_values
 
     def _completed_result(self, import_id: int) -> KnowledgeImportResult | None:
         with self._session_factory() as session:
@@ -882,7 +651,7 @@ class KnowledgeImportService:
         self.cancel_import(import_id)
 
     def recover_pending(self) -> list[int]:
-        pending: list[str] = []
+        pending: list[int] = []
         with self._session_factory() as session:
             rows = self._knowledge_repo.list_imports_by_status(
                 session, statuses=["queued", "running"],
@@ -900,7 +669,7 @@ class KnowledgeImportService:
                     row.status = "needs_attention"
                     row.phase = "source_reselection_required"
                     row.error_code = "knowledge_source_reselection_required"
-                    row.error_summary = _SAFE_IMPORT_ERRORS[
+                    row.error_summary = SAFE_IMPORT_ERRORS[
                         "knowledge_source_reselection_required"
                     ]
                     row.retryable = True
@@ -937,12 +706,12 @@ class KnowledgeImportService:
             }
             for artifact_id in source_artifact_ids:
                 artifact = session.get(ArtifactRow, artifact_id)
-                if artifact is not None and _is_current_source_cas_reference(
+                if artifact is not None and is_current_source_cas_reference(
                     Path(artifact.absolute_path), root
                 ):
                     source_paths.append(artifact.absolute_path)
             for artifact in registered_artifacts:
-                if _is_current_source_cas_reference(
+                if is_current_source_cas_reference(
                     Path(artifact.absolute_path), root
                 ):
                     source_paths.append(artifact.absolute_path)
@@ -1058,20 +827,20 @@ class KnowledgeImportService:
             row = self._knowledge_repo.get_import(session, import_id)
             if row is not None and row.cancel_requested:
                 self._mark_cancelled(row, session)
-                raise _ImportCancelled
+                raise ImportCancelled
 
     def _mark_cancelled(self, row: KnowledgeImportRow, session) -> None:
         row.status = "cancelled"
         row.phase = "cancelled"
         row.error_code = "knowledge_import_cancelled"
-        row.error_summary = _SAFE_IMPORT_ERRORS["knowledge_import_cancelled"]
+        row.error_summary = SAFE_IMPORT_ERRORS["knowledge_import_cancelled"]
         row.retryable = True
         row.updated_at = utc_now()
         self._knowledge_repo.save_import(session, row)
         session.commit()
 
     def _record_failure(self, import_id: int, exc: Exception) -> None:
-        if isinstance(exc, _ImportCancelled):
+        if isinstance(exc, ImportCancelled):
             return
         code = getattr(exc, "error_code", None)
         if not isinstance(code, str) or not code:
@@ -1093,7 +862,7 @@ class KnowledgeImportService:
             row.status = "needs_attention" if needs_attention else "failed"
             row.phase = "needs_attention" if needs_attention else "failed"
             row.error_code = code
-            row.error_summary = _SAFE_IMPORT_ERRORS.get(code, _SAFE_IMPORT_ERRORS["knowledge_import_failed"])
+            row.error_summary = SAFE_IMPORT_ERRORS.get(code, SAFE_IMPORT_ERRORS["knowledge_import_failed"])
             row.retryable = bool(getattr(exc, "retryable", False) or needs_attention)
             row.updated_at = utc_now()
             self._knowledge_repo.save_import(session, row)
@@ -1167,49 +936,3 @@ class KnowledgeImportService:
     def _take_source_path(self, import_id: int) -> Path | None:
         with self._source_path_lock:
             return self._source_paths.pop(import_id, None)
-
-
-class _ImportCancelled(Exception):
-    pass
-
-
-def _path_is_lexically_within(candidate: Path, root: Path) -> bool:
-    try:
-        absolute_candidate = Path(os.path.abspath(candidate.expanduser()))
-        absolute_root = Path(os.path.abspath(root.expanduser()))
-        absolute_candidate.relative_to(absolute_root)
-    except (OSError, ValueError):
-        return False
-    return True
-
-
-def _is_current_source_cas_reference(candidate: Path, root: Path) -> bool:
-    if not _path_is_lexically_within(candidate, root):
-        return False
-    absolute_candidate = Path(os.path.abspath(candidate.expanduser()))
-    absolute_root = Path(os.path.abspath(root.expanduser()))
-    relative = absolute_candidate.relative_to(absolute_root)
-    parts = relative.parts
-    if len(parts) != 6 or parts[:2] != ("objects", "source"):
-        return False
-    digest = parts[4]
-    return bool(
-        len(digest) == 64
-        and all(character in "0123456789abcdef" for character in digest)
-        and parts[2] == digest[:2]
-        and parts[3] == digest[2:4]
-        and (parts[5] == "source" or parts[5].startswith("source."))
-    )
-
-
-__all__ = [
-    "FileProbe",
-    "FileProbeResult",
-    "FormatNormalizer",
-    "KnowledgeImportReceipt",
-    "KnowledgeImportResult",
-    "KnowledgeImportService",
-    "KnowledgeImportView",
-    "ParserRouter",
-    "SUPPORTED_KNOWLEDGE_SUFFIXES",
-]

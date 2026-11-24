@@ -1,28 +1,19 @@
 from __future__ import annotations
 
-from .audit_contracts import ExecutionOrigin
-
-import difflib
-import hashlib
-import json
 import time
-import unicodedata
 from collections.abc import Callable
-from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from pydantic import Field, model_validator
 from sqlalchemy.orm import sessionmaker
-from sqlmodel import SQLModel
 
-from ..config import AppPaths
-from ..exceptions import DatasetSourceMissingError, ValidationError, report_exception
-from .data_tokenization_contracts import StagedTextResourceInput, TextPreparationInput, TextProcessingOptions
-from .dataset_inspection import InspectDatasetInput
-from .dataset_service import DatasetService, MaterializeManualApplyCsvInput
-from .ml.contracts import (
-    ApplyInputFile,
+from ...config import AppPaths
+from ...exceptions import DatasetSourceMissingError, ValidationError, report_exception
+from ..audit_contracts import ExecutionOrigin
+from ..dataset_inspection import InspectDatasetInput
+from ..dataset_service import DatasetService
+from ..ml.contracts import (
     ApplyModelPayload,
     ApplyTaskRequest,
     CandidateMetrics,
@@ -37,123 +28,57 @@ from .ml.contracts import (
     HyperparameterTuningTaskRequest,
     ManualTrainingPayload,
     TaskContinuationPlan,
-    TaskLogEntry,
-    TrainedModelContextPayload,
 )
-from .ml.evaluation import get_default_policy
-from .ml.registry import get_model_catalog_entry, get_model_service, list_model_catalog
-from .ml.trained_model_metadata import parse_trained_model_metadata, with_evaluation, with_evaluation_task
-from .ml.types import ApplyMode, ColumnRoleBinding, ColumnRoleKind, ModelFamily, ModelRoleSchema
-from .ml_task_service import CancelMLTaskInput, CreateMLTaskInput, MLTaskService
-from .storage.identity import reserve_ids
-from .storage.models import (
+from ..ml.evaluation import get_default_policy
+from ..ml.registry import get_model_catalog_entry, get_model_service, list_model_catalog
+from ..ml.trained_model_metadata import (
+    parse_trained_model_metadata,
+    with_evaluation,
+    with_evaluation_task,
+)
+from ..ml.types import ApplyMode, ModelFamily
+from ..ml_task_service import CancelMLTaskInput, CreateMLTaskInput, MLTaskService
+from ..storage.identity import reserve_ids
+from ..storage.models import (
     DatasetColumnBindingRow,
-    DatasetRow,
     JobDomain,
-    MLTaskArtifactRow,
     MLTaskRow,
     MLTaskStatus,
     MLTaskType,
     TrainedModelRow,
 )
-from .storage.repositories import DatasetColumnBindingRepository, TrainedModelRepository
-from .tabular import resolve_tabular_column_index, resolve_tabular_schema
+from ..storage.repositories import DatasetColumnBindingRepository, TrainedModelRepository
+from .column_binding import (
+    apply_columns_from_metadata,
+    column_binding_error_message,
+    feature_target_columns,
+    normalize_columns,
+    normalize_role_bindings,
+    validate_feature_target_projection,
+)
+from .contracts import (
+    ApplySourceInput,
+    ApplyWithFilesInput,
+    BulkTuneWithEvaluateInput,
+    CreateColumnBindingInput,
+    FitWithEvaluateInput,
+    MLTaskDetails,
+    TuneWithEvaluateInput,
+    _ApplyContext,
+    _ResolvedColumnBinding,
+    _TrainingContext,
+)
+from .preparation import (
+    build_apply_input_files,
+    build_dataset_snapshot,
+    build_text_preparation_input,
+    build_trained_model_context,
+    materialize_inline_apply_rows,
+    validate_model_runtime_admission,
+)
 
 if TYPE_CHECKING:
-    from .job_scheduler import JobScheduler
-
-_COLUMN_NAME_NORMALIZATION_TRANSLATION = str.maketrans(
-    {
-        "\u2018": "'",
-        "\u2019": "'",
-        "\u201c": '"',
-        "\u201d": '"',
-        "\u2013": "-",
-        "\u2014": "-",
-        "\u00a0": " ",
-    }
-)
-_MULTILINGUAL_TEXT_MODEL_KEYS = frozenset(
-    {
-        "text.classification.multilingual_logistic_regression_tfidf",
-        "text.clustering.multilingual_kmeans_tfidf",
-        "text.topic_modeling.multilingual_lda",
-        "text.similarity.multilingual_tfidf_cosine",
-    }
-)
-_MAX_TEXT_RESOURCE_ROWS = 20_000
-_MULTILINGUAL_TEXT_RETRIEVAL_KEY = "text.similarity.multilingual_tfidf_cosine"
-_MAX_EXACT_TEXT_RETRIEVAL_ROWS = 2_000
-
-
-class CreateColumnBindingInput(SQLModel):
-    dataset_id: int
-    role_bindings: list[dict[str, Any]] = Field(default_factory=list)
-    model_key: str | None = None
-
-
-class FitWithEvaluateInput(SQLModel):
-    origin: ExecutionOrigin | None = None
-    binding_id: int
-    run_name: str | None = None
-    model_key: str
-    params: dict[str, Any] = Field(default_factory=dict)
-
-
-class TuneWithEvaluateInput(SQLModel):
-    origin: ExecutionOrigin | None = None
-    binding_id: int
-    run_name: str | None = None
-    model_key: str
-    param_grid: dict[str, list[Any]] = Field(default_factory=dict)
-
-
-class BulkTuningSelection(SQLModel):
-    model_key: str
-    param_grid: dict[str, list[Any]] = Field(default_factory=dict)
-
-
-class BulkTuneWithEvaluateInput(SQLModel):
-    binding_id: int
-    run_name: str | None = None
-    selections: list[BulkTuningSelection] = Field(default_factory=list)
-
-
-class InlineApplyRowsInput(SQLModel):
-    header_index_map: dict[str, int] = Field(default_factory=dict)
-    data: list[list[Any]] = Field(default_factory=list)
-
-
-class ApplySourceInput(SQLModel):
-    source_path: str
-    dataset_id: int | None = None
-    artifact_id: int | None = None
-
-
-class ApplyWithFilesInput(SQLModel):
-    origin: ExecutionOrigin | None = None
-    trained_model_id: int
-    input_files: list[str] = Field(default_factory=list)
-    input_sources: list[ApplySourceInput] = Field(default_factory=list)
-    input_rows: InlineApplyRowsInput | None = None
-    horizon: int | None = Field(default=None, ge=1, le=365)
-
-    @model_validator(mode="after")
-    def _has_one_apply_mode(self) -> "ApplyWithFilesInput":
-        has_rows = bool(self.input_files or self.input_sources) or self.input_rows is not None
-        has_horizon = self.horizon is not None
-        if has_rows == has_horizon:
-            raise ValueError(
-                "Apply requires exactly one input mode: rows/files or a forecast horizon."
-            )
-        return self
-
-
-@dataclass(frozen=True)
-class MLTaskDetails:
-    task: MLTaskRow
-    artifacts: list[MLTaskArtifactRow]
-    logs: list[TaskLogEntry]
+    from ..job_scheduler import JobScheduler
 
 
 class MLService:
@@ -163,7 +88,7 @@ class MLService:
         session_factory: sessionmaker,
         dataset_service: DatasetService,
         ml_task_service: MLTaskService,
-        scheduler: "JobScheduler | None" = None,
+        scheduler: JobScheduler | None = None,
     ) -> None:
         self._paths = paths
         self._session_factory = session_factory
@@ -174,9 +99,9 @@ class MLService:
         self._column_bindings = DatasetColumnBindingRepository()
         self._ml_task_service.register_completion_listener(self._handle_task_completion)
 
-    def _build_default_scheduler(self) -> "JobScheduler":
-        from .job_scheduler import JobScheduler
-        from .ml_job_handler import MLJobHandler
+    def _build_default_scheduler(self) -> JobScheduler:
+        from ..job_scheduler import JobScheduler
+        from ..ml_job_handler import MLJobHandler
 
         scheduler = JobScheduler(
             self._session_factory,
@@ -204,10 +129,10 @@ class MLService:
         if not Path(dataset.source_path).exists():
             raise DatasetSourceMissingError("Dataset source file is missing.")
         inspection = self._dataset_service.inspect_source_file(InspectDatasetInput(source_path=dataset.source_path))
-        dataset_snapshot = self._build_dataset_snapshot(dataset, inspection)
+        dataset_snapshot = build_dataset_snapshot(dataset, inspection)
         available_columns = {column.name for column in inspection.columns}
         catalog = get_model_catalog_entry(input_data.model_key) if input_data.model_key else None
-        role_bindings = self._normalize_role_bindings(
+        role_bindings = normalize_role_bindings(
             input_data.role_bindings,
             train_role_schema=catalog.train_role_schema if catalog is not None else None,
             inspection_column_names=[column.name for column in inspection.columns],
@@ -219,12 +144,12 @@ class MLService:
         missing_by_role = {role: columns for role, columns in missing_by_role.items() if columns}
         if missing_by_role:
             raise ValidationError(
-                self._column_binding_error_message(
+                column_binding_error_message(
                     missing_by_role=missing_by_role,
                     available_columns=[column.name for column in inspection.columns],
                 )
             )
-        self._validate_feature_target_projection(role_bindings)
+        validate_feature_target_projection(role_bindings)
 
         with self._session_factory() as session:
             row = self._column_bindings.create(
@@ -253,7 +178,7 @@ class MLService:
 
     def fit_with_evaluate(self, input_data: FitWithEvaluateInput) -> MLTaskRow:
         context = self._build_training_context(input_data, input_data.model_key)
-        self._validate_model_runtime_admission(context)
+        validate_model_runtime_admission(context)
         model_service = get_model_service(input_data.model_key)
         try:
             params_model = model_service.validate_params(input_data.params)
@@ -274,7 +199,8 @@ class MLService:
                 if context.catalog.model_family is ModelFamily.FORECASTING
                 else None
             ),
-            text_preparation=self._build_text_preparation_input(
+            text_preparation=build_text_preparation_input(
+                self._dataset_service,
                 context,
                 params_model,
             ),
@@ -287,20 +213,9 @@ class MLService:
                 model_key=input_data.model_key,
                 params=params_model.model_dump(mode="json", by_alias=True),
             ),
-            trained_model_context=self._build_trained_model_context(context),
+            trained_model_context=build_trained_model_context(context),
         )
         return self._create_and_submit_task(context, MLTaskType.FIT, request, origin=input_data.origin)
-
-    @staticmethod
-    def _validate_model_runtime_admission(context: "_TrainingContext") -> None:
-        if (
-            context.catalog.model_key == _MULTILINGUAL_TEXT_RETRIEVAL_KEY
-            and context.inspection.row_count > _MAX_EXACT_TEXT_RETRIEVAL_ROWS
-        ):
-            raise ValidationError(
-                "Exact multilingual text retrieval supports at most "
-                f"{_MAX_EXACT_TEXT_RETRIEVAL_ROWS:,} source rows in v1."
-            )
 
     def tune_with_evaluate(self, input_data: TuneWithEvaluateInput) -> MLTaskRow:
         context = self._build_training_context(input_data, input_data.model_key)
@@ -337,7 +252,7 @@ class MLService:
                 model_key=input_data.model_key,
                 param_grid=param_grid_model.model_dump(mode="json", by_alias=True),
             ),
-            trained_model_context=self._build_trained_model_context(context),
+            trained_model_context=build_trained_model_context(context),
         )
         return self._create_and_submit_task(context, MLTaskType.HYPERPARAMETER_TUNING, request, origin=input_data.origin)
 
@@ -405,7 +320,6 @@ class MLService:
                     self.cancel_task(task_id)
                 except Exception as exc:
                     report_exception(exc)
-                    pass
                 raise ValidationError("Agent run was cancelled.")
             task = self.get_task_details(task_id).task
             if task.status in {MLTaskStatus.SUCCEEDED, MLTaskStatus.FAILED, MLTaskStatus.CANCELLED}:
@@ -519,7 +433,8 @@ class MLService:
             for path in input_data.input_files
         )
         inline_path = (
-            self._materialize_inline_apply_rows(
+            materialize_inline_apply_rows(
+                self._dataset_service,
                 apply_context.feature_columns,
                 input_data.input_rows,
             )
@@ -529,7 +444,12 @@ class MLService:
         if inline_path is not None:
             input_sources.append(ApplySourceInput(source_path=str(inline_path)))
         input_files = (
-            self._build_apply_input_files(apply_context.feature_columns, input_sources)
+            build_apply_input_files(
+                self._paths,
+                self._dataset_service,
+                apply_context.feature_columns,
+                input_sources,
+            )
             if apply_context.apply_mode is ApplyMode.ROWS
             else []
         )
@@ -591,10 +511,16 @@ class MLService:
                 holdout_artifact_path=holdout_artifact_path,
             ),
         )
-        origin = (ExecutionOrigin(thread_id=task.origin_thread_id,
-            tool_call_message_id=task.origin_tool_call_message_id,
-            explanation=task.agent_explanation, submitted_parameters=task.submitted_parameters or {})
-            if task.origin_thread_id and task.agent_explanation else None)
+        origin = (
+            ExecutionOrigin(
+                thread_id=task.origin_thread_id,
+                tool_call_message_id=task.origin_tool_call_message_id,
+                explanation=task.agent_explanation,
+                submitted_parameters=task.submitted_parameters or {},
+            )
+            if task.origin_thread_id and task.agent_explanation
+            else None
+        )
         created = self._create_task_from_request(MLTaskType.EVALUATE, evaluate_request, origin=origin)
         self._attach_evaluation_task_to_trained_model(trained_model_id, created.id)
         self._submit_ml_task(created)
@@ -620,7 +546,7 @@ class MLService:
         self,
         input_data: FitWithEvaluateInput | TuneWithEvaluateInput,
         model_key: str,
-    ) -> "_TrainingContext":
+    ) -> _TrainingContext:
         binding = self._resolve_column_binding(input_data.binding_id, model_key=model_key)
         feature_columns = binding.feature_columns
         target_columns = binding.target_columns
@@ -645,7 +571,8 @@ class MLService:
                 catalog.evaluation_kind,
                 model_key=model_key,
                 summary_metric_name=catalog.summary_metric_name,
-                group_aware=get_model_service(model_key).uses_automatic_groups or any(
+                group_aware=get_model_service(model_key).uses_automatic_groups
+                or any(
                     role_binding.role == "group" and role_binding.columns
                     for role_binding in binding.role_bindings
                 ),
@@ -654,104 +581,9 @@ class MLService:
             dataset_snapshot=binding.dataset_snapshot,
         )
 
-    def _build_trained_model_context(self, context: "_TrainingContext") -> TrainedModelContextPayload:
-        return TrainedModelContextPayload(
-            run_name=context.run_name,
-            dataset_name=context.dataset.name,
-            dataset_file_name=context.inspection.file_name,
-            evaluation_kind=context.catalog.evaluation_kind.value,
-            model_family=context.catalog.model_family.value,
-            model_task_kind=context.catalog.model_task_kind.value,
-            train_role_bindings=[binding.model_dump(mode="json") for binding in context.train_role_bindings],
-            apply_role_schema=context.catalog.apply_role_schema.model_dump(mode="json"),
-            result_contract=context.catalog.result_contract.model_dump(mode="json"),
-            dataset_row_count=context.inspection.row_count,
-            dataset_column_count=context.inspection.column_count,
-            preview_columns=list(context.inspection.preview_columns),
-            preview_rows=[list(row) for row in context.inspection.preview_rows],
-        )
-
-    def _build_text_preparation_input(
-        self,
-        context: "_TrainingContext",
-        params_model: Any,
-    ) -> TextPreparationInput | None:
-        if context.catalog.model_key not in _MULTILINGUAL_TEXT_MODEL_KEYS:
-            return None
-        params = params_model.model_dump(mode="python")
-        custom_ids = self._text_resource_dataset_ids(
-            params.get("custom_dictionary_dataset_ids"),
-            field_name="custom_dictionary_dataset_ids",
-        )
-        stopword_ids = self._text_resource_dataset_ids(
-            params.get("stopword_dataset_ids"),
-            field_name="stopword_dataset_ids",
-        )
-        if set(custom_ids) & set(stopword_ids):
-            raise ValidationError(
-                "A text resource Dataset cannot be both a custom dictionary and a stopword list."
-            )
-        return TextPreparationInput.model_validate(
-            {
-                "tokenizer_profile": params.get("preparation_profile"),
-                "phrase_mode": params.get("phrase_mode"),
-                **{name: params[name] for name in TextProcessingOptions.model_fields if name in params},
-                "custom_dictionary_resources": [
-                    self._stage_text_resource(context, dataset_id)
-                    for dataset_id in custom_ids
-                ],
-                "stopword_resources": [
-                    self._stage_text_resource(context, dataset_id)
-                    for dataset_id in stopword_ids
-                ],
-            }
-        )
-
-    @staticmethod
-    def _text_resource_dataset_ids(value: Any, *, field_name: str) -> list[int]:
-        if value is None:
-            return []
-        if not isinstance(value, list) or any(
-            type(item) is not int or item < 1 for item in value
-        ):
-            raise ValidationError(f"{field_name} must contain registered Dataset ids.")
-        if len(value) != len(set(value)):
-            raise ValidationError(f"{field_name} cannot contain duplicate Dataset ids.")
-        return value
-
-    def _stage_text_resource(
-        self,
-        context: "_TrainingContext",
-        dataset_id: int,
-    ) -> StagedTextResourceInput:
-        dataset = self._dataset_service.get_dataset(dataset_id)
-        if dataset.project_id != context.project_id:
-            raise ValidationError(
-                "Text preparation resources must belong to the training project."
-            )
-        source_path = Path(dataset.source_path)
-        if not source_path.is_file():
-            raise DatasetSourceMissingError("Text preparation resource source file is missing.")
-        inspection = self._dataset_service.inspect_source_file(
-            InspectDatasetInput(source_path=str(source_path.resolve()))
-        )
-        if inspection.column_count != 1 or not 1 <= inspection.row_count <= _MAX_TEXT_RESOURCE_ROWS:
-            raise ValidationError(
-                "Each text preparation resource must contain one term column and 1-20,000 rows."
-            )
-        digest = hashlib.sha256()
-        with source_path.open("rb") as source:
-            for chunk in iter(lambda: source.read(1024 * 1024), b""):
-                digest.update(chunk)
-        return StagedTextResourceInput(
-            dataset_id=dataset.id,
-            absolute_path=str(source_path.resolve()),
-            source_sha256=digest.hexdigest(),
-        )
-
     def _create_and_submit_task(
         self,
-        context: "_TrainingContext",
+        context: _TrainingContext,
         task_type: MLTaskType,
         request: FitTaskRequest | HyperparameterTuningTaskRequest,
         *,
@@ -783,8 +615,7 @@ class MLService:
             self._submit_ml_task(created)
         return created
 
-
-    def _build_apply_context(self, input_data: ApplyWithFilesInput) -> "_ApplyContext":
+    def _build_apply_context(self, input_data: ApplyWithFilesInput) -> _ApplyContext:
         trained_model_id = input_data.trained_model_id
         if not trained_model_id:
             raise ValidationError("Apply requires a trained model.")
@@ -812,8 +643,8 @@ class MLService:
 
         dataset = self._dataset_service.get_dataset(trained_model.dataset_id)
         apply_columns = (
-            self._normalize_columns(
-                self._apply_columns_from_metadata(metadata),
+            normalize_columns(
+                apply_columns_from_metadata(metadata),
                 "apply",
             )
             if requested_mode is ApplyMode.ROWS
@@ -842,7 +673,7 @@ class MLService:
             session.expunge(trained_model)
             return trained_model
 
-    def _resolve_column_binding(self, binding_id: int, *, model_key: str) -> "_ResolvedColumnBinding":
+    def _resolve_column_binding(self, binding_id: int, *, model_key: str) -> _ResolvedColumnBinding:
         normalized_binding_id = binding_id
         if not normalized_binding_id:
             raise ValidationError("Training requires a column binding.")
@@ -853,12 +684,12 @@ class MLService:
             session.expunge(binding)
 
         catalog = get_model_catalog_entry(model_key)
-        role_bindings = self._normalize_role_bindings(
+        role_bindings = normalize_role_bindings(
             binding.role_bindings,
             train_role_schema=catalog.train_role_schema,
         )
-        self._validate_feature_target_projection(role_bindings)
-        feature_columns, target_columns = self._feature_target_columns(role_bindings)
+        validate_feature_target_projection(role_bindings)
+        feature_columns, target_columns = feature_target_columns(role_bindings)
 
         dataset = self._dataset_service.get_dataset(binding.dataset_id)
         if not Path(dataset.source_path).exists():
@@ -874,7 +705,7 @@ class MLService:
             raise ValidationError(
                 "The stored Dataset identity is invalid. Re-create the column binding before training."
             ) from exc
-        current_snapshot = self._build_dataset_snapshot(dataset, inspection)
+        current_snapshot = build_dataset_snapshot(dataset, inspection)
         if stored_snapshot.model_dump(exclude={"sampling_fingerprint"}) != current_snapshot.model_dump(exclude={"sampling_fingerprint"}):
             raise ValidationError(
                 "The Dataset contents changed after its column roles were bound. Re-create the column binding "
@@ -896,335 +727,6 @@ class MLService:
             inspection=inspection,
             dataset_snapshot=stored_snapshot,
         )
-
-    def _build_apply_input_files(
-        self,
-        feature_columns: list[str],
-        input_sources: list[ApplySourceInput],
-    ) -> list[ApplyInputFile]:
-        if not input_sources:
-            raise ValidationError("Select at least one apply input file or provide inline apply rows.")
-        manual_root = (self._paths.temp / "manual-apply").resolve()
-        files: list[ApplyInputFile] = []
-        for input_source in input_sources:
-            raw_path = input_source.source_path
-            inspection = self._dataset_service.inspect_source_file(
-                InspectDatasetInput(source_path=str(Path(raw_path).resolve()))
-            )
-            available = {column.name for column in inspection.columns}
-            if not set(feature_columns).issubset(available):
-                raise ValidationError("Apply input file does not contain the required apply columns.")
-            absolute_path = Path(inspection.source_path).resolve()
-            source_kind = "manual_csv" if manual_root in absolute_path.parents else "user_file"
-            files.append(
-                ApplyInputFile(
-                    absolute_path=str(absolute_path),
-                    file_name=absolute_path.name,
-                    source_kind=source_kind,
-                    dataset_id=input_source.dataset_id,
-                    artifact_id=input_source.artifact_id,
-                )
-            )
-        return files
-
-    def _build_dataset_snapshot(
-        self,
-        dataset: DatasetRow,
-        inspection: Any,
-    ) -> DatasetSnapshotFact:
-        source_path = Path(dataset.source_path)
-        source_digest = hashlib.sha256()
-        with source_path.open("rb") as source:
-            for chunk in iter(lambda: source.read(1024 * 1024), b""):
-                source_digest.update(chunk)
-        schema_payload = {
-            "source_format": inspection.source_format.value,
-            "columns": [
-                {
-                    "name": column.name,
-                    "kind": column.kind.value,
-                    "nullable": column.nullable,
-                }
-                for column in inspection.columns
-            ],
-        }
-        schema_bytes = json.dumps(
-            schema_payload,
-            ensure_ascii=False,
-            separators=(",", ":"),
-            sort_keys=True,
-        ).encode("utf-8")
-        return DatasetSnapshotFact(
-            dataset_id=dataset.id,
-            source_sha256=source_digest.hexdigest(),
-            source_byte_size=source_path.stat().st_size,
-            schema_digest=hashlib.sha256(schema_bytes).hexdigest(),
-        )
-
-    def _materialize_inline_apply_rows(
-        self,
-        feature_columns: list[str],
-        input_rows: InlineApplyRowsInput | None,
-    ) -> Path | None:
-        if input_rows is None:
-            return None
-
-        header_index_map = self._normalize_inline_header_index_map(input_rows.header_index_map)
-        if set(header_index_map) != set(feature_columns):
-            raise ValidationError("Inline apply columns must match the trained model apply columns exactly.")
-        if not input_rows.data:
-            raise ValidationError("Inline apply rows require at least one data row.")
-
-        row_width = len(header_index_map)
-        rows: list[dict[str, str | None]] = []
-        for row in input_rows.data:
-            if len(row) != row_width:
-                raise ValidationError("Inline apply data rows must match the header index map width.")
-            rows.append(
-                {
-                    column: self._normalize_inline_cell(row[header_index_map[column]])
-                    for column in feature_columns
-                }
-            )
-
-        return self._dataset_service.materialize_manual_apply_csv(
-            MaterializeManualApplyCsvInput(
-                feature_columns=feature_columns,
-                rows=rows,
-            )
-        )
-
-    def _normalize_inline_header_index_map(self, header_index_map: dict[str, int]) -> dict[str, int]:
-        if not header_index_map:
-            raise ValidationError("Inline apply rows require a header_index_map.")
-
-        normalized: dict[str, int] = {}
-        for raw_column, raw_index in header_index_map.items():
-            column = str(raw_column).strip()
-            if not column:
-                raise ValidationError("Inline apply column names cannot be empty.")
-            if column in normalized:
-                raise ValidationError("Inline apply column names cannot be duplicated.")
-            if not isinstance(raw_index, int) or isinstance(raw_index, bool) or raw_index < 0:
-                raise ValidationError("Inline apply header indexes must be non-negative integers.")
-            normalized[column] = raw_index
-
-        indexes = list(normalized.values())
-        if len(set(indexes)) != len(indexes):
-            raise ValidationError("Inline apply header indexes cannot be duplicated.")
-        if sorted(indexes) != list(range(len(indexes))):
-            raise ValidationError("Inline apply header indexes must be contiguous and start at 0.")
-        return normalized
-
-    def _normalize_inline_cell(self, value: Any) -> str | None:
-        if value is None:
-            return None
-        if isinstance(value, (str, int, float, bool)):
-            return str(value)
-        raise ValidationError("Inline apply row values must be scalar JSON values.")
-
-    def _normalize_role_bindings(
-        self,
-        raw_bindings: list[dict[str, Any]],
-        *,
-        train_role_schema: ModelRoleSchema | None,
-        inspection_column_names: list[str] | None = None,
-    ) -> list[ColumnRoleBinding]:
-        if not raw_bindings:
-            raise ValidationError("At least one column role binding is required.")
-        schema_by_role = {
-            role.name: role
-            for role in train_role_schema.roles
-        } if train_role_schema is not None else {}
-        normalized: list[ColumnRoleBinding] = []
-        seen_roles: set[str] = set()
-        for raw_binding in raw_bindings:
-            binding_payload = self._canonicalize_role_binding_columns(
-                raw_binding,
-                inspection_column_names=inspection_column_names,
-            )
-            try:
-                binding = ColumnRoleBinding.model_validate(binding_payload)
-            except Exception as exc:
-                raise ValidationError("Column role bindings must be valid role binding objects.") from exc
-            role = binding.role.strip()
-            if not role:
-                raise ValidationError("Column role binding names cannot be empty.")
-            if role in seen_roles:
-                raise ValidationError(f"Duplicate column role binding '{role}' is not allowed.")
-            seen_roles.add(role)
-            role_definition = schema_by_role.get(role)
-            if train_role_schema is not None and role_definition is None and not train_role_schema.additional_roles:
-                raise ValidationError(f"Column role '{role}' is not accepted by the selected model.")
-            columns = self._normalize_role_columns(binding.columns, role)
-            role_kind = binding.role_kind or (
-                role_definition.kind if role_definition is not None else self._infer_role_kind(columns)
-            )
-            if role_definition is not None and role_kind != role_definition.kind:
-                raise ValidationError(f"Column role '{role}' must use role kind '{role_definition.kind.value}'.")
-            if role_kind is ColumnRoleKind.SINGLE_COLUMN and len(columns) != 1:
-                raise ValidationError(f"Column role '{role}' must bind exactly one column.")
-            if role_kind is ColumnRoleKind.MANY_COLUMNS and not columns:
-                raise ValidationError(f"Column role '{role}' must bind at least one column.")
-            normalized.append(
-                ColumnRoleBinding(
-                    role=role,
-                    columns=columns,
-                    role_kind=role_kind,
-                    required=role_definition.required if role_definition is not None else binding.required,
-                    metadata=dict(binding.metadata),
-                )
-            )
-
-        if train_role_schema is not None:
-            missing_roles = [
-                role.name
-                for role in train_role_schema.roles
-                if role.required and role.name not in seen_roles
-            ]
-            if missing_roles:
-                raise ValidationError(f"Missing required column roles: {', '.join(missing_roles)}.")
-        return normalized
-
-    def _canonicalize_role_binding_columns(
-        self,
-        raw_binding: dict[str, Any],
-        *,
-        inspection_column_names: list[str] | None,
-    ) -> dict[str, Any]:
-        if not isinstance(raw_binding, dict):
-            raise ValidationError("Column role bindings must be valid role binding objects.")
-
-        reference_keys = [
-            key
-            for key in ("columns", "column_indexes")
-            if key in raw_binding and raw_binding[key] is not None
-        ]
-        if len(reference_keys) > 1:
-            raise ValidationError("Column role bindings must use either columns or column_indexes, not both.")
-        if not reference_keys:
-            raise ValidationError("Column role bindings require columns or column_indexes.")
-
-        payload = dict(raw_binding)
-        if reference_keys[0] == "column_indexes":
-            payload["columns"] = self._resolve_role_column_indexes(
-                raw_binding["column_indexes"],
-                role=str(raw_binding.get("role") or ""),
-                inspection_column_names=inspection_column_names,
-            )
-        payload.pop("column_indexes", None)
-        return payload
-
-    def _resolve_role_column_indexes(
-        self,
-        raw_indexes: Any,
-        *,
-        role: str,
-        inspection_column_names: list[str] | None,
-    ) -> list[str]:
-        role_label = role.strip() or "<unnamed>"
-        if inspection_column_names is None:
-            raise ValidationError("Column indexes can only be resolved while creating a column binding.")
-        if not isinstance(raw_indexes, list):
-            raise ValidationError(f"Column role '{role_label}' column_indexes must be a list.")
-        if not raw_indexes:
-            raise ValidationError(f"Column role '{role_label}' column_indexes cannot be empty.")
-
-        schema = resolve_tabular_schema(inspection_column_names)
-        columns: list[str] = []
-        for index in raw_indexes:
-            field_name = f"Column role '{role_label}' column_indexes"
-            try:
-                columns.append(resolve_tabular_column_index(schema, index, field_name=field_name))
-            except ValidationError as exc:
-                # Keep the role-binding contract's actionable wording while
-                # delegating strict type/range semantics to the shared helper.
-                if isinstance(index, bool) or not isinstance(index, int):
-                    raise ValidationError(
-                        f"Column role '{role_label}' column_indexes must contain zero-based integer indexes."
-                    ) from exc
-                raise ValidationError(
-                    f"Column role '{role_label}' column_indexes index {index} is outside the available "
-                    "zero-based column range."
-                ) from exc
-        return columns
-
-    def _normalize_role_columns(self, columns: list[str], role: str) -> list[str]:
-        normalized = [column.strip() for column in columns if column.strip()]
-        if not normalized:
-            raise ValidationError(f"Column role '{role}' must bind at least one column.")
-        if len(set(normalized)) != len(normalized):
-            raise ValidationError(f"Duplicate columns are not allowed for role '{role}'.")
-        return normalized
-
-    def _infer_role_kind(self, columns: list[str]) -> ColumnRoleKind:
-        return ColumnRoleKind.SINGLE_COLUMN if len(columns) == 1 else ColumnRoleKind.MANY_COLUMNS
-
-    def _feature_target_columns(self, role_bindings: list[ColumnRoleBinding]) -> tuple[list[str], list[str]]:
-        feature_columns: list[str] = []
-        target_columns: list[str] = []
-        for binding in role_bindings:
-            if binding.role == "feature":
-                feature_columns = list(binding.columns)
-            elif binding.role == "target":
-                target_columns = list(binding.columns)
-        return feature_columns, target_columns
-
-    def _validate_feature_target_projection(self, role_bindings: list[ColumnRoleBinding]) -> None:
-        role_by_column: dict[str, str] = {}
-        for binding in role_bindings:
-            for column in binding.columns:
-                previous = role_by_column.get(column)
-                if previous is not None and previous != binding.role:
-                    raise ValidationError(
-                        f"Column '{column}' cannot be bound to multiple roles: '{previous}' and '{binding.role}'."
-                    )
-                role_by_column[column] = binding.role
-
-    def _apply_columns_from_metadata(self, metadata: Any) -> list[str]:
-        schema_roles = metadata.apply_role_schema.get("roles") if isinstance(metadata.apply_role_schema, dict) else None
-        role_names = [
-            str(role.get("name"))
-            for role in schema_roles or []
-            if isinstance(role, dict) and role.get("required", True)
-        ]
-        if not role_names:
-            role_names = ["feature"]
-        columns: list[str] = []
-        for role_name in role_names:
-            columns.extend(_role_columns(metadata.train_role_bindings, role_name))
-        return columns
-
-    def _normalize_columns(self, columns: list[str], label: str) -> list[str]:
-        normalized = [column.strip() for column in columns if column.strip()]
-        if not normalized:
-            raise ValidationError(f"At least one {label} column must be selected.")
-        if len(set(normalized)) != len(normalized):
-            raise ValidationError(f"Duplicate {label} columns are not allowed.")
-        return normalized
-
-    def _column_binding_error_message(
-        self,
-        *,
-        missing_by_role: dict[str, list[str]],
-        available_columns: list[str],
-    ) -> str:
-        lines = ["Bound columns must exist in the dataset."]
-        missing_columns: list[str] = []
-        for role, columns in missing_by_role.items():
-            missing_columns.extend(columns)
-            lines.append(f"Missing columns for role '{role}': {_format_column_names(columns)}.")
-        suggestions = _column_name_suggestions(
-            missing_columns,
-            available_columns,
-        )
-        if suggestions:
-            lines.append("Closest available column suggestions:")
-            for missing, matches in suggestions.items():
-                lines.append(f"- `{missing}` -> {_format_column_names(matches)}")
-        lines.append(f"Available columns: {_format_column_names(available_columns)}.")
-        lines.append("Use the exact column names returned by data.query or dataset inspection.")
-        return "\n".join(lines)
 
     def _update_trained_model_metadata_with_evaluation(
         self,
@@ -1272,38 +774,6 @@ class MLService:
             session.commit()
 
 
-@dataclass(frozen=True)
-class _TrainingContext:
-    project_id: int
-    dataset: Any
-    run_name: str
-    catalog: Any
-    train_role_bindings: list[ColumnRoleBinding]
-    column_selection: ColumnSelection
-    evaluation_policy: Any
-    inspection: Any
-    dataset_snapshot: DatasetSnapshotFact
-
-
-@dataclass(frozen=True)
-class _ResolvedColumnBinding:
-    dataset: DatasetRow
-    role_bindings: list[ColumnRoleBinding]
-    feature_columns: list[str]
-    target_columns: list[str]
-    inspection: Any
-    dataset_snapshot: DatasetSnapshotFact
-
-
-@dataclass(frozen=True)
-class _ApplyContext:
-    project_id: int
-    dataset: Any
-    feature_columns: list[str]
-    trained_model: TrainedModelRow
-    apply_mode: ApplyMode
-
-
 def _unsuccessful_task_error(task: MLTaskRow) -> ValidationError:
     message = f"ML task '{task.id}' finished with status '{task.status.value}'."
     if task.error_summary:
@@ -1311,48 +781,5 @@ def _unsuccessful_task_error(task: MLTaskRow) -> ValidationError:
     return ValidationError(message)
 
 
-def _now() -> Any:
-    from datetime import datetime, timezone
-
+def _now() -> datetime:
     return datetime.now(timezone.utc)
-
-
-def _format_column_names(columns: list[str]) -> str:
-    return ", ".join(f"`{column}`" for column in columns) if columns else "none"
-
-
-def _column_name_suggestions(missing_columns: list[str], available_columns: list[str]) -> dict[str, list[str]]:
-    available_by_normalized: dict[str, list[str]] = {}
-    for column in available_columns:
-        available_by_normalized.setdefault(_normalize_column_name_for_match(column), []).append(column)
-
-    suggestions: dict[str, list[str]] = {}
-    normalized_available = list(available_by_normalized)
-    for missing in missing_columns:
-        normalized_missing = _normalize_column_name_for_match(missing)
-        matches = list(available_by_normalized.get(normalized_missing) or [])
-        if not matches:
-            close_keys = difflib.get_close_matches(normalized_missing, normalized_available, n=3, cutoff=0.84)
-            for key in close_keys:
-                matches.extend(available_by_normalized[key])
-        if matches:
-            suggestions[missing] = matches[:3]
-    return suggestions
-
-
-def _role_columns(role_bindings: list[dict[str, Any]], role: str) -> list[str]:
-    for binding in role_bindings:
-        if binding.get("role") == role:
-            columns = binding.get("columns")
-            if isinstance(columns, list):
-                return [str(column) for column in columns]
-    return []
-
-
-def _normalize_column_name_for_match(value: str) -> str:
-    return (
-        unicodedata.normalize("NFKC", value)
-        .translate(_COLUMN_NAME_NORMALIZATION_TRANSLATION)
-        .casefold()
-        .strip()
-    )
