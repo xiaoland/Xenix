@@ -203,7 +203,10 @@ def validate_runtime_manifest(payload: object) -> dict[str, object]:
 
 def verify_runtime_files(root: Path, manifest: dict[str, object]) -> None:
     expected = {RUNTIME_MANIFEST_NAME}
-    for item in manifest["files"]:
+    files = manifest["files"]
+    if not isinstance(files, list):
+        raise ValueError("Native OCR runtime manifest file list is invalid.")
+    for item in files:
         relative = str(item["path"])
         path = resolve_member(root, relative)
         if (

@@ -100,7 +100,11 @@ def _remove_isolated_home(runtime_home: Path) -> None:
     shutil.rmtree(resolved)
 
 
-def _preserve_failure_evidence(profile: RuntimeProfileContext, exc_type, exc_value) -> None:
+def _preserve_failure_evidence(
+    profile: RuntimeProfileContext,
+    exc_type: type[BaseException] | None,
+    exc_value: BaseException | None,
+) -> None:
     summary = "".join(traceback.format_exception_only(exc_type, exc_value)).strip()
     root = Path(os.environ.get(EVIDENCE_DIR_ENV, DEFAULT_EVIDENCE_DIR)).resolve()
     destination = root / profile.run_id

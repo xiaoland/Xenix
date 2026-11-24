@@ -31,11 +31,11 @@ def migrate_v28_to_v29(engine: Engine) -> int:
         connection.exec_driver_sql(
             "CREATE TABLE audit_explanation (id INTEGER PRIMARY KEY NOT NULL, object_kind VARCHAR NOT NULL, object_id INTEGER NOT NULL, thread_id INTEGER NOT NULL, tool_call_message_id INTEGER, text VARCHAR NOT NULL, evidence JSON NOT NULL, created_at DATETIME NOT NULL)"
         )
-        for table, fields in {
+        for table, index_fields in {
             "artifact_derivation": ("origin_thread_id", "origin_tool_call_message_id"),
             "audit_explanation": ("object_kind", "object_id", "thread_id"),
         }.items():
-            for field in fields:
+            for field in index_fields:
                 connection.exec_driver_sql(f"CREATE INDEX ix_{table}_{field} ON {table} ({field})")
         # Dataset derivations already record a stable ToolCall identity.
         if "conversation_message" in tables:

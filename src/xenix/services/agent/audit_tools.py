@@ -1,10 +1,13 @@
 """Public audit tools: read domain evidence and append attributed interpretations."""
 
+from typing import Any
+
 from pydantic import Field
 
 from ..audit_contracts import AuditReference, AuditScope, ExplanationText
 from ..audit_service import AuditExplanationService, AuditQueryService
 from ..llm.tool_protocol import AgentTool, ToolExecutionContext, ToolSuccess
+from ..llm.tool_registry import AgentToolRegistry
 from .tool_inputs import AgentToolInput
 
 
@@ -26,7 +29,7 @@ class AuditExplainInput(AgentToolInput):
     evidence: list[AuditReference] = Field(min_length=1)
 
 
-def register_audit_tools(registry, session_factory) -> None:
+def register_audit_tools(registry: AgentToolRegistry, session_factory: Any) -> None:
     query = AuditQueryService(session_factory)
     writer = AuditExplanationService(session_factory)
 
@@ -59,27 +62,30 @@ def register_audit_tools(registry, session_factory) -> None:
             {"explanation_id": annotation_id, "reference": arguments.reference.model_dump(mode="json"), "saved": True}
         )
 
-    for tool in (
+    registry.register(
         AgentTool(
             name="audit.list",
             provider_name="audit_list",
             input_model=AuditListInput,
             implementation=list_outputs,
             description="Find this conversation's retained outputs and missing interpretations, including work completed in the background. Returns typed references for audit.inspect and audit.explain.",
-        ),
+        )
+    )
+    registry.register(
         AgentTool(
             name="audit.inspect",
             provider_name="audit_inspect",
             input_model=AuditInspectInput,
             implementation=inspect,
             description="Read recorded inputs, actual parameters, evaluation evidence, and earlier Agent explanations for a Dataset, model, Artifact or ML task. Does not execute work.",
-        ),
+        )
+    )
+    registry.register(
         AgentTool(
             name="audit.explain",
             provider_name="audit_explain",
             input_model=AuditExplainInput,
             implementation=explain,
             description="After inspecting completed results, save a business-readable interpretation with recorded evidence and limitations for each delivered output. Append corrections without overwriting history; never invent metrics. A pre-execution rationale alone is not a result interpretation.",
-        ),
-    ):
-        registry.register(tool)
+        )
+    )

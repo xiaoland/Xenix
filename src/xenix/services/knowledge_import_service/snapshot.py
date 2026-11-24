@@ -20,7 +20,7 @@ LOGGER = logging.getLogger(__name__)
 def prepare_source_snapshot(
     import_id: int,
     *,
-    session_factory: sessionmaker,
+    session_factory: sessionmaker[Any],
     knowledge_repo: KnowledgeRepository,
     artifacts: ArtifactService,
     store: KnowledgeContentStore,

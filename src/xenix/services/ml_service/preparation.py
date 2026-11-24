@@ -17,8 +17,8 @@ from ..dataset_service import DatasetService, MaterializeManualApplyCsvInput
 from ..ml.contracts import (
     ApplyInputFile,
     DatasetSnapshotFact,
-    TrainedModelContextPayload,
 )
+from ..ml.trained_model_metadata import TrainedModelContextPayload
 from ..storage.models import DatasetRow
 from .contracts import ApplySourceInput, InlineApplyRowsInput, _TrainingContext
 

@@ -1,9 +1,17 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
+from typing import Any
+
 from ...exceptions import ValidationError, report_exception
 
 
-def _raise_if_cancelled(ml_service, context, *, ml_task_ids=None) -> None:
+def _raise_if_cancelled(
+    ml_service: Any,
+    context: Any,
+    *,
+    ml_task_ids: Iterable[int] | None = None,
+) -> None:
     if not context.cancel_requested():
         return
     if ml_task_ids:

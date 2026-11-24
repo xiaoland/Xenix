@@ -69,7 +69,7 @@ def _dataset_name(value: Any) -> str | None:
         return None
     if "/" in value or "\\" in value:
         raise ValidationError("Message block field 'name' must be a logical Dataset name, not a path.")
-    return value
+    return str(value)
 
 
 def _bounded_identifier(value: Any, *, label: str) -> int:

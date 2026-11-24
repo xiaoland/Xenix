@@ -9,7 +9,7 @@ from collections.abc import Iterable
 from concurrent.futures import Future, ThreadPoolExecutor, wait
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy.orm import sessionmaker
 
@@ -67,7 +67,7 @@ class KnowledgeIndexService:
     def __init__(
         self,
         *,
-        session_factory: sessionmaker,
+        session_factory: sessionmaker[Any],
         semantic_service: KnowledgeSemanticService,
         embedding_service: EmbeddingService,
         embedding_settings_source: EmbeddingSettingsSource,

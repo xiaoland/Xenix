@@ -58,7 +58,7 @@ class HeadlessAgentServices:
 def build_headless_agent_services(
     *,
     paths: AppPaths,
-    session_factory: sessionmaker,
+    session_factory: sessionmaker[Any],
     llm: LLMService,
     embedding_settings_service: EmbeddingSettingsService,
     ml_worker_settings: MLWorkerSettingsService,
