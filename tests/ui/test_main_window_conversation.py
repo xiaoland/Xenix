@@ -59,6 +59,12 @@ class _Harness:
         self.pause_thread = Mock()
         self.get_thread_snapshot = Mock(side_effect=lambda thread_id: self.snapshots[thread_id])
         self.project_chatbot_events = Mock(side_effect=lambda snapshot: list(snapshot.events))
+        self.set_thread_model = Mock(side_effect=self._apply_thread_model)
+
+    def _apply_thread_model(self, thread_id: int, fq_model_key: str):
+        snapshot = self.snapshots[thread_id]
+        snapshot.thread.selected_fq_model_key = fq_model_key
+        return snapshot
 
     def list_threads(self):
         return self.threads
@@ -147,6 +153,49 @@ def test_opening_old_trial_thread_sends_with_current_default_model(qtbot: QtBot,
     submission = executor.submissions[0].submission
     assert submission.thread_id == 101
     assert submission.fq_model_key == "custom/preferred"
+
+
+def test_composer_model_switch_updates_thread_reverts_on_failure_and_keeps_pre_thread_choice(
+    qtbot: QtBot, ui_artifacts, tmp_path,
+) -> None:
+    from xenix.exceptions import ValidationError
+
+    settings = LLMSettings(
+        providers=[
+            LLMProviderConfig(key="alpha", models=["first", "second"]),
+            LLMProviderConfig(key="beta", models=["other"]),
+        ],
+        default_fq_model_key="alpha/first",
+    )
+    llm_service = LLMService(FrozenLLMSettingsSource(settings))
+    window, harness, executor = _window(qtbot, ui_artifacts, tmp_path, llm_service=llm_service)
+    composer = window._thread_detail_view.composer
+    picker = composer.model_picker
+
+    # Switch model on an open thread: persists via set_thread_model and submits selected model.
+    beta_index = picker.findData("beta/other")
+    assert beta_index >= 0
+    picker.setCurrentIndex(beta_index)
+    assert harness.set_thread_model.call_args.args == (102, "beta/other")
+    assert composer.selected_fq_model_key() == "beta/other"
+
+    composer.editor.setPlainText("Use switched model")
+    qtbot.mouseClick(composer.send_button, Qt.MouseButton.LeftButton)
+    assert executor.submissions[0].submission.fq_model_key == "beta/other"
+
+    # Unlock composer and verify failed switch reverts picker to thread's real model.
+    window._chat_workspace._select_conversation_thread(102)
+    harness.set_thread_model.side_effect = ValidationError("Model switch rejected")
+    second_index = picker.findData("alpha/second")
+    picker.setCurrentIndex(second_index)
+    assert composer.selected_fq_model_key() == "beta/other"
+
+    # With no active thread, a pre-selected composer model survives options re-sync (e.g., retranslate).
+    window._chat_workspace._select_conversation_thread(None)
+    picker.setCurrentIndex(second_index)
+    assert composer.selected_fq_model_key() == "alpha/second"
+    window._chat_workspace.sync_model_options()
+    assert composer.selected_fq_model_key() == "alpha/second"
 
 
 def test_pre_ack_failure_preserves_composer_for_retry(qtbot: QtBot, ui_artifacts, tmp_path) -> None:
