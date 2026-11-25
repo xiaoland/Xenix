@@ -18,11 +18,22 @@
 
 When monitoring asynchronous workflows such as GitHub Actions, prefer a completion or failure notification when the environment supports one. Otherwise, wait at least 60 seconds between status checks, including checks through different commands or tools; use a longer interval for slow builds and uploads. Batch checks for independent active runs. Notify the user only when a phase changes, an actionable failure or approval requirement appears, or the workflow completes; an unchanged queued/running state is not a progress update. Workflow monitoring is separate from a build or transfer process's own diagnostic heartbeat.
 
+## Run the Development App
+
+Run from the changed worktree with its persistent `.runtime/dev` data. For a restart, close that worktree's existing development instance and wait for it to exit before launching again. VS Code's **PDM: dev** task and **Xenix Native: Debug App** launch both set up the development environment.
+
+```powershell
+$env:XENIX_APP_HOME = Join-Path $PWD.Path '.runtime/dev'
+$env:XENIX_ENV = 'development'
+pdm run dev
+```
+
+Check the startup manifest's `runtime_home` and confirm the main window has opened before handing it over for manual acceptance. Without an override the launcher uses the [platform default app home](docs/40-deployment/runtime-state.md#locate-and-inspect). Use `pdm run dev --isolated` for a fresh temporary home.
+
 ## Development Commands
 
 - Python `3.14.2` is the project and packaged runtime.
 - PDM `2.26.6` is the project workflow frontend; `pdm sync --clean -G :all` makes the project-local virtual environment match `pdm.lock`. Follow it with `pdm run prepare` to generate the ignored Skill catalog and compiled translations before a first static check.
-- `pdm run dev` runs the desktop application.
 - `pdm run test` prepares runtime resources and runs the complete offline acceptance portfolio in one process. Pass normal pytest selectors directly, for example `pdm run test tests/ml/test_data_cleaning_service.py -q`; `--direct` remains accepted for existing scripts but does not select a different runner.
 - `pdm run pytest --direct <pytest selectors/options>` runs a focused selection with the same isolated temporary-path setup.
 - `pdm run test-affected` runs only the offline tests affected by source changes via `pytest-testmon`'s coverage-based selection: the first run builds the `.testmondata` baseline (running everything), and later runs re-run only affected tests. `pdm run list-affected` lists the affected set without running. It is a developer aid and never narrows CI.
@@ -54,7 +65,7 @@ Use the smallest verification set that proves the affected contract. Run `pdm ru
 | Data cleaning and registered outputs | `pdm run test tests/ml/test_data_cleaning_service.py tests/ml/test_ml_foundation_profile_cleaning.py -q` | Agent guidance and packaged worker imports |
 | Conversation state and callback delivery | `pdm run test tests/ui_models tests/ui/test_chatbot_contract.py -q` | Harness acceptance and native Windows smoke |
 | Application assembly or dependency imports | `pdm run check`, then `pdm run smoke --isolated` | Bundle and packaged smoke after import-path changes |
-| Documentation only | Inspect changed links, commands, and ownership consistency | No application run unless a runtime claim needs evidence |
+| Documentation only | Inspect changed links, commands, and ownership consistency | Check any runtime claims that need new evidence |
 
 ### Fixtures and completion
 

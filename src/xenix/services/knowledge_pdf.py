@@ -2,14 +2,19 @@ from __future__ import annotations
 
 import math
 import unicodedata
+from contextlib import closing
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pypdfium2
 from pypdfium2 import raw as pdfium_c
 
 from ..exceptions import ValidationError, report_exception
+
+if TYPE_CHECKING:
+    from docling_core.types.doc import DoclingDocument
 
 
 class PdfPageTextState(StrEnum):
@@ -96,11 +101,46 @@ def probe_pdf_pages(path: Path) -> tuple[PdfPageEvidence, ...]:
         document.close()
 
 
+def parse_native_pdf(path: Path, *, text_pages: set[int]) -> DoclingDocument:
+    """Project embedded PDF text and page provenance into the canonical IR."""
+    from docling_core.types.doc import BoundingBox, DocItemLabel, DoclingDocument, ProvenanceItem, Size
+
+    document = DoclingDocument(name=path.stem)
+    try:
+        with pypdfium2.PdfDocument(path) as pdf:
+            for index in range(len(pdf)):
+                page_no = index + 1
+                with closing(pdf[index]) as page:
+                    width, height = page.get_size()
+                    document.add_page(page_no=page_no, size=Size(width=width, height=height))
+                    if page_no not in text_pages:
+                        continue
+                    with closing(page.get_textpage()) as text_page:
+                        text = text_page.get_text_bounded().strip()
+                    if text:
+                        document.add_text(
+                            DocItemLabel.PARAGRAPH,
+                            text,
+                            prov=ProvenanceItem(
+                                page_no=page_no,
+                                bbox=BoundingBox(l=0.0, t=0.0, r=width, b=height),
+                                charspan=(0, len(text)),
+                            ),
+                        )
+    except pypdfium2.PdfiumError as exc:
+        raise ValidationError(
+            "The PDF text layer could not be read.",
+            error_code="knowledge_pdf_native_parse_failed",
+            retryable=True,
+        ) from exc
+    return document
+
+
 def _probe_page(page_object, *, page: int) -> PdfPageEvidence:
     text_page = None
     try:
         text_page = page_object.get_textpage()
-        text = text_page.get_text_range().strip()
+        text = text_page.get_text_bounded().strip()
         extracted_characters = len(text)
         alphanumeric_characters = sum(character.isalnum() for character in text)
         suspicious_characters = sum(_suspicious_character(character) for character in text)
@@ -190,5 +230,6 @@ __all__ = [
     "PdfPageEvidence",
     "PdfPageTextState",
     "classify_pdf_page_text",
+    "parse_native_pdf",
     "probe_pdf_pages",
 ]

@@ -5,15 +5,17 @@ import time
 from concurrent.futures import Future
 from pathlib import Path
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication
 from pytestqt.qtbot import QtBot
 
 from xenix.config import ensure_app_dirs, get_app_paths
 from xenix.i18n import TranslationManager
-from xenix.services.embedding_service import EmbeddingSettingsService
+from xenix.services.ai_settings import AISettingsService
 from xenix.services.knowledge_index_service import KnowledgeIndexOverview
-from xenix.services.llm import LLMService, LLMSettingsService
 from xenix.services.ml.worker_settings import MLWorkerSettingsService
+from xenix.ui.conversation.shortcuts import ConversationShortcuts, SHORTCUT_SETTINGS_FILE
+from xenix.ui.settings.contracts import SettingsTab
 from xenix.ui.settings_dialog import SettingsDialog
 
 
@@ -39,16 +41,13 @@ def _build_dialog(
 ) -> SettingsDialog:
     monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
     paths = ensure_app_dirs(get_app_paths())
-    llm_settings = LLMSettingsService(paths)
     dialog = SettingsDialog(
         paths,
         paths.logs / "xenix.log",
         paths.state / "xenix.db",
         TranslationManager(qapp, paths),
-        LLMService(llm_settings),
-        llm_settings,
+        AISettingsService(paths),
         MLWorkerSettingsService(paths),
-        EmbeddingSettingsService(paths),
         knowledge_index_service=index_service,
     )
     return dialog
@@ -78,13 +77,35 @@ def test_settings_controls_have_stable_unique_semantic_identities(
         dialog._provider_editor._add_provider_button,
         dialog._provider_editor._remove_provider_button,
         dialog._provider_editor._provider_api_key_input,
-        dialog._embedding_settings._api_key_input,
+        dialog._embedding_settings._model_selector,
+        dialog._conversation_settings._default_model_selector,
     )
 
     identities = [control.accessibleIdentifier() for control in controls]
 
     assert all(identities)
     assert len(identities) == len(set(identities))
+    dialog.close()
+    dialog.shutdown()
+
+
+def test_shortcut_tab_records_and_persists_a_key_combination(
+    monkeypatch, tmp_path: Path, qapp: QApplication, qtbot: QtBot,
+) -> None:
+    dialog = _build_dialog(qapp=qapp, monkeypatch=monkeypatch, tmp_path=tmp_path, index_service=None)
+    qtbot.addWidget(dialog)
+    dialog.show_tab(SettingsTab.SHORTCUTS)
+    shortcut = dialog._shortcut_settings.steer_editor
+    shortcut.setFocus()
+    qtbot.keyClick(shortcut, Qt.Key.Key_Return, Qt.KeyboardModifier.AltModifier)
+    qtbot.waitUntil(lambda: dialog._shortcut_settings.current_settings().steer == "Alt+Return")
+
+    with qtbot.waitSignal(dialog.agent_settings_saved):
+        dialog._save_button.click()
+
+    assert ConversationShortcuts.load(get_app_paths().config / SHORTCUT_SETTINGS_FILE) == ConversationShortcuts(
+        send="Return", steer="Alt+Return",
+    )
     dialog.close()
     dialog.shutdown()
 

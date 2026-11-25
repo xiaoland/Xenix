@@ -102,7 +102,6 @@ class Canonicalizer:
                 "display_name": identity.display_name,
             },
             "runtime": {
-                "docling": _package_version("docling"),
                 "docling_core": _package_version("docling-core"),
                 "docling_schema": docling_schema,
             },

@@ -6,10 +6,13 @@ from types import SimpleNamespace
 from typing import Callable
 from unittest.mock import Mock
 
-from PySide6.QtCore import Qt
+import pytest
+from PySide6.QtCore import QTimer, Qt
+from PySide6.QtWidgets import QApplication, QMessageBox, QPushButton, QToolButton
 from pytestqt.qtbot import QtBot
 
 from tests.ui.pytest_plugin import UiArtifactRegistry
+from xenix.exceptions import ValidationError
 from xenix.services.agent import (
     AgentHarnessStreamEvent,
     AttachmentImportProgress,
@@ -24,8 +27,11 @@ from xenix.services.agent.chatbot_events import (
     ChatbotEventStatus,
     build_thinking_chatbot_event,
 )
+from xenix.services.agent.harness_service import MessageDraft, MessageDraftAttachment
 from xenix.services.llm import FrozenLLMSettingsSource, LLMProviderConfig, LLMService, LLMSettings
 from xenix.ui.main_window import MainWindow
+from xenix.ui.conversation.message_editor import UserMessageEditor
+from xenix.ui.conversation.shortcuts import ConversationShortcuts
 from xenix.ui.history import HarnessHistoryAdapter
 from xenix.ui.windows.auxiliary import AuxiliaryWindowCoordinator
 
@@ -114,6 +120,143 @@ def _submit(view, text: str, attachment: Path | None = None) -> None:
         paths = [str(attachment.resolve())]
     view.composer.editor.setPlainText(text)
     view.message_submitted.emit(text, paths, "")
+
+
+def _snapshot_event(recorded, *, final: bool) -> AgentHarnessStreamEvent:
+    return AgentHarnessStreamEvent(
+        kind="snapshot", client_submission_id=recorded.submission.client_submission_id,
+        thread_id=102, snapshot=_snapshot(102, "Thread A"), is_final=final,
+    )
+
+
+def test_composer_queues_and_prioritizes_steering_at_the_next_boundary(qtbot, ui_artifacts, tmp_path) -> None:
+    window, _harness, executor = _window(qtbot, ui_artifacts, tmp_path)
+    window._history_panel.open_thread(102)
+    view = window._thread_detail_view
+    _submit(view, "Active")
+    active = executor.submissions[0]
+    active.on_event(_snapshot_event(active, final=False))
+
+    view.composer.editor.setPlainText("Ordinary follow-up")
+    qtbot.keyClick(view.composer.editor, Qt.Key.Key_Return)
+    view.composer.editor.setPlainText("Change direction")
+    qtbot.keyClick(view.composer.editor, Qt.Key.Key_Return, Qt.KeyboardModifier.ControlModifier)
+
+    assert len(executor.submissions) == 1
+    assert view.message_queue.isVisible()
+    assert view.layout().indexOf(view.timeline) < view.layout().indexOf(view.message_queue) < view.layout().indexOf(view.composer)
+    assert [row.text for row in view.message_queue._rows] == ["Change direction", "Ordinary follow-up"]
+    active.on_event(_snapshot_event(active, final=True))
+    steer = executor.submissions[1]
+    assert steer.submission.text == "Change direction"
+    steer.on_event(_snapshot_event(steer, final=True))
+    followup = executor.submissions[2]
+    assert followup.submission.text == "Ordinary follow-up"
+
+
+def test_queued_message_uses_its_model_after_the_previous_request_fails(qtbot, ui_artifacts, tmp_path) -> None:
+    settings = LLMSettings(
+        providers=[LLMProviderConfig(key="custom", models=["broken", "working"])],
+        default_fq_model_key="custom/broken",
+    )
+    window, _harness, executor = _window(
+        qtbot, ui_artifacts, tmp_path, llm_service=LLMService(FrozenLLMSettingsSource(settings)),
+    )
+    window._history_panel.open_thread(102)
+    view = window._thread_detail_view
+    view.composer.editor.setPlainText("First request")
+    qtbot.keyClick(view.composer.editor, Qt.Key.Key_Return)
+    active = executor.submissions[0]
+    assert active.submission.fq_model_key == "custom/broken"
+    active.on_event(_snapshot_event(active, final=False))
+
+    view.set_selected_fq_model_key("custom/working")
+    view.composer.editor.setPlainText("Try the working model")
+    qtbot.keyClick(view.composer.editor, Qt.Key.Key_Return)
+    active.on_failure(active.submission.client_submission_id, ValidationError("Request failed"))
+
+    assert len(executor.submissions) == 2
+    queued = executor.submissions[1].submission
+    assert queued.thread_id == 102
+    assert queued.fq_model_key == "custom/working"
+    assert queued.text == "Try the working model"
+
+
+def test_chat_shortcuts_can_be_reassigned(qtbot, ui_artifacts, tmp_path) -> None:
+    window, _harness, executor = _window(qtbot, ui_artifacts, tmp_path)
+    view = window._thread_detail_view
+    window._history_panel.open_thread(102)
+    _submit(view, "Active")
+    active = executor.submissions[0]
+    active.on_event(_snapshot_event(active, final=False))
+
+    view.composer.set_conversation_shortcuts(ConversationShortcuts(send="Ctrl+Return", steer="Return"))
+    view.composer.editor.setPlainText("Queued using the remapped key")
+    qtbot.keyClick(view.composer.editor, Qt.Key.Key_Return, Qt.KeyboardModifier.ControlModifier)
+    view.composer.editor.setPlainText("Steered using the remapped key")
+    qtbot.keyClick(view.composer.editor, Qt.Key.Key_Return)
+    assert [row.steering for row in view.message_queue._rows] == [True, False]
+
+
+def test_copy_message_to_other_composer_keeps_original_attachment_paths(qtbot, ui_artifacts, tmp_path, request) -> None:
+    window, harness, _executor = _window(qtbot, ui_artifacts, tmp_path)
+    clipboard = QApplication.clipboard()
+    request.addfinalizer(clipboard.clear)
+    path = tmp_path / "source.csv"
+    path.write_text("a,b\n1,2", encoding="utf-8")
+    missing = tmp_path / "moved.csv"
+    harness.message_draft = Mock(return_value=MessageDraft(
+        text="Use this data",
+        following_ids=(),
+        attachments=(
+            MessageDraftAttachment(path.name, str(path), (42,)),
+            MessageDraftAttachment(missing.name, str(missing), (43,)),
+        ),
+    ))
+    view = window._thread_detail_view
+    window._history_panel.open_thread(102)
+    view.timeline.add_message("You", [], message_id=42, actions=True)
+    bubble = view.timeline.message_bubbles_by_id[42]
+    copy = next(button for button in bubble.findChildren(QToolButton)
+                if button.accessibleIdentifier() == "chat.message.copy")
+    qtbot.mouseClick(copy, Qt.MouseButton.LeftButton)
+    assert clipboard.text() == "Use this data"
+    window._history_panel.open_thread(101)
+    qtbot.keyClick(view.composer.editor, Qt.Key.Key_V, Qt.KeyboardModifier.ControlModifier)
+    assert view.composer.editor.toPlainText() == "Use this data"
+    assert view.composer.attached_files == [str(path), str(missing)]
+    assert view.composer.attachment_states[str(path)].status is ComposerAttachmentStatus.READY
+    assert view.composer.attachment_states[str(missing)].status is ComposerAttachmentStatus.FAILED
+
+
+@pytest.mark.parametrize("following", [(), (43, 44)])
+def test_edit_message_confirms_only_a_nonempty_suffix(qtbot, ui_artifacts, tmp_path, monkeypatch, following) -> None:
+    window, harness, executor = _window(qtbot, ui_artifacts, tmp_path)
+    harness.message_draft = Mock(return_value=MessageDraft("Original", following, ()))
+    confirm = Mock(return_value=QMessageBox.StandardButton.Yes)
+    monkeypatch.setattr(QMessageBox, "question", confirm)
+    view = window._thread_detail_view
+    window._history_panel.open_thread(102)
+    view.timeline.add_message("You", [], message_id=42, actions=True)
+    bubble = view.timeline.message_bubbles_by_id[42]
+
+    def save_edit():
+        editor = next(widget for widget in QApplication.topLevelWidgets()
+                      if isinstance(widget, UserMessageEditor) and widget.isVisible())
+        editor.editor.setPlainText("Revised")
+        save = next(button for button in editor.findChildren(QPushButton)
+                    if button.accessibleIdentifier() == "chat.message-editor.save")
+        save.click()
+
+    QTimer.singleShot(0, save_edit)
+    edit = next(button for button in bubble.findChildren(QToolButton)
+                if button.accessibleIdentifier() == "chat.message.edit")
+    qtbot.mouseClick(edit, Qt.MouseButton.LeftButton)
+    submission = executor.submissions[0].submission
+    assert submission.text == "Revised"
+    assert submission.replacement.message_id == 42
+    assert submission.replacement.confirmed_following_ids == following
+    assert confirm.call_count == bool(following)
 
 
 def test_main_window_exposes_dataset_audit_entry(qtbot: QtBot, ui_artifacts, tmp_path) -> None:

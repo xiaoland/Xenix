@@ -7,7 +7,7 @@ os.environ["QT_QPA_PLATFORM"] = "windows"
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
-from PySide6.QtWidgets import QApplication, QDialog, QLineEdit, QVBoxLayout
+from PySide6.QtWidgets import QApplication, QDialog, QLineEdit, QToolButton, QVBoxLayout
 from pytestqt.qtbot import QtBot
 
 from tests.ui.pytest_plugin import UiArtifactRegistry
@@ -35,11 +35,9 @@ def test_native_chat_window_expose_focus_dialog_and_user_bubble(
     view.composer.editor.setFocus(Qt.FocusReason.OtherFocusReason)
     qtbot.waitUntil(lambda: qapp.focusWidget() is view.composer.editor, timeout=5_000)
 
-    user_bubble = next(
-        bubble
-        for bubble in view.findChildren(ChatMessageBubble)
-        if bubble._author == "You"
-    )
+    message_bubbles = view.findChildren(ChatMessageBubble)
+    user_bubble = next(bubble for bubble in message_bubbles if bubble._author == "You")
+    assistant_bubble = next(bubble for bubble in message_bubbles if bubble._author == "Xenix")
     for width in (760, 980):
         previous_card_width = user_bubble._card.width()
         view.resize(width, scenario.viewport_height)
@@ -53,6 +51,14 @@ def test_native_chat_window_expose_focus_dialog_and_user_bubble(
         image = user_bubble._card.grab().toImage()
         assert image.width() > 0 and image.height() > 0
         assert _is_black(image.pixelColor(2, 2))
+        for bubble, action_count in ((user_bubble, 2), (assistant_bubble, 1)):
+            buttons = bubble.findChildren(QToolButton)
+            assert len(buttons) == action_count
+            assert all(button.accessibleName() and not button.icon().isNull() and not button.text() for button in buttons)
+            qtbot.waitUntil(
+                lambda rightmost=buttons[-1], card=bubble._card: rightmost.geometry().right() == card.geometry().right()
+            )
+            assert all(button.geometry().top() > bubble._card.geometry().bottom() for button in buttons)
 
     dialog = QDialog(view)
     dialog.setWindowTitle("Synthetic native dialog")

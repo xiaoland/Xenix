@@ -38,6 +38,8 @@ _SCROLL_FOLLOW_THRESHOLD = 24
 class ChatTimeline(QWidget):
     service_link_activated = Signal(str)
     source_file_activated = Signal(str)
+    message_edit_requested = Signal(object)
+    message_copy_requested = Signal(object)
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -147,15 +149,20 @@ class ChatTimeline(QWidget):
         message_id: int | str | None = None,
         event_id: str | None = None,
         auto_scroll: bool = True,
+        actions: bool = False,
     ) -> ChatMessageBubble:
         bubble = ChatMessageBubble(
             author=author,
             blocks=blocks,
             artifact_resolver=self._artifact_resolver,
             parent=self,
+            actions=actions,
         )
         bubble.link_activated.connect(self.service_link_activated.emit)
         bubble.source_file_activated.connect(self.source_file_activated.emit)
+        if actions and message_id is not None:
+            bubble.edit_requested.connect(lambda: self.message_edit_requested.emit(message_id))
+            bubble.copy_requested.connect(lambda: self.message_copy_requested.emit(message_id))
         bubble.set_available_width(self._message_column.width())
         self._message_layout.insertWidget(self._message_insert_index(), bubble)
         widget_id = event_id or message_id
@@ -196,6 +203,7 @@ class ChatTimeline(QWidget):
             message_id=event.source_message_ids[0] if event.source_message_ids else None,
             event_id=event.id,
             auto_scroll=auto_scroll,
+            actions=event.kind is ChatbotEventKind.TEXT and bool(event.source_message_ids),
         )
 
     def add_tool_event(self, event: ChatbotEvent, *, auto_scroll: bool = True) -> ToolCallItem:

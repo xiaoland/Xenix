@@ -125,11 +125,8 @@ SHA-256. The public object key is therefore content-addressed: separate build
 bytes can coexist safely, while each packaged client remains bound to one exact
 catalog hash.
 
-Packaged smoke installs the already-built locked OCR generation offline, runs its
-native self-test and golden-image recognition through the spawned Knowledge
-worker, imports the image, derives bounded Units, reaches keyword lookup, and
-checks the recorded runtime generation. It also imports valid DOCX and PPTX
-documents through the frozen worker and retrieves bounded presentation text.
+Packaged smoke installs the already-built locked OCR generation offline, runs its native self-test and golden-image recognition through the spawned Knowledge worker, imports the image, derives bounded Units, reaches keyword lookup, and checks the recorded runtime generation.
+The frozen Knowledge worker also imports a native-text PDF, DOCX, and PPTX, and retrieves text from the resulting Knowledge Units.
 Native runtime verification runs the extracted worker from a foreign working
 directory after the builder PaddleOCR checkout has been made unavailable, and scans
 released binaries for real builder paths. Activation or a parser-helper exercise

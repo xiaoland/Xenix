@@ -8,10 +8,11 @@ Developers and support operators use this runbook to locate active state, invest
 
 `XENIX_APP_HOME` selects an explicit runtime home; otherwise Xenix uses its platform default. On Windows this is normally `%LOCALAPPDATA%\Xenix`. Resolve the active home before acting, especially when tests or isolated runs override it.
 
+Development and manual acceptance use the current worktree's persistent `.runtime/dev`. [Run the development app](../../CONTRIBUTING.md#run-the-development-app)
+
 Treat its contents by ownership:
 
-- config: application settings and persistent install identity, including
-  `agent_settings.json`, independent `embedding_settings.json`, and worker settings;
+- config: application settings and persistent install identity, including `ai_settings.json`, `shortcuts.json`, and worker settings. Until the first save of AI settings, the desktop reads `agent_settings.json` and `embedding_settings.json` as upgrade inputs. The first save atomically writes the combined snapshot and leaves the older files available for rollback.
 - logs: local JSON diagnostic evidence;
 - state: SQLite authority and app-owned dataset state;
 - artifacts: generated reports, exports, models, and task work;
@@ -39,7 +40,7 @@ Inspect evidence by symptom:
 | Symptom | Start with |
 | --- | --- |
 | startup or persistence failure | application log, active database, schema/migration error |
-| provider behavior | Agent settings and application log; never copy credentials into a report |
+| provider behavior | Settings → AI and the application log. Omit credentials from reports. |
 | ML worker failure | worker settings, task log, local/remote validation result |
 | Knowledge import failure | Workspace `Task queue` state and its View Log event timeline; application log for coordinator/runtime diagnostics |
 | local OCR setup or repair failure | Knowledge Settings typed setup reason, then the application log and the app-owned OCR staging/generation manifests; do not copy raw document content into support evidence |
@@ -47,6 +48,8 @@ Inspect evidence by symptom:
 | semantic Knowledge lookup failure | Knowledge Settings index state/task error, then vector-generation metadata and its contained derived index; do not alter canonical objects |
 | telemetry failure | [Observability](observability.md) and local exporter errors |
 | packaged-only failure | [Packaging](packaging.md) and packaged smoke evidence |
+
+AI settings upgrade reuses a provider when the legacy embedding connection has the same protocol, effective API root, credentials, and timeout. A different connection becomes an embedding provider. Both paths preserve the legacy embedding profile so the settings upgrade itself leaves compatible vector indexes usable.
 
 ## Backup and Restore
 

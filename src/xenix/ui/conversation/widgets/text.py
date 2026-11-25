@@ -11,7 +11,9 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ..clipboard import MIME_TYPE, read_message_clipboard
 from ..presentation import ArtifactResolver
+from ..shortcuts import ConversationShortcuts, normalized_key, shortcut_key
 from .artifacts import ArtifactPreviewDocument
 from .common import _propagate_geometry_change
 
@@ -84,6 +86,8 @@ class AutoHeightTextBrowser(QTextBrowser):
 class AutoGrowingTextEdit(QPlainTextEdit):
     multiline_changed = Signal(bool)
     submit_requested = Signal()
+    steer_requested = Signal()
+    attachment_paths_pasted = Signal(list)
 
     def __init__(
         self,
@@ -99,6 +103,7 @@ class AutoGrowingTextEdit(QPlainTextEdit):
         self._horizontal_padding = max(0, horizontal_padding)
         self._multiline = False
         self._viewport_insets = (0, 0)
+        self.set_conversation_shortcuts(ConversationShortcuts())
         self.setAttribute(Qt.WA_TranslucentBackground, True)
         self.setAutoFillBackground(False)
         self.viewport().setAttribute(Qt.WA_TranslucentBackground, True)
@@ -121,11 +126,35 @@ class AutoGrowingTextEdit(QPlainTextEdit):
         self._sync_height()
 
     def keyPressEvent(self, event) -> None:  # type: ignore[override]
-        if event.key() in (Qt.Key_Return, Qt.Key_Enter) and not (event.modifiers() & Qt.ShiftModifier):
+        pressed = normalized_key(event.keyCombination())
+        if pressed == self._send_key:
             event.accept()
-            self.submit_requested.emit()
+            if not event.isAutoRepeat():
+                self.submit_requested.emit()
+            return
+        if pressed == self._steer_key:
+            event.accept()
+            if not event.isAutoRepeat():
+                self.steer_requested.emit()
             return
         super().keyPressEvent(event)
+
+    def set_conversation_shortcuts(self, shortcuts: ConversationShortcuts) -> None:
+        self._send_key = shortcut_key(shortcuts.send)
+        self._steer_key = shortcut_key(shortcuts.steer)
+
+    def canInsertFromMimeData(self, source) -> bool:  # type: ignore[override]
+        return source.hasFormat(MIME_TYPE) or super().canInsertFromMimeData(source)
+
+    def insertFromMimeData(self, source) -> None:  # type: ignore[override]
+        draft = read_message_clipboard(source)
+        if draft is None:
+            super().insertFromMimeData(source)
+            return
+        text, paths = draft
+        self.insertPlainText(text)
+        if paths:
+            self.attachment_paths_pasted.emit(paths)
 
     def _sync_height(self) -> None:
         font_metrics = self.fontMetrics()

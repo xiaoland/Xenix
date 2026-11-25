@@ -9,7 +9,6 @@ import urllib.parse
 import urllib.request
 from collections.abc import Sequence
 from dataclasses import dataclass
-from enum import StrEnum
 from hashlib import sha256
 from pathlib import Path
 from typing import Any, Literal, Protocol, runtime_checkable
@@ -26,6 +25,7 @@ from pydantic import (
 
 from ..config import AppPaths
 from ..exceptions import ValidationError, report_exception
+from .ai_providers import AIProtocol as EmbeddingDialect
 
 SETTINGS_FILE_NAME = "embedding_settings.json"
 EMBEDDING_SETTINGS_FILE_NAME = SETTINGS_FILE_NAME
@@ -40,12 +40,8 @@ _PROFILE_SCHEMA = "xenix.embedding-profile/v1"
 _ENCODING_FORMAT = "float"
 
 
-class EmbeddingDialect(StrEnum):
-    OPENAI_COMPATIBLE = "openai_compatible"
-
-
 class EmbeddingSettings(BaseModel):
-    """User-owned settings for the independent embedding provider."""
+    """Resolved adapter settings, also used to read legacy standalone files."""
 
     model_config = ConfigDict(
         extra="forbid",

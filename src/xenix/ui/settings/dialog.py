@@ -23,28 +23,27 @@ from PySide6.QtWidgets import (
 from ...config import AppPaths
 from ...exceptions import report_exception
 from ...i18n import TranslationManager
-from ...services.embedding_service import EmbeddingSettingsService
+from ...services.ai_providers import AIModelKind, AIProviderConfig, model_options
+from ...services.ai_settings import AISettings, AISettingsService
 from ...services.knowledge_index_service import (
     KnowledgeIndexKind,
     KnowledgeIndexService,
-)
-from ...services.llm import (
-    LLMService,
-    LLMSettings,
-    LLMSettingsService,
 )
 from ...services.ml.worker_settings import MLWorkerSettingsService
 from ...services.paddle_ocr_service import PaddleOcrDeploymentService
 from ...services.update_service import UpdateService
 from ..about_dialog import AboutDialog
+from ..conversation.shortcuts import ConversationShortcuts, SHORTCUT_SETTINGS_FILE
 from ..semantic_identity import identify
 from ._card import Card
 from .contracts import SettingsTab
+from .conversation import ConversationSettingsEditor
 from .embedding import EmbeddingSettings
 from .index_status import KnowledgeIndexStatus
 from .ml_workers import MLWorkers
 from .ocr import OcrSettings
 from .provider import ProviderSettingsEditor
+from .shortcuts import ShortcutSettingsEditor
 
 
 class SettingsDialog(QDialog):
@@ -59,10 +58,8 @@ class SettingsDialog(QDialog):
         log_path: Path,
         db_path: Path,
         translation_manager: TranslationManager,
-        llm_service: LLMService,
-        llm_settings_service: LLMSettingsService,
+        ai_settings_service: AISettingsService,
         ml_worker_settings_service: MLWorkerSettingsService,
-        embedding_settings_service: EmbeddingSettingsService,
         update_service: UpdateService | None = None,
         paddle_ocr_deployment: PaddleOcrDeploymentService | None = None,
         knowledge_index_service: KnowledgeIndexService | None = None,
@@ -73,8 +70,9 @@ class SettingsDialog(QDialog):
         self._log_path = log_path
         self._db_path = db_path
         self._translation_manager = translation_manager
-        self._llm_settings_service = llm_settings_service
-        self._embedding_settings_service = embedding_settings_service
+        self._ai_settings_service = ai_settings_service
+        saved_settings = ai_settings_service.load()
+        self._saved_embedding = saved_settings.embedding_settings()
         self._software_updates_available = update_service is not None
         self._update_operation_active = False
         self._knowledge_index_service = knowledge_index_service
@@ -87,7 +85,16 @@ class SettingsDialog(QDialog):
         self._save_button = QPushButton()
 
         self._tabs = QTabWidget()
-        self._provider_editor = ProviderSettingsEditor(LLMSettings(), parent=self)
+        self._provider_editor = ProviderSettingsEditor(saved_settings.providers, parent=self)
+
+        self._conversation_card = Card()
+        self._conversation_settings = ConversationSettingsEditor()
+        self._conversation_card.set_content(self._conversation_settings)
+        self._shortcut_path = paths.config / SHORTCUT_SETTINGS_FILE
+        self._saved_shortcuts = ConversationShortcuts.load(self._shortcut_path)
+        self._shortcut_settings = ShortcutSettingsEditor(self._saved_shortcuts)
+        self._shortcut_card = Card()
+        self._shortcut_card.set_content(self._shortcut_settings)
 
         self._embedding_card = Card()
         self._embedding_settings = EmbeddingSettings()
@@ -111,8 +118,9 @@ class SettingsDialog(QDialog):
         self.resize(760, 760)
         self._build_ui()
         self._wire_events()
-        self._load_agent_settings()
-        self._load_embedding_settings()
+        self._refresh_model_choices(saved_settings.providers)
+        self._conversation_settings.load_settings(saved_settings.conversation)
+        self._embedding_settings.load_settings(saved_settings.knowledge)
         self.retranslate_ui()
 
     def _assign_semantic_identities(self) -> None:
@@ -148,6 +156,18 @@ class SettingsDialog(QDialog):
         ai_layout.addWidget(self._provider_editor)
         ai_layout.addStretch(1)
 
+        conversation_tab = QWidget()
+        conversation_layout = QVBoxLayout(conversation_tab)
+        conversation_layout.setContentsMargins(12, 12, 12, 12)
+        conversation_layout.addWidget(self._conversation_card)
+        conversation_layout.addStretch(1)
+
+        shortcuts_tab = QWidget()
+        shortcuts_layout = QVBoxLayout(shortcuts_tab)
+        shortcuts_layout.setContentsMargins(12, 12, 12, 12)
+        shortcuts_layout.addWidget(self._shortcut_card)
+        shortcuts_layout.addStretch(1)
+
         knowledge_tab = QWidget()
         knowledge_layout = QVBoxLayout(knowledge_tab)
         knowledge_layout.setContentsMargins(12, 12, 12, 12)
@@ -166,6 +186,8 @@ class SettingsDialog(QDialog):
 
         self._tab_indexes = {
             SettingsTab.AI: self._tabs.addTab(ai_tab, ""),
+            SettingsTab.CONVERSATION: self._tabs.addTab(conversation_tab, ""),
+            SettingsTab.SHORTCUTS: self._tabs.addTab(shortcuts_tab, ""),
             SettingsTab.KNOWLEDGE_BASE: self._tabs.addTab(knowledge_tab, ""),
             SettingsTab.ML_WORKERS: self._tabs.addTab(ml_workers_tab, ""),
         }
@@ -183,12 +205,15 @@ class SettingsDialog(QDialog):
         self._about_button.clicked.connect(self._open_about_dialog)
         self._language_selector.currentIndexChanged.connect(self._on_language_changed)
         self._save_button.clicked.connect(self._save_agent_settings)
+        self._provider_editor.providers_changed.connect(self._refresh_model_choices)
         self._ml_workers.worker_saved.connect(self.ml_worker_settings_saved.emit)
 
     def retranslate_ui(self) -> None:
         self.setWindowTitle(self.tr("Settings"))
         self._language_label.setText(self.tr("Language"))
         self._tabs.setTabText(self._tab_indexes[SettingsTab.AI], self.tr("AI"))
+        self._tabs.setTabText(self._tab_indexes[SettingsTab.CONVERSATION], self.tr("Conversation"))
+        self._tabs.setTabText(self._tab_indexes[SettingsTab.SHORTCUTS], self.tr("Keyboard Shortcuts"))
         self._tabs.setTabText(
             self._tab_indexes[SettingsTab.KNOWLEDGE_BASE],
             self.tr("Knowledge Base"),
@@ -198,6 +223,8 @@ class SettingsDialog(QDialog):
             self.tr("ML Workers"),
         )
         self._provider_editor.retranslate_ui()
+        self._conversation_settings.retranslate_ui()
+        self._shortcut_settings.retranslate_ui()
         self._embedding_settings.retranslate_ui()
         self._ocr_settings.retranslate_ui()
         self._index_status.retranslate_ui()
@@ -301,17 +328,31 @@ class SettingsDialog(QDialog):
         if self._about_dialog is not None:
             self._about_dialog.set_update_operation_active(active)
 
-    def _load_agent_settings(self) -> None:
-        self._provider_editor.load_settings(self._llm_settings_service.load())
-
-    def _load_embedding_settings(self) -> None:
-        self._embedding_settings.load_settings(self._embedding_settings_service.load())
+    def _refresh_model_choices(self, providers: list[AIProviderConfig]) -> None:
+        self._conversation_settings.set_model_options(model_options(providers, AIModelKind.CHAT))
+        self._embedding_settings.set_model_options(model_options(providers, AIModelKind.EMBEDDING))
 
     def _save_agent_settings(self) -> None:
+        try:
+            shortcuts = self._shortcut_settings.current_settings()
+        except ValueError:
+            self.show_tab(SettingsTab.SHORTCUTS)
+            QMessageBox.warning(self, self.tr("Settings"), self.tr("Choose two distinct keyboard shortcuts."))
+            return
+        knowledge = self._embedding_settings.current_settings()
+        if knowledge.enabled and not knowledge.fq_model_key:
+            QMessageBox.warning(
+                self, self.tr("Settings"), self.tr("Select an embedding model to enable text vectors."),
+            )
+            return
         rebuild_choice = "none"
         try:
-            llm_settings = self._provider_editor.current_settings()
-            embedding_settings = self._embedding_settings.current_settings()
+            settings = AISettings(
+                providers=self._provider_editor.current_providers(),
+                conversation=self._conversation_settings.current_settings(),
+                knowledge=knowledge,
+            )
+            embedding_settings = settings.embedding_settings()
         except Exception as exc:
             logging.getLogger(__name__).exception("UI operation failed: %s", exc)
             QMessageBox.warning(self, self.tr("Settings"), str(exc))
@@ -320,7 +361,7 @@ class SettingsDialog(QDialog):
             confirmation_required = (
                 self._knowledge_index_service is not None
                 and self._knowledge_index_service.embedding_change_requires_confirmation(
-                    self._embedding_settings.snapshot,
+                    self._saved_embedding,
                     embedding_settings,
                 )
             )
@@ -332,13 +373,15 @@ class SettingsDialog(QDialog):
             if rebuild_choice == "cancel":
                 return
         try:
-            self._llm_settings_service.save(llm_settings)
-            self._embedding_settings_service.save(embedding_settings)
+            self._ai_settings_service.save(settings)
+            if shortcuts != self._saved_shortcuts:
+                shortcuts.save(self._shortcut_path)
         except Exception as exc:
             logging.getLogger(__name__).exception("UI operation failed: %s", exc)
             QMessageBox.warning(self, self.tr("Settings"), str(exc))
             return
-        self._embedding_settings.load_settings(embedding_settings)
+        self._saved_embedding = embedding_settings
+        self._saved_shortcuts = shortcuts
         self.agent_settings_saved.emit()
         self.embedding_settings_saved.emit()
         if rebuild_choice == "rebuild" and self._knowledge_index_service is not None:

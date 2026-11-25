@@ -1,25 +1,200 @@
+import io
+import json
+from contextlib import closing
 from pathlib import Path
+from threading import Event
+from urllib.error import HTTPError
 
 import pytest
 from pydantic import BaseModel, ConfigDict
 
 from xenix.config import ensure_app_dirs, get_app_paths
-from xenix.exceptions import NotFoundError
+from xenix.exceptions import NotFoundError, ValidationError
 from xenix.services.agent import AgentHarnessService, SubmitUserTurnInput
 from xenix.services.llm import (
     AgentToolRegistry,
     AppendUserMessageInput,
+    FrozenLLMSettingsSource,
     LLMConversationService,
+    LLMProviderConfig,
+    LLMService,
+    LLMSettings,
     ProviderResponse,
     ProviderToolCall,
     ToolSuccess,
 )
 from xenix.services.storage import StorageBootstrapService
 from xenix.services.llm.tool_protocol import AgentTool
+from xenix.services.llm.conversation_models import UserMessageReplacement
 
 
 class EmptyToolInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
+
+
+@pytest.mark.parametrize("arrives_during_tool", [False, True])
+def test_steering_yields_at_complete_exchange_boundary(storage, arrives_during_tool: bool) -> None:
+    steer = Event()
+    executed = []
+    registry = AgentToolRegistry()
+
+    def run_tool(_input, _context):
+        executed.append("ran")
+        if arrives_during_tool:
+            steer.set()
+        return ToolSuccess(value={"ok": True})
+
+    registry.register(AgentTool(
+        name="test.record", provider_name="test_record", description="Record",
+        input_model=EmptyToolInput, implementation=run_tool,
+    ))
+
+    class Provider:
+        calls = 0
+
+        def complete(self, messages, _tools):
+            self.calls += 1
+            if self.calls == 1:
+                if not arrives_during_tool:
+                    steer.set()
+                return ProviderResponse(tool_calls=[
+                    ProviderToolCall(
+                        provider_call_id=f"call-{index}", tool_name="test.record",
+                        provider_name="test_record", arguments={},
+                    )
+                    for index in range(2)
+                ])
+            assert [message.content_blocks[0].text for message in messages if message.role == "user"] == [
+                "Original work", "Steer here",
+            ]
+            return ProviderResponse(assistant_content_blocks=[{"type": "text", "text": "Redirected."}])
+
+    provider = Provider()
+    harness = AgentHarnessService(
+        conversation_service=LLMConversationService(
+            session_factory=storage.session_factory, tool_registry=registry,
+        ),
+        provider=provider,
+    )
+    events = list(harness.submit_user_turn_stream(
+        SubmitUserTurnInput(text="Original work"), should_steer=steer.is_set,
+    ))
+    assert events[-1].is_final and provider.calls == 1
+    snapshot = events[-1].snapshot
+    assert snapshot is not None
+    assert snapshot.messages[0].kind.value == "user"
+    calls = {message.id for message in snapshot.messages if message.kind.value == "tool_call"}
+    results = {message.tool_call_message_id for message in snapshot.messages if message.kind.value == "tool_result"}
+    assert calls == results
+    assert len(snapshot.messages) == (5 if arrives_during_tool else 1)
+    assert len(executed) == (2 if arrives_during_tool else 0)
+    redirected = harness.submit_user_turn(SubmitUserTurnInput(thread_id=snapshot.thread.id, text="Steer here"))
+    assert redirected.messages[-1].text == "Redirected."
+
+
+def test_edit_requires_current_suffix_confirmation_and_replays_from_replacement(storage) -> None:
+    registry = AgentToolRegistry()
+    registry.register(AgentTool(
+        name="test.record", provider_name="test_record", description="Record",
+        input_model=EmptyToolInput, implementation=lambda _input, _context: ToolSuccess(value={"ok": True}),
+    ))
+
+    class Provider:
+        calls = 0
+
+        def complete(self, messages, _tools):
+            self.calls += 1
+            if self.calls == 2:
+                return ProviderResponse(tool_calls=[ProviderToolCall(
+                    provider_call_id="previous-call", tool_name="test.record",
+                    provider_name="test_record", arguments={},
+                )])
+            if self.calls == 4:
+                assert [message.content_blocks[0].text for message in messages if message.role == "user"] == [
+                    "Keep this", "Revised request",
+                ]
+                assert not any(message.role == "tool" for message in messages)
+            return ProviderResponse(assistant_content_blocks=[{"type": "text", "text": "Done."}])
+
+    harness = AgentHarnessService(
+        conversation_service=LLMConversationService(
+            session_factory=storage.session_factory, tool_registry=registry,
+        ),
+        provider=Provider(),
+    )
+    first = harness.submit_user_turn(SubmitUserTurnInput(text="Keep this"))
+    previous = harness.submit_user_turn(SubmitUserTurnInput(thread_id=first.thread.id, text="Replace this"))
+    before = [row.id for row in previous.messages]
+    request = SubmitUserTurnInput(
+        thread_id=first.thread.id,
+        text="Revised request",
+        replacement=UserMessageReplacement(message_id=before[2]),
+    )
+    with pytest.raises(ValidationError, match="following this edit have changed"):
+        harness.submit_user_turn(request)
+    assert [row.id for row in harness.get_thread_snapshot(first.thread.id).messages] == before
+    draft = harness.message_draft(first.thread.id, before[2])
+    assert draft.following_ids == tuple(before[3:])
+    request.replacement = UserMessageReplacement(message_id=before[2], confirmed_following_ids=draft.following_ids)
+    revised = harness.submit_user_turn(request)
+    after = [row.id for row in revised.messages]
+    assert after[:2] == before[:2]
+    assert len(after) == 4
+    assert set(after[2:]).isdisjoint(before)
+
+
+@pytest.mark.parametrize("reopen", [False, True])
+def test_harness_switches_models_and_continues_after_terminal_request_failure(
+    monkeypatch, storage, reopen: bool,
+) -> None:
+    def response(request, *, timeout):
+        assert timeout == 120
+        payload = json.loads(request.data)
+        if payload["model"] == "broken":
+            raise HTTPError(request.full_url, 401, "Unauthorized", {}, io.BytesIO(b"{}"))
+        assert request.full_url == "https://models.example.test/v1/chat/completions"
+        assert payload["model"] == "working"
+        messages = [message for message in payload["messages"] if message["role"] == "user"]
+        assert [message["content"] for message in messages] == ["First question", "Second question"]
+        return io.BytesIO(b'data: {"choices":[{"delta":{"content":"Recovered."}}]}\n\ndata: [DONE]\n\n')
+
+    monkeypatch.setattr("xenix.services.llm.providers.request.urlopen", response)
+    llm = LLMService(FrozenLLMSettingsSource(LLMSettings(
+        providers=[LLMProviderConfig(
+            key="models", base_url="https://models.example.test",
+            api_key="example-key", models=["broken", "working"],
+        )],
+        retry_attempts=1,
+    )))
+
+    def new_harness() -> AgentHarnessService:
+        return AgentHarnessService(
+            conversation_service=LLMConversationService(
+                session_factory=storage.session_factory, tool_registry=AgentToolRegistry(), llm_service=llm,
+            ),
+            llm_service=llm,
+        )
+
+    harness = new_harness()
+    thread_id = harness.create_thread(fq_model_key="models/broken").thread.id
+    first = SubmitUserTurnInput(thread_id=thread_id, text="First question")
+    with closing(harness.submit_user_turn_stream(first)) as stream:
+        assert next(stream).kind == "snapshot"
+        with pytest.raises(ValidationError, match="submission is already active"):
+            harness.submit_user_turn(
+                SubmitUserTurnInput(thread_id=thread_id, fq_model_key="models/working", text="Too soon"),
+            )
+        with pytest.raises(ValidationError, match="401"):
+            list(stream)
+    assert [message.kind.value for message in harness.get_thread_snapshot(thread_id).messages] == ["user"]
+
+    if reopen:
+        harness = new_harness()
+    recovered = harness.submit_user_turn(
+        SubmitUserTurnInput(thread_id=thread_id, fq_model_key="models/working", text="Second question"),
+    )
+    assert [message.kind.value for message in recovered.messages] == ["user", "user", "assistant"]
+    assert recovered.messages[-1].text == "Recovered."
 
 
 def test_harness_returns_invalid_arguments_to_model_for_repair(storage) -> None:

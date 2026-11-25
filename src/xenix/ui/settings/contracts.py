@@ -5,6 +5,8 @@ from enum import StrEnum
 
 class SettingsTab(StrEnum):
     AI = "ai"
+    CONVERSATION = "conversation"
+    SHORTCUTS = "shortcuts"
     KNOWLEDGE_BASE = "knowledge_base"
     ML_WORKERS = "ml_workers"
 

@@ -35,12 +35,7 @@ canonical-ready generation
   checks. Supported documents and presentations are parsed locally by AnyDoc's Rust
   backend and adapted into the common Docling IR; no external office process is
   spawned.
-- PDF routing consumes bounded page evidence rather than one document-wide choice.
-  Native text is classified as `credible`, `suspect`, or `absent` from extracted
-  text, suspicious Unicode, image coverage, and font evidence. Credible pages use
-  native Docling, absent pages use OCR, and suspect pages use native+OCR hybrid when
-  OCR is ready. Xenix does not claim generic complex-layout understanding from this
-  classifier alone.
+- PDF routing classifies native text per page as `credible`, `suspect`, or `absent` from extracted text, suspicious Unicode, image coverage, and font evidence. PDFium projects native text with page provenance into the Docling IR without downloading layout or table models. Absent pages use OCR, and suspect pages combine native text and OCR when OCR is ready. Native extraction uses the embedded text order and offers page-level location.
 - Local OCR uses one optional, one-click-installed archive containing an
   Xenix-owned native worker built on official Paddle Inference C++, its compiled-in
   fixed pipeline configuration, complete dependency closure, and an explicitly
