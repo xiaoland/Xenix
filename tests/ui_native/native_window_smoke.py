@@ -55,7 +55,9 @@ def test_native_chat_window_expose_focus_dialog_and_user_bubble(
             buttons = bubble.findChildren(QToolButton)
             assert len(buttons) == action_count
             assert all(button.accessibleName() and not button.icon().isNull() and not button.text() for button in buttons)
-            qtbot.waitUntil(lambda: buttons[-1].geometry().right() == bubble._card.geometry().right())
+            qtbot.waitUntil(
+                lambda rightmost=buttons[-1], card=bubble._card: rightmost.geometry().right() == card.geometry().right()
+            )
             assert all(button.geometry().top() > bubble._card.geometry().bottom() for button in buttons)
 
     dialog = QDialog(view)
