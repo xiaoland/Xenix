@@ -169,8 +169,10 @@ def test_send_action_accessible_name_tracks_visual_state(qtbot: QtBot, tmp_path)
     assert view.composer.send_button.accessibleName() == view.tr("Preparing attachments")
 
     view.set_running(True)
-    assert view.composer.send_button.text() == view.tr("Stop")
-    assert view.composer.send_button.accessibleName() == view.tr("Stop")
+    assert view.composer.stop_button.text() == view.tr("Stop")
+    assert view.composer.stop_button.isEnabled()
+    view.set_attachment_status(str(attachment), ComposerAttachmentStatus.READY)
+    assert view.composer.send_button.accessibleName() == view.tr("Queue message")
 
 
 def test_composer_attachment_chip_is_addressable_by_path(qtbot: QtBot, tmp_path) -> None:
@@ -191,7 +193,7 @@ def test_composer_attachment_chip_is_addressable_by_path(qtbot: QtBot, tmp_path)
     assert item_reference(remove) == str(attachment.resolve())
 
 
-def test_attachment_remove_is_disabled_while_running(qtbot: QtBot, tmp_path) -> None:
+def test_draft_attachment_can_be_removed_while_another_message_runs(qtbot: QtBot, tmp_path) -> None:
     view = ThreadDetailView()
     qtbot.addWidget(view)
     attachment = tmp_path / "sample.csv"
@@ -204,7 +206,7 @@ def test_attachment_remove_is_disabled_while_running(qtbot: QtBot, tmp_path) -> 
     assert remove_button().isEnabled()
 
     view.set_running(True)
-    assert not remove_button().isEnabled()
+    assert remove_button().isEnabled()
 
     view.set_running(False)
     assert remove_button().isEnabled()

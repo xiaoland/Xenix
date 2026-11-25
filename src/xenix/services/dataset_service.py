@@ -136,6 +136,7 @@ class DatasetSourcePresentation:
     file_name: str
     open_path: str | None
     is_openable: bool
+    original_path: str | None = None
 
 
 class DatasetAuditInputPresentation(SQLModel):
@@ -542,15 +543,18 @@ class DatasetService:
 
                 original_path = imported.original_path
                 open_path: str | None = None
+                local_path: str | None = None
                 is_openable = False
                 if isinstance(original_path, str):
                     original_path = original_path.strip()
                     if original_path:
                         try:
                             candidate = Path(original_path)
-                            if candidate.is_absolute() and candidate.is_file():
-                                open_path = str(candidate)
-                                is_openable = True
+                            if candidate.is_absolute():
+                                local_path = str(candidate)
+                                if candidate.is_file():
+                                    open_path = local_path
+                                    is_openable = True
                         except (OSError, ValueError, RuntimeError):
                             # A stale or malformed path is a projection-level
                             # availability issue, not a thread-load failure.
@@ -562,6 +566,7 @@ class DatasetService:
                     file_name=file_name,
                     open_path=open_path,
                     is_openable=is_openable,
+                    original_path=local_path,
                 )
         except Exception as exc:
             report_exception(exc)

@@ -113,30 +113,23 @@ class ConversationRepository:
         )
         return list(session.exec(statement))
 
+    def delete_message_suffix(self, session: Session, rows: list[ConversationMessageRow]) -> None:
+        # Tool Results reference their calls, which must exist until the results are deleted.
+        for row in rows:
+            if row.tool_call_message_id is not None:
+                session.delete(row)
+        session.flush()
+        for row in rows:
+            if row.tool_call_message_id is None:
+                session.delete(row)
+        session.flush()
+
     def delete_thread(self, session: Session, thread_id: int) -> ConversationThreadRow | None:
         row = self.get_thread(session, thread_id)
         if row is None:
             return None
 
-        # Delete tool_result rows before the tool_call rows they reference: the
-        # self-referential FK on tool_call_message_id has no ON DELETE action, so
-        # children must go first.
-        dependent_results = session.exec(
-            select(ConversationMessageRow).where(
-                ConversationMessageRow.thread_id == thread_id,
-                ConversationMessageRow.tool_call_message_id.is_not(None),
-            )
-        ).all()
-        for message in dependent_results:
-            session.delete(message)
-        session.flush()
-
-        remaining_messages = session.exec(
-            select(ConversationMessageRow).where(ConversationMessageRow.thread_id == thread_id)
-        ).all()
-        for message in remaining_messages:
-            session.delete(message)
-        session.flush()
+        self.delete_message_suffix(session, self.list_messages(session, thread_id))
         session.delete(row)
         session.flush()
         return row

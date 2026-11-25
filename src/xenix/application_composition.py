@@ -125,7 +125,7 @@ def build_workbench_window(
         scheduler.register_handler(handler)
     lifetime.add_cleanup("job scheduler", scheduler.shutdown)
 
-    from .ui.conversation.execution import ThreadedSubmissionExecutor
+    from .ui.conversation.shortcuts import SHORTCUT_SETTINGS_FILE
     from .ui.audit_center import AuditCenterDialog
     from .services.audit_service import AuditQueryService
     from .ui.history import HarnessHistoryAdapter
@@ -191,7 +191,7 @@ def build_workbench_window(
     window = MainWindow(
         current_locale=translation_manager.current_locale,
         agent_harness_service=agent_services.harness,
-        conversation_executor=ThreadedSubmissionExecutor(agent_services.harness.submit_user_turn_stream),
+        shortcut_settings_path=paths.config / SHORTCUT_SETTINGS_FILE,
         llm_service=llm_service,
         artifact_service=agent_services.artifacts,
         link_router=link_router,

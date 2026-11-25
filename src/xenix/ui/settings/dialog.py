@@ -33,6 +33,7 @@ from ...services.ml.worker_settings import MLWorkerSettingsService
 from ...services.paddle_ocr_service import PaddleOcrDeploymentService
 from ...services.update_service import UpdateService
 from ..about_dialog import AboutDialog
+from ..conversation.shortcuts import ConversationShortcuts, SHORTCUT_SETTINGS_FILE
 from ..semantic_identity import identify
 from ._card import Card
 from .contracts import SettingsTab
@@ -42,6 +43,7 @@ from .index_status import KnowledgeIndexStatus
 from .ml_workers import MLWorkers
 from .ocr import OcrSettings
 from .provider import ProviderSettingsEditor
+from .shortcuts import ShortcutSettingsEditor
 
 
 class SettingsDialog(QDialog):
@@ -88,6 +90,11 @@ class SettingsDialog(QDialog):
         self._conversation_card = Card()
         self._conversation_settings = ConversationSettingsEditor()
         self._conversation_card.set_content(self._conversation_settings)
+        self._shortcut_path = paths.config / SHORTCUT_SETTINGS_FILE
+        self._saved_shortcuts = ConversationShortcuts.load(self._shortcut_path)
+        self._shortcut_settings = ShortcutSettingsEditor(self._saved_shortcuts)
+        self._shortcut_card = Card()
+        self._shortcut_card.set_content(self._shortcut_settings)
 
         self._embedding_card = Card()
         self._embedding_settings = EmbeddingSettings()
@@ -155,6 +162,12 @@ class SettingsDialog(QDialog):
         conversation_layout.addWidget(self._conversation_card)
         conversation_layout.addStretch(1)
 
+        shortcuts_tab = QWidget()
+        shortcuts_layout = QVBoxLayout(shortcuts_tab)
+        shortcuts_layout.setContentsMargins(12, 12, 12, 12)
+        shortcuts_layout.addWidget(self._shortcut_card)
+        shortcuts_layout.addStretch(1)
+
         knowledge_tab = QWidget()
         knowledge_layout = QVBoxLayout(knowledge_tab)
         knowledge_layout.setContentsMargins(12, 12, 12, 12)
@@ -174,6 +187,7 @@ class SettingsDialog(QDialog):
         self._tab_indexes = {
             SettingsTab.AI: self._tabs.addTab(ai_tab, ""),
             SettingsTab.CONVERSATION: self._tabs.addTab(conversation_tab, ""),
+            SettingsTab.SHORTCUTS: self._tabs.addTab(shortcuts_tab, ""),
             SettingsTab.KNOWLEDGE_BASE: self._tabs.addTab(knowledge_tab, ""),
             SettingsTab.ML_WORKERS: self._tabs.addTab(ml_workers_tab, ""),
         }
@@ -199,6 +213,7 @@ class SettingsDialog(QDialog):
         self._language_label.setText(self.tr("Language"))
         self._tabs.setTabText(self._tab_indexes[SettingsTab.AI], self.tr("AI"))
         self._tabs.setTabText(self._tab_indexes[SettingsTab.CONVERSATION], self.tr("Conversation"))
+        self._tabs.setTabText(self._tab_indexes[SettingsTab.SHORTCUTS], self.tr("Keyboard Shortcuts"))
         self._tabs.setTabText(
             self._tab_indexes[SettingsTab.KNOWLEDGE_BASE],
             self.tr("Knowledge Base"),
@@ -209,6 +224,7 @@ class SettingsDialog(QDialog):
         )
         self._provider_editor.retranslate_ui()
         self._conversation_settings.retranslate_ui()
+        self._shortcut_settings.retranslate_ui()
         self._embedding_settings.retranslate_ui()
         self._ocr_settings.retranslate_ui()
         self._index_status.retranslate_ui()
@@ -317,6 +333,12 @@ class SettingsDialog(QDialog):
         self._embedding_settings.set_model_options(model_options(providers, AIModelKind.EMBEDDING))
 
     def _save_agent_settings(self) -> None:
+        try:
+            shortcuts = self._shortcut_settings.current_settings()
+        except ValueError:
+            self.show_tab(SettingsTab.SHORTCUTS)
+            QMessageBox.warning(self, self.tr("Settings"), self.tr("Choose two distinct keyboard shortcuts."))
+            return
         knowledge = self._embedding_settings.current_settings()
         if knowledge.enabled and not knowledge.fq_model_key:
             QMessageBox.warning(
@@ -352,11 +374,14 @@ class SettingsDialog(QDialog):
                 return
         try:
             self._ai_settings_service.save(settings)
+            if shortcuts != self._saved_shortcuts:
+                shortcuts.save(self._shortcut_path)
         except Exception as exc:
             logging.getLogger(__name__).exception("UI operation failed: %s", exc)
             QMessageBox.warning(self, self.tr("Settings"), str(exc))
             return
         self._saved_embedding = embedding_settings
+        self._saved_shortcuts = shortcuts
         self.agent_settings_saved.emit()
         self.embedding_settings_saved.emit()
         if rebuild_choice == "rebuild" and self._knowledge_index_service is not None:

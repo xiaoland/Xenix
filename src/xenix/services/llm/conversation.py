@@ -54,6 +54,7 @@ from .conversation_models import (
 from .conversation_titles import TitleGenerationMixin
 from .messages import (
     AssistantOutputItem,
+    DatasetBlock,
     ProviderOutputItem,
     SourceAttachmentBlock,
     ToolCallOutputItem,
@@ -255,8 +256,8 @@ class LLMConversationService(TitleGenerationMixin):
         self,
         *,
         thread_id: int | None,
-        expected_frontier_id: int | None,
         client_submission_id: str,
+        expected_frontier_id: int | None = None,
     ) -> SubmissionClaim:
         normalized_id = client_submission_id.strip()
         if not normalized_id:
@@ -266,6 +267,8 @@ class LLMConversationService(TitleGenerationMixin):
         with self._pending_lock:
             with self._gate(thread_id):
                 snapshot = self.get_thread_snapshot(thread_id)
+                if expected_frontier_id is None and snapshot.messages:
+                    expected_frontier_id = snapshot.messages[-1].id
                 duplicate = next(
                     (message for message in snapshot.messages if message.client_submission_id == normalized_id),
                     None,
@@ -331,9 +334,35 @@ class LLMConversationService(TitleGenerationMixin):
                             raise ValidationError(
                                 "SourceAttachmentBlock is a legacy presentation block and cannot be written to a new User Message."
                             )
+                        sequence_index = len(messages)
+                        if replacement := input_data.replacement:
+                            match = next((
+                                (index, row) for index, row in enumerate(messages)
+                                if row.id == replacement.message_id and row.kind is ConversationMessageKind.USER
+                            ), None)
+                            if match is None:
+                                raise NotFoundError("The user message to edit was not found.")
+                            index, previous = match
+                            if tuple(row.id for row in messages[index + 1:]) != replacement.confirmed_following_ids:
+                                raise ValidationError(
+                                    "The messages following this edit have changed.",
+                                    error_code="conversation_edit_changed",
+                                )
+                            canonical_blocks += tuple(
+                                block for block in blocks_from_payload(previous.content_payload)
+                                if isinstance(block, DatasetBlock)
+                                and (
+                                    replacement.retained_dataset_ids is None
+                                    or block.dataset_id in replacement.retained_dataset_ids
+                                )
+                            )
+                            if not canonical_blocks:
+                                raise ValidationError("A conversation message needs text or at least one attachment.")
+                            self._repository.delete_message_suffix(session, messages[index:])
+                            sequence_index = index
                         row = ConversationMessageRow(
                             thread_id=input_data.thread_id,
-                            sequence_index=len(messages),
+                            sequence_index=sequence_index,
                             kind=ConversationMessageKind.USER,
                             client_submission_id=client_submission_id,
                             content_payload={"blocks": blocks_to_json(canonical_blocks)},

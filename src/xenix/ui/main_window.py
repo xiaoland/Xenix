@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from pathlib import Path
 
 from PySide6.QtCore import QEvent, Signal
 from PySide6.QtWidgets import (
@@ -19,6 +20,7 @@ from ..services.llm import LLMService
 from .chat_workspace import ChatWorkspace
 from .chatbot import ThreadDetailView
 from .conversation.execution import SubmissionExecutor
+from .conversation.shortcuts import ConversationShortcuts
 from .history import HistoryPanel, HistoryPort
 from .layout_debug import dump_layout_if_enabled
 from .native_widgets import emphasize_label
@@ -49,8 +51,10 @@ class MainWindow(QMainWindow):
         history_port: HistoryPort,
         auxiliary_factory: Callable[[QWidget], AuxiliaryWindowCoordinator],
         conversation_executor: SubmissionExecutor | None = None,
+        shortcut_settings_path: Path | None = None,
     ) -> None:
         super().__init__()
+        self._shortcut_settings_path = shortcut_settings_path
         self._auxiliary_windows = auxiliary_factory(self)
         self._auxiliary_windows.settings_saved.connect(self._reload_agent_provider)
 
@@ -67,7 +71,7 @@ class MainWindow(QMainWindow):
         self._history_panel = HistoryPanel(
             history_port,
             is_thread_running=lambda thread_id: (
-                self.conversation_thread_id == thread_id and not self.conversation_idle
+                self._chat_workspace.thread_has_input_work(thread_id)
             ),
             parent=self,
         )
@@ -92,6 +96,7 @@ class MainWindow(QMainWindow):
         self._setup_ui()
         self.retranslate_ui()
         self._chat_workspace.sync_model_options()
+        self._reload_conversation_shortcuts()
 
     # Public delegations (Widget Lab and headed harness) ---------------------
 
@@ -170,6 +175,13 @@ class MainWindow(QMainWindow):
 
     def _reload_agent_provider(self) -> None:
         self._chat_workspace.sync_model_options()
+        self._reload_conversation_shortcuts()
+
+    def _reload_conversation_shortcuts(self) -> None:
+        if self._shortcut_settings_path is not None:
+            self._thread_detail_view.composer.set_conversation_shortcuts(
+                ConversationShortcuts.load(self._shortcut_settings_path)
+            )
 
     # Lifecycle --------------------------------------------------------------
 

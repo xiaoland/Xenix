@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
 
 from .conversation.composer import ChatComposer
 from .conversation.presentation import ComposerAttachmentState, ComposerAttachmentStatus
+from .conversation.queue_panel import MessageQueuePanel
 from .conversation.timeline import ChatTimeline
 from .conversation.widgets import (
     AttachmentChip,
@@ -99,6 +100,9 @@ class _OperationNotificationBar(QFrame):
 
 class ThreadDetailView(QWidget):
     message_submitted = Signal(str, list, str)
+    steering_submitted = Signal(str, list, str)
+    message_edit_requested = Signal(object)
+    message_copy_requested = Signal(object)
     files_attached = Signal(list)
     attachment_removed = Signal(str)
     service_link_activated = Signal(str)
@@ -114,9 +118,11 @@ class ThreadDetailView(QWidget):
 
         self.timeline = ChatTimeline(self)
         self.composer = ChatComposer(self)
+        self.message_queue = MessageQueuePanel(self)
         self.notification_bar = _OperationNotificationBar(self)
 
         self.composer.message_submitted.connect(self.message_submitted.emit)
+        self.composer.steering_submitted.connect(self.steering_submitted.emit)
         self.composer.files_attached.connect(self.files_attached.emit)
         self.composer.attachment_removed.connect(self.attachment_removed.emit)
         self.composer.stop_requested.connect(self.stop_requested.emit)
@@ -125,6 +131,8 @@ class ThreadDetailView(QWidget):
         self.composer.model_selected.connect(self.model_selected.emit)
         self.timeline.service_link_activated.connect(self.service_link_activated.emit)
         self.timeline.source_file_activated.connect(self.source_file_activated.emit)
+        self.timeline.message_edit_requested.connect(self.message_edit_requested.emit)
+        self.timeline.message_copy_requested.connect(self.message_copy_requested.emit)
 
         root = QVBoxLayout(self)
         root.setObjectName("threadDetailLayout")
@@ -132,11 +140,13 @@ class ThreadDetailView(QWidget):
         root.setSpacing(10)
         root.addWidget(self.timeline, 1)
         root.addWidget(self.notification_bar, 0)
+        root.addWidget(self.message_queue, 0)
         root.addWidget(self.composer, 0)
 
     def retranslate_ui(self) -> None:
         self.timeline.retranslate_ui()
         self.notification_bar.retranslate_ui()
+        self.message_queue.retranslate_ui()
         self.composer.retranslate_ui()
 
     def changeEvent(self, event: QEvent) -> None:
