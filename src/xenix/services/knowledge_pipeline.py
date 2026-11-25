@@ -31,7 +31,7 @@ from .knowledge_formats import (
     KnowledgeFormatCapability,
     KnowledgeFormatRegistry,
 )
-from .knowledge_pdf import PdfPageTextState, probe_pdf_pages
+from .knowledge_pdf import PdfPageTextState, parse_native_pdf, probe_pdf_pages
 from .paddle_ocr_service import (
     MAX_PROTOCOL_MESSAGE_BYTES,
     NATIVE_OCR_PROTOCOL_VERSION,
@@ -874,7 +874,7 @@ class _PdfRouteProvider:
         for evidence in probe_pdf_pages(normalized.path):
             payload = evidence.to_payload()
             if evidence.text_state is PdfPageTextState.CREDIBLE:
-                route_id = "docling-pdf-native"
+                route_id = "pdfium-native-text"
                 reason = "native_text_credible"
             elif ocr_ready:
                 route_id = (
@@ -892,7 +892,7 @@ class _PdfRouteProvider:
             "pdf",
             tuple(units),
             "docling-document-plus-page-projections",
-            policy_version=2,
+            policy_version=3,
             ocr_ready=ocr_ready,
         )
 
@@ -945,14 +945,18 @@ class _AnyDocParserProvider:
 
 class _PdfParserProvider:
     provider_id = "pdf"
-    backend = "docling"
-    package_distribution = "docling"
+    backend = "pdfium"
+    package_distribution = "pypdfium2"
 
     def parse(self, context: ParserExecutionContext) -> ParsedContent:
-        document = _docling_convert(
+        document = parse_native_pdf(
             context.normalized.path,
-            source_format="pdf",
-            work_dir=context.work_dir,
+            text_pages={
+                unit.page
+                for unit in context.plan.units
+                if unit.page is not None
+                and unit.evidence.get("text_state") != PdfPageTextState.ABSENT
+            },
         )
         ocr_pages = [
             unit.page - 1
@@ -1915,37 +1919,6 @@ def _image_docling_document(path: Path):
     document = DoclingDocument(name=path.stem)
     document.add_picture()
     return document
-
-
-def _docling_convert(
-    path: Path,
-    *,
-    source_format: str,
-    work_dir: Path,
-):
-    from .knowledge_docling import convert_document
-
-    _ = work_dir
-    try:
-        document = convert_document(path, source_format=source_format)
-    except Exception as exc:
-        raise ValidationError(
-            "Docling could not parse the document.",
-            error_code="knowledge_docling_conversion_failed",
-            error_details={"diagnostic_code": _docling_diagnostic_code(exc)},
-            retryable=True,
-        ) from exc
-    return document
-
-
-def _docling_diagnostic_code(exc: Exception) -> str:
-    if isinstance(exc, MemoryError):
-        return "docling_memory_error"
-    if isinstance(exc, (ImportError, ModuleNotFoundError)):
-        return "docling_dependency_error"
-    if isinstance(exc, OSError):
-        return "docling_runtime_error"
-    return "docling_conversion_error"
 
 
 def _append_paddle_ocr_pages(

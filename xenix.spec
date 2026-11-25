@@ -23,12 +23,11 @@ knowledge_datas = []
 knowledge_hiddenimports = []
 for package_name in (
     "anydoc",
-    "docling",
     "docling_core",
-    "docling_ibm_models",
     "lancedb",
     "pypdfium2",
     "pikepdf",
+    "docx",
     "pptx",
     "zstandard",
     "msoffcrypto",

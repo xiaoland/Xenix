@@ -116,6 +116,7 @@ _SAFE_IMPORT_ERRORS = {
     "knowledge_pptx_expansion_limit": "The expanded PPTX package is too large.",
     "knowledge_pptx_compression_ratio": "The PPTX package compression ratio is unsafe.",
     "knowledge_docling_conversion_failed": "The document could not be parsed into canonical content.",
+    "knowledge_pdf_native_parse_failed": "The PDF text layer could not be read.",
     "knowledge_canonical_integrity_failed": "Canonical content failed integrity validation.",
     "knowledge_source_integrity_failed": "The app-owned source snapshot failed integrity validation.",
     "knowledge_source_reselection_required": "Select the source file again to retry this import.",
