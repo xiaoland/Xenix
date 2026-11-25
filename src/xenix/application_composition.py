@@ -19,7 +19,7 @@ from .config import AppPaths
 from .i18n import TranslationManager
 from .observability import LLM_USAGE_JOURNAL_FILE_NAME, LocalLLMUsageObservability
 from .services.agent.composition import build_headless_agent_services
-from .services.embedding_service import EmbeddingSettingsService
+from .services.ai_settings import AIConversationSettingsSource, AIEmbeddingSettingsSource, AISettingsService
 from .services.job_service import JobQueryService
 from .services.knowledge_derivation_service import KnowledgeDerivationService
 from .services.knowledge_document_lifecycle_service import KnowledgeDocumentLifecycleService
@@ -28,7 +28,7 @@ from .services.knowledge_index_service import KnowledgeIndexService
 from .services.knowledge_task_query import KnowledgeTaskQueryService
 from .services.knowledge_workspace_service import KnowledgeWorkspaceService
 from .services.link_router import LinkRouter
-from .services.llm import LLMService, LLMSettingsService
+from .services.llm import LLMService
 from .services.ml.worker_settings import MLWorkerSettingsService
 from .services.paddle_ocr_service import PaddleOcrDeploymentService
 from .services.storage.layout import database_path
@@ -50,9 +50,9 @@ def build_workbench_window(
 ) -> MainWindow:
     """Assemble all handlers before recovery or dispatch starts."""
     ml_worker_settings_service = MLWorkerSettingsService(paths)
-    llm_settings_service = LLMSettingsService(paths)
-    embedding_settings_service = EmbeddingSettingsService(paths)
-    llm_service = LLMService(llm_settings_service)
+    ai_settings_service = AISettingsService(paths)
+    embedding_settings_service = AIEmbeddingSettingsSource(ai_settings_service)
+    llm_service = LLMService(AIConversationSettingsSource(ai_settings_service))
     agent_services = build_headless_agent_services(
         paths=paths,
         session_factory=context.session_factory,
@@ -141,9 +141,7 @@ def build_workbench_window(
             log_path=log_path,
             db_path=database_path(paths),
             translation_manager=translation_manager,
-            llm_service=llm_service,
-            llm_settings_service=llm_settings_service,
-            embedding_settings_service=embedding_settings_service,
+            ai_settings_service=ai_settings_service,
             ml_worker_settings_service=ml_worker_settings_service,
             update_service=update_service,
             paddle_ocr_deployment=paddle_ocr_deployment,

@@ -55,6 +55,7 @@ supports, and what uncertainty remains.
 - Local services, SQLite state, and local canonical artifacts remain authoritative.
   SSH workers provide execution and cache capacity only.
 - External LLM-provider APIs are adapters, not a Xenix-owned remote backend.
+- AI settings manage provider connections and their chat and embedding model lists. Conversation settings select chat models for the default response, title, and turn guard. Knowledge settings select an embedding model for text vectors.
 - MVP exposes one global Knowledge Library. Its internal identity permits future
   multiple-library instances, but no library-management UI is promised.
 - Knowledge import preserves the selected source and canonical content locally.
@@ -72,6 +73,7 @@ supports, and what uncertainty remains.
 
 - **Dataset**: registered tabular data available to Xenix analysis and model work.
 - **Artifact**: a service-registered result that the user can open or preview.
+- **AI provider**: a configured AI API connection exposing chat models, embedding models, or both.
 - **LLM model**: the provider model selected for a conversation's next assistant
   response.
 - **Trained analyzer**: a reusable analysis or ML result that can be applied to

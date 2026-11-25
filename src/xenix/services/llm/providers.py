@@ -173,7 +173,7 @@ class OpenAICompatibleChatProvider:
         streaming_enabled: bool = True,
     ) -> None:
         self._provider_key = (provider_key or "openai").strip() or "openai"
-        self._base_url = (base_url or "https://api.openai.com").rstrip("/")
+        self._base_url = (base_url or "https://api.openai.com").rstrip("/").removesuffix("/v1")
         self._api_key = api_key or ""
         self._model = model or "gpt-4o-mini"
         self._timeout_seconds = timeout_seconds

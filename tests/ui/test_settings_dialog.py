@@ -10,9 +10,8 @@ from pytestqt.qtbot import QtBot
 
 from xenix.config import ensure_app_dirs, get_app_paths
 from xenix.i18n import TranslationManager
-from xenix.services.embedding_service import EmbeddingSettingsService
+from xenix.services.ai_settings import AISettingsService
 from xenix.services.knowledge_index_service import KnowledgeIndexOverview
-from xenix.services.llm import LLMService, LLMSettingsService
 from xenix.services.ml.worker_settings import MLWorkerSettingsService
 from xenix.ui.settings_dialog import SettingsDialog
 
@@ -39,16 +38,13 @@ def _build_dialog(
 ) -> SettingsDialog:
     monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
     paths = ensure_app_dirs(get_app_paths())
-    llm_settings = LLMSettingsService(paths)
     dialog = SettingsDialog(
         paths,
         paths.logs / "xenix.log",
         paths.state / "xenix.db",
         TranslationManager(qapp, paths),
-        LLMService(llm_settings),
-        llm_settings,
+        AISettingsService(paths),
         MLWorkerSettingsService(paths),
-        EmbeddingSettingsService(paths),
         knowledge_index_service=index_service,
     )
     return dialog
@@ -78,7 +74,8 @@ def test_settings_controls_have_stable_unique_semantic_identities(
         dialog._provider_editor._add_provider_button,
         dialog._provider_editor._remove_provider_button,
         dialog._provider_editor._provider_api_key_input,
-        dialog._embedding_settings._api_key_input,
+        dialog._embedding_settings._model_selector,
+        dialog._conversation_settings._default_model_selector,
     )
 
     identities = [control.accessibleIdentifier() for control in controls]

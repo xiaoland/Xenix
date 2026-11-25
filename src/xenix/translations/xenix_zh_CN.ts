@@ -2288,16 +2288,17 @@ Trigger: %2</source>
 <context>
     <name>SettingsDialog</name>
     <message>
-        <location filename="../ui/settings/dialog.py" line="189"/>
-        <location filename="../ui/settings/dialog.py" line="317"/>
-        <location filename="../ui/settings/dialog.py" line="339"/>
-        <location filename="../ui/settings/provider.py" line="216"/>
-        <location filename="../ui/settings/provider.py" line="239"/>
+        <location filename="../ui/settings/dialog.py" line="198"/>
+        <location filename="../ui/settings/dialog.py" line="323"/>
+        <location filename="../ui/settings/dialog.py" line="336"/>
+        <location filename="../ui/settings/dialog.py" line="357"/>
+        <location filename="../ui/settings/provider.py" line="175"/>
+        <location filename="../ui/settings/provider.py" line="198"/>
         <source>Settings</source>
         <translation>设置</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="190"/>
+        <location filename="../ui/settings/dialog.py" line="199"/>
         <source>Language</source>
         <translation>语言</translation>
     </message>
@@ -2306,125 +2307,161 @@ Trigger: %2</source>
         <translation type="vanished">LLM 提供商</translation>
     </message>
     <message>
-        <location filename="../ui/settings/embedding.py" line="101"/>
-        <location filename="../ui/settings/provider.py" line="159"/>
+        <location filename="../ui/settings/provider.py" line="135"/>
         <source>Base URL</source>
         <translation>基础 URL</translation>
     </message>
     <message>
-        <location filename="../ui/settings/embedding.py" line="102"/>
-        <location filename="../ui/settings/provider.py" line="160"/>
+        <location filename="../ui/settings/provider.py" line="136"/>
         <source>API key</source>
         <translation>API 密钥</translation>
     </message>
     <message>
-        <location filename="../ui/settings/embedding.py" line="103"/>
         <source>Model</source>
-        <translation>模型</translation>
+        <translation type="vanished">模型</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="165"/>
+        <location filename="../ui/settings/conversation.py" line="68"/>
         <source>Turn guard model</source>
         <translation>轮次守卫模型</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="166"/>
+        <location filename="../ui/settings/conversation.py" line="69"/>
         <source>Thread title model</source>
         <translation>线程标题模型</translation>
     </message>
     <message>
-        <location filename="../ui/settings/embedding.py" line="109"/>
-        <location filename="../ui/settings/provider.py" line="162"/>
+        <location filename="../ui/settings/provider.py" line="142"/>
         <source>Timeout</source>
         <translation>超时</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="191"/>
+        <location filename="../ui/settings/dialog.py" line="200"/>
         <source>AI</source>
         <translation>AI</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="194"/>
+        <location filename="../ui/settings/dialog.py" line="201"/>
+        <source>Conversation</source>
+        <translation>会话</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings/dialog.py" line="204"/>
         <source>Knowledge Base</source>
         <translation>知识库</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="198"/>
+        <location filename="../ui/settings/dialog.py" line="208"/>
         <source>ML Workers</source>
         <translation>ML 工作器</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="153"/>
+        <location filename="../ui/settings/dialog.py" line="323"/>
+        <source>Select an embedding model to enable text vectors.</source>
+        <translation>请选择一个向量模型后再启用文本向量。</translation>
+    </message>
+    <message>
         <source>Global models</source>
-        <translation>全局模型</translation>
+        <translation type="vanished">全局模型</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="154"/>
         <source>LLM providers</source>
-        <translation>LLM 提供商</translation>
+        <translation type="vanished">LLM 提供商</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="155"/>
+        <location filename="../ui/settings/provider.py" line="130"/>
+        <source>AI providers</source>
+        <translation>AI 提供商</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings/provider.py" line="131"/>
         <source>Provider</source>
         <translation>提供商</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="156"/>
+        <location filename="../ui/settings/provider.py" line="132"/>
         <source>Provider key</source>
         <translation>提供商键</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="157"/>
+        <location filename="../ui/settings/provider.py" line="133"/>
         <source>Provider name</source>
         <translation>提供商名称</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="158"/>
+        <location filename="../ui/settings/provider.py" line="134"/>
+        <source>Protocol</source>
+        <translation>通信协议</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings/provider.py" line="137"/>
+        <source>Chat models</source>
+        <translation>大语言模型</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings/provider.py" line="138"/>
+        <source>Embedding models</source>
+        <translation>向量模型</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings/provider.py" line="139"/>
+        <source>One model ID per line</source>
+        <translation>每行输入一个模型 ID</translation>
+    </message>
+    <message>
         <source>Dialect</source>
-        <translation>方言</translation>
+        <translation type="vanished">方言</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="161"/>
         <source>Models</source>
-        <translation>模型</translation>
+        <translation type="vanished">模型</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="163"/>
+        <location filename="../ui/settings/provider.py" line="143"/>
         <source>Streaming</source>
         <translation>流式输出</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="164"/>
+        <location filename="../ui/settings/conversation.py" line="67"/>
         <source>Default model</source>
         <translation>默认模型</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="167"/>
+        <location filename="../ui/settings/conversation.py" line="70"/>
         <source>LLM retry attempts</source>
         <translation>LLM 重试次数</translation>
     </message>
     <message>
-        <location filename="../ui/settings/embedding.py" line="99"/>
         <source>Embedding provider</source>
-        <translation>嵌入模型提供商</translation>
+        <translation type="vanished">嵌入模型提供商</translation>
     </message>
     <message>
-        <location filename="../ui/settings/embedding.py" line="100"/>
+        <location filename="../ui/settings/embedding.py" line="68"/>
+        <source>Text vectors</source>
+        <translation>文本向量</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings/embedding.py" line="69"/>
         <source>Enabled</source>
         <translation>启用</translation>
     </message>
     <message>
-        <location filename="../ui/settings/embedding.py" line="104"/>
+        <location filename="../ui/settings/embedding.py" line="70"/>
+        <source>Embedding model</source>
+        <translation>向量模型</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings/embedding.py" line="71"/>
         <source>Dimensions</source>
         <translation>向量维度</translation>
     </message>
     <message>
-        <location filename="../ui/settings/embedding.py" line="106"/>
+        <location filename="../ui/settings/embedding.py" line="73"/>
         <source>Provider default (0)</source>
         <translation>使用提供商默认值（0）</translation>
     </message>
     <message>
-        <location filename="../ui/settings/embedding.py" line="108"/>
+        <location filename="../ui/settings/embedding.py" line="75"/>
         <source>Batch size</source>
         <translation>批次大小</translation>
     </message>
@@ -2450,17 +2487,17 @@ Trigger: %2</source>
         <translation>重建索引...</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="168"/>
+        <location filename="../ui/settings/provider.py" line="144"/>
         <source>Add</source>
         <translation>添加</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="169"/>
+        <location filename="../ui/settings/provider.py" line="145"/>
         <source>Remove</source>
         <translation>移除</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="171"/>
+        <location filename="../ui/settings/provider.py" line="147"/>
         <source>OpenAI-compatible</source>
         <translation>OpenAI 兼容</translation>
     </message>
@@ -2491,7 +2528,7 @@ Trigger: %2</source>
         <translation>添加 SSH 工作器...</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="205"/>
+        <location filename="../ui/settings/dialog.py" line="216"/>
         <source>About</source>
         <translation>关于</translation>
     </message>
@@ -2524,7 +2561,7 @@ Trigger: %2</source>
         <translation type="vanished">打开日志目录</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="206"/>
+        <location filename="../ui/settings/dialog.py" line="217"/>
         <source>Save</source>
         <translation>保存</translation>
     </message>
@@ -2595,22 +2632,22 @@ Trigger: %2</source>
         <translation>本地 PaddleOCR 尚未安装</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="250"/>
+        <location filename="../ui/settings/dialog.py" line="261"/>
         <source>English</source>
         <translation>English</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="251"/>
+        <location filename="../ui/settings/dialog.py" line="262"/>
         <source>Simplified Chinese</source>
         <translation>简体中文</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="276"/>
+        <location filename="../ui/settings/dialog.py" line="287"/>
         <source>Language Switch Failed</source>
         <translation>语言切换失败</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="277"/>
+        <location filename="../ui/settings/dialog.py" line="288"/>
         <source>Unable to switch the application language.
 
 {details}</source>
@@ -2627,22 +2664,22 @@ Trigger: %2</source>
         <translation type="vanished">Embedding 设置已保存，但无法将文本向量重建加入队列。</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="357"/>
+        <location filename="../ui/settings/dialog.py" line="375"/>
         <source>Rebuild text vectors?</source>
         <translation>重建文本向量？</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="360"/>
+        <location filename="../ui/settings/dialog.py" line="378"/>
         <source>This change uses a different embedding space. Existing text vectors cannot be reused for current Knowledge content.</source>
         <translation>此更改将使用不同的 Embedding 空间。现有文本向量无法用于当前知识库内容。</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="365"/>
+        <location filename="../ui/settings/dialog.py" line="383"/>
         <source>Save and rebuild now</source>
         <translation>保存并立即重建</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="369"/>
+        <location filename="../ui/settings/dialog.py" line="387"/>
         <source>Save; rebuild later</source>
         <translation>保存；稍后重建</translation>
     </message>
@@ -2802,7 +2839,8 @@ Text vectors: %2</source>
         <translation type="vanished">此提供商由部署管理，无法在此处移除。</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="394"/>
+        <location filename="../ui/settings/conversation.py" line="55"/>
+        <location filename="../ui/settings/embedding.py" line="64"/>
         <source>None</source>
         <translation>无</translation>
     </message>

@@ -2147,139 +2147,176 @@ Trigger: %2</translation>
 <context>
     <name>SettingsDialog</name>
     <message>
-        <location filename="../ui/settings/dialog.py" line="189"/>
-        <location filename="../ui/settings/dialog.py" line="317"/>
-        <location filename="../ui/settings/dialog.py" line="339"/>
-        <location filename="../ui/settings/provider.py" line="216"/>
-        <location filename="../ui/settings/provider.py" line="239"/>
+        <location filename="../ui/settings/dialog.py" line="198"/>
+        <location filename="../ui/settings/dialog.py" line="323"/>
+        <location filename="../ui/settings/dialog.py" line="336"/>
+        <location filename="../ui/settings/dialog.py" line="357"/>
+        <location filename="../ui/settings/provider.py" line="175"/>
+        <location filename="../ui/settings/provider.py" line="198"/>
         <source>Settings</source>
         <translation>Settings</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="190"/>
+        <location filename="../ui/settings/dialog.py" line="199"/>
         <source>Language</source>
         <translation>Language</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="191"/>
+        <location filename="../ui/settings/dialog.py" line="200"/>
         <source>AI</source>
         <translation>AI</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="194"/>
+        <location filename="../ui/settings/dialog.py" line="201"/>
+        <source>Conversation</source>
+        <translation type="unfinished">Conversation</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings/dialog.py" line="204"/>
         <source>Knowledge Base</source>
         <translation>Knowledge Base</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="198"/>
+        <location filename="../ui/settings/dialog.py" line="208"/>
         <source>ML Workers</source>
         <translation>ML Workers</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="153"/>
+        <location filename="../ui/settings/dialog.py" line="323"/>
+        <source>Select an embedding model to enable text vectors.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Global models</source>
-        <translation>Global models</translation>
+        <translation type="vanished">Global models</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="154"/>
         <source>LLM providers</source>
-        <translation>LLM providers</translation>
+        <translation type="vanished">LLM providers</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="155"/>
+        <location filename="../ui/settings/provider.py" line="130"/>
+        <source>AI providers</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/settings/provider.py" line="131"/>
         <source>Provider</source>
         <translation>Provider</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="156"/>
+        <location filename="../ui/settings/provider.py" line="132"/>
         <source>Provider key</source>
         <translation>Provider key</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="157"/>
+        <location filename="../ui/settings/provider.py" line="133"/>
         <source>Provider name</source>
         <translation>Provider name</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="158"/>
-        <source>Dialect</source>
-        <translation>Dialect</translation>
+        <location filename="../ui/settings/provider.py" line="134"/>
+        <source>Protocol</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/settings/embedding.py" line="101"/>
-        <location filename="../ui/settings/provider.py" line="159"/>
+        <location filename="../ui/settings/provider.py" line="137"/>
+        <source>Chat models</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/settings/provider.py" line="138"/>
+        <source>Embedding models</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/settings/provider.py" line="139"/>
+        <source>One model ID per line</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Dialect</source>
+        <translation type="vanished">Dialect</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings/provider.py" line="135"/>
         <source>Base URL</source>
         <translation>Base URL</translation>
     </message>
     <message>
-        <location filename="../ui/settings/embedding.py" line="102"/>
-        <location filename="../ui/settings/provider.py" line="160"/>
+        <location filename="../ui/settings/provider.py" line="136"/>
         <source>API key</source>
         <translation>API key</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="161"/>
         <source>Models</source>
-        <translation>Models</translation>
+        <translation type="vanished">Models</translation>
     </message>
     <message>
-        <location filename="../ui/settings/embedding.py" line="109"/>
-        <location filename="../ui/settings/provider.py" line="162"/>
+        <location filename="../ui/settings/provider.py" line="142"/>
         <source>Timeout</source>
         <translation>Timeout</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="163"/>
+        <location filename="../ui/settings/provider.py" line="143"/>
         <source>Streaming</source>
         <translation>Streaming</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="164"/>
+        <location filename="../ui/settings/conversation.py" line="67"/>
         <source>Default model</source>
         <translation>Default model</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="165"/>
+        <location filename="../ui/settings/conversation.py" line="68"/>
         <source>Turn guard model</source>
         <translation>Turn guard model</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="166"/>
+        <location filename="../ui/settings/conversation.py" line="69"/>
         <source>Thread title model</source>
         <translation>Thread title model</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="167"/>
+        <location filename="../ui/settings/conversation.py" line="70"/>
         <source>LLM retry attempts</source>
         <translation>LLM retry attempts</translation>
     </message>
     <message>
-        <location filename="../ui/settings/embedding.py" line="99"/>
         <source>Embedding provider</source>
-        <translation>Embedding provider</translation>
+        <translation type="vanished">Embedding provider</translation>
     </message>
     <message>
-        <location filename="../ui/settings/embedding.py" line="100"/>
+        <location filename="../ui/settings/embedding.py" line="69"/>
         <source>Enabled</source>
         <translation>Enabled</translation>
     </message>
     <message>
-        <location filename="../ui/settings/embedding.py" line="103"/>
         <source>Model</source>
-        <translation>Model</translation>
+        <translation type="vanished">Model</translation>
     </message>
     <message>
-        <location filename="../ui/settings/embedding.py" line="104"/>
+        <location filename="../ui/settings/embedding.py" line="68"/>
+        <source>Text vectors</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/settings/embedding.py" line="70"/>
+        <source>Embedding model</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/settings/embedding.py" line="71"/>
         <source>Dimensions</source>
         <translation>Dimensions</translation>
     </message>
     <message>
-        <location filename="../ui/settings/embedding.py" line="106"/>
+        <location filename="../ui/settings/embedding.py" line="73"/>
         <source>Provider default (0)</source>
         <translation>Provider default (0)</translation>
     </message>
     <message>
-        <location filename="../ui/settings/embedding.py" line="108"/>
+        <location filename="../ui/settings/embedding.py" line="75"/>
         <source>Batch size</source>
         <translation>Batch size</translation>
     </message>
@@ -2305,17 +2342,17 @@ Trigger: %2</translation>
         <translation>Rebuild indexes...</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="168"/>
+        <location filename="../ui/settings/provider.py" line="144"/>
         <source>Add</source>
         <translation>Add</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="169"/>
+        <location filename="../ui/settings/provider.py" line="145"/>
         <source>Remove</source>
         <translation>Remove</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="171"/>
+        <location filename="../ui/settings/provider.py" line="147"/>
         <source>OpenAI-compatible</source>
         <translation>OpenAI-compatible</translation>
     </message>
@@ -2330,12 +2367,12 @@ Trigger: %2</translation>
         <translation>Add SSH worker...</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="205"/>
+        <location filename="../ui/settings/dialog.py" line="216"/>
         <source>About</source>
         <translation>About</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="206"/>
+        <location filename="../ui/settings/dialog.py" line="217"/>
         <source>Save</source>
         <translation>Save</translation>
     </message>
@@ -2406,22 +2443,22 @@ Trigger: %2</translation>
         <translation>Local PaddleOCR is not installed</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="250"/>
+        <location filename="../ui/settings/dialog.py" line="261"/>
         <source>English</source>
         <translation>English</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="251"/>
+        <location filename="../ui/settings/dialog.py" line="262"/>
         <source>Simplified Chinese</source>
         <translation>Simplified Chinese</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="276"/>
+        <location filename="../ui/settings/dialog.py" line="287"/>
         <source>Language Switch Failed</source>
         <translation>Language Switch Failed</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="277"/>
+        <location filename="../ui/settings/dialog.py" line="288"/>
         <source>Unable to switch the application language.
 
 {details}</source>
@@ -2438,22 +2475,22 @@ Trigger: %2</translation>
         <translation type="vanished">Embedding settings were saved, but the vector rebuild could not be queued.</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="357"/>
+        <location filename="../ui/settings/dialog.py" line="375"/>
         <source>Rebuild text vectors?</source>
         <translation>Rebuild text vectors?</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="360"/>
+        <location filename="../ui/settings/dialog.py" line="378"/>
         <source>This change uses a different embedding space. Existing text vectors cannot be reused for current Knowledge content.</source>
         <translation>This change uses a different embedding space. Existing text vectors cannot be reused for current Knowledge content.</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="365"/>
+        <location filename="../ui/settings/dialog.py" line="383"/>
         <source>Save and rebuild now</source>
         <translation>Save and rebuild now</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="369"/>
+        <location filename="../ui/settings/dialog.py" line="387"/>
         <source>Save; rebuild later</source>
         <translation>Save; rebuild later</translation>
     </message>
@@ -2613,7 +2650,8 @@ Text vectors: %2</translation>
         <translation type="vanished">This provider is managed by a deployment and cannot be removed here.</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="394"/>
+        <location filename="../ui/settings/conversation.py" line="55"/>
+        <location filename="../ui/settings/embedding.py" line="64"/>
         <source>None</source>
         <translation>None</translation>
     </message>

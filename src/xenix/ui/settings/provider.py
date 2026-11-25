@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 
 from pydantic import ValidationError as PydanticValidationError
-from PySide6.QtCore import QCoreApplication, QEvent
+from PySide6.QtCore import QCoreApplication, QEvent, Signal
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -19,29 +19,23 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ...services.llm import (
-    LLMDialect,
-    LLMModelOption,
-    LLMProviderConfig,
-    LLMService,
-    LLMSettings,
-)
+from ...services.ai_providers import AIProtocol, AIProviderConfig
 from ..semantic_identity import identify
 from ._card import Card
 
 
 class ProviderSettingsEditor(QWidget):
-    """AI-tab provider draft editor, including its dependent global model choices."""
+    """Edit provider connections and the two model lists they publish."""
 
-    def __init__(self, settings: LLMSettings, parent: QWidget | None = None) -> None:
+    providers_changed = Signal(list)
+
+    def __init__(self, providers: list[AIProviderConfig], parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self._provider_configs: list[LLMProviderConfig] = []
+        self._provider_configs: list[AIProviderConfig] = []
         self._loading_provider = False
         self._active_provider_index = 0
 
-        self._global_models_card = Card()
         self._llm_card = Card()
-        self._global_models_title_label = QLabel()
         self._llm_title_label = QLabel()
         self._provider_selector_label = QLabel()
         self._provider_key_label = QLabel()
@@ -50,12 +44,9 @@ class ProviderSettingsEditor(QWidget):
         self._provider_base_url_label = QLabel()
         self._provider_api_key_label = QLabel()
         self._provider_models_label = QLabel()
+        self._embedding_models_label = QLabel()
         self._provider_timeout_label = QLabel()
         self._provider_streaming_label = QLabel()
-        self._llm_default_model_label = QLabel()
-        self._llm_guard_model_label = QLabel()
-        self._llm_thread_title_model_label = QLabel()
-        self._llm_retry_attempts_label = QLabel()
         self._provider_selector = QComboBox()
         self._add_provider_button = QPushButton()
         self._remove_provider_button = QPushButton()
@@ -67,19 +58,16 @@ class ProviderSettingsEditor(QWidget):
         self._provider_api_key_input.setEchoMode(QLineEdit.EchoMode.Password)
         self._provider_models_input = QPlainTextEdit()
         self._provider_models_input.setFixedHeight(82)
+        self._embedding_models_input = QPlainTextEdit()
+        self._embedding_models_input.setFixedHeight(82)
         self._provider_timeout_input = QSpinBox()
         self._provider_timeout_input.setRange(1, 3600)
         self._provider_timeout_input.setSuffix(" s")
         self._provider_streaming_checkbox = QCheckBox()
-        self._llm_default_model_selector = QComboBox()
-        self._llm_guard_model_selector = QComboBox()
-        self._llm_thread_title_model_selector = QComboBox()
-        self._llm_retry_attempts_input = QSpinBox()
-        self._llm_retry_attempts_input.setRange(1, 20)
         self._assign_semantic_identities()
         self._build_ui()
         self._wire_events()
-        self.load_settings(settings)
+        self.load_providers(providers)
         self.retranslate_ui()
 
     def _assign_semantic_identities(self) -> None:
@@ -93,12 +81,9 @@ class ProviderSettingsEditor(QWidget):
             (self._provider_base_url_input, "settings.llm.provider.base-url"),
             (self._provider_api_key_input, "settings.llm.provider.api-key"),
             (self._provider_models_input, "settings.llm.provider.models"),
+            (self._embedding_models_input, "settings.ai.provider.embedding-models"),
             (self._provider_timeout_input, "settings.llm.provider.timeout"),
             (self._provider_streaming_checkbox, "settings.llm.provider.streaming"),
-            (self._llm_default_model_selector, "settings.llm.default-model"),
-            (self._llm_guard_model_selector, "settings.llm.turn-guard-model"),
-            (self._llm_thread_title_model_selector, "settings.llm.thread-title-model"),
-            (self._llm_retry_attempts_input, "settings.llm.retry-attempts"),
         ):
             identify(widget, semantic_id)
 
@@ -106,16 +91,6 @@ class ProviderSettingsEditor(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(16)
-
-        global_content = QWidget()
-        global_layout = QFormLayout(global_content)
-        global_layout.setContentsMargins(0, 0, 0, 0)
-        global_layout.addRow(self._global_models_title_label)
-        global_layout.addRow(self._llm_default_model_label, self._llm_default_model_selector)
-        global_layout.addRow(self._llm_guard_model_label, self._llm_guard_model_selector)
-        global_layout.addRow(self._llm_thread_title_model_label, self._llm_thread_title_model_selector)
-        global_layout.addRow(self._llm_retry_attempts_label, self._llm_retry_attempts_input)
-        self._global_models_card.set_content(global_content)
 
         provider_content = QWidget()
         provider_layout = QFormLayout(provider_content)
@@ -125,7 +100,7 @@ class ProviderSettingsEditor(QWidget):
         selector_row.addWidget(self._provider_selector, 1)
         selector_row.addWidget(self._add_provider_button)
         selector_row.addWidget(self._remove_provider_button)
-        self._provider_dialect_selector.addItem("OpenAI-compatible", LLMDialect.OPENAI_COMPATIBLE.value)
+        self._provider_dialect_selector.addItem("OpenAI-compatible", AIProtocol.OPENAI_COMPATIBLE.value)
         provider_layout.addRow(self._llm_title_label)
         provider_layout.addRow(self._provider_selector_label, selector_row)
         provider_layout.addRow(self._provider_key_label, self._provider_key_input)
@@ -134,11 +109,11 @@ class ProviderSettingsEditor(QWidget):
         provider_layout.addRow(self._provider_base_url_label, self._provider_base_url_input)
         provider_layout.addRow(self._provider_api_key_label, self._provider_api_key_input)
         provider_layout.addRow(self._provider_models_label, self._provider_models_input)
+        provider_layout.addRow(self._embedding_models_label, self._embedding_models_input)
         provider_layout.addRow(self._provider_timeout_label, self._provider_timeout_input)
         provider_layout.addRow(self._provider_streaming_label, self._provider_streaming_checkbox)
         self._llm_card.set_content(provider_content)
 
-        layout.addWidget(self._global_models_card)
         layout.addWidget(self._llm_card)
         layout.addStretch(1)
 
@@ -146,33 +121,30 @@ class ProviderSettingsEditor(QWidget):
         self._provider_selector.currentIndexChanged.connect(self._on_provider_changed)
         self._add_provider_button.clicked.connect(self._add_provider)
         self._remove_provider_button.clicked.connect(self._remove_provider)
-        self._provider_models_input.textChanged.connect(self._on_models_text_changed)
+        self._provider_models_input.textChanged.connect(self._on_provider_identity_changed)
+        self._embedding_models_input.textChanged.connect(self._on_provider_identity_changed)
+        self._provider_key_input.editingFinished.connect(self._on_provider_identity_changed)
+        self._provider_name_input.editingFinished.connect(self._on_provider_identity_changed)
 
     def retranslate_ui(self) -> None:
-        self._global_models_title_label.setText(QCoreApplication.translate("SettingsDialog", "Global models"))
-        self._llm_title_label.setText(QCoreApplication.translate("SettingsDialog", "LLM providers"))
+        self._llm_title_label.setText(QCoreApplication.translate("SettingsDialog", "AI providers"))
         self._provider_selector_label.setText(QCoreApplication.translate("SettingsDialog", "Provider"))
         self._provider_key_label.setText(QCoreApplication.translate("SettingsDialog", "Provider key"))
         self._provider_name_label.setText(QCoreApplication.translate("SettingsDialog", "Provider name"))
-        self._provider_dialect_label.setText(QCoreApplication.translate("SettingsDialog", "Dialect"))
+        self._provider_dialect_label.setText(QCoreApplication.translate("SettingsDialog", "Protocol"))
         self._provider_base_url_label.setText(QCoreApplication.translate("SettingsDialog", "Base URL"))
         self._provider_api_key_label.setText(QCoreApplication.translate("SettingsDialog", "API key"))
-        self._provider_models_label.setText(QCoreApplication.translate("SettingsDialog", "Models"))
+        self._provider_models_label.setText(QCoreApplication.translate("SettingsDialog", "Chat models"))
+        self._embedding_models_label.setText(QCoreApplication.translate("SettingsDialog", "Embedding models"))
+        model_hint = QCoreApplication.translate("SettingsDialog", "One model ID per line")
+        self._provider_models_input.setPlaceholderText(model_hint)
+        self._embedding_models_input.setPlaceholderText(model_hint)
         self._provider_timeout_label.setText(QCoreApplication.translate("SettingsDialog", "Timeout"))
         self._provider_streaming_label.setText(QCoreApplication.translate("SettingsDialog", "Streaming"))
-        self._llm_default_model_label.setText(QCoreApplication.translate("SettingsDialog", "Default model"))
-        self._llm_guard_model_label.setText(QCoreApplication.translate("SettingsDialog", "Turn guard model"))
-        self._llm_thread_title_model_label.setText(QCoreApplication.translate("SettingsDialog", "Thread title model"))
-        self._llm_retry_attempts_label.setText(QCoreApplication.translate("SettingsDialog", "LLM retry attempts"))
         self._add_provider_button.setText(QCoreApplication.translate("SettingsDialog", "Add"))
         self._remove_provider_button.setText(QCoreApplication.translate("SettingsDialog", "Remove"))
         self._provider_dialect_selector.setItemText(
             0, QCoreApplication.translate("SettingsDialog", "OpenAI-compatible")
-        )
-        self._refresh_model_selectors(
-            default_key=self._llm_default_model_selector.currentData(),
-            guard_key=self._llm_guard_model_selector.currentData(),
-            title_key=self._llm_thread_title_model_selector.currentData(),
         )
 
     def changeEvent(self, event: QEvent) -> None:
@@ -180,26 +152,15 @@ class ProviderSettingsEditor(QWidget):
             self.retranslate_ui()
         super().changeEvent(event)
 
-    def load_settings(self, settings: LLMSettings) -> None:
-        self._provider_configs = [provider.model_copy(deep=True) for provider in settings.providers]
+    def load_providers(self, providers: list[AIProviderConfig]) -> None:
+        self._provider_configs = [provider.model_copy(deep=True) for provider in providers]
         self._reload_provider_selector(0)
         self._load_provider_fields(0)
-        self._refresh_model_selectors(
-            default_key=settings.default_fq_model_key,
-            guard_key=settings.turn_completion_guard_fq_model_key,
-            title_key=settings.thread_title_fq_model_key,
-        )
-        self._llm_retry_attempts_input.setValue(settings.retry_attempts)
+        self.providers_changed.emit(self._provider_configs)
 
-    def current_settings(self) -> LLMSettings:
+    def current_providers(self) -> list[AIProviderConfig]:
         self._store_current_provider_fields()
-        return LLMSettings(
-            providers=self._provider_configs,
-            default_fq_model_key=str(self._llm_default_model_selector.currentData() or ""),
-            turn_completion_guard_fq_model_key=str(self._llm_guard_model_selector.currentData() or ""),
-            thread_title_fq_model_key=str(self._llm_thread_title_model_selector.currentData() or ""),
-            retry_attempts=self._llm_retry_attempts_input.value(),
-        )
+        return self._provider_configs
 
     def _on_provider_changed(self, index: int) -> None:
         if self._loading_provider:
@@ -216,7 +177,7 @@ class ProviderSettingsEditor(QWidget):
             )
             return
         self._load_provider_fields(index)
-        self._refresh_model_selectors_preserving_selection()
+        self.providers_changed.emit(self._provider_configs)
 
     def _revert_provider_selection(self) -> None:
         """Return the selector to the currently loaded provider after a failed switch."""
@@ -243,11 +204,11 @@ class ProviderSettingsEditor(QWidget):
         while f"provider{index}" in existing:
             index += 1
         self._provider_configs.append(
-            LLMProviderConfig(key=f"provider{index}", display_name=f"Provider {index}", models=["gpt-4o-mini"])
+            AIProviderConfig(key=f"provider{index}", display_name=f"Provider {index}", models=["gpt-4o-mini"])
         )
         self._reload_provider_selector(len(self._provider_configs) - 1)
         self._load_provider_fields(len(self._provider_configs) - 1)
-        self._refresh_model_selectors_preserving_selection()
+        self.providers_changed.emit(self._provider_configs)
 
     def _remove_provider(self) -> None:
         if len(self._provider_configs) <= 1:
@@ -257,7 +218,7 @@ class ProviderSettingsEditor(QWidget):
         next_index = min(index, len(self._provider_configs) - 1)
         self._reload_provider_selector(next_index)
         self._load_provider_fields(next_index)
-        self._refresh_model_selectors_preserving_selection()
+        self.providers_changed.emit(self._provider_configs)
 
     def _reload_provider_selector(self, selected_index: int) -> None:
         self._loading_provider = True
@@ -282,6 +243,7 @@ class ProviderSettingsEditor(QWidget):
         self._provider_base_url_input.setText(provider.base_url)
         self._provider_api_key_input.setText(provider.api_key)
         self._provider_models_input.setPlainText("\n".join(provider.models))
+        self._embedding_models_input.setPlainText("\n".join(provider.embedding_models))
         self._provider_timeout_input.setValue(provider.timeout_seconds)
         self._provider_streaming_checkbox.setChecked(provider.streaming_enabled)
         self._active_provider_index = provider_index
@@ -294,89 +256,34 @@ class ProviderSettingsEditor(QWidget):
         if not 0 <= index < len(self._provider_configs):
             return
         current = self._provider_configs[index]
-        self._provider_configs[index] = LLMProviderConfig(
+        self._provider_configs[index] = AIProviderConfig(
             key=self._provider_key_input.text().strip(),
             display_name=self._provider_name_input.text().strip(),
-            dialect=LLMDialect(str(self._provider_dialect_selector.currentData())),
+            dialect=AIProtocol(str(self._provider_dialect_selector.currentData())),
             base_url=self._provider_base_url_input.text().strip(),
             api_key=self._provider_api_key_input.text(),
-            models=self._model_lines(),
+            models=self._model_lines(self._provider_models_input),
+            embedding_models=self._model_lines(self._embedding_models_input),
             timeout_seconds=self._provider_timeout_input.value(),
             streaming_enabled=self._provider_streaming_checkbox.isChecked(),
             dialect_config=current.dialect_config,
+            embedding_profile_key=current.embedding_profile_key,
         )
         provider = self._provider_configs[index]
         self._provider_selector.setItemText(index, provider.display_name or provider.key)
         self._provider_selector.setItemData(index, provider.key)
 
-    def _on_models_text_changed(self) -> None:
-        """Keep the global model selectors in sync with the edited models list.
-
-        Editing the provider's Models field changes the available model set, so
-        the Default/Turn-guard/Thread-title selectors must be rebuilt immediately
-        rather than only when the provider is switched or the dialog is reopened.
-        """
-
-        if self._loading_provider or not self._provider_configs:
+    def _on_provider_identity_changed(self) -> None:
+        if self._loading_provider:
             return
         try:
             self._store_current_provider_fields()
         except PydanticValidationError:
             return
-        self._refresh_model_selectors_preserving_selection()
+        keys = {provider.key for provider in self._provider_configs}
+        if len(keys) == len(self._provider_configs):
+            self.providers_changed.emit(self._provider_configs)
 
-    def _refresh_model_selectors(
-        self, *, default_key: object | None = None, guard_key: object | None = None, title_key: object | None = None
-    ) -> None:
-        if not self._provider_configs:
-            return
-        try:
-            settings = LLMSettings(providers=self._provider_configs)
-        except PydanticValidationError:
-            return
-        options = LLMService.model_options_from_settings(settings)
-        self._replace_model_selector_items(
-            self._llm_default_model_selector,
-            options,
-            selected_key=str(default_key or settings.default_fq_model_key),
-            include_blank=False,
-        )
-        self._replace_model_selector_items(
-            self._llm_guard_model_selector, options, selected_key=str(guard_key or ""), include_blank=True
-        )
-        self._replace_model_selector_items(
-            self._llm_thread_title_model_selector, options, selected_key=str(title_key or ""), include_blank=True
-        )
-
-    def _refresh_model_selectors_preserving_selection(self) -> None:
-        """Refresh model options without resetting the user's global choices.
-
-        Adding or removing a provider changes the available model set; the three
-        global selectors must keep their current selections when those keys still
-        exist, instead of silently resetting to the first option.
-        """
-
-        self._refresh_model_selectors(
-            default_key=self._llm_default_model_selector.currentData(),
-            guard_key=self._llm_guard_model_selector.currentData(),
-            title_key=self._llm_thread_title_model_selector.currentData(),
-        )
-
-    def _replace_model_selector_items(
-        self, selector: QComboBox, options: list[LLMModelOption], *, selected_key: str, include_blank: bool
-    ) -> None:
-        selector.blockSignals(True)
-        selector.clear()
-        if include_blank:
-            selector.addItem(QCoreApplication.translate("SettingsDialog", "None"), "")
-        for option in options:
-            selector.addItem(option.label, option.fq_model_key)
-        selector.setCurrentIndex(max(0, selector.findData(selected_key)))
-        selector.blockSignals(False)
-
-    def _model_lines(self) -> list[str]:
-        return [
-            line.strip()
-            for line in self._provider_models_input.toPlainText().replace(",", "\n").splitlines()
-            if line.strip()
-        ]
+    @staticmethod
+    def _model_lines(editor: QPlainTextEdit) -> list[str]:
+        return editor.toPlainText().replace(",", "\n").splitlines()
