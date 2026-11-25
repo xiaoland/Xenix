@@ -340,37 +340,34 @@ class AgentHarnessService:
                 fq_model_key=input_data.fq_model_key,
                 interface_locale=input_data.interface_locale,
             ).thread.id
-        else:
-            snapshot = self.get_thread_snapshot(thread_id)
-            selected = self._resolve_fq_model_key(input_data.fq_model_key, snapshot.thread.selected_fq_model_key)
-            if selected and selected != snapshot.thread.selected_fq_model_key:
-                self._conversation_service.set_thread_model(thread_id, selected)
-
         submission_id = (input_data.client_submission_id or uuid4().hex).strip()
         claim = self._conversation_service.claim_user_submission(
             thread_id=thread_id,
             expected_frontier_id=self._frontier_id(thread_id),
             client_submission_id=submission_id,
         )
-        existing_message_id = getattr(claim, "existing_message_id", None)
-        if existing_message_id:
+        if claim.existing_message_id is not None:
             # A retried client acknowledgement is not a new UserMessage.  Do
             # not import attachments, clear a Thread pause, or re-sample the
             # old frontier; simply project the already-canonical snapshot.
-            try:
-                snapshot = self.get_thread_snapshot(thread_id)
-                yield AgentHarnessStreamEvent(
-                    kind="snapshot",
-                    thread_id=thread_id,
-                    client_submission_id=submission_id,
-                    snapshot=snapshot,
-                    chatbot_events=self.project_chatbot_events(snapshot),
-                    is_final=True,
-                )
-            finally:
-                self._conversation_service.release_user_submission_claim(claim)
+            snapshot = self.get_thread_snapshot(thread_id)
+            yield AgentHarnessStreamEvent(
+                kind="snapshot",
+                thread_id=thread_id,
+                client_submission_id=submission_id,
+                snapshot=snapshot,
+                chatbot_events=self.project_chatbot_events(snapshot),
+                is_final=True,
+            )
             return
+        title_task: _InitialTitleTask | None = None
         try:
+            current = self.get_thread_snapshot(thread_id).thread.selected_fq_model_key
+            selected = self._resolve_fq_model_key(input_data.fq_model_key, current)
+            if self._llm_service is not None and not selected:
+                raise ValidationError("No chat model is configured.")
+            if selected and selected != current:
+                self._conversation_service.set_thread_model(thread_id, selected)
             imported: list[DatasetAttachmentInput] = []
             for source_index, source in enumerate(input_data.source_attachments):
                 yield AgentHarnessStreamEvent(
@@ -409,33 +406,35 @@ class AgentHarnessService:
                 ),
                 expected_frontier_id=claim.expected_frontier_id,
             )
+
+            yield AgentHarnessStreamEvent(
+                kind="snapshot",
+                thread_id=thread_id,
+                client_submission_id=submission_id,
+                snapshot=snapshot,
+                chatbot_events=self.project_chatbot_events(snapshot),
+            )
+            first_user_message_id = snapshot.messages[-1].id
+            for event in self._sample_until_client_frontier(
+                thread_id,
+                first_user_message_id,
+                client_submission_id=submission_id,
+            ):
+                if event.is_final:
+                    self._conversation_service.release_user_submission_claim(claim)
+                yield event
+                # Resuming after the real Thinking event guarantees that the
+                # append acknowledgement and pending sampling Message already
+                # exist before title-model I/O starts.
+                if title_task is None and claim.initial_title_eligible and event.kind == "thinking":
+                    title_task = self._start_initial_title_task(
+                        claim=claim,
+                        first_user_message_id=first_user_message_id,
+                        appended_snapshot=snapshot,
+                    )
         finally:
             self._conversation_service.release_user_submission_claim(claim)
 
-        yield AgentHarnessStreamEvent(
-            kind="snapshot",
-            thread_id=thread_id,
-            client_submission_id=submission_id,
-            snapshot=snapshot,
-            chatbot_events=self.project_chatbot_events(snapshot),
-        )
-        title_task: _InitialTitleTask | None = None
-        first_user_message_id = snapshot.messages[-1].id
-        for event in self._sample_until_client_frontier(
-            thread_id,
-            first_user_message_id,
-            client_submission_id=submission_id,
-        ):
-            yield event
-            # Resuming after the real Thinking event guarantees that the
-            # append acknowledgement and pending sampling Message already
-            # exist before title-model I/O starts.
-            if title_task is None and claim.initial_title_eligible and event.kind == "thinking":
-                title_task = self._start_initial_title_task(
-                    claim=claim,
-                    first_user_message_id=first_user_message_id,
-                    appended_snapshot=snapshot,
-                )
         if title_task is not None:
             if title_task.result() is not None:
                 # Title I/O may finish while the primary pending placeholder

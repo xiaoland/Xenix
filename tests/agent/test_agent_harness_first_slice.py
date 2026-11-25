@@ -1,15 +1,23 @@
+import io
+import json
+from contextlib import closing
 from pathlib import Path
+from urllib.error import HTTPError
 
 import pytest
 from pydantic import BaseModel, ConfigDict
 
 from xenix.config import ensure_app_dirs, get_app_paths
-from xenix.exceptions import NotFoundError
+from xenix.exceptions import NotFoundError, ValidationError
 from xenix.services.agent import AgentHarnessService, SubmitUserTurnInput
 from xenix.services.llm import (
     AgentToolRegistry,
     AppendUserMessageInput,
+    FrozenLLMSettingsSource,
     LLMConversationService,
+    LLMProviderConfig,
+    LLMService,
+    LLMSettings,
     ProviderResponse,
     ProviderToolCall,
     ToolSuccess,
@@ -20,6 +28,60 @@ from xenix.services.llm.tool_protocol import AgentTool
 
 class EmptyToolInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
+
+
+@pytest.mark.parametrize("reopen", [False, True])
+def test_harness_switches_models_and_continues_after_terminal_request_failure(
+    monkeypatch, storage, reopen: bool,
+) -> None:
+    def response(request, *, timeout):
+        assert timeout == 120
+        payload = json.loads(request.data)
+        if payload["model"] == "broken":
+            raise HTTPError(request.full_url, 401, "Unauthorized", {}, io.BytesIO(b"{}"))
+        assert request.full_url == "https://models.example.test/v1/chat/completions"
+        assert payload["model"] == "working"
+        messages = [message for message in payload["messages"] if message["role"] == "user"]
+        assert [message["content"] for message in messages] == ["First question", "Second question"]
+        return io.BytesIO(b'data: {"choices":[{"delta":{"content":"Recovered."}}]}\n\ndata: [DONE]\n\n')
+
+    monkeypatch.setattr("xenix.services.llm.providers.request.urlopen", response)
+    llm = LLMService(FrozenLLMSettingsSource(LLMSettings(
+        providers=[LLMProviderConfig(
+            key="models", base_url="https://models.example.test",
+            api_key="example-key", models=["broken", "working"],
+        )],
+        retry_attempts=1,
+    )))
+
+    def new_harness() -> AgentHarnessService:
+        return AgentHarnessService(
+            conversation_service=LLMConversationService(
+                session_factory=storage.session_factory, tool_registry=AgentToolRegistry(), llm_service=llm,
+            ),
+            llm_service=llm,
+        )
+
+    harness = new_harness()
+    thread_id = harness.create_thread(fq_model_key="models/broken").thread.id
+    first = SubmitUserTurnInput(thread_id=thread_id, text="First question")
+    with closing(harness.submit_user_turn_stream(first)) as stream:
+        assert next(stream).kind == "snapshot"
+        with pytest.raises(ValidationError, match="submission is already active"):
+            harness.submit_user_turn(
+                SubmitUserTurnInput(thread_id=thread_id, fq_model_key="models/working", text="Too soon"),
+            )
+        with pytest.raises(ValidationError, match="401"):
+            list(stream)
+    assert [message.kind.value for message in harness.get_thread_snapshot(thread_id).messages] == ["user"]
+
+    if reopen:
+        harness = new_harness()
+    recovered = harness.submit_user_turn(
+        SubmitUserTurnInput(thread_id=thread_id, fq_model_key="models/working", text="Second question"),
+    )
+    assert [message.kind.value for message in recovered.messages] == ["user", "user", "assistant"]
+    assert recovered.messages[-1].text == "Recovered."
 
 
 def test_harness_returns_invalid_arguments_to_model_for_repair(storage) -> None:

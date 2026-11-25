@@ -188,6 +188,8 @@ recovery record, and process restart does not restore it. A new explicit
 UserMessage is the only resume command after a paused terminal ToolResult; it
 never causes automatic replay of that old frontier.
 
+Submission admission uses a process-local claim per Thread from preparation through terminal sampling. An explicit new submission can append to an idle Thread after a failed request, a Stop, or process restart, even if the last durable Message is a UserMessage or ToolResult. Existing final Messages remain in the transcript, completed Tool exchanges are replayed as history, and sampling starts from the new UserMessage. Pending sampling, duplicate submission identities, and stale frontier checks remain independent of the final Message kind.
+
 ## History Reopen and Source-Presentation Sequence
 
 ```mermaid
@@ -224,7 +226,7 @@ Dataset authority; the Chatbot block remains only its read-only UI projection.
 ## Safety and Change Rules
 
 - Application/runtime Thread deletion goes through `LLMConversationService`.
-  It rejects deletion while sampling is pending; its storage path deletes
+  It rejects deletion while a submission is active or sampling is pending. Its storage path deletes
   dependent ToolResults before their ToolCalls and remaining Messages.
 - Changes to a provider, Tool, pending lifecycle, source presentation, or
   Chatbot event must preserve the topology above. Do not add a convenience

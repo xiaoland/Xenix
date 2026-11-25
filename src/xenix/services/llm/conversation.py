@@ -112,7 +112,7 @@ class LLMConversationService(TitleGenerationMixin):
         self._repository = ConversationRepository()
         self._gates_lock = threading.Lock()
         self._thread_gates: dict[int, threading.RLock] = {}
-        self._claims: set[tuple[int, str]] = set()
+        self._claims: dict[int, SubmissionClaim] = {}
         self._claims_lock = threading.Lock()
         self._pending: dict[int, _PendingExchange] = {}
         self._pending_lock = threading.RLock()
@@ -224,6 +224,9 @@ class LLMConversationService(TitleGenerationMixin):
                 with self._session_factory() as session:
                     if self._repository.list_pending(session, thread_id):
                         raise ValidationError("Cannot delete a Thread while LLM sampling is pending.")
+                    with self._claims_lock:
+                        if thread_id in self._claims:
+                            raise ValidationError("Cannot delete a Thread while a submission is active.")
                     row = self._repository.delete_thread(session, thread_id)
                     if row is None:
                         raise NotFoundError(f"Conversation Thread '{thread_id}' was not found.")
@@ -277,25 +280,25 @@ class LLMConversationService(TitleGenerationMixin):
                 self._validate_user_append_messages(
                     snapshot.messages,
                     expected_frontier_id,
-                    allow_paused_frontier=self._thread_control_locked(thread_id).paused,
                 )
-                key = (thread_id, normalized_id)
-                with self._claims_lock:
-                    if key in self._claims:
-                        raise ValidationError("This submission is already being prepared.")
-                    self._claims.add(key)
-                return SubmissionClaim(
+                claim = SubmissionClaim(
                     thread_id=thread_id,
                     expected_frontier_id=expected_frontier_id,
                     client_submission_id=normalized_id,
                     initial_title_eligible=self.is_initial_title_eligible(snapshot),
                 )
+                with self._claims_lock:
+                    if thread_id in self._claims:
+                        raise ValidationError("A submission is already active for this Thread.")
+                    self._claims[thread_id] = claim
+                return claim
 
     def release_user_submission_claim(self, claim: SubmissionClaim) -> None:
         if not claim.thread_id:
             return
         with self._claims_lock:
-            self._claims.discard((claim.thread_id, claim.client_submission_id))
+            if self._claims.get(claim.thread_id) is claim:
+                self._claims.pop(claim.thread_id)
 
     def append_user_message(
         self,
@@ -322,7 +325,6 @@ class LLMConversationService(TitleGenerationMixin):
                         self._validate_user_append_messages(
                             messages,
                             expected_frontier_id,
-                            allow_paused_frontier=control.paused,
                         )
                         canonical_blocks = normalize_message_blocks(input_data.content_blocks)
                         if any(isinstance(block, SourceAttachmentBlock) for block in canonical_blocks):
@@ -1058,30 +1060,12 @@ class LLMConversationService(TitleGenerationMixin):
     def _validate_user_append_messages(
         messages: list[ConversationMessageRow],
         expected_frontier_id: int | None,
-        *,
-        allow_paused_frontier: bool = False,
     ) -> None:
         if any(row.kind is ConversationMessageKind.PENDING_LLM_SAMPLING for row in messages):
             raise ValidationError("Cannot append a User Message while LLM sampling is pending.")
-        if not messages:
-            if expected_frontier_id is not None:
-                raise ValidationError("The requested User frontier is stale.")
-            return
-        tail = messages[-1]
-        if expected_frontier_id is not None and tail.id != expected_frontier_id:
+        frontier_id = messages[-1].id if messages else None
+        if frontier_id != expected_frontier_id:
             raise ValidationError("The requested User frontier is stale.")
-        # A paused Thread (the user pressed Stop) abandons its current frontier,
-        # so a new User Message may re-enter whether the stop landed during
-        # initial sampling (USER/CLIENT_CONTROL frontier) or tool-result
-        # sampling (TOOL_RESULT frontier).
-        if allow_paused_frontier:
-            return
-        if tail.kind in {
-            ConversationMessageKind.USER,
-            ConversationMessageKind.CLIENT_CONTROL,
-            ConversationMessageKind.TOOL_RESULT,
-        }:
-            raise ValidationError("The existing Client frontier must be sampled before another User Message.")
 
     def _admit_provider_request(self, pending_message_id: int) -> None:
         """Linearize one provider attempt against the runtime Thread pause."""
