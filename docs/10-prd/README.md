@@ -57,7 +57,7 @@ supports, and what uncertainty remains.
 - External LLM-provider APIs are adapters, not a Xenix-owned remote backend.
 - AI settings manage provider connections and their chat and embedding model lists. Conversation settings select chat models for the default response, title, and turn guard. Knowledge settings select an embedding model for text vectors.
 - While a conversation runs, the composer accepts queued follow-ups and steering messages. The message queue sits above the composer. Keyboard shortcuts configure both actions, with Enter and Ctrl+Enter as their defaults.
-- User messages can be edited and resent from any position. A confirmation is required when the edit removes later conversation records. Copying a message into the Xenix composer restores its text and original attachment references as a draft.
+- Message actions appear as icons below the bubble's right edge. User messages can be edited and resent from any position. A confirmation is required when the edit removes later conversation records. Copying a message into the Xenix composer restores its text and original attachment references as a draft.
 - MVP exposes one global Knowledge Library. Its internal identity permits future
   multiple-library instances, but no library-management UI is promised.
 - Knowledge import preserves the selected source and canonical content locally.
