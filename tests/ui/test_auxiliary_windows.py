@@ -6,7 +6,7 @@ from PySide6.QtCore import QCoreApplication, QEvent, Signal
 from PySide6.QtWidgets import QWidget
 from pytestqt.qtbot import QtBot
 
-from xenix.ui.settings_dialog import SettingsTab
+from xenix.ui.settings import SettingsTab
 from xenix.ui.windows.auxiliary import AuxiliaryWindowCoordinator
 
 

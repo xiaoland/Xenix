@@ -8,6 +8,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
+
 from xenix.exceptions import ValidationError
 from xenix.services.data_tokenization_contracts import StagedTextResourceInput, TextPreparationInput
 from xenix.services.ml.models.text_analysis import (
@@ -34,6 +35,8 @@ from xenix.services.ml.text_preparation import (
     build_text_vectorization_facts,
     prepare_text_classification_data,
 )
+
+pytestmark = pytest.mark.slow
 
 
 FIXTURE_ROOT = FIXTURES_ROOT / "ml_rt_service" / "text_classification"

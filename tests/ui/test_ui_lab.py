@@ -23,6 +23,7 @@ from xenix.ui.semantic_identity import item_reference
 
 
 SCENARIO_IDS = tuple(scenario.id for scenario in list_scenarios())
+pytestmark = pytest.mark.ui_capture
 
 
 def _build_scenario(qapp: QApplication, qtbot: QtBot, scenario_id: str):

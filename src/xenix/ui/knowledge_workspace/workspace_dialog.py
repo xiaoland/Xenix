@@ -53,7 +53,7 @@ if TYPE_CHECKING:
         KnowledgeWorkspaceService,
         KnowledgeWorkspaceStatus,
     )
-    from ...services.paddle_ocr_service import PaddleOcrDeploymentService
+    from ...services.paddle_ocr import PaddleOcrDeploymentService
     from ..knowledge_index_ui import KnowledgeIndexRebuildDialog
 
 

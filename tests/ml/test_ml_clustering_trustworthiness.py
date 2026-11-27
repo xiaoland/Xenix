@@ -9,6 +9,7 @@ import joblib
 import numpy as np
 import pandas as pd
 import pytest
+
 from sklearn.metrics import adjusted_rand_score, silhouette_score
 
 from xenix.services.ml.clustering_evidence import (
@@ -21,6 +22,8 @@ from xenix.services.ml.models.clustering import (
     DBSCANClusteringService,
     KMeansClusteringService,
 )
+
+pytestmark = pytest.mark.slow
 
 
 FIXTURES = FIXTURES_ROOT / "ml_cf_service"

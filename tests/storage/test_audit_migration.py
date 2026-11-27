@@ -4,8 +4,7 @@ import pytest
 from sqlalchemy import inspect
 from sqlmodel import Session, create_engine
 
-from xenix.services.storage.migration_v29 import migrate_v28_to_v29
-from xenix.services.storage.migrations import get_user_version, run_migrations
+from xenix.services.storage.migrations import get_user_version, migrate_v28_to_v29, run_migrations
 from xenix.services.storage.models import MLTaskRow, MLTaskStatus
 
 

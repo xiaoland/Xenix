@@ -8,6 +8,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
+
 from xenix.services.data_tokenization_contracts import TextPreparationInput
 from xenix.services.ml.text_discovery import (
     MultilingualTextClusterer,
@@ -34,6 +35,8 @@ from xenix.services.ml.models.text_analysis import (
     MultilingualTextTopicModelingService,
 )
 from xenix.services.ml.types import EvaluationKind
+
+pytestmark = pytest.mark.slow
 
 
 FIXTURE = FIXTURES_ROOT / "ml_rt_service" / "text_discovery" / "bilingual_feedback.csv"

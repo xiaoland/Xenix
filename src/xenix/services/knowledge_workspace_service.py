@@ -7,7 +7,7 @@ from enum import StrEnum
 from .knowledge_index_service import KnowledgeIndexOverview, KnowledgeIndexService
 from .knowledge_service import KnowledgeDocumentSummary, KnowledgeService
 from .knowledge_task_query import KnowledgeTaskQueryService, KnowledgeTaskSummary
-from .paddle_ocr_service import PaddleOcrDeploymentService, PaddleOcrState, PaddleOcrStatus
+from .paddle_ocr import PaddleOcrDeploymentService, PaddleOcrState, PaddleOcrStatus
 
 
 class KnowledgeWorkspaceDocumentsState(StrEnum):

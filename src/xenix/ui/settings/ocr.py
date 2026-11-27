@@ -6,7 +6,7 @@ from PySide6.QtCore import QCoreApplication, QEvent, QThreadPool
 from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import QFormLayout, QLabel, QMessageBox, QPushButton, QWidget
 
-from ...services.paddle_ocr_service import PaddleOcrState, PaddleOcrStatus
+from ...services.paddle_ocr import PaddleOcrState, PaddleOcrStatus
 from ..ocr_deployment_tasks import OcrInstallTask, OcrStatusTask, PaddleOcrDeploymentPort
 from ..semantic_identity import identify
 

@@ -1,14 +1,12 @@
 import io
 import json
 from contextlib import closing
-from pathlib import Path
 from threading import Event
 from urllib.error import HTTPError
 
 import pytest
 from pydantic import BaseModel, ConfigDict
 
-from xenix.config import ensure_app_dirs, get_app_paths
 from xenix.exceptions import NotFoundError, ValidationError
 from xenix.services.agent import AgentHarnessService, SubmitUserTurnInput
 from xenix.services.llm import (
@@ -23,7 +21,6 @@ from xenix.services.llm import (
     ProviderToolCall,
     ToolSuccess,
 )
-from xenix.services.storage import StorageBootstrapService
 from xenix.services.llm.tool_protocol import AgentTool
 from xenix.services.llm.conversation_models import UserMessageReplacement
 
@@ -339,9 +336,7 @@ class ToolThenTextProvider:
         return ProviderResponse(assistant_content_blocks=[{"type": "text", "text": "Dataset inspected."}])
 
 
-def test_harness_coordinates_tool_but_llm_service_commits_messages(monkeypatch, tmp_path: Path) -> None:
-    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
-    context = StorageBootstrapService().initialize(ensure_app_dirs(get_app_paths()))
+def test_harness_coordinates_tool_but_llm_service_commits_messages(storage) -> None:
     registry = AgentToolRegistry()
     registry.register(AgentTool(
         name="data.inspect",
@@ -353,7 +348,7 @@ def test_harness_coordinates_tool_but_llm_service_commits_messages(monkeypatch, 
     provider = ToolThenTextProvider()
     harness = AgentHarnessService(
         conversation_service=LLMConversationService(
-            session_factory=context.session_factory, tool_registry=registry,
+            session_factory=storage.session_factory, tool_registry=registry,
         ),
         provider=provider,
     )
@@ -373,11 +368,9 @@ def test_harness_coordinates_tool_but_llm_service_commits_messages(monkeypatch, 
         harness.get_thread_snapshot(snapshot.thread.id)
 
 
-def test_direct_xtt_tool_result_has_one_value_across_storage_provider_and_chatbot(monkeypatch, tmp_path: Path) -> None:
+def test_direct_xtt_tool_result_has_one_value_across_storage_provider_and_chatbot(storage) -> None:
     """The Tool itself chooses XTT; neither consumer derives another result."""
 
-    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
-    context = StorageBootstrapService().initialize(ensure_app_dirs(get_app_paths()))
     canonical_xtt = (
         "shape: 1 rows × 1 columns\n"
         "returned_rows: 1\n"
@@ -422,7 +415,7 @@ def test_direct_xtt_tool_result_has_one_value_across_storage_provider_and_chatbo
     provider = _CapturingProvider()
     harness = AgentHarnessService(
         conversation_service=LLMConversationService(
-            session_factory=context.session_factory,
+            session_factory=storage.session_factory,
             tool_registry=registry,
         ),
         provider=provider,
@@ -442,7 +435,7 @@ def test_direct_xtt_tool_result_has_one_value_across_storage_provider_and_chatbo
     assert canonical_xtt in event.detail_blocks[0]["text"]
 
 
-def test_paused_thread_admits_new_user_message_after_stop(monkeypatch, tmp_path: Path) -> None:
+def test_paused_thread_admits_new_user_message_after_stop(storage) -> None:
     """Stopping during a provider retry must not block the next User Message.
 
     A user-facing Stop abandons the provisional sampling placeholder, leaving a
@@ -450,10 +443,8 @@ def test_paused_thread_admits_new_user_message_after_stop(monkeypatch, tmp_path:
     failing with "the existing Client frontier must be sampled first".
     """
 
-    monkeypatch.setenv("XENIX_APP_HOME", str(tmp_path / "xenix-home"))
-    context = StorageBootstrapService().initialize(ensure_app_dirs(get_app_paths()))
     service = LLMConversationService(
-        session_factory=context.session_factory,
+        session_factory=storage.session_factory,
         tool_registry=AgentToolRegistry(),
     )
 
@@ -488,4 +479,3 @@ def test_paused_thread_admits_new_user_message_after_stop(monkeypatch, tmp_path:
         expected_frontier_id=claim.expected_frontier_id,
     )
     assert [message.kind.value for message in second.messages] == ["user", "user"]
-    context.engine.dispose()

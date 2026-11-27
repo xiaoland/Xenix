@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
@@ -22,7 +23,7 @@ class StorageContext:
 
     paths: AppPaths
     engine: Engine
-    session_factory: sessionmaker
+    session_factory: sessionmaker[Any]
     schema_version: int
 
 

@@ -65,6 +65,12 @@ class _Harness:
         self.pause_thread = Mock()
         self.get_thread_snapshot = Mock(side_effect=lambda thread_id: self.snapshots[thread_id])
         self.project_chatbot_events = Mock(side_effect=lambda snapshot: list(snapshot.events))
+        self.set_thread_model = Mock(side_effect=self._apply_thread_model)
+
+    def _apply_thread_model(self, thread_id: int, fq_model_key: str):
+        snapshot = self.snapshots[thread_id]
+        snapshot.thread.selected_fq_model_key = fq_model_key
+        return snapshot
 
     def list_threads(self):
         return self.threads
@@ -260,14 +266,20 @@ def test_edit_message_confirms_only_a_nonempty_suffix(qtbot, ui_artifacts, tmp_p
 
 
 def test_main_window_exposes_dataset_audit_entry(qtbot: QtBot, ui_artifacts, tmp_path) -> None:
-    window, _harness, _executor = _window(qtbot, ui_artifacts, tmp_path)
+    from PySide6.QtWidgets import QPushButton
+    from tests.support.ui_queries import find_control
 
-    assert window._audit_button.isVisible()
-    assert window._audit_button.text() == window.tr("Audit Center")
-    assert window._audit_button.accessibleIdentifier() == "main.header.audit"
+    window, _harness, _executor = _window(qtbot, ui_artifacts, tmp_path)
+    audit_button = find_control(window, "main.header.audit", QPushButton)
+
+    assert audit_button.isVisible()
+    assert audit_button.text() == window.tr("Audit Center")
 
 
 def test_opening_old_trial_thread_sends_with_current_default_model(qtbot: QtBot, ui_artifacts, tmp_path) -> None:
+    from PySide6.QtWidgets import QComboBox, QPlainTextEdit, QPushButton
+    from tests.support.ui_queries import find_control
+
     settings = LLMSettings(
         providers=[LLMProviderConfig(key="custom", models=["first", "preferred"])],
         default_fq_model_key="custom/preferred",
@@ -276,20 +288,69 @@ def test_opening_old_trial_thread_sends_with_current_default_model(qtbot: QtBot,
     window, harness, executor = _window(qtbot, ui_artifacts, tmp_path, llm_service=llm_service)
     harness.snapshots[102].thread.selected_fq_model_key = "custom/first"
     harness.snapshots[101].thread.selected_fq_model_key = "trial/old-model"
-    composer = window._thread_detail_view.composer
+    picker = find_control(window, "chat.composer.model-picker", QComboBox)
+    editor = find_control(window, "chat.composer.editor", QPlainTextEdit)
+    send_button = find_control(window, "chat.composer.send-or-stop", QPushButton)
 
     window._history_panel.open_thread(102)
-    assert composer.selected_fq_model_key() == "custom/first"
+    assert picker.currentData() == "custom/first"
     window._history_panel.open_thread(101)
-    assert composer.selected_fq_model_key() == "custom/preferred"
+    assert picker.currentData() == "custom/preferred"
     window._chat_workspace.sync_model_options()
-    assert composer.selected_fq_model_key() == "custom/preferred"
-    composer.editor.setPlainText("Continue the analysis")
-    qtbot.mouseClick(composer.send_button, Qt.MouseButton.LeftButton)
+    assert picker.currentData() == "custom/preferred"
+    editor.setPlainText("Continue the analysis")
+    qtbot.mouseClick(send_button, Qt.MouseButton.LeftButton)
 
     submission = executor.submissions[0].submission
     assert submission.thread_id == 101
     assert submission.fq_model_key == "custom/preferred"
+
+
+def test_composer_model_switch_updates_thread_reverts_on_failure_and_keeps_pre_thread_choice(
+    qtbot: QtBot, ui_artifacts, tmp_path,
+) -> None:
+    from PySide6.QtWidgets import QComboBox, QPlainTextEdit
+    from tests.support.ui_queries import find_control
+
+    settings = LLMSettings(
+        providers=[
+            LLMProviderConfig(key="alpha", models=["first", "second"]),
+            LLMProviderConfig(key="beta", models=["other"]),
+        ],
+        default_fq_model_key="alpha/first",
+    )
+    llm_service = LLMService(FrozenLLMSettingsSource(settings))
+    window, harness, executor = _window(qtbot, ui_artifacts, tmp_path, llm_service=llm_service)
+    picker = find_control(window, "chat.composer.model-picker", QComboBox)
+    editor = find_control(window, "chat.composer.editor", QPlainTextEdit)
+    send_button = find_control(window, "chat.composer.send-or-stop", QPushButton)
+
+    # Switch model on an open thread: persists via set_thread_model and submits selected model.
+    beta_index = picker.findData("beta/other")
+    assert beta_index >= 0
+    picker.setCurrentIndex(beta_index)
+    assert harness.set_thread_model.call_args.args == (102, "beta/other")
+    assert picker.currentData() == "beta/other"
+
+    editor.setPlainText("Use switched model")
+    qtbot.mouseClick(send_button, Qt.MouseButton.LeftButton)
+    active = executor.submissions[0]
+    assert active.submission.fq_model_key == "beta/other"
+    active.on_event(_snapshot_event(active, final=True))
+    assert window.conversation_idle
+
+    harness.set_thread_model.side_effect = ValidationError("Model switch rejected")
+    second_index = picker.findData("alpha/second")
+    picker.setCurrentIndex(second_index)
+    assert harness.set_thread_model.call_args.args == (102, "alpha/second")
+    assert picker.currentData() == "beta/other"
+
+    # With no active thread, a pre-selected composer model survives options re-sync (e.g., retranslate).
+    window._chat_workspace._select_conversation_thread(None)
+    picker.setCurrentIndex(second_index)
+    assert picker.currentData() == "alpha/second"
+    window._chat_workspace.sync_model_options()
+    assert picker.currentData() == "alpha/second"
 
 
 def test_pre_ack_failure_preserves_composer_for_retry(qtbot: QtBot, ui_artifacts, tmp_path) -> None:

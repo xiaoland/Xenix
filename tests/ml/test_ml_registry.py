@@ -6,6 +6,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
+
 from xenix.exceptions import ValidationError
 from xenix.services.ml.contracts import (
     DatasetSnapshotFact,
@@ -25,6 +26,8 @@ from xenix.services.ml.preparation import build_group_aware_cv, prepare_supervis
 from xenix.services.ml.registry import list_model_catalog
 from xenix.services.ml.models.classification import LogisticRegressionService
 from xenix.services.ml.types import ColumnRoleKind, EvaluationKind
+
+pytestmark = pytest.mark.slow
 
 
 def _snapshot(*, source_sha256: str = "a" * 64) -> DatasetSnapshotFact:

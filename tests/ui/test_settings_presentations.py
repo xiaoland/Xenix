@@ -15,7 +15,7 @@ from xenix.services.llm import (
     LLMSettings,
     LLMSettingsService,
 )
-from xenix.services.paddle_ocr_service import PaddleOcrState, PaddleOcrStatus
+from xenix.services.paddle_ocr import PaddleOcrState, PaddleOcrStatus
 from xenix.ui.settings.conversation import ConversationSettingsEditor
 from xenix.ui.settings.ocr import OcrSettings
 from xenix.ui.settings.provider import ProviderSettingsEditor

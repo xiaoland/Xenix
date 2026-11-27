@@ -14,9 +14,8 @@ from xenix.i18n import TranslationManager
 from xenix.services.ai_settings import AISettingsService
 from xenix.services.knowledge_index_service import KnowledgeIndexOverview
 from xenix.services.ml.worker_settings import MLWorkerSettingsService
-from xenix.ui.conversation.shortcuts import ConversationShortcuts, SHORTCUT_SETTINGS_FILE
-from xenix.ui.settings.contracts import SettingsTab
-from xenix.ui.settings_dialog import SettingsDialog
+from xenix.ui.conversation.shortcuts import SHORTCUT_SETTINGS_FILE, ConversationShortcuts
+from xenix.ui.settings import SettingsDialog, SettingsTab
 
 
 def _overview(state: str, *, unit_count: int) -> KnowledgeIndexOverview:
@@ -59,6 +58,8 @@ def test_settings_controls_have_stable_unique_semantic_identities(
     qapp: QApplication,
     qtbot: QtBot,
 ) -> None:
+    from tests.support.ui_queries import find_control
+
     dialog = _build_dialog(
         qapp=qapp,
         monkeypatch=monkeypatch,
@@ -66,25 +67,22 @@ def test_settings_controls_have_stable_unique_semantic_identities(
         index_service=None,
     )
     qtbot.addWidget(dialog)
-    controls = (
-        dialog._language_selector,
-        dialog._about_button,
-        dialog._save_button,
-        dialog._ocr_settings._setup_button,
-        dialog._index_status._rebuild_button,
-        dialog._ml_workers._setup_button,
-        dialog._provider_editor._provider_selector,
-        dialog._provider_editor._add_provider_button,
-        dialog._provider_editor._remove_provider_button,
-        dialog._provider_editor._provider_api_key_input,
-        dialog._embedding_settings._model_selector,
-        dialog._conversation_settings._default_model_selector,
+    expected_ids = (
+        "settings.general.language",
+        "settings.about.open",
+        "settings.save",
+        "settings.knowledge.ocr.setup",
+        "settings.knowledge.indexes.rebuild",
+        "settings.ml-workers.add-ssh",
+        "settings.llm.provider.selector",
+        "settings.llm.provider.add",
+        "settings.llm.provider.remove",
+        "settings.llm.provider.api-key",
+        "settings.embedding.model",
+        "settings.llm.default-model",
     )
-
-    identities = [control.accessibleIdentifier() for control in controls]
-
-    assert all(identities)
-    assert len(identities) == len(set(identities))
+    for semantic_id in expected_ids:
+        assert find_control(dialog, semantic_id) is not None
     dialog.close()
     dialog.shutdown()
 
@@ -202,20 +200,20 @@ def test_settings_dialog_discards_status_from_previous_activation(
                     self.in_flight += 1
                     self.max_in_flight = max(self.max_in_flight, self.in_flight)
                 self.entered[call_index].set()
-                if not self.release[call_index].wait(timeout=3):
-                    future.set_exception(
-                        TimeoutError("Index status test release timed out.")
-                    )
-                    return
                 try:
+                    if not self.release[call_index].wait(timeout=3):
+                        future.set_exception(
+                            TimeoutError("Index status test release timed out.")
+                        )
+                        return
                     if call_index == 0:
                         result = _overview("needs_attention", unit_count=0)
                     else:
                         result = _overview("ready", unit_count=67)
-                    future.set_result(result)
                 finally:
                     with self._lock:
                         self.in_flight -= 1
+                future.set_result(result)
 
             threading.Thread(target=complete, daemon=True).start()
             return future

@@ -7,7 +7,7 @@ from collections.abc import Callable, Sequence
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QVBoxLayout, QWidget
 
 from xenix.services.ai_providers import AIProviderConfig
-from xenix.services.paddle_ocr_service import PaddleOcrState, PaddleOcrStatus
+from xenix.services.paddle_ocr import PaddleOcrState, PaddleOcrStatus
 from xenix.ui.history import HistoryPanel, HistoryThreadSummary
 from xenix.ui.settings.ocr import OcrSettings
 from xenix.ui.settings.provider import ProviderSettingsEditor

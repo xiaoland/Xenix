@@ -30,7 +30,7 @@ from ...services.knowledge_index_service import (
     KnowledgeIndexService,
 )
 from ...services.ml.worker_settings import MLWorkerSettingsService
-from ...services.paddle_ocr_service import PaddleOcrDeploymentService
+from ...services.paddle_ocr import PaddleOcrDeploymentService
 from ...services.update_service import UpdateService
 from ..about_dialog import AboutDialog
 from ..conversation.shortcuts import ConversationShortcuts, SHORTCUT_SETTINGS_FILE

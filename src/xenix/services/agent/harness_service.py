@@ -407,9 +407,7 @@ class AgentHarnessService:
             client_submission_id=submission_id,
         )
         if claim.existing_message_id is not None:
-            # A retried client acknowledgement is not a new UserMessage.  Do
-            # not import attachments, clear a Thread pause, or re-sample the
-            # old frontier; simply project the already-canonical snapshot.
+            # Return the existing snapshot without replaying the submission.
             snapshot = self.get_thread_snapshot(thread_id)
             yield AgentHarnessStreamEvent(
                 kind="snapshot",

@@ -30,7 +30,7 @@ from ..exceptions import ValidationError
 from .knowledge_canonical import CanonicalIdentity, Canonicalizer
 from .knowledge_content_store import KnowledgeContentStore
 from .knowledge_pipeline import FileProbe, FormatNormalizer, ParseExecutor, ParserRouter
-from .paddle_ocr_service import PaddleOcrDeploymentService, PaddleOcrService
+from .paddle_ocr import PaddleOcrDeploymentService, PaddleOcrService
 from .storage.layout import knowledge_import_result_path, knowledge_import_task_root
 from .windows_process_tree import arm_current_process_tree
 

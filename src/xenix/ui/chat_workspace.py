@@ -180,7 +180,7 @@ class ChatWorkspace(QObject):
 
     def sync_model_options(self) -> None:
         options = [(option.fq_model_key, option.label) for option in self._llm_service.model_options()]
-        selected = None
+        selected: str | None = None
         if self.conversation_thread_id is not None:
             try:
                 selected = self._agent_harness_service.get_thread_snapshot(
@@ -189,6 +189,8 @@ class ChatWorkspace(QObject):
             except Exception as exc:
                 report_exception(exc)
                 selected = None
+        else:
+            selected = self._thread_detail_view.selected_fq_model_key() or None
         if not any(key == selected for key, _ in options):
             selected = self._llm_service.default_fq_model_key()
         self._thread_detail_view.set_model_options(options, selected_fq_model_key=selected)
@@ -225,6 +227,12 @@ class ChatWorkspace(QObject):
             if not isinstance(exc, XenixError):
                 report_exception(exc)
             self._thread_detail_view.show_operation_error(str(exc))
+            try:
+                current = self._agent_harness_service.get_thread_snapshot(self.conversation_thread_id)
+            except Exception:
+                self.sync_model_options()
+            else:
+                self._sync_thread_model_picker(current)
             return
         self._sync_thread_model_picker(snapshot)
 

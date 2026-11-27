@@ -279,7 +279,7 @@ def _load_runtime_imports(*, module_loaded: Callable[[], None] | None = None) ->
         "xenix.services.knowledge_document_lifecycle_service",
         "xenix.services.knowledge_index_service",
         "xenix.services.knowledge_workspace_service",
-        "xenix.services.paddle_ocr_service",
+        "xenix.services.paddle_ocr",
         "xenix.services.llm",
         "xenix.services.ml.worker_settings",
         "xenix.services.storage",

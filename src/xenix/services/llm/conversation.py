@@ -12,7 +12,6 @@ Data models live in ``conversation_models`` and title generation in
 from __future__ import annotations
 
 import copy
-import json
 import logging
 import threading
 from collections.abc import Callable, Iterator
@@ -34,10 +33,15 @@ from ..storage.models import (
     ConversationMessageKind,
     ConversationMessageRow,
     ConversationThreadRow,
-    ConversationToolResultStatus,
     default_agent_thread_system_prompt,
 )
 from ..storage.repositories import ConversationRepository
+from .conversation_messages import (
+    build_final_message_rows,
+    build_provider_messages,
+    validate_exchange_result_budget,
+    validate_user_append_messages,
+)
 from .conversation_models import (
     AppendUserMessageInput,
     ConversationLiveEvent,
@@ -52,6 +56,7 @@ from .conversation_models import (
     _utc_now,
 )
 from .conversation_titles import TitleGenerationMixin
+from .conversation_usage import primary_usage_root, query_usage_overviews
 from .messages import (
     AssistantOutputItem,
     DatasetBlock,
@@ -71,13 +76,9 @@ from .providers import (
 )
 from .service import LLMModelOption, LLMService
 from .tool_protocol import (
-    MAX_EXCHANGE_RESULT_BYTES,
-    InvalidToolArguments,
     StagedToolCall,
     ToolExecutionContext,
     ToolScope,
-    canonical_json_bytes,
-    canonical_tool_result_value,
     scope_fingerprint,
     terminal_tool_result,
     tool_failure_from_exception,
@@ -164,36 +165,9 @@ class LLMConversationService(TitleGenerationMixin):
             return ConversationSnapshot(thread=thread, messages=self._repository.list_messages(session, thread_id))
 
     def usage_overviews(self, snapshot: ConversationSnapshot) -> tuple[ConversationUsageOverview, ...]:
-        """Read safe token totals for completed User-to-LLM interactions.
+        """Read safe token totals for completed User-to-LLM interactions."""
 
-        Canonical Messages determine which interactions are complete.  The
-        injected observability reader contributes only independently-recorded
-        token facts; missing or failing telemetry never changes the snapshot
-        or any Conversation command.
-        """
-
-        completed = self._completed_user_interactions(snapshot.messages)
-        if not completed:
-            return ()
-        try:
-            aggregates = self._usage_observability.query_primary_usage(
-                thread_id=snapshot.thread.id,
-                root_user_message_ids=[root.id for root, _terminal in completed],
-            )
-        except Exception as exc:
-            report_exception(exc)
-            LOGGER.warning("LLM usage observability query failed: %s", exc.__class__.__name__)
-            return ()
-        return tuple(
-            ConversationUsageOverview(
-                root_user_message_id=root.id,
-                terminal_llm_message_id=terminal.id,
-                terminal_sequence_index=terminal.sequence_index,
-                usage=aggregate,
-            )
-            for root, terminal in completed
-            if (aggregate := aggregates.get(root.id)) is not None and aggregate.request_count > 0
-        )
+        return query_usage_overviews(snapshot, self._usage_observability)
 
     def rename_thread(self, thread_id: int, title: str | None) -> ConversationSnapshot:
         with self._gate(thread_id):
@@ -280,7 +254,7 @@ class LLMConversationService(TitleGenerationMixin):
                         client_submission_id=normalized_id,
                         existing_message_id=duplicate.id,
                     )
-                self._validate_user_append_messages(
+                validate_user_append_messages(
                     snapshot.messages,
                     expected_frontier_id,
                 )
@@ -325,7 +299,7 @@ class LLMConversationService(TitleGenerationMixin):
                         None,
                     )
                     if duplicate is None:
-                        self._validate_user_append_messages(
+                        validate_user_append_messages(
                             messages,
                             expected_frontier_id,
                         )
@@ -673,7 +647,7 @@ class LLMConversationService(TitleGenerationMixin):
                     thread_id=thread_id,
                     sequence_index=row.sequence_index,
                     frontier_message_id=expected_frontier_id,
-                    root_user_message_id=self._primary_usage_root(messages),
+                    root_user_message_id=primary_usage_root(messages),
                     scope=tool_scope,
                     scope_fingerprint=advertised_scope_fingerprint,
                 )
@@ -754,7 +728,7 @@ class LLMConversationService(TitleGenerationMixin):
         try:
             with self._pending_lock:
                 exchange = self._current_exchange(pending_message_id)
-                self._validate_exchange_result_budget(exchange)
+                validate_exchange_result_budget(exchange)
                 with self._gate(exchange.thread_id):
                     if not exchange.tool_execution_started and self._exchange_is_paused_locked(exchange):
                         self._discard_pending_locked(exchange.thread_id, expected_pending_id=pending_message_id)
@@ -771,7 +745,7 @@ class LLMConversationService(TitleGenerationMixin):
                         # before staging its immutable replacements.
                         session.flush()
                         sequence = exchange.sequence_index
-                        inserted = self._final_message_rows(exchange, sequence)
+                        inserted = build_final_message_rows(exchange, sequence)
                         for row in inserted:
                             session.add(row)
                         thread = self._repository.get_thread(session, exchange.thread_id)
@@ -793,73 +767,6 @@ class LLMConversationService(TitleGenerationMixin):
             # frontier rather than retaining a recoverable pseudo-run.
             self.cancel_sampling(pending_message_id)
             raise
-
-    def _final_message_rows(self, exchange: _PendingExchange, sequence: int) -> list[ConversationMessageRow]:
-        rows: list[ConversationMessageRow] = []
-        for item in exchange.output_items:
-            if isinstance(item, AssistantOutputItem):
-                rows.append(
-                    ConversationMessageRow(
-                        thread_id=exchange.thread_id,
-                        sequence_index=sequence,
-                        kind=ConversationMessageKind.ASSISTANT,
-                        text=item.text,
-                        reasoning=item.reasoning,
-                        refusal=item.refusal,
-                        created_at=_utc_now(),
-                    )
-                )
-                sequence += 1
-        for call in exchange.calls.values():
-            # Preserve undecodable arguments verbatim for history and replay;
-            # they must never appear to be a successfully decoded empty object.
-            content_payload = {"tool_name": call.tool_name, "provider_name": call.provider_name}
-            if isinstance(call.arguments, InvalidToolArguments):
-                content_payload["raw_arguments"] = call.arguments.raw_text
-                arguments_payload = None
-            else:
-                arguments_payload = dict(call.arguments)
-            rows.append(
-                ConversationMessageRow(
-                    id=call.staged_call_id,
-                    thread_id=exchange.thread_id,
-                    sequence_index=sequence,
-                    kind=ConversationMessageKind.TOOL_CALL,
-                    # ``tool_name`` is canonical registry identity; the
-                    # provider-facing name is adapter pairing data needed for
-                    # faithful replay and belongs in this immutable payload.
-                    content_payload=content_payload,
-                    provider_call_id=call.provider_call_id,
-                    tool_id=call.tool_name,
-                    contract_version="v1",
-                    arguments_payload=arguments_payload,
-                    scope_fingerprint=call.scope_fingerprint,
-                    created_at=_utc_now(),
-                )
-            )
-            sequence += 1
-        for call in exchange.calls.values():
-            result = exchange.results[call.staged_call_id]
-            rows.append(
-                ConversationMessageRow(
-                    thread_id=exchange.thread_id,
-                    sequence_index=sequence,
-                    kind=ConversationMessageKind.TOOL_RESULT,
-                    content_payload={"tool_name": call.tool_name},
-                    tool_call_message_id=call.staged_call_id,
-                    result_status=ConversationToolResultStatus(result.status),
-                    value_payload=result.value,
-                    # New failures are their own typed canonical value.  Keep
-                    # this legacy column empty rather than duplicating a
-                    # competing failure summary.
-                    error_summary=None,
-                    created_at=_utc_now(),
-                )
-            )
-            sequence += 1
-        if not rows:
-            raise ValidationError("LLM output produced no final Message.")
-        return rows
 
     def _complete(
         self,
@@ -886,87 +793,11 @@ class LLMConversationService(TitleGenerationMixin):
         return self._require_llm_service().complete(**arguments)
 
     def _provider_messages(self, snapshot: ConversationSnapshot) -> list[ProviderMessage]:
-        rows: list[ProviderMessage] = [ProviderMessage(role="system", content=snapshot.thread.system_prompt)]
-        if self._context_messages_provider is not None:
-            # Composition injects provider-neutral contextual instructions.
-            # They are derived from finalized Messages only and never mutate
-            # the canonical conversation or introduce a Harness dependency.
-            rows.extend(self._context_messages_provider(snapshot))
-        messages = [row for row in snapshot.messages if row.kind is not ConversationMessageKind.PENDING_LLM_SAMPLING]
-        index = 0
-        while index < len(messages):
-            row = messages[index]
-            if row.kind is ConversationMessageKind.USER:
-                blocks = blocks_from_payload(row.content_payload)
-                rows.append(
-                    ProviderMessage(
-                        role="user",
-                        content="",
-                        content_blocks=list(blocks),
-                        source_message_id=row.id,
-                    )
-                )
-            elif row.kind is ConversationMessageKind.CLIENT_CONTROL:
-                blocks = blocks_from_payload(row.content_payload)
-                rows.append(
-                    ProviderMessage(
-                        role="user",
-                        content="",
-                        content_blocks=list(blocks),
-                        source_message_id=row.id,
-                    )
-                )
-            elif row.kind is ConversationMessageKind.ASSISTANT:
-                calls: list[ConversationMessageRow] = []
-                index += 1
-                while index < len(messages) and messages[index].kind is ConversationMessageKind.TOOL_CALL:
-                    calls.append(messages[index])
-                    index += 1
-                payload: dict[str, Any] = {}
-                if row.reasoning:
-                    payload["reasoning_content"] = row.reasoning
-                if row.refusal:
-                    payload["refusal"] = row.refusal
-                if calls:
-                    payload["tool_calls"] = [self._provider_call_payload(call) for call in calls]
-                blocks = blocks_from_payload(row.content_payload)
-                rows.append(
-                    ProviderMessage(
-                        role="assistant",
-                        content=row.text or "",
-                        content_blocks=list(blocks),
-                        provider_payload=payload,
-                        source_message_id=row.id,
-                    )
-                )
-                continue
-            elif row.kind is ConversationMessageKind.TOOL_CALL:
-                calls = []
-                while index < len(messages) and messages[index].kind is ConversationMessageKind.TOOL_CALL:
-                    calls.append(messages[index])
-                    index += 1
-                rows.append(
-                    ProviderMessage(
-                        role="assistant",
-                        content="",
-                        provider_payload={"tool_calls": [self._provider_call_payload(call) for call in calls]},
-                        source_message_id=calls[0].id,
-                    )
-                )
-                continue
-            elif row.kind is ConversationMessageKind.TOOL_RESULT:
-                call = next((candidate for candidate in messages if candidate.id == row.tool_call_message_id), None)
-                if call is not None:
-                    rows.append(
-                        ProviderMessage(
-                            role="tool",
-                            tool_result_value=self._canonical_tool_result_value(row),
-                            provider_payload={"tool_call_id": call.provider_call_id or ""},
-                            source_message_id=row.id,
-                        )
-                    )
-            index += 1
-        return rows
+        return build_provider_messages(
+            snapshot,
+            tool_registry=self._tool_registry,
+            context_messages_provider=self._context_messages_provider,
+        )
 
     def _primary_usage_observation(
         self,
@@ -1018,83 +849,6 @@ class LLMConversationService(TitleGenerationMixin):
         except Exception as exc:
             report_exception(exc)
             LOGGER.warning("LLM usage observability write failed: %s", exc.__class__.__name__)
-
-    @staticmethod
-    def _primary_usage_root(messages: list[ConversationMessageRow]) -> str | None:
-        if not messages:
-            return None
-        frontier = messages[-1]
-        if frontier.kind is ConversationMessageKind.USER:
-            return frontier.id
-        if frontier.kind is not ConversationMessageKind.TOOL_RESULT:
-            return None
-        for row in reversed(messages[:-1]):
-            if row.kind is ConversationMessageKind.USER:
-                return row.id
-        return None
-
-    @staticmethod
-    def _completed_user_interactions(
-        messages: list[ConversationMessageRow],
-    ) -> list[tuple[ConversationMessageRow, ConversationMessageRow]]:
-        """Find terminal LLM emissions without inventing a durable Turn."""
-
-        rows = sorted(
-            (
-                row
-                for row in messages
-                if row.kind is not ConversationMessageKind.PENDING_LLM_SAMPLING
-            ),
-            key=lambda row: row.sequence_index,
-        )
-        completed: list[tuple[ConversationMessageRow, ConversationMessageRow]] = []
-        active_user: ConversationMessageRow | None = None
-        index = 0
-        llm_kinds = {ConversationMessageKind.ASSISTANT, ConversationMessageKind.TOOL_CALL}
-        while index < len(rows):
-            row = rows[index]
-            if row.kind is ConversationMessageKind.USER:
-                active_user = row
-                index += 1
-                continue
-            if row.kind not in llm_kinds:
-                index += 1
-                continue
-            emission: list[ConversationMessageRow] = []
-            while index < len(rows) and rows[index].kind in llm_kinds:
-                emission.append(rows[index])
-                index += 1
-            has_tool_calls = any(item.kind is ConversationMessageKind.TOOL_CALL for item in emission)
-            terminal = next(
-                (item for item in reversed(emission) if item.kind is ConversationMessageKind.ASSISTANT),
-                None,
-            )
-            if active_user is not None and not has_tool_calls and terminal is not None:
-                completed.append((active_user, terminal))
-                active_user = None
-        return completed
-
-    def _validate_exchange_result_budget(self, exchange: _PendingExchange) -> None:
-        total = 0
-        for result in exchange.results.values():
-            envelope = {
-                "status": result.status,
-                "value": result.value,
-            }
-            total += len(canonical_json_bytes(envelope))
-        if total > MAX_EXCHANGE_RESULT_BYTES:
-            raise ValidationError("The staged Tool Result exchange exceeds its byte limit.")
-
-    @staticmethod
-    def _validate_user_append_messages(
-        messages: list[ConversationMessageRow],
-        expected_frontier_id: int | None,
-    ) -> None:
-        if any(row.kind is ConversationMessageKind.PENDING_LLM_SAMPLING for row in messages):
-            raise ValidationError("Cannot append a User Message while LLM sampling is pending.")
-        frontier_id = messages[-1].id if messages else None
-        if frontier_id != expected_frontier_id:
-            raise ValidationError("The requested User frontier is stale.")
 
     def _admit_provider_request(self, pending_message_id: int) -> None:
         """Linearize one provider attempt against the runtime Thread pause."""
@@ -1186,43 +940,6 @@ class LLMConversationService(TitleGenerationMixin):
         gate = self._gate_for(thread_id)
         with gate:
             yield
-
-    def _provider_call_payload(self, call: ConversationMessageRow) -> dict[str, Any]:
-        payload = call.content_payload if isinstance(call.content_payload, dict) else {}
-        raw_provider_name = payload.get("provider_name")
-        if isinstance(raw_provider_name, str) and raw_provider_name.strip():
-            provider_name = raw_provider_name.strip()
-        else:
-            # v14-to-v15 rows written before the provider-name preservation
-            # repair contain only the canonical registry name.  The LLM-owned
-            # registry is the only compatible fallback authority; new rows
-            # always persist the provider-facing name above.
-            tool_name = (call.tool_id or "").strip()
-            try:
-                provider_name = self._tool_registry.get(tool_name).provider_name
-            except ValidationError:
-                provider_name = tool_name
-        return {
-            "id": call.provider_call_id or "",
-            "type": "function",
-            "function": {
-                "name": provider_name,
-                "arguments": (
-                    payload["raw_arguments"] if "raw_arguments" in payload
-                    else json.dumps(call.arguments_payload or {}, ensure_ascii=False, separators=(",", ":"))
-                ),
-            },
-        }
-
-    @staticmethod
-    def _canonical_tool_result_value(result: ConversationMessageRow) -> Any:
-        status = getattr(result, "result_status", None)
-        failed = status is ConversationToolResultStatus.FAILED or getattr(status, "value", status) == "failed"
-        return canonical_tool_result_value(
-            value=result.value_payload,
-            failed=failed,
-            legacy_error_summary=result.error_summary,
-        )
 
     def _require_llm_service(self) -> LLMService:
         if self._llm_service is None:

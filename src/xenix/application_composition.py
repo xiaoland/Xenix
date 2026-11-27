@@ -30,7 +30,7 @@ from .services.knowledge_workspace_service import KnowledgeWorkspaceService
 from .services.link_router import LinkRouter
 from .services.llm import LLMService
 from .services.ml.worker_settings import MLWorkerSettingsService
-from .services.paddle_ocr_service import PaddleOcrDeploymentService
+from .services.paddle_ocr import PaddleOcrDeploymentService
 from .services.storage.layout import database_path
 from .services.storage.repositories import KnowledgeRepository
 from .ui.main_window import MainWindow
@@ -131,7 +131,7 @@ def build_workbench_window(
     from .ui.history import HarnessHistoryAdapter
     from .ui.job_center import JobCenterDialog
     from .ui.knowledge_workspace import KnowledgeWorkspaceDialog
-    from .ui.settings_dialog import SettingsDialog
+    from .ui.settings import SettingsDialog
     from .ui.software_update import SoftwareUpdateController
     from .ui.windows.auxiliary import AuxiliaryWindowCoordinator
 

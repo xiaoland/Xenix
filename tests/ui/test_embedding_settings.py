@@ -1,7 +1,7 @@
 from pathlib import Path
 from types import SimpleNamespace
 
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QComboBox, QLineEdit, QPushButton
 from pytestqt.qtbot import QtBot
 
 from xenix.config import ensure_app_dirs, get_app_paths
@@ -15,7 +15,8 @@ from xenix.services.embedding_service import (
 from xenix.services.knowledge_index_service import KnowledgeIndexService
 from xenix.services.llm import LLMProviderConfig, LLMService, LLMSettings, LLMSettingsService
 from xenix.services.ml.worker_settings import MLWorkerSettingsService
-from xenix.ui.settings_dialog import SettingsDialog, SettingsTab
+from xenix.ui.settings import SettingsDialog, SettingsTab
+from tests.support.ui_queries import find_control
 
 
 def test_embedding_model_change_requires_user_confirmation_before_rebuild(
@@ -88,18 +89,21 @@ def test_embedding_model_change_requires_user_confirmation_before_rebuild(
     )
     qtbot.addWidget(dialog)
 
+    title = find_control(dialog, "settings.llm.thread-title-model", QComboBox)
+    model = find_control(dialog, "settings.embedding.model", QComboBox)
+    provider_url = find_control(dialog, "settings.llm.provider.base-url", QLineEdit)
+    save_button = find_control(dialog, "settings.save", QPushButton)
+
     try:
         dialog.show_tab(SettingsTab.CONVERSATION)
-        title = dialog._conversation_settings._thread_title_model_selector
         assert title.currentData() == "openai/title"
         assert [title.itemData(i) for i in range(title.count())] == ["", "openai/chat", "openai/title"]
         dialog.show_tab(SettingsTab.KNOWLEDGE_BASE)
-        model = dialog._embedding_settings._model_selector
         assert model.currentData() == "embedding/meaning-v1"
         assert [model.itemData(i) for i in range(model.count())] == [
             "", "openai/namespace/meaning-v2", "embedding/meaning-v1",
         ]
-        dialog._save_agent_settings()
+        save_button.click()
         assert settings.settings_path.exists()
         assert embedding_profile_from_settings(embeddings.load()).profile_fingerprint == before
         assert indexes.enqueued == []
@@ -110,7 +114,7 @@ def test_embedding_model_change_requires_user_confirmation_before_rebuild(
             lambda: "rebuild",
         )
         model.setCurrentIndex(model.findData("openai/namespace/meaning-v2"))
-        dialog._save_agent_settings()
+        save_button.click()
 
         assert embeddings.load().model == "namespace/meaning-v2"
         assert embeddings.load().api_key == chat_provider.api_key
@@ -123,8 +127,8 @@ def test_embedding_model_change_requires_user_confirmation_before_rebuild(
             lambda: "cancel",
         )
         dialog.show_tab(SettingsTab.AI)
-        dialog._provider_editor._provider_base_url_input.setText("https://edited.example.test")
-        dialog._save_agent_settings()
+        provider_url.setText("https://edited.example.test")
+        save_button.click()
 
         assert embeddings.load().base_url == chat_provider.base_url
         assert legacy_embeddings.load() == embedding
