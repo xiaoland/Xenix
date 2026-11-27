@@ -2,14 +2,26 @@ from __future__ import annotations
 
 import json
 import time
-from enum import StrEnum
 from pathlib import Path
 from typing import Any, Callable, Iterator, Protocol
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, model_validator
 
 from ...config import AppPaths
 from ...exceptions import NotFoundError, ValidationError
+from ..ai_providers import (
+    DEFAULT_FQ_MODEL_KEY as DEFAULT_FQ_MODEL_KEY,
+    DEFAULT_MODEL_KEY as DEFAULT_MODEL_KEY,
+    DEFAULT_PROVIDER_KEY as DEFAULT_PROVIDER_KEY,
+    AIModelKind,
+    AIModelOption,
+    AIModelRef,
+    AIProtocol,
+    AIProviderConfig,
+    fq_model_key,
+    model_options,
+    parse_fq_model_key,
+)
 from .providers import (
     LLMRequestMetadata,
     LLMRetryEvent,
@@ -23,80 +35,26 @@ from .tool_protocol import (
 )
 
 SETTINGS_FILE_NAME = "agent_settings.json"
-DEFAULT_PROVIDER_KEY = "openai"
-DEFAULT_MODEL_KEY = "gpt-4o-mini"
-DEFAULT_FQ_MODEL_KEY = f"{DEFAULT_PROVIDER_KEY}/{DEFAULT_MODEL_KEY}"
+LLMDialect = AIProtocol
+LLMModelOption = AIModelOption
+LLMModelRef = AIModelRef
+LLMProviderConfig = AIProviderConfig
 
 
-class LLMDialect(StrEnum):
-    OPENAI_COMPATIBLE = "openai_compatible"
-
-
-class LLMProviderConfig(BaseModel):
-    key: str = DEFAULT_PROVIDER_KEY
-    display_name: str = "OpenAI"
-    dialect: LLMDialect = LLMDialect.OPENAI_COMPATIBLE
-    base_url: str = "https://api.openai.com"
-    api_key: str = ""
-    models: list[str] = Field(default_factory=lambda: [DEFAULT_MODEL_KEY])
-    timeout_seconds: int = Field(default=120, ge=1, le=3600)
-    streaming_enabled: bool = True
-    dialect_config: dict[str, Any] = Field(default_factory=dict)
-
-    @field_validator("key")
-    @classmethod
-    def _validate_provider_key(cls, value: str) -> str:
-        provider_key = value.strip()
-        if not provider_key:
-            raise ValueError("Provider key cannot be empty.")
-        if "/" in provider_key:
-            raise ValueError("Provider key cannot contain '/'.")
-        return provider_key
-
-    @field_validator("display_name")
-    @classmethod
-    def _normalize_display_name(cls, value: str) -> str:
-        return value.strip()
-
-    @field_validator("models")
-    @classmethod
-    def _validate_models(cls, value: list[str]) -> list[str]:
-        models: list[str] = []
-        seen: set[str] = set()
-        for raw_model in value:
-            model_key = str(raw_model).strip()
-            if not model_key:
-                continue
-            if "/" in model_key:
-                raise ValueError("Model key cannot contain '/'.")
-            if model_key not in seen:
-                models.append(model_key)
-                seen.add(model_key)
-        if not models:
-            raise ValueError("Provider must define at least one model.")
-        return models
-
-
-class LLMModelRef(BaseModel):
-    provider_key: str
-    model_key: str
-
-
-class LLMModelOption(BaseModel):
-    fq_model_key: str
-    provider_key: str
-    model_key: str
-    label: str
-
-
-class LLMSettings(BaseModel):
-    providers: list[LLMProviderConfig] = Field(
-        default_factory=lambda: [LLMProviderConfig()]
-    )
+class ConversationSettings(BaseModel):
     default_fq_model_key: str = DEFAULT_FQ_MODEL_KEY
     turn_completion_guard_fq_model_key: str = ""
     thread_title_fq_model_key: str = ""
     retry_attempts: int = Field(default=5, ge=1, le=20)
+
+
+class LLMSettings(ConversationSettings):
+    providers: list[LLMProviderConfig] = Field(default_factory=lambda: [LLMProviderConfig()])
+
+    def conversation_settings(self) -> ConversationSettings:
+        return ConversationSettings.model_construct(
+            **self.model_dump(include=set(ConversationSettings.model_fields))
+        )
 
     @model_validator(mode="before")
     @classmethod
@@ -123,20 +81,14 @@ class LLMSettings(BaseModel):
             self.providers = [LLMProviderConfig()]
 
         provider_keys: set[str] = set()
-        available: set[str] = set()
         for provider in self.providers:
             if provider.key in provider_keys:
                 raise ValueError(f"Provider key '{provider.key}' is duplicated.")
             provider_keys.add(provider.key)
-            for model_key in provider.models:
-                available.add(LLMService.fq_model_key(provider.key, model_key))
-
+        options = model_options(self.providers, AIModelKind.CHAT)
+        available = {option.fq_model_key for option in options}
         if self.default_fq_model_key not in available:
-            first_provider = self.providers[0]
-            self.default_fq_model_key = LLMService.fq_model_key(
-                first_provider.key,
-                first_provider.models[0],
-            )
+            self.default_fq_model_key = options[0].fq_model_key if options else ""
 
         for field_name in (
             "turn_completion_guard_fq_model_key",
@@ -154,8 +106,6 @@ class LLMSettingsSource(Protocol):
     """Supplies the settings used by an ``LLMService`` instance."""
 
     def load(self) -> LLMSettings: ...
-
-    def save(self, settings: LLMSettings) -> None: ...
 
 
 class FrozenLLMSettingsSource:
@@ -209,9 +159,6 @@ class LLMService:
 
     def load_settings(self) -> LLMSettings:
         return self._settings_service.load()
-
-    def save_settings(self, settings: LLMSettings) -> None:
-        self._settings_service.save(settings)
 
     def default_fq_model_key(self) -> str:
         return self.load_settings().default_fq_model_key
@@ -291,6 +238,8 @@ class LLMService:
     def request_metadata(self, fq_model_key: str | None = None) -> LLMRequestMetadata:
         settings = self.load_settings()
         selected_key = fq_model_key or settings.default_fq_model_key
+        if not selected_key:
+            raise NotFoundError("No chat model is configured.")
         ref = self.parse_fq_model_key(selected_key)
         provider_config = self._provider_for_key(settings, ref.provider_key)
         if ref.model_key not in provider_config.models:
@@ -314,6 +263,8 @@ class LLMService:
         fq_model_key: str | None = None,
     ) -> OpenAICompatibleChatProvider:
         selected_key = fq_model_key or settings.default_fq_model_key
+        if not selected_key:
+            raise NotFoundError("No chat model is configured.")
         ref = self.parse_fq_model_key(selected_key)
         provider_config = self._provider_for_key(settings, ref.provider_key)
         if ref.model_key not in provider_config.models:
@@ -408,47 +359,12 @@ class LLMService:
             raise NotFoundError(f"LLM model '{normalized}' was not found.")
         return normalized
 
-    @staticmethod
-    def fq_model_key(provider_key: str, model_key: str) -> str:
-        provider = provider_key.strip()
-        model = model_key.strip()
-        if not provider:
-            raise ValidationError("Provider key cannot be empty.")
-        if not model:
-            raise ValidationError("Model key cannot be empty.")
-        if "/" in provider:
-            raise ValidationError("Provider key cannot contain '/'.")
-        if "/" in model:
-            raise ValidationError("Model key cannot contain '/'.")
-        return f"{provider}/{model}"
-
-    @staticmethod
-    def parse_fq_model_key(fq_model_key: str) -> LLMModelRef:
-        normalized = fq_model_key.strip()
-        parts = normalized.split("/")
-        if len(parts) != 2 or not parts[0].strip() or not parts[1].strip():
-            raise ValidationError("Model key must use 'provider/model' format.")
-        provider_key, model_key = parts[0].strip(), parts[1].strip()
-        if "/" in model_key:
-            raise ValidationError("Model key cannot contain '/'.")
-        return LLMModelRef(provider_key=provider_key, model_key=model_key)
+    fq_model_key = staticmethod(fq_model_key)
+    parse_fq_model_key = staticmethod(parse_fq_model_key)
 
     @staticmethod
     def model_options_from_settings(settings: LLMSettings) -> list[LLMModelOption]:
-        options: list[LLMModelOption] = []
-        for provider in settings.providers:
-            provider_label = provider.display_name or provider.key
-            for model_key in provider.models:
-                fq_model_key = LLMService.fq_model_key(provider.key, model_key)
-                options.append(
-                    LLMModelOption(
-                        fq_model_key=fq_model_key,
-                        provider_key=provider.key,
-                        model_key=model_key,
-                        label=f"{provider_label} / {model_key}",
-                    )
-                )
-        return options
+        return model_options(settings.providers, AIModelKind.CHAT)
 
     def _provider_for_key(self, settings: LLMSettings, provider_key: str) -> LLMProviderConfig:
         for provider in settings.providers:

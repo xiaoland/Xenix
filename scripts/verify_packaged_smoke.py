@@ -34,6 +34,7 @@ _KNOWLEDGE_MARKER_FIELDS = (
     "same_sha_reimport",
     "schema_version",
     "spawned_docx_import",
+    "spawned_pdf_import",
     "spawned_pptx_import",
 )
 
@@ -194,6 +195,10 @@ def main() -> int:
         if marker.get("spawned_docx_import") is not True:
             raise RuntimeError(
                 "Packaged smoke did not import DOCX through the spawned Knowledge worker."
+            )
+        if marker.get("spawned_pdf_import") is not True:
+            raise RuntimeError(
+                "Packaged smoke did not import and index PDF through the Knowledge pipeline."
             )
         if marker.get("spawned_pptx_import") is not True:
             raise RuntimeError(

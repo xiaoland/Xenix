@@ -54,7 +54,7 @@ class _PdfRouteProvider:
         for evidence in probe_pdf_pages(normalized.path):
             payload = evidence.to_payload()
             if evidence.text_state is PdfPageTextState.CREDIBLE:
-                route_id = "docling-pdf-native"
+                route_id = "pdfium-native-text"
                 reason = "native_text_credible"
             elif ocr_ready:
                 route_id = (
@@ -72,7 +72,7 @@ class _PdfRouteProvider:
             "pdf",
             tuple(units),
             "docling-document-plus-page-projections",
-            policy_version=2,
+            policy_version=3,
             ocr_ready=ocr_ready,
         )
 

@@ -21,6 +21,7 @@ from uuid import uuid4
 from xenix.config import AppPaths, ensure_app_dirs, package_root
 from xenix.observability import LLMTokenUsage, LLM_USAGE_JOURNAL_FILE_NAME, LocalLLMUsageObservability
 from xenix.services.agent.composition import build_headless_agent_services
+from xenix.services.ai_settings import AISettings
 from xenix.services.embedding_service import EmbeddingSettings, EmbeddingSettingsService
 from xenix.services.knowledge_derivation_service import KnowledgeDerivationService
 from xenix.services.knowledge_import_service import KnowledgeImportService
@@ -369,8 +370,11 @@ def load_settings_snapshot(path: Path) -> tuple[LLMSettings, str]:
     if not path.is_file():
         raise BenchmarkSettingsError("missing_llm_settings")
     try:
-        raw = path.read_text(encoding="utf-8")
-        settings = LLMSettings.model_validate_json(raw)
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        if isinstance(payload, dict) and "conversation" in payload and "knowledge" in payload:
+            settings = AISettings.model_validate(payload).llm_settings()
+        else:
+            settings = LLMSettings.model_validate(payload)
     except (OSError, UnicodeError, json.JSONDecodeError, ValueError):
         raise BenchmarkSettingsError("invalid_llm_settings") from None
     return settings, _sha256_file(path)
@@ -380,8 +384,11 @@ def load_embedding_settings_snapshot(path: Path) -> tuple[EmbeddingSettings, str
     if not path.is_file():
         raise BenchmarkSettingsError("missing_embedding_settings")
     try:
-        raw = path.read_text(encoding="utf-8")
-        settings = EmbeddingSettings.model_validate_json(raw)
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        if isinstance(payload, dict) and "conversation" in payload and "knowledge" in payload:
+            settings = AISettings.model_validate(payload).embedding_settings()
+        else:
+            settings = EmbeddingSettings.model_validate(payload)
     except (OSError, UnicodeError, json.JSONDecodeError, ValueError):
         raise BenchmarkSettingsError("invalid_embedding_settings") from None
     return settings, _sha256_file(path)

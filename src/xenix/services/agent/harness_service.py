@@ -42,10 +42,12 @@ from ..llm import (
     ThreadPausedError,
     blocks_from_payload,
 )
+from ..llm.conversation_models import UserMessageReplacement
+from ..llm.messages import MarkdownBlock
 from ..llm.providers import AgentProvider, LLMRetryEvent
 from ..llm.service import LLMModelOption, LLMService
 from ..llm.tool_protocol import ToolScope
-from ..storage.models import ConversationThreadRow
+from ..storage.models import ConversationMessageKind, ConversationThreadRow
 from .chatbot_events import (
     ChatbotEvent,
     ChatbotEventAuthor,
@@ -83,6 +85,25 @@ class SubmitUserTurnInput(SQLModel):
     fq_model_key: str | None = None
     interface_locale: str | None = None
     client_submission_id: str | None = None
+    replacement: UserMessageReplacement | None = None
+
+
+@dataclass(frozen=True)
+class MessageDraftAttachment:
+    name: str
+    path: str | None
+    dataset_ids: tuple[int, ...]
+
+
+@dataclass(frozen=True)
+class MessageDraft:
+    text: str
+    following_ids: tuple[int, ...]
+    attachments: tuple[MessageDraftAttachment, ...]
+
+    @property
+    def paths(self) -> tuple[str, ...]:
+        return tuple(dict.fromkeys(item.path for item in self.attachments if item.path is not None))
 
 
 class AttachmentImportStatus(StrEnum):
@@ -179,6 +200,42 @@ class AgentHarnessService:
 
     def get_thread_snapshot(self, thread_id: int) -> ConversationSnapshot:
         return self._conversation_service.get_thread_snapshot(thread_id)
+
+    def message_draft(self, thread_id: int, message_id: int) -> MessageDraft:
+        snapshot = self.get_thread_snapshot(thread_id)
+        match = next((
+            (index, row) for index, row in enumerate(snapshot.messages)
+            if row.id == message_id and row.kind in {ConversationMessageKind.USER, ConversationMessageKind.ASSISTANT}
+        ), None)
+        if match is None:
+            raise NotFoundError("The message is no longer available.")
+        index, message = match
+        blocks = blocks_from_payload(message.content_payload)
+        text = "\n\n".join(
+            block.text for block in blocks if isinstance(block, (TextBlock, MarkdownBlock))
+        ) or message.text or ""
+        groups: dict[tuple[str, int], tuple[str, str | None, list[int]]] = {}
+        for block in blocks:
+            if isinstance(block, DatasetBlock):
+                source = self._resolve_dataset_source_presentation(block.dataset_id)
+                key = ("source", source.source_group_id) if source is not None else ("dataset", block.dataset_id)
+                if key not in groups:
+                    groups[key] = (
+                        source.file_name if source is not None else block.name or str(block.dataset_id),
+                        (source.original_path or source.open_path) if source is not None else None,
+                        [],
+                    )
+                groups[key][2].append(block.dataset_id)
+        return MessageDraft(
+            text=text,
+            following_ids=tuple(
+                row.id for row in snapshot.messages[index + 1:]
+                if row.kind is not ConversationMessageKind.PENDING_LLM_SAMPLING
+            ),
+            attachments=tuple(
+                MessageDraftAttachment(name, path, tuple(ids)) for name, path, ids in groups.values()
+            ),
+        )
 
     def list_llm_model_options(self) -> list[LLMModelOption]:
         return self._conversation_service.model_options() if self._llm_service is not None else []
@@ -317,7 +374,9 @@ class AgentHarnessService:
             raise ValidationError("LLM sampling did not produce a conversation snapshot.")
         return final
 
-    def submit_user_turn_stream(self, input_data: SubmitUserTurnInput) -> Iterator[AgentHarnessStreamEvent]:
+    def submit_user_turn_stream(
+        self, input_data: SubmitUserTurnInput, *, should_steer: Callable[[], bool] | None = None,
+    ) -> Iterator[AgentHarnessStreamEvent]:
         """Submit one turn under the production trace boundary used by benchmarks."""
 
         with start_span(
@@ -330,9 +389,11 @@ class AgentHarnessService:
                 "agent.attachment.source.count": len(input_data.source_attachments),
             },
         ):
-            yield from self._submit_user_turn_stream(input_data)
+            yield from self._submit_user_turn_stream(input_data, should_steer=should_steer)
 
-    def _submit_user_turn_stream(self, input_data: SubmitUserTurnInput) -> Iterator[AgentHarnessStreamEvent]:
+    def _submit_user_turn_stream(
+        self, input_data: SubmitUserTurnInput, *, should_steer: Callable[[], bool] | None,
+    ) -> Iterator[AgentHarnessStreamEvent]:
         self._validate_submission(input_data)
         thread_id = input_data.thread_id
         if thread_id is None:
@@ -340,37 +401,31 @@ class AgentHarnessService:
                 fq_model_key=input_data.fq_model_key,
                 interface_locale=input_data.interface_locale,
             ).thread.id
-        else:
-            snapshot = self.get_thread_snapshot(thread_id)
-            selected = self._resolve_fq_model_key(input_data.fq_model_key, snapshot.thread.selected_fq_model_key)
-            if selected and selected != snapshot.thread.selected_fq_model_key:
-                self._conversation_service.set_thread_model(thread_id, selected)
-
         submission_id = (input_data.client_submission_id or uuid4().hex).strip()
         claim = self._conversation_service.claim_user_submission(
             thread_id=thread_id,
-            expected_frontier_id=self._frontier_id(thread_id),
             client_submission_id=submission_id,
         )
-        existing_message_id = getattr(claim, "existing_message_id", None)
-        if existing_message_id:
-            # A retried client acknowledgement is not a new UserMessage.  Do
-            # not import attachments, clear a Thread pause, or re-sample the
-            # old frontier; simply project the already-canonical snapshot.
-            try:
-                snapshot = self.get_thread_snapshot(thread_id)
-                yield AgentHarnessStreamEvent(
-                    kind="snapshot",
-                    thread_id=thread_id,
-                    client_submission_id=submission_id,
-                    snapshot=snapshot,
-                    chatbot_events=self.project_chatbot_events(snapshot),
-                    is_final=True,
-                )
-            finally:
-                self._conversation_service.release_user_submission_claim(claim)
+        if claim.existing_message_id is not None:
+            # Return the existing snapshot without replaying the submission.
+            snapshot = self.get_thread_snapshot(thread_id)
+            yield AgentHarnessStreamEvent(
+                kind="snapshot",
+                thread_id=thread_id,
+                client_submission_id=submission_id,
+                snapshot=snapshot,
+                chatbot_events=self.project_chatbot_events(snapshot),
+                is_final=True,
+            )
             return
+        title_task: _InitialTitleTask | None = None
         try:
+            current = self.get_thread_snapshot(thread_id).thread.selected_fq_model_key
+            selected = self._resolve_fq_model_key(input_data.fq_model_key, current)
+            if self._llm_service is not None and not selected:
+                raise ValidationError("No chat model is configured.")
+            if selected and selected != current:
+                self._conversation_service.set_thread_model(thread_id, selected)
             imported: list[DatasetAttachmentInput] = []
             for source_index, source in enumerate(input_data.source_attachments):
                 yield AgentHarnessStreamEvent(
@@ -406,36 +461,40 @@ class AgentHarnessService:
                     thread_id=thread_id,
                     client_submission_id=submission_id,
                     content_blocks=blocks,
+                    replacement=input_data.replacement,
                 ),
                 expected_frontier_id=claim.expected_frontier_id,
             )
+
+            yield AgentHarnessStreamEvent(
+                kind="snapshot",
+                thread_id=thread_id,
+                client_submission_id=submission_id,
+                snapshot=snapshot,
+                chatbot_events=self.project_chatbot_events(snapshot),
+            )
+            first_user_message_id = snapshot.messages[-1].id
+            for event in self._sample_until_client_frontier(
+                thread_id,
+                first_user_message_id,
+                client_submission_id=submission_id,
+                should_steer=should_steer,
+            ):
+                if event.is_final:
+                    self._conversation_service.release_user_submission_claim(claim)
+                yield event
+                # Resuming after the real Thinking event guarantees that the
+                # append acknowledgement and pending sampling Message already
+                # exist before title-model I/O starts.
+                if title_task is None and claim.initial_title_eligible and event.kind == "thinking":
+                    title_task = self._start_initial_title_task(
+                        claim=claim,
+                        first_user_message_id=first_user_message_id,
+                        appended_snapshot=snapshot,
+                    )
         finally:
             self._conversation_service.release_user_submission_claim(claim)
 
-        yield AgentHarnessStreamEvent(
-            kind="snapshot",
-            thread_id=thread_id,
-            client_submission_id=submission_id,
-            snapshot=snapshot,
-            chatbot_events=self.project_chatbot_events(snapshot),
-        )
-        title_task: _InitialTitleTask | None = None
-        first_user_message_id = snapshot.messages[-1].id
-        for event in self._sample_until_client_frontier(
-            thread_id,
-            first_user_message_id,
-            client_submission_id=submission_id,
-        ):
-            yield event
-            # Resuming after the real Thinking event guarantees that the
-            # append acknowledgement and pending sampling Message already
-            # exist before title-model I/O starts.
-            if title_task is None and claim.initial_title_eligible and event.kind == "thinking":
-                title_task = self._start_initial_title_task(
-                    claim=claim,
-                    first_user_message_id=first_user_message_id,
-                    appended_snapshot=snapshot,
-                )
         if title_task is not None:
             if title_task.result() is not None:
                 # Title I/O may finish while the primary pending placeholder
@@ -458,13 +517,14 @@ class AgentHarnessService:
         frontier_id: int,
         *,
         client_submission_id: str | None = None,
+        should_steer: Callable[[], bool] | None = None,
     ) -> Iterator[AgentHarnessStreamEvent]:
         while True:
             # A Thread pause is a live admission barrier.  The current
             # exchange, if any, is allowed to settle; a paused loop must never
             # start another provider request merely because an old Tool Result
             # snapshot was already yielded.
-            if self.is_thread_paused(thread_id):
+            if self.is_thread_paused(thread_id) or (should_steer is not None and should_steer()):
                 yield from self._paused_pending_events(
                     thread_id,
                     pending_message_id=None,
@@ -577,6 +637,17 @@ class AgentHarnessService:
                         pending_message_id=pending.pending_message_id,
                         client_submission_id=client_submission_id,
                         snapshot=final_snapshot, chatbot_events=self.project_chatbot_events(final_snapshot), is_final=True,
+                    )
+                    return
+                if should_steer is not None and should_steer():
+                    # The proposed batch has not executed, so there are no Tool
+                    # Results to settle before admitting the steering message.
+                    self._conversation_service.cancel_sampling(active_pending_id)
+                    self._clear_cancel_event(active_pending_id)
+                    active_pending_id = None
+                    yield from self._paused_pending_events(
+                        thread_id, pending_message_id=pending.pending_message_id,
+                        client_submission_id=client_submission_id,
                     )
                     return
                 snapshot: ConversationSnapshot | None = None
@@ -704,7 +775,8 @@ class AgentHarnessService:
             )
 
     def _validate_submission(self, input_data: SubmitUserTurnInput) -> None:
-        if not input_data.text.strip() and not input_data.dataset_attachments and not input_data.source_attachments:
+        if (not input_data.text.strip() and not input_data.dataset_attachments
+                and not input_data.source_attachments and input_data.replacement is None):
             raise ValidationError("A conversation message needs text or at least one attachment.")
         if input_data.thread_id is not None:
             self.get_thread_snapshot(input_data.thread_id)
@@ -716,10 +788,6 @@ class AgentHarnessService:
         if selected is None and self._llm_service is not None:
             return self._conversation_service.default_fq_model_key()
         return selected
-
-    def _frontier_id(self, thread_id: int) -> int | None:
-        snapshot = self.get_thread_snapshot(thread_id)
-        return snapshot.messages[-1].id if snapshot.messages else None
 
     def _snapshot_if_thread_exists(self, thread_id: int) -> ConversationSnapshot | None:
         try:

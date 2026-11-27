@@ -18,6 +18,8 @@ flowchart TD
 
 The headless Agent factory constructs the common graph. Its typed lazy factories delay domain implementations without string-based module/class lookup. A lazy service forwards ordinary method/property access and is unsuitable for Python special methods or `isinstance` checks. Register implementations in composition; do not add imports from a domain back into the application.
 
+Desktop assembly shares one AI settings source across the provider editor, conversation, and Knowledge text vectors. The settings service resolves model choices against the provider registry and projects request settings to the chat and embedding adapters. Each adapter owns its wire protocol, and a Knowledge embedding session freezes the resolved connection and profile for the operation.
+
 Desktop assembly requests a stopped scheduler, registers every Knowledge kind, constructs the window, then starts recovery and dispatch once. Headless callers normally receive a started scheduler. No handler may be replaced or added after start; this makes the full recovery graph and routing table stable for the process lifetime. See [Job Feed Contract](../20-prd-tdd/job-feed-contract.md) for kind routing and domain concurrency.
 
 Register each acquired resource with `ApplicationLifetime` immediately. Release order is the window and its feature work, scheduler, Knowledge services, database engine, observability flush, then logging. Startup failure uses this same owner; repeated window/application close releases resources once, and a cleanup exception is logged without preventing later cleanup. Scheduler shutdown stops admission and has a bounded worker wait; a warning reports workers still running after that deadline, rather than claiming every domain has drained.

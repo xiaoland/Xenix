@@ -127,16 +127,16 @@ def test_running_scenario_exposes_stop_contract(qapp: QApplication, qtbot: QtBot
     QApplication.sendPostedEvents(None, QEvent.DeferredDelete)
 
     assert view.composer.send_button.accessibleIdentifier() == "chat.composer.send-or-stop"
-    assert view.composer.send_button.accessibleName() == view.tr("Stop")
-    assert view.composer.send_button.isEnabled()
-    assert not view.composer.editor.isEnabled()
+    assert view.composer.stop_button.accessibleName() == view.tr("Stop")
+    assert view.composer.stop_button.isEnabled()
+    assert view.composer.editor.isEnabled()
 
     remove_buttons = _widgets_with_role(view, "chat.composer.attachment.remove")
     assert {item_reference(button) for button in remove_buttons} == {
         str(Path("C:/xenix-synthetic/quarterly-sales.csv").resolve()),
         str(Path("C:/xenix-synthetic/regional-targets.xlsx").resolve()),
     }
-    assert all(not button.isEnabled() for button in remove_buttons)
+    assert all(button.isEnabled() for button in remove_buttons)
     handle.cleanup()
 
 

@@ -238,27 +238,9 @@ def validate_exchange_result_budget(exchange: _PendingExchange) -> None:
 def validate_user_append_messages(
     messages: list[ConversationMessageRow],
     expected_frontier_id: int | None,
-    *,
-    allow_paused_frontier: bool = False,
 ) -> None:
     if any(row.kind is ConversationMessageKind.PENDING_LLM_SAMPLING for row in messages):
         raise ValidationError("Cannot append a User Message while LLM sampling is pending.")
-    if not messages:
-        if expected_frontier_id is not None:
-            raise ValidationError("The requested User frontier is stale.")
-        return
-    tail = messages[-1]
-    if expected_frontier_id is not None and tail.id != expected_frontier_id:
+    frontier_id = messages[-1].id if messages else None
+    if frontier_id != expected_frontier_id:
         raise ValidationError("The requested User frontier is stale.")
-    # A paused Thread (the user pressed Stop) abandons its current frontier,
-    # so a new User Message may re-enter whether the stop landed during
-    # initial sampling (USER/CLIENT_CONTROL frontier) or tool-result
-    # sampling (TOOL_RESULT frontier).
-    if allow_paused_frontier:
-        return
-    if tail.kind in {
-        ConversationMessageKind.USER,
-        ConversationMessageKind.CLIENT_CONTROL,
-        ConversationMessageKind.TOOL_RESULT,
-    }:
-        raise ValidationError("The existing Client frontier must be sampled before another User Message.")

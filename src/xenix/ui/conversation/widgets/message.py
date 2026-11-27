@@ -11,11 +11,14 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QSizePolicy,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
 
+from ...icons import icon
 from ...markdown_renderer import render_chat_markdown
+from ...semantic_identity import identify
 from ..presentation import ArtifactResolver, ChatbotBlock, render_content_blocks
 from .artifacts import ArtifactPreviewDocument
 from .common import _propagate_geometry_change
@@ -140,6 +143,8 @@ class UserMessageBody(QWidget):
 class ChatMessageBubble(QFrame):
     link_activated = Signal(str)
     source_file_activated = Signal(str)
+    edit_requested = Signal()
+    copy_requested = Signal()
 
     def __init__(
         self,
@@ -148,12 +153,15 @@ class ChatMessageBubble(QFrame):
         blocks: list[ChatbotBlock],
         artifact_resolver: ArtifactResolver | None = None,
         parent: QWidget | None = None,
+        actions: bool = False,
     ) -> None:
         super().__init__(parent)
         self._author = author
         self._author_label: QLabel | None = None
         self._artifact_resolver = artifact_resolver
         self._source_attachment_targets: dict[str, str] = {}
+        self._edit_button: QToolButton | None = None
+        self._copy_button: QToolButton | None = None
         self.setObjectName("chatMessageRow")
 
         if author == "You":
@@ -204,10 +212,46 @@ class ChatMessageBubble(QFrame):
         row_layout.setSpacing(0)
         if author == "You":
             row_layout.addStretch(1)
-            row_layout.addWidget(card, 0)
-        else:
-            row_layout.addWidget(card, 1)
-            row_layout.addStretch(0)
+
+        column = QVBoxLayout()
+        column.setSpacing(3)
+        column.addWidget(card)
+        row_layout.addLayout(column, 0 if author == "You" else 1)
+
+        if actions:
+            footer = QHBoxLayout()
+            footer.setSpacing(2)
+            footer.addStretch(1)
+            if author == "You":
+                self._edit_button = self._action_button("chat.message.edit", "ph.pencil-simple")
+                self._edit_button.clicked.connect(self.edit_requested.emit)
+                footer.addWidget(self._edit_button)
+            self._copy_button = self._action_button("chat.message.copy", "ph.copy")
+            self._copy_button.clicked.connect(self.copy_requested.emit)
+            footer.addWidget(self._copy_button)
+            column.addLayout(footer)
+            self._translate_actions()
+
+    def _action_button(self, identifier: str, icon_name: str) -> QToolButton:
+        button = QToolButton(self)
+        button.setAutoRaise(True)
+        button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
+        button.setIcon(icon(icon_name))
+        button.setIconSize(QSize(15, 15))
+        button.setFixedSize(24, 24)
+        button.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        identify(button, identifier)
+        return button
+
+    def _translate_actions(self) -> None:
+        if self._edit_button is not None:
+            label = self.tr("Edit")
+            self._edit_button.setAccessibleName(label)
+            self._edit_button.setToolTip(label)
+        if self._copy_button is not None:
+            label = self.tr("Copy")
+            self._copy_button.setAccessibleName(label)
+            self._copy_button.setToolTip(label)
 
     def _card_object_name(self, author: str, blocks: list[ChatbotBlock]) -> str:
         if author == "You":
@@ -250,6 +294,7 @@ class ChatMessageBubble(QFrame):
         self._browser.setHtml(self._render_blocks(self._blocks))
 
     def retranslate_ui(self) -> None:
+        self._translate_actions()
         if self._author_label is not None:
             self._author_label.setText(self._display_author())
         self._browser.setHtml(self._render_blocks(self._blocks))

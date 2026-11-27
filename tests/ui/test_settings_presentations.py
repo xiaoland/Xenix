@@ -7,6 +7,7 @@ from PySide6.QtCore import QCoreApplication, QEvent, QTranslator
 from PySide6.QtWidgets import QApplication, QMessageBox
 from pytestqt.qtbot import QtBot
 
+from xenix.services.ai_providers import AIModelKind, model_options
 from xenix.services.llm import (
     DEFAULT_FQ_MODEL_KEY,
     LLMProviderConfig,
@@ -15,64 +16,74 @@ from xenix.services.llm import (
     LLMSettingsService,
 )
 from xenix.services.paddle_ocr import PaddleOcrState, PaddleOcrStatus
+from xenix.ui.settings.conversation import ConversationSettingsEditor
 from xenix.ui.settings.ocr import OcrSettings
 from xenix.ui.settings.provider import ProviderSettingsEditor
 
 
-def test_provider_editor_round_trips_provider_and_global_choices(qapp: QApplication, qtbot: QtBot) -> None:
-    editor = ProviderSettingsEditor(
-        LLMSettings(providers=[LLMProviderConfig(key="one", display_name="One", models=["small"])]),
-    )
+def _editors(settings: LLMSettings, qtbot: QtBot) -> tuple[ProviderSettingsEditor, ConversationSettingsEditor]:
+    provider = ProviderSettingsEditor(settings.providers)
+    conversation = ConversationSettingsEditor()
+    qtbot.addWidget(provider)
+    qtbot.addWidget(conversation)
+
+    def refresh(providers):
+        conversation.set_model_options(model_options(providers, AIModelKind.CHAT))
+
+    provider.providers_changed.connect(refresh)
+    refresh(settings.providers)
+    conversation.load_settings(settings)
+    return provider, conversation
+
+
+def test_provider_editor_round_trips_both_model_types(qtbot: QtBot) -> None:
+    editor = ProviderSettingsEditor([LLMProviderConfig(key="one", display_name="One", models=["small"])])
     qtbot.addWidget(editor)
     editor._add_provider()
     editor._provider_name_input.setText("Two")
     editor._provider_models_input.setPlainText("large\nvision")
-    settings = editor.current_settings()
-    assert [provider.display_name for provider in settings.providers] == ["One", "Two"]
-    assert settings.providers[1].models == ["large", "vision"]
-    editor.load_settings(settings)
+    editor._embedding_models_input.setPlainText("company/vector")
+    providers = editor.current_providers()
+    assert [provider.display_name for provider in providers] == ["One", "Two"]
+    assert providers[1].models == ["large", "vision"]
+    assert providers[1].embedding_models == ["company/vector"]
+    editor.load_providers(providers)
     assert editor._provider_selector.count() == 2
 
 
-def test_add_provider_preserves_global_model_choices(qapp: QApplication, qtbot: QtBot) -> None:
-    editor = ProviderSettingsEditor(
+def test_add_provider_preserves_conversation_model_choices(qtbot: QtBot) -> None:
+    editor, conversation = _editors(
         LLMSettings(
             providers=[LLMProviderConfig(key="one", display_name="One", models=["a", "b"])],
             default_fq_model_key="one/b",
             turn_completion_guard_fq_model_key="one/b",
             thread_title_fq_model_key="one/b",
-        )
+        ),
+        qtbot,
     )
-    qtbot.addWidget(editor)
-    assert editor._llm_default_model_selector.currentData() == "one/b"
-    assert editor._llm_guard_model_selector.currentData() == "one/b"
-    assert editor._llm_thread_title_model_selector.currentData() == "one/b"
 
     editor._add_provider()
 
-    assert editor._llm_default_model_selector.currentData() == "one/b"
-    assert editor._llm_guard_model_selector.currentData() == "one/b"
-    assert editor._llm_thread_title_model_selector.currentData() == "one/b"
+    assert conversation._default_model_selector.currentData() == "one/b"
+    assert conversation._guard_model_selector.currentData() == "one/b"
+    assert conversation._thread_title_model_selector.currentData() == "one/b"
 
 
-def test_editing_models_refreshes_global_model_selectors(qapp: QApplication, qtbot: QtBot) -> None:
-    editor = ProviderSettingsEditor(
+def test_editing_models_refreshes_conversation_model_selectors(qtbot: QtBot) -> None:
+    editor, conversation = _editors(
         LLMSettings(
             providers=[LLMProviderConfig(key="one", display_name="One", models=["a", "b"])],
             default_fq_model_key="one/a",
-        )
+        ),
+        qtbot,
     )
-    qtbot.addWidget(editor)
-    assert editor._llm_default_model_selector.count() == 2
+    assert conversation._default_model_selector.count() == 2
 
     editor._provider_models_input.setPlainText("a\nb\nc")
+    editor._embedding_models_input.setPlainText("vector")
 
-    assert editor._llm_default_model_selector.count() == 3
-    assert [editor._llm_default_model_selector.itemData(i) for i in range(3)] == [
-        "one/a",
-        "one/b",
-        "one/c",
-    ]
+    selector = conversation._default_model_selector
+    assert [selector.itemData(i) for i in range(selector.count())] == ["one/a", "one/b", "one/c"]
 
 
 def test_provider_switch_with_invalid_draft_warns_and_preserves_input(
@@ -80,14 +91,10 @@ def test_provider_switch_with_invalid_draft_warns_and_preserves_input(
     qtbot: QtBot,
     monkeypatch,
 ) -> None:
-    editor = ProviderSettingsEditor(
-        LLMSettings(
-            providers=[
-                LLMProviderConfig(key="one", display_name="One", models=["a"]),
-                LLMProviderConfig(key="two", display_name="Two", models=["b"]),
-            ]
-        )
-    )
+    editor = ProviderSettingsEditor([
+        LLMProviderConfig(key="one", display_name="One", models=["a"]),
+        LLMProviderConfig(key="two", display_name="Two", models=["b"]),
+    ])
     qtbot.addWidget(editor)
     editor._provider_key_input.setText("")
     warnings: list[tuple[object, ...]] = []
@@ -138,15 +145,14 @@ def test_provider_editor_upgrades_saved_trial_settings(
     assert [option.fq_model_key for option in LLMService(service).model_options()] == [
         title_model or DEFAULT_FQ_MODEL_KEY
     ]
-    editor = ProviderSettingsEditor(service.load())
-    qtbot.addWidget(editor)
+    editor, conversation = _editors(service.load(), qtbot)
     assert editor._provider_selector.count() == 1
     assert editor._provider_api_key_input.text() == ("custom-key" if has_custom_provider else "")
     assert not editor._provider_base_url_input.isReadOnly()
     assert not editor._provider_api_key_input.isReadOnly()
     editor._provider_base_url_input.setText("https://configured.example.test")
     editor._provider_api_key_input.setText("edited-key")
-    service.save(editor.current_settings())
+    service.save(LLMSettings(providers=editor.current_providers(), **conversation.current_settings().model_dump()))
 
     saved = service.load()
     assert "packaged_trial" not in service.settings_path.read_text(encoding="utf-8")
@@ -173,28 +179,29 @@ def test_provider_retranslation_refreshes_model_labels_without_losing_draft(
             del context, disambiguation, n
             return "No model" if source_text == "None" else source_text
 
-    editor = ProviderSettingsEditor(
+    editor, conversation = _editors(
         LLMSettings(
             providers=[LLMProviderConfig(key="one", display_name="One", models=["small"])]
-        )
+        ),
+        qtbot,
     )
-    qtbot.addWidget(editor)
     editor._provider_name_input.setText("Unsaved provider name")
     selected_values = (
-        editor._llm_default_model_selector.currentData(),
-        editor._llm_guard_model_selector.currentData(),
-        editor._llm_thread_title_model_selector.currentData(),
+        conversation._default_model_selector.currentData(),
+        conversation._guard_model_selector.currentData(),
+        conversation._thread_title_model_selector.currentData(),
     )
     translator = Translator()
     qapp.installTranslator(translator)
     try:
         QCoreApplication.sendEvent(editor, QEvent(QEvent.LanguageChange))
-        assert editor._llm_guard_model_selector.itemText(0) == "No model"
-        assert editor._llm_thread_title_model_selector.itemText(0) == "No model"
+        QCoreApplication.sendEvent(conversation, QEvent(QEvent.LanguageChange))
+        assert conversation._guard_model_selector.itemText(0) == "No model"
+        assert conversation._thread_title_model_selector.itemText(0) == "No model"
         assert (
-            editor._llm_default_model_selector.currentData(),
-            editor._llm_guard_model_selector.currentData(),
-            editor._llm_thread_title_model_selector.currentData(),
+            conversation._default_model_selector.currentData(),
+            conversation._guard_model_selector.currentData(),
+            conversation._thread_title_model_selector.currentData(),
         ) == selected_values
         assert editor._provider_name_input.text() == "Unsaved provider name"
     finally:

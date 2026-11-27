@@ -46,7 +46,7 @@ _SCENARIOS = (*AUDIT_SCENARIOS,
     ScenarioSpec(
         id="chat.running-with-attachments",
         title="Running chat with attachments",
-        description="Locked composer with ready and failed synthetic attachments.",
+        description="Editable composer with ready and failed synthetic attachments during an active response.",
         viewport_width=900,
         viewport_height=680,
         build=build_chat_running_with_attachments,

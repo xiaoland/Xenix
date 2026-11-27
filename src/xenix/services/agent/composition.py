@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from ..dataset_service import DatasetService
     from ..data_cleaning import DataCleaningService
     from ..data_transform import DataQueryTransformService
-    from ..embedding_service import EmbeddingService, EmbeddingSettingsService
+    from ..embedding_service import EmbeddingService, EmbeddingSettingsSource
     from ..job_scheduler import JobScheduler
     from ..knowledge_semantic_service import KnowledgeSemanticService
     from ..llm import LLMService
@@ -49,7 +49,7 @@ class HeadlessAgentServices:
     ml: MLService
     llm: LLMService
     knowledge: KnowledgeService
-    embedding_settings: EmbeddingSettingsService
+    embedding_settings: EmbeddingSettingsSource
     embedding: EmbeddingService
     knowledge_semantic: KnowledgeSemanticService
     scheduler: JobScheduler
@@ -60,7 +60,7 @@ def build_headless_agent_services(
     paths: AppPaths,
     session_factory: sessionmaker[Any],
     llm: LLMService,
-    embedding_settings_service: EmbeddingSettingsService,
+    embedding_settings_service: EmbeddingSettingsSource,
     ml_worker_settings: MLWorkerSettingsService,
     usage_observability: LLMUsageObservability,
     start_scheduler: bool = True,

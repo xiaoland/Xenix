@@ -23,9 +23,10 @@ Read the relevant owner and applicable subtree `AGENTS.md`; load further guidanc
 ## Development Workflow
 
 - Python `3.14.2`, PDM `2.26.6`, PySide6/Qt Widgets.
-- Install: `pdm sync --clean -G :all`, then `pdm run prepare`. Run: `pdm run dev`.
+- Install: `pdm sync --clean -G :all`, then `pdm run prepare`.
 - Focused verification: `pdm run pytest --direct <selectors>`; broad verification: `pdm run test` and `pdm run check`. Startup/runtime changes also use `pdm run smoke --isolated`. Packaging gates and verification selection are in CONTRIBUTING.
-- Diagnostics: `pdm run diagnostic-bundle`. Runtime defaults to `%LOCALAPPDATA%\Xenix`, overridden by `XENIX_APP_HOME`; inspect `state/xenix.db`, `logs/xenix.log`, and `config/` only within the authorized task.
+- After completing a change, restart the development app from the changed worktree and leave it open for manual acceptance. Follow [Run the development app](CONTRIBUTING.md#run-the-development-app) to use that worktree's persistent `.runtime/dev`.
+- Diagnostics: `pdm run diagnostic-bundle`. Use [Runtime State](docs/40-deployment/runtime-state.md#locate-and-inspect) to identify the app home before inspecting its database, logs, or config within the authorized task.
 
 ## Collaboration
 

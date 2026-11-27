@@ -29,11 +29,13 @@ from .presentation import (
     ComposerAttachmentStatus,
     SUPPORTED_DATASET_SUFFIXES,
 )
+from .shortcuts import ConversationShortcuts
 from .widgets import AttachmentChip, AutoGrowingTextEdit
 
 
 class ChatComposer(QWidget):
     message_submitted = Signal(str, list, str)
+    steering_submitted = Signal(str, list, str)
     files_attached = Signal(list)
     attachment_removed = Signal(str)
     stop_requested = Signal()
@@ -74,6 +76,8 @@ class ChatComposer(QWidget):
         self._editor = AutoGrowingTextEdit(max_lines=6)
         self._editor.setObjectName("chatComposerEditor")
         self._editor.submit_requested.connect(self._handle_button_clicked)
+        self._editor.steer_requested.connect(self._handle_steer_clicked)
+        self._editor.attachment_paths_pasted.connect(self.add_local_files)
 
         self._model_picker = QComboBox()
         self._model_picker.setObjectName("modelPicker")
@@ -86,6 +90,13 @@ class ChatComposer(QWidget):
         self._send_button.setMinimumWidth(76)
         self._send_button.setFixedHeight(34)
         self._send_button.clicked.connect(self._handle_button_clicked)
+        self._steer_button = QPushButton()
+        self._steer_button.clicked.connect(self._handle_steer_clicked)
+        self._stop_button = QPushButton()
+        self._stop_button.clicked.connect(self.stop_requested.emit)
+        self._steer_button.hide()
+        self._stop_button.hide()
+        self.set_conversation_shortcuts(ConversationShortcuts())
 
         self._step_confirmation_bar = QFrame()
         self._step_confirmation_bar.setObjectName("stepConfirmationBar")
@@ -119,6 +130,8 @@ class ChatComposer(QWidget):
         self._composer_controls_row.addWidget(self._attach_button)
         self._composer_controls_row.addStretch(1)
         self._composer_controls_row.addWidget(self._model_picker)
+        self._composer_controls_row.addWidget(self._stop_button)
+        self._composer_controls_row.addWidget(self._steer_button)
         self._composer_controls_row.addWidget(self._send_button)
 
         composer_layout.addWidget(self._step_confirmation_bar)
@@ -176,6 +189,8 @@ class ChatComposer(QWidget):
         identify(self._editor, "chat.composer.editor")
         identify(self._model_picker, "chat.composer.model-picker")
         identify(self._send_button, "chat.composer.send-or-stop")
+        identify(self._steer_button, "chat.composer.steer")
+        identify(self._stop_button, "chat.composer.stop")
         identify(self._step_continue_button, "chat.step-budget.continue")
         identify(self._step_stop_button, "chat.step-budget.stop")
 
@@ -188,6 +203,10 @@ class ChatComposer(QWidget):
         self._model_picker.setAccessibleName(self.tr("Model for the next turn"))
         self._step_continue_button.setText(self.tr("Continue"))
         self._step_stop_button.setText(self.tr("Stop"))
+        self._stop_button.setText(self.tr("Stop"))
+        self._steer_button.setText(self.tr("Steer"))
+        self._stop_button.setAccessibleName(self.tr("Stop"))
+        self._steer_button.setAccessibleName(self.tr("Steer"))
         self._composer_drop_title.setText(self.tr("Drop files to attach"))
         self._composer_drop_hint.setText(self.tr("Release here to add them to the next message"))
         self._sync_send_button_text()
@@ -206,6 +225,11 @@ class ChatComposer(QWidget):
         self._sync_attachment_removal()
         self._sync_send_button_text()
         self._sync_composer_controls_enabled()
+
+    def set_conversation_shortcuts(self, shortcuts: ConversationShortcuts) -> None:
+        self._editor.set_conversation_shortcuts(shortcuts)
+        self._send_button.setToolTip(shortcuts.send)
+        self._steer_button.setToolTip(shortcuts.steer)
 
     def begin_composer_submission(self, attachment_paths: list[str]) -> None:
         """Lock the captured Composer input while Harness owns its import."""
@@ -285,24 +309,17 @@ class ChatComposer(QWidget):
 
     def _sync_send_button_text(self) -> None:
         self._send_button.setIcon(QIcon())
-        if self._running:
-            send_text = self.tr("Stop")
-        elif self._preparing_submission:
-            send_text = self.tr("Send")
-        elif self._has_pending_attachments():
+        action = self.tr("Queue message") if self._running else self.tr("Send")
+        if not self._preparing_submission and self._has_pending_attachments():
             send_text = ""
             self._send_button.setIcon(spinner_icon())
             self._send_button.setIconSize(QSize(16, 16))
         else:
-            send_text = self.tr("Send")
+            send_text = action
         self._send_button.setText(send_text)
-        if self._running:
-            accessible_name = self.tr("Stop")
-        elif self._has_pending_attachments():
-            accessible_name = self.tr("Preparing attachments")
-        else:
-            accessible_name = self.tr("Send")
-        self._send_button.setAccessibleName(accessible_name)
+        self._send_button.setAccessibleName(action if send_text else self.tr("Preparing attachments"))
+        self._steer_button.setVisible(self._running)
+        self._stop_button.setVisible(self._running)
 
     def show_step_confirmation(self, message: str) -> None:
         self._awaiting_step_confirmation = True
@@ -326,6 +343,10 @@ class ChatComposer(QWidget):
     @property
     def send_button(self) -> QPushButton:
         return self._send_button
+
+    @property
+    def stop_button(self) -> QPushButton:
+        return self._stop_button
 
     @property
     def attach_button(self) -> QPushButton:
@@ -465,7 +486,7 @@ class ChatComposer(QWidget):
         self._sync_composer_controls_enabled()
 
     def _remove_attached_file(self, path: str, *, notify: bool = True) -> None:
-        if self._running or self._preparing_submission:
+        if self._preparing_submission:
             return
         resolved_path = str(Path(path).resolve())
         if resolved_path not in self._attached_files:
@@ -501,7 +522,7 @@ class ChatComposer(QWidget):
         )
 
     def _can_accept_file_drop(self, event) -> bool:
-        if self._running or self._preparing_submission or self._awaiting_step_confirmation:
+        if self._preparing_submission or self._awaiting_step_confirmation:
             return False
         return bool(self._local_file_paths(event))
 
@@ -527,9 +548,12 @@ class ChatComposer(QWidget):
         self._composer_drop_overlay.setGeometry(self._composer_shell.rect())
 
     def _handle_button_clicked(self) -> None:
-        if self._running:
-            self.stop_requested.emit()
-            return
+        self._submit_draft(steer=False)
+
+    def _handle_steer_clicked(self) -> None:
+        self._submit_draft(steer=True)
+
+    def _submit_draft(self, *, steer: bool) -> None:
         if self._preparing_submission or self._awaiting_step_confirmation:
             return
         text = self._editor.toPlainText().strip()
@@ -538,29 +562,23 @@ class ChatComposer(QWidget):
         files = self._ready_attachment_paths()
         if not text and not files:
             return
-        self.message_submitted.emit(text, files, self.selected_fq_model_key())
+        signal = self.steering_submitted if steer else self.message_submitted
+        signal.emit(text, files, self.selected_fq_model_key())
 
     def _sync_composer_controls_enabled(self) -> None:
-        can_edit = not self._running and not self._preparing_submission and not self._awaiting_step_confirmation
+        can_edit = not self._preparing_submission and not self._awaiting_step_confirmation
         self._editor.setEnabled(can_edit)
         self._attach_button.setEnabled(can_edit)
-        if self._running:
-            # The send button is the Stop control while running; it must stay
-            # actionable even when a source attachment failed to import.
-            send_enabled = not self._awaiting_step_confirmation
-        else:
-            send_enabled = (
-                not self._awaiting_step_confirmation
-                and not self._has_unready_attachments()
-                and not self._preparing_submission
-            )
+        send_enabled = can_edit and not self._has_unready_attachments()
         self._send_button.setEnabled(send_enabled)
+        self._steer_button.setEnabled(send_enabled)
+        self._stop_button.setEnabled(self._running and not self._awaiting_step_confirmation)
         self._model_picker.setEnabled(bool(self._model_options) and can_edit)
         self._step_continue_button.setEnabled(self._awaiting_step_confirmation)
         self._step_stop_button.setEnabled(self._awaiting_step_confirmation)
 
     def _sync_attachment_removal(self) -> None:
-        enabled = not self._running and not self._preparing_submission
+        enabled = not self._preparing_submission
         for index in range(self._attachment_layout.count()):
             item = self._attachment_layout.itemAt(index)
             widget = item.widget() if item is not None else None
@@ -580,7 +598,7 @@ class ChatComposer(QWidget):
                 status=ComposerAttachmentStatus.READY,
             )
             chip = AttachmentChip(state, self)
-            chip.set_removal_enabled(not self._running and not self._preparing_submission)
+            chip.set_removal_enabled(not self._preparing_submission)
             chip.remove_requested.connect(self._remove_attached_file)
             self._attachment_layout.insertWidget(self._attachment_layout.count() - 1, chip)
 

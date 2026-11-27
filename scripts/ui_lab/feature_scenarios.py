@@ -6,7 +6,7 @@ from collections.abc import Callable, Sequence
 
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QVBoxLayout, QWidget
 
-from xenix.services.llm import LLMProviderConfig, LLMSettings
+from xenix.services.ai_providers import AIProviderConfig
 from xenix.services.paddle_ocr import PaddleOcrState, PaddleOcrStatus
 from xenix.ui.history import HistoryPanel, HistoryThreadSummary
 from xenix.ui.settings.ocr import OcrSettings
@@ -66,15 +66,11 @@ class _SyntheticOcr:
 def build_settings_provider_and_ocr(_context: ScenarioContext) -> ScenarioHandle:
     root = QWidget()
     layout = QHBoxLayout(root)
-    settings = LLMSettings(
-        providers=[LLMProviderConfig(
-            key="synthetic", display_name="Synthetic provider",
-            base_url="https://synthetic.invalid/v1", api_key="",
-            models=["fast", "reasoning"],
-        )],
-        default_fq_model_key="synthetic/fast",
-    )
-    editor = ProviderSettingsEditor(settings, root)
+    editor = ProviderSettingsEditor([AIProviderConfig(
+        key="synthetic", display_name="Synthetic provider",
+        base_url="https://synthetic.invalid/v1",
+        models=["fast", "reasoning"], embedding_models=["semantic-search"],
+    )], root)
     ocr = OcrSettings(_SyntheticOcr())
     ocr_card = QFrame()
     ocr_card.setFrameShape(QFrame.Shape.StyledPanel)

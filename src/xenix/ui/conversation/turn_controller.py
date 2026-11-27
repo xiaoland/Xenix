@@ -91,6 +91,8 @@ class ConversationTurnController:
             return TurnUpdate(TurnAction.IGNORE)
         kind = event.kind
         event_thread_id = event.thread_id
+        if self._thread_id is None and event_thread_id is not None:
+            self._thread_id = event_thread_id
         is_final = event.is_final
         if event_thread_id in self._paused_thread_ids and not (kind == "snapshot" and is_final):
             return TurnUpdate(TurnAction.IGNORE)

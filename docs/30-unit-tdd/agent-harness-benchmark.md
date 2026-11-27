@@ -10,6 +10,8 @@ A cell is one `AgentHarness × subject model × case × execution mode × repeti
 
 Subject and Embedding settings are loaded once and copied into the cell. Their hashes describe the configuration used; changing an external settings file later does not invalidate an already running snapshot. A case may prepare public Knowledge state before subject timing starts.
 
+The explicit settings paths can each point to the desktop's `ai_settings.json` or to the corresponding standalone legacy snapshot. The benchmark resolves the chat or embedding settings for each supplied path.
+
 One task may contain several sequential user requests in the same thread and runtime. `build_submissions` supplies that sequence; existing single-request cases retain `build_submission`. The runner saves a snapshot, incremental metrics, and case-owned delivery evidence after each request. Later requests contain only the next business input, never evaluator-supplied answers to earlier requests. The provider budget belongs to the whole task, while UI completion flags belong to each submission.
 
 ```mermaid

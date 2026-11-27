@@ -470,61 +470,68 @@
 <context>
     <name>ChatComposer</name>
     <message>
-        <location filename="../ui/conversation/composer.py" line="183"/>
-        <location filename="../ui/conversation/composer.py" line="184"/>
+        <location filename="../ui/conversation/composer.py" line="198"/>
+        <location filename="../ui/conversation/composer.py" line="199"/>
         <source>Message Xenix</source>
         <translation>给 Xenix 发消息</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/composer.py" line="185"/>
-        <location filename="../ui/conversation/composer.py" line="186"/>
-        <location filename="../ui/conversation/composer.py" line="414"/>
-        <location filename="../ui/conversation/composer.py" line="425"/>
+        <location filename="../ui/conversation/composer.py" line="200"/>
+        <location filename="../ui/conversation/composer.py" line="201"/>
+        <location filename="../ui/conversation/composer.py" line="434"/>
+        <location filename="../ui/conversation/composer.py" line="445"/>
         <source>Attach files</source>
         <translation>添加文件</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/composer.py" line="187"/>
-        <location filename="../ui/conversation/composer.py" line="188"/>
+        <location filename="../ui/conversation/composer.py" line="202"/>
+        <location filename="../ui/conversation/composer.py" line="203"/>
         <source>Model for the next turn</source>
         <translation>下一轮使用的模型</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/composer.py" line="189"/>
+        <location filename="../ui/conversation/composer.py" line="204"/>
         <source>Continue</source>
         <translation>继续</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/composer.py" line="190"/>
-        <location filename="../ui/conversation/composer.py" line="288"/>
-        <location filename="../ui/conversation/composer.py" line="299"/>
+        <location filename="../ui/conversation/composer.py" line="205"/>
+        <location filename="../ui/conversation/composer.py" line="206"/>
         <source>Stop</source>
         <translation>停止</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/composer.py" line="191"/>
+        <location filename="../ui/conversation/composer.py" line="207"/>
+        <source>Steer</source>
+        <translation>插话</translation>
+    </message>
+    <message>
+        <location filename="../ui/conversation/composer.py" line="208"/>
         <source>Drop files to attach</source>
         <translation>拖放文件以添加附件</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/composer.py" line="192"/>
+        <location filename="../ui/conversation/composer.py" line="209"/>
         <source>Release here to add them to the next message</source>
         <translation>松开后添加到下一条消息</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/composer.py" line="290"/>
-        <location filename="../ui/conversation/composer.py" line="296"/>
-        <location filename="../ui/conversation/composer.py" line="303"/>
+        <location filename="../ui/conversation/composer.py" line="310"/>
         <source>Send</source>
         <translation>发送</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/composer.py" line="301"/>
+        <location filename="../ui/conversation/composer.py" line="310"/>
+        <source>Queue message</source>
+        <translation>加入队列</translation>
+    </message>
+    <message>
+        <location filename="../ui/conversation/composer.py" line="318"/>
         <source>Preparing attachments</source>
         <translation>正在准备附件</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/composer.py" line="416"/>
+        <location filename="../ui/conversation/composer.py" line="436"/>
         <source>Data files (*.csv *.xlsx *.xls)</source>
         <translation>数据文件 (*.csv *.xlsx *.xls)</translation>
     </message>
@@ -532,17 +539,27 @@
 <context>
     <name>ChatMessageBubble</name>
     <message>
-        <location filename="../ui/conversation/widgets/message.py" line="227"/>
+        <location filename="../ui/conversation/widgets/message.py" line="244"/>
+        <source>Edit</source>
+        <translation>编辑</translation>
+    </message>
+    <message>
+        <location filename="../ui/conversation/widgets/message.py" line="246"/>
+        <source>Copy</source>
+        <translation>复制</translation>
+    </message>
+    <message>
+        <location filename="../ui/conversation/widgets/message.py" line="260"/>
         <source>You</source>
         <translation>你</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/widgets/message.py" line="229"/>
+        <location filename="../ui/conversation/widgets/message.py" line="262"/>
         <source>Tool</source>
         <translation>工具</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/widgets/message.py" line="231"/>
+        <location filename="../ui/conversation/widgets/message.py" line="264"/>
         <source>System</source>
         <translation>系统</translation>
     </message>
@@ -554,6 +571,26 @@
         <location filename="../ui/conversation/timeline.py" line="100"/>
         <source>Scroll to bottom</source>
         <translation>滚动到底部</translation>
+    </message>
+</context>
+<context>
+    <name>ChatWorkspace</name>
+    <message>
+        <location filename="../ui/chat_workspace.py" line="419"/>
+        <source>Some attachment paths are unavailable.</source>
+        <translation>部分附件的原始路径不可用。</translation>
+    </message>
+    <message>
+        <location filename="../ui/chat_workspace.py" line="464"/>
+        <source>Replace this message?</source>
+        <translation>替换这条消息？</translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../ui/chat_workspace.py" line="465"/>
+        <source>Saving will remove %n later conversation record(s) and send the edited message.</source>
+        <translation>
+            <numerusform>保存会删除 %n 条后续会话记录，并发送编辑后的消息。</numerusform>
+        </translation>
     </message>
 </context>
 <context>
@@ -2286,18 +2323,71 @@ Trigger: %2</source>
     </message>
 </context>
 <context>
+    <name>MessageQueuePanel</name>
+    <message>
+        <location filename="../ui/conversation/queue_panel.py" line="65"/>
+        <source>Failed</source>
+        <translation>失败</translation>
+    </message>
+    <message>
+        <location filename="../ui/conversation/queue_panel.py" line="67"/>
+        <source>Edit message</source>
+        <translation>编辑消息</translation>
+    </message>
+    <message>
+        <location filename="../ui/conversation/queue_panel.py" line="69"/>
+        <source>Steer</source>
+        <translation>插话</translation>
+    </message>
+    <message>
+        <location filename="../ui/conversation/queue_panel.py" line="71"/>
+        <source>Queued</source>
+        <translation>已排队</translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../ui/conversation/queue_panel.py" line="74"/>
+        <source>%n attachment(s)</source>
+        <translation>
+            <numerusform>%n 个附件</numerusform>
+        </translation>
+    </message>
+    <message>
+        <location filename="../ui/conversation/queue_panel.py" line="86"/>
+        <location filename="../ui/conversation/queue_panel.py" line="87"/>
+        <source>Message queue</source>
+        <translation>消息队列</translation>
+    </message>
+    <message>
+        <location filename="../ui/conversation/queue_panel.py" line="88"/>
+        <source>Remove from queue</source>
+        <translation>从队列移除</translation>
+    </message>
+    <message>
+        <location filename="../ui/conversation/queue_panel.py" line="89"/>
+        <source>Restore draft</source>
+        <translation>恢复到输入框</translation>
+    </message>
+    <message>
+        <location filename="../ui/conversation/queue_panel.py" line="90"/>
+        <source>Resume queue</source>
+        <translation>继续发送队列</translation>
+    </message>
+</context>
+<context>
     <name>SettingsDialog</name>
     <message>
-        <location filename="../ui/settings/dialog.py" line="189"/>
-        <location filename="../ui/settings/dialog.py" line="317"/>
-        <location filename="../ui/settings/dialog.py" line="339"/>
-        <location filename="../ui/settings/provider.py" line="216"/>
-        <location filename="../ui/settings/provider.py" line="239"/>
+        <location filename="../ui/settings/dialog.py" line="212"/>
+        <location filename="../ui/settings/dialog.py" line="340"/>
+        <location filename="../ui/settings/dialog.py" line="345"/>
+        <location filename="../ui/settings/dialog.py" line="358"/>
+        <location filename="../ui/settings/dialog.py" line="381"/>
+        <location filename="../ui/settings/provider.py" line="175"/>
+        <location filename="../ui/settings/provider.py" line="198"/>
         <source>Settings</source>
         <translation>设置</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="190"/>
+        <location filename="../ui/settings/dialog.py" line="213"/>
         <source>Language</source>
         <translation>语言</translation>
     </message>
@@ -2306,125 +2396,171 @@ Trigger: %2</source>
         <translation type="vanished">LLM 提供商</translation>
     </message>
     <message>
-        <location filename="../ui/settings/embedding.py" line="101"/>
-        <location filename="../ui/settings/provider.py" line="159"/>
+        <location filename="../ui/settings/provider.py" line="135"/>
         <source>Base URL</source>
         <translation>基础 URL</translation>
     </message>
     <message>
-        <location filename="../ui/settings/embedding.py" line="102"/>
-        <location filename="../ui/settings/provider.py" line="160"/>
+        <location filename="../ui/settings/provider.py" line="136"/>
         <source>API key</source>
         <translation>API 密钥</translation>
     </message>
     <message>
-        <location filename="../ui/settings/embedding.py" line="103"/>
         <source>Model</source>
-        <translation>模型</translation>
+        <translation type="vanished">模型</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="165"/>
+        <location filename="../ui/settings/conversation.py" line="68"/>
         <source>Turn guard model</source>
         <translation>轮次守卫模型</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="166"/>
+        <location filename="../ui/settings/conversation.py" line="69"/>
         <source>Thread title model</source>
         <translation>线程标题模型</translation>
     </message>
     <message>
-        <location filename="../ui/settings/embedding.py" line="109"/>
-        <location filename="../ui/settings/provider.py" line="162"/>
+        <location filename="../ui/settings/provider.py" line="142"/>
         <source>Timeout</source>
         <translation>超时</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="191"/>
+        <location filename="../ui/settings/dialog.py" line="214"/>
         <source>AI</source>
         <translation>AI</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="194"/>
+        <location filename="../ui/settings/dialog.py" line="215"/>
+        <source>Conversation</source>
+        <translation>会话</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings/dialog.py" line="216"/>
+        <source>Keyboard Shortcuts</source>
+        <translation>快捷键</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings/dialog.py" line="219"/>
         <source>Knowledge Base</source>
         <translation>知识库</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="198"/>
+        <location filename="../ui/settings/dialog.py" line="223"/>
         <source>ML Workers</source>
         <translation>ML 工作器</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="153"/>
+        <location filename="../ui/settings/dialog.py" line="340"/>
+        <source>Choose two distinct keyboard shortcuts.</source>
+        <translation>请选择两个不同的快捷键。</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings/dialog.py" line="345"/>
+        <source>Select an embedding model to enable text vectors.</source>
+        <translation>请选择一个向量模型后再启用文本向量。</translation>
+    </message>
+    <message>
         <source>Global models</source>
-        <translation>全局模型</translation>
+        <translation type="vanished">全局模型</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="154"/>
         <source>LLM providers</source>
-        <translation>LLM 提供商</translation>
+        <translation type="vanished">LLM 提供商</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="155"/>
+        <location filename="../ui/settings/provider.py" line="130"/>
+        <source>AI providers</source>
+        <translation>AI 提供商</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings/provider.py" line="131"/>
         <source>Provider</source>
         <translation>提供商</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="156"/>
+        <location filename="../ui/settings/provider.py" line="132"/>
         <source>Provider key</source>
         <translation>提供商键</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="157"/>
+        <location filename="../ui/settings/provider.py" line="133"/>
         <source>Provider name</source>
         <translation>提供商名称</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="158"/>
+        <location filename="../ui/settings/provider.py" line="134"/>
+        <source>Protocol</source>
+        <translation>通信协议</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings/provider.py" line="137"/>
+        <source>Chat models</source>
+        <translation>大语言模型</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings/provider.py" line="138"/>
+        <source>Embedding models</source>
+        <translation>向量模型</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings/provider.py" line="139"/>
+        <source>One model ID per line</source>
+        <translation>每行输入一个模型 ID</translation>
+    </message>
+    <message>
         <source>Dialect</source>
-        <translation>方言</translation>
+        <translation type="vanished">方言</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="161"/>
         <source>Models</source>
-        <translation>模型</translation>
+        <translation type="vanished">模型</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="163"/>
+        <location filename="../ui/settings/provider.py" line="143"/>
         <source>Streaming</source>
         <translation>流式输出</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="164"/>
+        <location filename="../ui/settings/conversation.py" line="67"/>
         <source>Default model</source>
         <translation>默认模型</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="167"/>
+        <location filename="../ui/settings/conversation.py" line="70"/>
         <source>LLM retry attempts</source>
         <translation>LLM 重试次数</translation>
     </message>
     <message>
-        <location filename="../ui/settings/embedding.py" line="99"/>
         <source>Embedding provider</source>
-        <translation>嵌入模型提供商</translation>
+        <translation type="vanished">嵌入模型提供商</translation>
     </message>
     <message>
-        <location filename="../ui/settings/embedding.py" line="100"/>
+        <location filename="../ui/settings/embedding.py" line="68"/>
+        <source>Text vectors</source>
+        <translation>文本向量</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings/embedding.py" line="69"/>
         <source>Enabled</source>
         <translation>启用</translation>
     </message>
     <message>
-        <location filename="../ui/settings/embedding.py" line="104"/>
+        <location filename="../ui/settings/embedding.py" line="70"/>
+        <source>Embedding model</source>
+        <translation>向量模型</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings/embedding.py" line="71"/>
         <source>Dimensions</source>
         <translation>向量维度</translation>
     </message>
     <message>
-        <location filename="../ui/settings/embedding.py" line="106"/>
+        <location filename="../ui/settings/embedding.py" line="73"/>
         <source>Provider default (0)</source>
         <translation>使用提供商默认值（0）</translation>
     </message>
     <message>
-        <location filename="../ui/settings/embedding.py" line="108"/>
+        <location filename="../ui/settings/embedding.py" line="75"/>
         <source>Batch size</source>
         <translation>批次大小</translation>
     </message>
@@ -2450,17 +2586,17 @@ Trigger: %2</source>
         <translation>重建索引...</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="168"/>
+        <location filename="../ui/settings/provider.py" line="144"/>
         <source>Add</source>
         <translation>添加</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="169"/>
+        <location filename="../ui/settings/provider.py" line="145"/>
         <source>Remove</source>
         <translation>移除</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="171"/>
+        <location filename="../ui/settings/provider.py" line="147"/>
         <source>OpenAI-compatible</source>
         <translation>OpenAI 兼容</translation>
     </message>
@@ -2491,7 +2627,7 @@ Trigger: %2</source>
         <translation>添加 SSH 工作器...</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="205"/>
+        <location filename="../ui/settings/dialog.py" line="232"/>
         <source>About</source>
         <translation>关于</translation>
     </message>
@@ -2524,7 +2660,7 @@ Trigger: %2</source>
         <translation type="vanished">打开日志目录</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="206"/>
+        <location filename="../ui/settings/dialog.py" line="233"/>
         <source>Save</source>
         <translation>保存</translation>
     </message>
@@ -2595,22 +2731,22 @@ Trigger: %2</source>
         <translation>本地 PaddleOCR 尚未安装</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="250"/>
+        <location filename="../ui/settings/dialog.py" line="277"/>
         <source>English</source>
         <translation>English</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="251"/>
+        <location filename="../ui/settings/dialog.py" line="278"/>
         <source>Simplified Chinese</source>
         <translation>简体中文</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="276"/>
+        <location filename="../ui/settings/dialog.py" line="303"/>
         <source>Language Switch Failed</source>
         <translation>语言切换失败</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="277"/>
+        <location filename="../ui/settings/dialog.py" line="304"/>
         <source>Unable to switch the application language.
 
 {details}</source>
@@ -2627,22 +2763,22 @@ Trigger: %2</source>
         <translation type="vanished">Embedding 设置已保存，但无法将文本向量重建加入队列。</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="357"/>
+        <location filename="../ui/settings/dialog.py" line="400"/>
         <source>Rebuild text vectors?</source>
         <translation>重建文本向量？</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="360"/>
+        <location filename="../ui/settings/dialog.py" line="403"/>
         <source>This change uses a different embedding space. Existing text vectors cannot be reused for current Knowledge content.</source>
         <translation>此更改将使用不同的 Embedding 空间。现有文本向量无法用于当前知识库内容。</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="365"/>
+        <location filename="../ui/settings/dialog.py" line="408"/>
         <source>Save and rebuild now</source>
         <translation>保存并立即重建</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="369"/>
+        <location filename="../ui/settings/dialog.py" line="412"/>
         <source>Save; rebuild later</source>
         <translation>保存；稍后重建</translation>
     </message>
@@ -2802,9 +2938,23 @@ Text vectors: %2</source>
         <translation type="vanished">此提供商由部署管理，无法在此处移除。</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="394"/>
+        <location filename="../ui/settings/conversation.py" line="55"/>
+        <location filename="../ui/settings/embedding.py" line="64"/>
         <source>None</source>
         <translation>无</translation>
+    </message>
+</context>
+<context>
+    <name>ShortcutSettingsEditor</name>
+    <message>
+        <location filename="../ui/settings/shortcuts.py" line="37"/>
+        <source>Send or queue a message</source>
+        <translation>发送或排队消息</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings/shortcuts.py" line="38"/>
+        <source>Steer the conversation</source>
+        <translation>插话</translation>
     </message>
 </context>
 <context>
@@ -3516,6 +3666,40 @@ Text vectors: %2</source>
         <location filename="../ui/conversation/presentation.py" line="471"/>
         <source>↑ {input} · ↓ {output}</source>
         <translation>↑ {input} · ↓ {output}</translation>
+    </message>
+</context>
+<context>
+    <name>UserMessageEditor</name>
+    <message>
+        <location filename="../ui/conversation/message_editor.py" line="18"/>
+        <source>Edit message</source>
+        <translation>编辑消息</translation>
+    </message>
+    <message>
+        <location filename="../ui/conversation/message_editor.py" line="25"/>
+        <location filename="../ui/conversation/message_editor.py" line="73"/>
+        <source>Attach files</source>
+        <translation>添加附件</translation>
+    </message>
+    <message>
+        <location filename="../ui/conversation/message_editor.py" line="26"/>
+        <source>Remove attachment</source>
+        <translation>移除附件</translation>
+    </message>
+    <message>
+        <location filename="../ui/conversation/message_editor.py" line="32"/>
+        <source>Attachments</source>
+        <translation>附件</translation>
+    </message>
+    <message>
+        <location filename="../ui/conversation/message_editor.py" line="36"/>
+        <source>Save and send</source>
+        <translation>保存并发送</translation>
+    </message>
+    <message>
+        <location filename="../ui/conversation/message_editor.py" line="73"/>
+        <source>Data files (*.csv *.xlsx *.xls)</source>
+        <translation>数据文件 (*.csv *.xlsx *.xls)</translation>
     </message>
 </context>
 <context>

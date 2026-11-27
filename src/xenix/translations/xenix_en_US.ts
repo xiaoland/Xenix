@@ -443,61 +443,68 @@
 <context>
     <name>ChatComposer</name>
     <message>
-        <location filename="../ui/conversation/composer.py" line="183"/>
-        <location filename="../ui/conversation/composer.py" line="184"/>
+        <location filename="../ui/conversation/composer.py" line="198"/>
+        <location filename="../ui/conversation/composer.py" line="199"/>
         <source>Message Xenix</source>
         <translation>Message Xenix</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/composer.py" line="185"/>
-        <location filename="../ui/conversation/composer.py" line="186"/>
-        <location filename="../ui/conversation/composer.py" line="414"/>
-        <location filename="../ui/conversation/composer.py" line="425"/>
+        <location filename="../ui/conversation/composer.py" line="200"/>
+        <location filename="../ui/conversation/composer.py" line="201"/>
+        <location filename="../ui/conversation/composer.py" line="434"/>
+        <location filename="../ui/conversation/composer.py" line="445"/>
         <source>Attach files</source>
         <translation>Attach files</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/composer.py" line="187"/>
-        <location filename="../ui/conversation/composer.py" line="188"/>
+        <location filename="../ui/conversation/composer.py" line="202"/>
+        <location filename="../ui/conversation/composer.py" line="203"/>
         <source>Model for the next turn</source>
         <translation>Model for the next turn</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/composer.py" line="189"/>
+        <location filename="../ui/conversation/composer.py" line="204"/>
         <source>Continue</source>
         <translation>Continue</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/composer.py" line="190"/>
-        <location filename="../ui/conversation/composer.py" line="288"/>
-        <location filename="../ui/conversation/composer.py" line="299"/>
+        <location filename="../ui/conversation/composer.py" line="205"/>
+        <location filename="../ui/conversation/composer.py" line="206"/>
         <source>Stop</source>
         <translation>Stop</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/composer.py" line="191"/>
+        <location filename="../ui/conversation/composer.py" line="207"/>
+        <source>Steer</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/conversation/composer.py" line="208"/>
         <source>Drop files to attach</source>
         <translation>Drop files to attach</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/composer.py" line="192"/>
+        <location filename="../ui/conversation/composer.py" line="209"/>
         <source>Release here to add them to the next message</source>
         <translation>Release here to add them to the next message</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/composer.py" line="290"/>
-        <location filename="../ui/conversation/composer.py" line="296"/>
-        <location filename="../ui/conversation/composer.py" line="303"/>
+        <location filename="../ui/conversation/composer.py" line="310"/>
         <source>Send</source>
         <translation>Send</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/composer.py" line="301"/>
+        <location filename="../ui/conversation/composer.py" line="310"/>
+        <source>Queue message</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/conversation/composer.py" line="318"/>
         <source>Preparing attachments</source>
         <translation>Preparing attachments</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/composer.py" line="416"/>
+        <location filename="../ui/conversation/composer.py" line="436"/>
         <source>Data files (*.csv *.xlsx *.xls)</source>
         <translation>Data files (*.csv *.xlsx *.xls)</translation>
     </message>
@@ -505,17 +512,27 @@
 <context>
     <name>ChatMessageBubble</name>
     <message>
-        <location filename="../ui/conversation/widgets/message.py" line="227"/>
+        <location filename="../ui/conversation/widgets/message.py" line="244"/>
+        <source>Edit</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/conversation/widgets/message.py" line="246"/>
+        <source>Copy</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/conversation/widgets/message.py" line="260"/>
         <source>You</source>
         <translation>You</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/widgets/message.py" line="229"/>
+        <location filename="../ui/conversation/widgets/message.py" line="262"/>
         <source>Tool</source>
         <translation>Tool</translation>
     </message>
     <message>
-        <location filename="../ui/conversation/widgets/message.py" line="231"/>
+        <location filename="../ui/conversation/widgets/message.py" line="264"/>
         <source>System</source>
         <translation>System</translation>
     </message>
@@ -527,6 +544,27 @@
         <location filename="../ui/conversation/timeline.py" line="100"/>
         <source>Scroll to bottom</source>
         <translation>Scroll to bottom</translation>
+    </message>
+</context>
+<context>
+    <name>ChatWorkspace</name>
+    <message>
+        <location filename="../ui/chat_workspace.py" line="419"/>
+        <source>Some attachment paths are unavailable.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/chat_workspace.py" line="464"/>
+        <source>Replace this message?</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../ui/chat_workspace.py" line="465"/>
+        <source>Saving will remove %n later conversation record(s) and send the edited message.</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+        </translation>
     </message>
 </context>
 <context>
@@ -2145,141 +2183,241 @@ Trigger: %2</translation>
     </message>
 </context>
 <context>
+    <name>MessageQueuePanel</name>
+    <message>
+        <location filename="../ui/conversation/queue_panel.py" line="65"/>
+        <source>Failed</source>
+        <translation type="unfinished">Failed</translation>
+    </message>
+    <message>
+        <location filename="../ui/conversation/queue_panel.py" line="67"/>
+        <source>Edit message</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/conversation/queue_panel.py" line="69"/>
+        <source>Steer</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/conversation/queue_panel.py" line="71"/>
+        <source>Queued</source>
+        <translation type="unfinished">Queued</translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../ui/conversation/queue_panel.py" line="74"/>
+        <source>%n attachment(s)</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+        </translation>
+    </message>
+    <message>
+        <location filename="../ui/conversation/queue_panel.py" line="86"/>
+        <location filename="../ui/conversation/queue_panel.py" line="87"/>
+        <source>Message queue</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/conversation/queue_panel.py" line="88"/>
+        <source>Remove from queue</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/conversation/queue_panel.py" line="89"/>
+        <source>Restore draft</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/conversation/queue_panel.py" line="90"/>
+        <source>Resume queue</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
     <name>SettingsDialog</name>
     <message>
-        <location filename="../ui/settings/dialog.py" line="189"/>
-        <location filename="../ui/settings/dialog.py" line="317"/>
-        <location filename="../ui/settings/dialog.py" line="339"/>
-        <location filename="../ui/settings/provider.py" line="216"/>
-        <location filename="../ui/settings/provider.py" line="239"/>
+        <location filename="../ui/settings/dialog.py" line="212"/>
+        <location filename="../ui/settings/dialog.py" line="340"/>
+        <location filename="../ui/settings/dialog.py" line="345"/>
+        <location filename="../ui/settings/dialog.py" line="358"/>
+        <location filename="../ui/settings/dialog.py" line="381"/>
+        <location filename="../ui/settings/provider.py" line="175"/>
+        <location filename="../ui/settings/provider.py" line="198"/>
         <source>Settings</source>
         <translation>Settings</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="190"/>
+        <location filename="../ui/settings/dialog.py" line="213"/>
         <source>Language</source>
         <translation>Language</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="191"/>
+        <location filename="../ui/settings/dialog.py" line="214"/>
         <source>AI</source>
         <translation>AI</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="194"/>
+        <location filename="../ui/settings/dialog.py" line="215"/>
+        <source>Conversation</source>
+        <translation type="unfinished">Conversation</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings/dialog.py" line="216"/>
+        <source>Keyboard Shortcuts</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/settings/dialog.py" line="219"/>
         <source>Knowledge Base</source>
         <translation>Knowledge Base</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="198"/>
+        <location filename="../ui/settings/dialog.py" line="223"/>
         <source>ML Workers</source>
         <translation>ML Workers</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="153"/>
+        <location filename="../ui/settings/dialog.py" line="340"/>
+        <source>Choose two distinct keyboard shortcuts.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/settings/dialog.py" line="345"/>
+        <source>Select an embedding model to enable text vectors.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Global models</source>
-        <translation>Global models</translation>
+        <translation type="vanished">Global models</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="154"/>
         <source>LLM providers</source>
-        <translation>LLM providers</translation>
+        <translation type="vanished">LLM providers</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="155"/>
+        <location filename="../ui/settings/provider.py" line="130"/>
+        <source>AI providers</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/settings/provider.py" line="131"/>
         <source>Provider</source>
         <translation>Provider</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="156"/>
+        <location filename="../ui/settings/provider.py" line="132"/>
         <source>Provider key</source>
         <translation>Provider key</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="157"/>
+        <location filename="../ui/settings/provider.py" line="133"/>
         <source>Provider name</source>
         <translation>Provider name</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="158"/>
-        <source>Dialect</source>
-        <translation>Dialect</translation>
+        <location filename="../ui/settings/provider.py" line="134"/>
+        <source>Protocol</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ui/settings/embedding.py" line="101"/>
-        <location filename="../ui/settings/provider.py" line="159"/>
+        <location filename="../ui/settings/provider.py" line="137"/>
+        <source>Chat models</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/settings/provider.py" line="138"/>
+        <source>Embedding models</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/settings/provider.py" line="139"/>
+        <source>One model ID per line</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Dialect</source>
+        <translation type="vanished">Dialect</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings/provider.py" line="135"/>
         <source>Base URL</source>
         <translation>Base URL</translation>
     </message>
     <message>
-        <location filename="../ui/settings/embedding.py" line="102"/>
-        <location filename="../ui/settings/provider.py" line="160"/>
+        <location filename="../ui/settings/provider.py" line="136"/>
         <source>API key</source>
         <translation>API key</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="161"/>
         <source>Models</source>
-        <translation>Models</translation>
+        <translation type="vanished">Models</translation>
     </message>
     <message>
-        <location filename="../ui/settings/embedding.py" line="109"/>
-        <location filename="../ui/settings/provider.py" line="162"/>
+        <location filename="../ui/settings/provider.py" line="142"/>
         <source>Timeout</source>
         <translation>Timeout</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="163"/>
+        <location filename="../ui/settings/provider.py" line="143"/>
         <source>Streaming</source>
         <translation>Streaming</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="164"/>
+        <location filename="../ui/settings/conversation.py" line="67"/>
         <source>Default model</source>
         <translation>Default model</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="165"/>
+        <location filename="../ui/settings/conversation.py" line="68"/>
         <source>Turn guard model</source>
         <translation>Turn guard model</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="166"/>
+        <location filename="../ui/settings/conversation.py" line="69"/>
         <source>Thread title model</source>
         <translation>Thread title model</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="167"/>
+        <location filename="../ui/settings/conversation.py" line="70"/>
         <source>LLM retry attempts</source>
         <translation>LLM retry attempts</translation>
     </message>
     <message>
-        <location filename="../ui/settings/embedding.py" line="99"/>
         <source>Embedding provider</source>
-        <translation>Embedding provider</translation>
+        <translation type="vanished">Embedding provider</translation>
     </message>
     <message>
-        <location filename="../ui/settings/embedding.py" line="100"/>
+        <location filename="../ui/settings/embedding.py" line="69"/>
         <source>Enabled</source>
         <translation>Enabled</translation>
     </message>
     <message>
-        <location filename="../ui/settings/embedding.py" line="103"/>
         <source>Model</source>
-        <translation>Model</translation>
+        <translation type="vanished">Model</translation>
     </message>
     <message>
-        <location filename="../ui/settings/embedding.py" line="104"/>
+        <location filename="../ui/settings/embedding.py" line="68"/>
+        <source>Text vectors</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/settings/embedding.py" line="70"/>
+        <source>Embedding model</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/settings/embedding.py" line="71"/>
         <source>Dimensions</source>
         <translation>Dimensions</translation>
     </message>
     <message>
-        <location filename="../ui/settings/embedding.py" line="106"/>
+        <location filename="../ui/settings/embedding.py" line="73"/>
         <source>Provider default (0)</source>
         <translation>Provider default (0)</translation>
     </message>
     <message>
-        <location filename="../ui/settings/embedding.py" line="108"/>
+        <location filename="../ui/settings/embedding.py" line="75"/>
         <source>Batch size</source>
         <translation>Batch size</translation>
     </message>
@@ -2305,17 +2443,17 @@ Trigger: %2</translation>
         <translation>Rebuild indexes...</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="168"/>
+        <location filename="../ui/settings/provider.py" line="144"/>
         <source>Add</source>
         <translation>Add</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="169"/>
+        <location filename="../ui/settings/provider.py" line="145"/>
         <source>Remove</source>
         <translation>Remove</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="171"/>
+        <location filename="../ui/settings/provider.py" line="147"/>
         <source>OpenAI-compatible</source>
         <translation>OpenAI-compatible</translation>
     </message>
@@ -2330,12 +2468,12 @@ Trigger: %2</translation>
         <translation>Add SSH worker...</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="205"/>
+        <location filename="../ui/settings/dialog.py" line="232"/>
         <source>About</source>
         <translation>About</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="206"/>
+        <location filename="../ui/settings/dialog.py" line="233"/>
         <source>Save</source>
         <translation>Save</translation>
     </message>
@@ -2406,22 +2544,22 @@ Trigger: %2</translation>
         <translation>Local PaddleOCR is not installed</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="250"/>
+        <location filename="../ui/settings/dialog.py" line="277"/>
         <source>English</source>
         <translation>English</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="251"/>
+        <location filename="../ui/settings/dialog.py" line="278"/>
         <source>Simplified Chinese</source>
         <translation>Simplified Chinese</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="276"/>
+        <location filename="../ui/settings/dialog.py" line="303"/>
         <source>Language Switch Failed</source>
         <translation>Language Switch Failed</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="277"/>
+        <location filename="../ui/settings/dialog.py" line="304"/>
         <source>Unable to switch the application language.
 
 {details}</source>
@@ -2438,22 +2576,22 @@ Trigger: %2</translation>
         <translation type="vanished">Embedding settings were saved, but the vector rebuild could not be queued.</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="357"/>
+        <location filename="../ui/settings/dialog.py" line="400"/>
         <source>Rebuild text vectors?</source>
         <translation>Rebuild text vectors?</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="360"/>
+        <location filename="../ui/settings/dialog.py" line="403"/>
         <source>This change uses a different embedding space. Existing text vectors cannot be reused for current Knowledge content.</source>
         <translation>This change uses a different embedding space. Existing text vectors cannot be reused for current Knowledge content.</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="365"/>
+        <location filename="../ui/settings/dialog.py" line="408"/>
         <source>Save and rebuild now</source>
         <translation>Save and rebuild now</translation>
     </message>
     <message>
-        <location filename="../ui/settings/dialog.py" line="369"/>
+        <location filename="../ui/settings/dialog.py" line="412"/>
         <source>Save; rebuild later</source>
         <translation>Save; rebuild later</translation>
     </message>
@@ -2613,9 +2751,23 @@ Text vectors: %2</translation>
         <translation type="vanished">This provider is managed by a deployment and cannot be removed here.</translation>
     </message>
     <message>
-        <location filename="../ui/settings/provider.py" line="394"/>
+        <location filename="../ui/settings/conversation.py" line="55"/>
+        <location filename="../ui/settings/embedding.py" line="64"/>
         <source>None</source>
         <translation>None</translation>
+    </message>
+</context>
+<context>
+    <name>ShortcutSettingsEditor</name>
+    <message>
+        <location filename="../ui/settings/shortcuts.py" line="37"/>
+        <source>Send or queue a message</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/settings/shortcuts.py" line="38"/>
+        <source>Steer the conversation</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -3255,6 +3407,40 @@ Text vectors: %2</translation>
         <location filename="../ui/conversation/presentation.py" line="471"/>
         <source>↑ {input} · ↓ {output}</source>
         <translation>↑ {input} · ↓ {output}</translation>
+    </message>
+</context>
+<context>
+    <name>UserMessageEditor</name>
+    <message>
+        <location filename="../ui/conversation/message_editor.py" line="18"/>
+        <source>Edit message</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/conversation/message_editor.py" line="25"/>
+        <location filename="../ui/conversation/message_editor.py" line="73"/>
+        <source>Attach files</source>
+        <translation type="unfinished">Attach files</translation>
+    </message>
+    <message>
+        <location filename="../ui/conversation/message_editor.py" line="26"/>
+        <source>Remove attachment</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/conversation/message_editor.py" line="32"/>
+        <source>Attachments</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/conversation/message_editor.py" line="36"/>
+        <source>Save and send</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/conversation/message_editor.py" line="73"/>
+        <source>Data files (*.csv *.xlsx *.xls)</source>
+        <translation type="unfinished">Data files (*.csv *.xlsx *.xls)</translation>
     </message>
 </context>
 <context>

@@ -60,10 +60,13 @@ Tool modules.
 - Chatbot UI submits intent and renders Chatbot Events. It neither accesses a
   conversation repository nor infers protocol state from storage rows or raw
   Tool payloads.
+- Desktop conversation coordination keeps a process-local input queue per Thread and dispatches one submission at a time. Ordinary submissions wait until the active Harness submission settles. Steering submissions are presented ahead of ordinary follow-ups and ask Harness to yield at its next complete exchange boundary. Queued messages stay outside the canonical transcript and can be removed or restored to the composer before dispatch.
+- Stop suspends automatic dispatch and keeps queued messages available. Resuming the queue or submitting another message restarts dispatch. A history edit receives priority for confirmation and dispatch after the active submission settles.
 - Expected failures from local UI commands such as opening a link use transient operation feedback outside the timeline. Internal exception presentation is owned by [Unit TDD](../30-unit-tdd/application-composition.md#error-reporting). A terminal Harness submission failure uses a dismissible notification outside the timeline that remains until the next submission or Thread selection, while failures already represented by Chatbot Events, including connection retries and Tool failures, remain visible in the conversation UI.
 - Final Messages are durable. A pending sampling Message is the sole
   provisional canonical state. There is no persistent `Turn`, `Run`,
   `ConversationStore`, execution ledger, or automatic cross-process recovery.
+- User-message editing replaces the target and removes the confirmed suffix in one Conversation transaction, then samples from the replacement. A changed suffix rejects the write and leaves history intact. Existing Dataset attachments can be retained by identity. Independently managed artifacts, datasets, and jobs follow their own lifecycle.
 - Finalization atomically commits independent ToolCall/ToolResult Messages and
   an Assistant Message when the provider emitted one. A ToolResult directly
   identifies its ToolCall; neither Artifact nor observability becomes
@@ -188,6 +191,10 @@ recovery record, and process restart does not restore it. A new explicit
 UserMessage is the only resume command after a paused terminal ToolResult; it
 never causes automatic replay of that old frontier.
 
+Submission admission uses a process-local claim per Thread from preparation through terminal sampling. An explicit new submission can append to an idle Thread after a failed request, a Stop, or process restart, even if the last durable Message is a UserMessage or ToolResult. Existing final Messages remain in the transcript, completed Tool exchanges are replayed as history, and sampling starts from the new UserMessage. Pending sampling, duplicate submission identities, and stale frontier checks remain independent of the final Message kind.
+
+When the desktop queue requests steering, Harness yields before the next provider request. A complete assistant response is committed. A proposed tool batch can be abandoned before its first invocation, while a started batch commits its complete ToolCall/ToolResult set before yielding. The desktop then dispatches the steering message as the next explicit UserMessage.
+
 ## History Reopen and Source-Presentation Sequence
 
 ```mermaid
@@ -217,6 +224,8 @@ The UI opening target is a short-lived desktop capability, not ordinary event
 content. A missing/malformed source therefore cannot prevent the snapshot from
 opening or cause provider/canonical data to gain a local path.
 
+Copy resolves original source paths through Dataset provenance for the explicit clipboard action. The desktop writes a versioned Xenix draft payload alongside plain text. Pasting restores the draft and passes paths through normal attachment validation before any import.
+
 The same post-snapshot seam may attach Dataset derivation evidence to a Tool event
 by its ToolCall identity. Unlike source presentation, this evidence is persisted
 Dataset authority; the Chatbot block remains only its read-only UI projection.
@@ -224,7 +233,7 @@ Dataset authority; the Chatbot block remains only its read-only UI projection.
 ## Safety and Change Rules
 
 - Application/runtime Thread deletion goes through `LLMConversationService`.
-  It rejects deletion while sampling is pending; its storage path deletes
+  It rejects deletion while a submission is active or sampling is pending. Its storage path deletes
   dependent ToolResults before their ToolCalls and remaining Messages.
 - Changes to a provider, Tool, pending lifecycle, source presentation, or
   Chatbot event must preserve the topology above. Do not add a convenience

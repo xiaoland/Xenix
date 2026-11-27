@@ -125,9 +125,11 @@ pdm run prepare
 pdm run dev --isolated
 ```
 
-`--isolated` 使用临时工作区，适合初次体验；需要保留日常工作时，使用 `pdm run dev` 启动持久工作区。Python 与依赖约束以 [pyproject.toml](pyproject.toml)、[pdm.lock](pdm.lock) 为准，本地环境选择见 [pdm.toml](pdm.toml)。
+`--isolated` 使用临时工作区，适合初次体验。要在当前工作树保留开发和验收数据，请使用持久的 `.runtime/dev`。[开发版启动说明](CONTRIBUTING.md#run-the-development-app)
 
-1. 在设置中配置 LLM 提供商、API 凭据和可用模型。
+Python 与依赖版本由 [pyproject.toml](pyproject.toml) 和 [pdm.lock](pdm.lock) 定义，本地环境选择见 [pdm.toml](pdm.toml)。
+
+1. 在「设置 → AI」配置提供商、API 凭据和模型，再到「设置 → 会话」选择默认对话模型。
 2. 新建会话并附加一份 CSV / Excel 数据。
 3. 从具体问题开始，例如：“请先检查这份数据的质量，再概括值得关注的趋势。”
 4. 继续追问，按需查看本地产出、审计依据与后台任务。

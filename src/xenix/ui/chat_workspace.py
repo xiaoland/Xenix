@@ -10,17 +10,17 @@ model-picker sync, and the stream/error/service-link marshaling.
 from __future__ import annotations
 
 import threading
-from collections.abc import Callable
-from dataclasses import dataclass
+from collections.abc import Callable, Iterable
+from dataclasses import dataclass, field
 from pathlib import Path
 from uuid import uuid4
 
 from PySide6.QtCore import QCoreApplication, QObject, Qt, QUrl, Signal
-from PySide6.QtGui import QDesktopServices
-from PySide6.QtWidgets import QProgressDialog
+from PySide6.QtGui import QDesktopServices, QGuiApplication
+from PySide6.QtWidgets import QDialog, QMessageBox, QProgressDialog
 
 from ..exceptions import XenixError, report_exception
-from ..services.agent import (
+from ..services.agent.harness_service import (
     AgentHarnessService,
     AgentHarnessStreamEvent,
     AttachmentImportStatus,
@@ -30,13 +30,18 @@ from ..services.agent import (
 from ..services.artifact_service import ArtifactService
 from ..services.link_router import LinkRouter
 from ..services.llm import ConversationSnapshot, LLMService
+from ..services.llm.conversation_models import UserMessageReplacement
 from .chatbot import ComposerAttachmentStatus, ThreadDetailView
+from .conversation.clipboard import message_clipboard
 from .conversation.execution import SubmissionExecutor, ThreadedSubmissionExecutor
+from .conversation.message_editor import UserMessageEditor
+from .conversation.queue_panel import QueuedMessage
 from .conversation.turn_controller import (
     ConversationTurnController,
     FailureRecovery,
     StopDisposition,
     TurnAction,
+    TurnUpdate,
 )
 from .history import HistoryPanel
 
@@ -58,6 +63,31 @@ class _ServiceLinkActivationFailed:
 class _ComposerAttachmentRecord:
     path: str
     attachment: SourceAttachmentInput
+
+
+@dataclass
+class _Submission:
+    input: SubmitUserTurnInput
+    steering: bool = False
+    holding_draft: bool = False
+    failure: str = ""
+
+    @property
+    def paths(self) -> list[str]:
+        return [source.file_path for source in self.input.source_attachments]
+
+    @property
+    def edit_message_id(self) -> int | None:
+        return self.input.replacement.message_id if self.input.replacement is not None else None
+
+
+@dataclass
+class _ThreadInput:
+    controller: ConversationTurnController = field(default_factory=ConversationTurnController)
+    waiting: list[_Submission] = field(default_factory=list)
+    active: _Submission | None = None
+    steer_requested: threading.Event = field(default_factory=threading.Event)
+    paused: bool = False
 
 
 class ChatWorkspace(QObject):
@@ -90,17 +120,23 @@ class ChatWorkspace(QObject):
         self._current_locale = current_locale
         self._history_panel = history_panel
         self._thread_detail_view = thread_detail_view
-        self._conversation = ConversationTurnController()
-        self._conversation_executor = conversation_executor or ThreadedSubmissionExecutor(
-            self._agent_harness_service.submit_user_turn_stream
-        )
+        self._lane = _ThreadInput()
+        self._by_thread: dict[int, _ThreadInput] = {}
+        self._by_submission: dict[str, _ThreadInput] = {}
+        self._closed = False
+        self._conversation_executor = conversation_executor or ThreadedSubmissionExecutor(self._submission_stream)
         self._composer_attachments: dict[str, _ComposerAttachmentRecord] = {}
-        self._submission_attachment_paths: tuple[str, ...] = ()
         self._service_link_progress_dialog: QProgressDialog | None = None
         self._active_service_link_activation_ids: set[str] = set()
 
         self._thread_detail_view.set_artifact_resolver(self._artifact_service.resolve_uri)
         self._thread_detail_view.message_submitted.connect(self._submit_chat_message)
+        self._thread_detail_view.steering_submitted.connect(self._steer_chat_message)
+        self._thread_detail_view.message_edit_requested.connect(self._edit_message)
+        self._thread_detail_view.message_copy_requested.connect(self._copy_message)
+        self._thread_detail_view.message_queue.remove_requested.connect(self._remove_queued_message)
+        self._thread_detail_view.message_queue.restore_requested.connect(self._restore_queued_message)
+        self._thread_detail_view.message_queue.resume_requested.connect(self._resume_queue)
         self._thread_detail_view.files_attached.connect(self._register_source_attachments)
         self._thread_detail_view.attachment_removed.connect(self._discard_composer_attachment)
         self._thread_detail_view.model_selected.connect(self._update_thread_model)
@@ -118,12 +154,16 @@ class ChatWorkspace(QObject):
     # Public shell surface ---------------------------------------------------
 
     @property
-    def conversation_thread_id(self) -> str | None:
-        return self._conversation.thread_id
+    def conversation_thread_id(self) -> int | None:
+        return self._lane.controller.thread_id
 
     @property
     def conversation_idle(self) -> bool:
-        return not self._conversation.busy
+        return self._lane.active is None
+
+    def thread_has_input_work(self, thread_id: int) -> bool:
+        lane = self._by_thread.get(thread_id)
+        return lane is not None and (lane.active is not None or bool(lane.waiting))
 
     @property
     def composer_attachments(self) -> dict[str, _ComposerAttachmentRecord]:
@@ -160,8 +200,15 @@ class ChatWorkspace(QObject):
         self.sync_model_options()
 
     def shutdown(self) -> None:
-        self._conversation.shutdown()
+        self._closed = True
+        for lane in self._by_thread.values():
+            lane.controller.shutdown()
+        self._lane.controller.shutdown()
         self._conversation_executor.shutdown()
+        self._by_submission.clear()
+        self._by_thread.clear()
+        self._lane.active = None
+        self._lane.waiting.clear()
         self._active_service_link_activation_ids.clear()
         self._close_service_link_progress_if_idle()
 
@@ -172,7 +219,7 @@ class ChatWorkspace(QObject):
             self._thread_detail_view.set_selected_fq_model_key(self._llm_service.default_fq_model_key())
 
     def _update_thread_model(self, fq_model_key: str) -> None:
-        if self.conversation_thread_id is None:
+        if self.conversation_thread_id is None or not self.conversation_idle:
             return
         try:
             snapshot = self._agent_harness_service.set_thread_model(self.conversation_thread_id, fq_model_key)
@@ -192,20 +239,31 @@ class ChatWorkspace(QObject):
     # Submission and source attachments --------------------------------------
 
     def _submit_chat_message(self, text: str, file_paths: list[str], fq_model_key: str) -> None:
-        if not self.conversation_idle:
-            return
+        self._accept_message(text, file_paths, fq_model_key, steer=False)
+
+    def _steer_chat_message(self, text: str, file_paths: list[str], fq_model_key: str) -> None:
+        self._accept_message(text, file_paths, fq_model_key, steer=True)
+
+    def _accept_message(self, text: str, file_paths: list[str], fq_model_key: str, *, steer: bool) -> None:
         source_attachments = self._ready_source_attachments(file_paths)
         if source_attachments is None:
             return
-
-        self._start_harness_submission(
+        entry = _Submission(SubmitUserTurnInput(
+            thread_id=self.conversation_thread_id,
             text=text,
             source_attachments=source_attachments,
-            file_paths=file_paths,
-            fq_model_key=fq_model_key,
+            fq_model_key=fq_model_key or None,
             interface_locale=self._current_locale(),
             client_submission_id=uuid4().hex,
-        )
+        ), steering=steer)
+        self._thread_detail_view.clear_operation_notification()
+        self._lane.paused = False
+        if self.conversation_idle and not any(not item.failure for item in self._lane.waiting):
+            entry.holding_draft = True
+            self._start_submission(self._lane, entry)
+            return
+        self._clear_submitted_draft(entry)
+        self._enqueue(self._lane, entry)
 
     def _register_source_attachments(self, file_paths: list[str]) -> None:
         for file_path in file_paths:
@@ -241,44 +299,184 @@ class ChatWorkspace(QObject):
             ComposerAttachmentStatus.READY,
         )
 
-    def _start_harness_submission(
-        self,
-        *,
-        text: str,
-        source_attachments: list[SourceAttachmentInput],
-        file_paths: list[str],
-        fq_model_key: str,
-        interface_locale: str,
-        client_submission_id: str,
-    ) -> None:
-        try:
-            submit_input = SubmitUserTurnInput(
-                thread_id=self.conversation_thread_id,
-                text=text,
-                source_attachments=source_attachments,
-                fq_model_key=fq_model_key or None,
-                interface_locale=interface_locale,
-                client_submission_id=client_submission_id,
-            )
-        except Exception as exc:
-            if not isinstance(exc, XenixError):
-                report_exception(exc)
-            self._thread_detail_view.show_operation_error(str(exc))
-            return
+    def _submission_stream(self, submission: SubmitUserTurnInput) -> Iterable[AgentHarnessStreamEvent]:
+        lane = self._by_submission.get(submission.client_submission_id or "")
+        return self._agent_harness_service.submit_user_turn_stream(
+            submission, should_steer=lane.steer_requested.is_set if lane is not None else None,
+        )
 
-        if not self._conversation.begin(client_submission_id, len(file_paths)):
+    def _start_submission(self, lane: _ThreadInput, entry: _Submission) -> None:
+        submission_id = entry.input.client_submission_id
+        assert submission_id is not None
+        if not lane.controller.begin(submission_id, len(entry.paths)):
             return
-        self._thread_detail_view.clear_operation_notification()
-        self._submission_attachment_paths = tuple(str(Path(path).resolve()) for path in file_paths)
-        self._thread_detail_view.begin_composer_submission(file_paths)
+        lane.active = entry
+        self._by_submission[submission_id] = lane
+        entry.input.thread_id = lane.controller.thread_id
+        if lane is self._lane:
+            if entry.holding_draft:
+                self._thread_detail_view.begin_composer_submission(entry.paths)
+            else:
+                self._thread_detail_view.set_running(True)
         try:
             self._conversation_executor.start(
-                submit_input,
+                entry.input,
                 on_event=self.harness_stream_event.emit,
                 on_failure=self._harness_failure_received.emit,
             )
         except Exception as exc:
-            self._render_harness_error(client_submission_id, exc)
+            self._render_harness_error(submission_id, exc)
+
+    def _enqueue(self, lane: _ThreadInput, entry: _Submission) -> None:
+        index = next(
+            (
+                i for i, item in enumerate(lane.waiting)
+                if item.edit_message_id is None and (entry.edit_message_id is not None or entry.steering and not item.steering)
+            ),
+            len(lane.waiting),
+        )
+        lane.waiting.insert(index, entry)
+        self._update_steering(lane)
+        self._render_queue()
+        self._drain_queue(lane)
+
+    @staticmethod
+    def _update_steering(lane: _ThreadInput) -> None:
+        if not lane.paused and any(item.steering and not item.failure for item in lane.waiting):
+            lane.steer_requested.set()
+        else:
+            lane.steer_requested.clear()
+
+    def _drain_queue(self, lane: _ThreadInput) -> None:
+        if self._closed or lane.paused or lane.active is not None:
+            return
+        while (entry := next((item for item in lane.waiting if not item.failure), None)) is not None:
+            if entry.edit_message_id is not None and lane is not self._lane:
+                # The history confirmation belongs to the owning Thread view.
+                return
+            lane.waiting.remove(entry)
+            self._update_steering(lane)
+            self._render_queue()
+            if entry.edit_message_id is not None:
+                # The modal dialog may process Qt callbacks. Keep this lane
+                # occupied until its freshly observed suffix is confirmed.
+                lane.active = entry
+                try:
+                    accepted = self._prepare_edit(lane, entry)
+                finally:
+                    lane.active = None
+                if not accepted:
+                    continue
+            self._start_submission(lane, entry)
+            return
+
+    def _render_queue(self) -> None:
+        self._thread_detail_view.message_queue.set_messages(tuple(
+            QueuedMessage(
+                entry.input.client_submission_id or "", entry.input.text, len(entry.paths),
+                entry.steering, entry.edit_message_id is not None, entry.failure,
+            )
+            for entry in self._lane.waiting
+        ), paused=self._lane.paused)
+
+    def _remove_queued_message(self, submission_id: str) -> None:
+        self._lane.waiting = [
+            entry for entry in self._lane.waiting if entry.input.client_submission_id != submission_id
+        ]
+        self._update_steering(self._lane)
+        self._render_queue()
+
+    def _restore_queued_message(self, submission_id: str) -> None:
+        entry = next((item for item in self._lane.waiting if item.input.client_submission_id == submission_id), None)
+        if entry is None or entry.edit_message_id is not None:
+            return
+        editor = self._thread_detail_view.composer.editor
+        if not editor.isEnabled():
+            return
+        if entry.input.text:
+            if editor.toPlainText():
+                editor.appendPlainText(entry.input.text)
+            else:
+                editor.setPlainText(entry.input.text)
+        self._thread_detail_view.composer.add_local_files(entry.paths)
+        self._remove_queued_message(submission_id)
+        editor.setFocus()
+
+    def _resume_queue(self) -> None:
+        self._lane.paused = False
+        self._update_steering(self._lane)
+        self._render_queue()
+        self._drain_queue(self._lane)
+
+    def _clear_submitted_draft(self, entry: _Submission) -> None:
+        for path in entry.paths:
+            self._composer_attachments.pop(path, None)
+        self._thread_detail_view.acknowledge_composer_submission()
+
+    def _copy_message(self, message_id: int) -> None:
+        thread_id = self.conversation_thread_id
+        if thread_id is None:
+            return
+        try:
+            draft = self._agent_harness_service.message_draft(thread_id, message_id)
+        except XenixError as exc:
+            self._thread_detail_view.show_operation_error(str(exc))
+            return
+        QGuiApplication.clipboard().setMimeData(message_clipboard(draft.text, draft.paths))
+        if any(attachment.path is None for attachment in draft.attachments):
+            self._thread_detail_view.show_operation_status(self.tr("Some attachment paths are unavailable."))
+
+    def _edit_message(self, message_id: int) -> None:
+        lane = self._lane
+        thread_id = lane.controller.thread_id
+        if thread_id is None:
+            return
+        try:
+            draft = self._agent_harness_service.message_draft(thread_id, message_id)
+        except XenixError as exc:
+            self._thread_detail_view.show_operation_error(str(exc))
+            return
+        editor = UserMessageEditor(draft, self._thread_detail_view)
+        if editor.exec() != QDialog.DialogCode.Accepted:
+            return
+        dataset_ids, paths = editor.attachments()
+        try:
+            entry = _Submission(SubmitUserTurnInput(
+                thread_id=thread_id,
+                text=editor.editor.toPlainText().strip(),
+                source_attachments=[self._source_attachment_input(path) for path in paths],
+                fq_model_key=self._thread_detail_view.selected_fq_model_key() or None,
+                interface_locale=self._current_locale(),
+                client_submission_id=uuid4().hex,
+                replacement=UserMessageReplacement(message_id=message_id, retained_dataset_ids=dataset_ids),
+            ))
+        except (OSError, ValueError) as exc:
+            self._thread_detail_view.show_operation_error(str(exc))
+            return
+        self._thread_detail_view.clear_operation_notification()
+        lane.paused = False
+        self._enqueue(lane, entry)
+
+    def _prepare_edit(self, lane: _ThreadInput, entry: _Submission) -> bool:
+        thread_id = lane.controller.thread_id
+        replacement = entry.input.replacement
+        assert thread_id is not None and replacement is not None
+        try:
+            draft = self._agent_harness_service.message_draft(thread_id, replacement.message_id)
+        except XenixError as exc:
+            self._thread_detail_view.show_operation_error(str(exc))
+            return False
+        following = draft.following_ids
+        if following and QMessageBox.question(
+            self._thread_detail_view,
+            self.tr("Replace this message?"),
+            self.tr("Saving will remove %n later conversation record(s) and send the edited message.", "", len(following)),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.Cancel,
+        ) != QMessageBox.StandardButton.Yes:
+            return False
+        entry.input.replacement = replacement.model_copy(update={"confirmed_following_ids": following})
+        return True
 
     def _source_attachment_input(self, file_path: str) -> SourceAttachmentInput:
         source_path = Path(file_path).expanduser().resolve(strict=True)
@@ -311,71 +509,96 @@ class ChatWorkspace(QObject):
 
     # Stream and error rendering ---------------------------------------------
 
-    def _render_harness_snapshot(self, snapshot: ConversationSnapshot) -> None:
-        self._submission_attachment_paths = ()
-        self._sync_thread_model_picker(snapshot)
-        self._thread_detail_view.hide_thinking_indicator()
-        self._thread_detail_view.render_events(self._agent_harness_service.project_chatbot_events(snapshot))
-        self._thread_detail_view.abort_composer_submission()
-        self._thread_detail_view.set_running(False)
-        self.refresh_history(selected_thread_id=snapshot.thread.id)
-
     def _render_harness_stream_event(self, event: AgentHarnessStreamEvent) -> None:
-        update = self._conversation.route(event)
+        if self._closed:
+            return
+        if event.kind == "title":
+            if event.thread_id == self.conversation_thread_id:
+                self.refresh_history(selected_thread_id=self.conversation_thread_id)
+            return
+        submission_id = event.client_submission_id or ""
+        lane = self._by_submission.get(submission_id)
+        if lane is None or lane.active is None:
+            return
+        entry = lane.active
+        previous_thread_id = lane.controller.thread_id
+        update = lane.controller.route(event)
         if update.action is TurnAction.IGNORE:
             return
-        if update.action is TurnAction.ATTACHMENT:
-            if update.attachment_index is not None:
-                self._render_attachment_import_progress(event, update.attachment_index)
-            return
-        if update.action is TurnAction.TITLE:
-            self.refresh_history(selected_thread_id=self.conversation_thread_id)
-            return
+        if event.thread_id is not None:
+            self._by_thread[event.thread_id] = lane
+        if lane is self._lane:
+            if previous_thread_id is None and update.action is TurnAction.ATTACHMENT:
+                self.conversation_changed.emit(lane.controller.thread_id)
+            self._render_active_event(event, update, entry)
+
+        if update.acknowledge_composer:
+            entry.holding_draft = False
         if update.action is TurnAction.FINAL_SNAPSHOT:
-            self._render_harness_snapshot(event.snapshot)
+            self._finish_submission(lane, submission_id)
+
+    def _render_active_event(
+        self, event: AgentHarnessStreamEvent, update: TurnUpdate, entry: _Submission,
+    ) -> None:
+        if update.action is TurnAction.ATTACHMENT:
+            if update.attachment_index is not None and entry.holding_draft and event.attachment_import is not None:
+                path = entry.paths[update.attachment_index]
+                status = (
+                    ComposerAttachmentStatus.PENDING if event.attachment_import.status is AttachmentImportStatus.PENDING
+                    else ComposerAttachmentStatus.FAILED
+                )
+                self._thread_detail_view.set_attachment_status(path, status)
             return
-        if update.action is TurnAction.SNAPSHOT:
+        if update.action in {TurnAction.SNAPSHOT, TurnAction.FINAL_SNAPSHOT}:
+            assert event.snapshot is not None
+            if (update.acknowledge_composer or update.action is TurnAction.FINAL_SNAPSHOT) and entry.holding_draft:
+                self._clear_submitted_draft(entry)
+                self._thread_detail_view.abort_composer_submission()
             if update.acknowledge_composer:
-                for file_path in self._submission_attachment_paths:
-                    self._composer_attachments.pop(file_path, None)
-                self._thread_detail_view.acknowledge_composer_submission()
-            self._sync_thread_model_picker(event.snapshot)
+                self._thread_detail_view.set_running(True)
             self._thread_detail_view.render_events(
                 event.chatbot_events
                 if event.chatbot_events is not None
                 else self._agent_harness_service.project_chatbot_events(event.snapshot)
             )
+            if update.action is TurnAction.FINAL_SNAPSHOT:
+                self._thread_detail_view.set_running(False)
+            self.conversation_changed.emit(event.snapshot.thread.id)
             self.refresh_history(selected_thread_id=event.snapshot.thread.id)
             return
-        if update.action is TurnAction.LIVE_EVENT:
-            if update.activate_running:
-                self._thread_detail_view.set_running(True)
-            self._thread_detail_view.apply_chatbot_event(event.chatbot_event)
+        if update.activate_running:
+            self._thread_detail_view.set_running(True)
+        self._thread_detail_view.apply_chatbot_event(event.chatbot_event)
 
     def _render_harness_error(self, submission_id: str, failure: object) -> None:
-        recovery = self._conversation.fail(submission_id)
+        lane = self._by_submission.get(submission_id)
+        if lane is None or lane.active is None:
+            return
+        entry = lane.active
+        recovery = lane.controller.fail(submission_id)
         if recovery is FailureRecovery.IGNORE:
             return
-        self._thread_detail_view.hide_thinking_indicator()
-        if recovery is FailureRecovery.RESTORE_SNAPSHOT:
-            self._restore_stable_message_view()
-        self._submission_attachment_paths = ()
-        self._thread_detail_view.abort_composer_submission()
-        self._thread_detail_view.show_submission_error(str(failure))
-        self._thread_detail_view.set_running(False)
-        self.harness_failed.emit(failure)
+        if recovery is FailureRecovery.PRESERVE_COMPOSER and not entry.holding_draft:
+            entry.failure = str(failure)
+            lane.waiting.append(entry)
+        if lane is self._lane:
+            self._thread_detail_view.hide_thinking_indicator()
+            if recovery is FailureRecovery.RESTORE_SNAPSHOT:
+                self._restore_stable_message_view()
+            self._thread_detail_view.abort_composer_submission()
+            self._thread_detail_view.show_submission_error(str(failure))
+            self._thread_detail_view.set_running(False)
+            self.harness_failed.emit(failure)
         if isinstance(failure, Exception) and not isinstance(failure, XenixError):
             report_exception(failure)
+        self._finish_submission(lane, submission_id)
 
-    def _render_attachment_import_progress(self, event: AgentHarnessStreamEvent, source_index: int) -> None:
-        progress = event.attachment_import
-        if progress is None:
-            return
-        path = self._submission_attachment_paths[source_index]
-        if progress.status is AttachmentImportStatus.PENDING:
-            self._thread_detail_view.set_attachment_status(path, ComposerAttachmentStatus.PENDING)
-        elif progress.status is AttachmentImportStatus.FAILED:
-            self._thread_detail_view.set_attachment_status(path, ComposerAttachmentStatus.FAILED)
+    def _finish_submission(self, lane: _ThreadInput, submission_id: str) -> None:
+        self._by_submission.pop(submission_id, None)
+        lane.active = None
+        self._update_steering(lane)
+        self._render_queue()
+        self._drain_queue(lane)
 
     def _restore_stable_message_view(self) -> None:
         if self.conversation_thread_id is None:
@@ -431,7 +654,7 @@ class ChatWorkspace(QObject):
             self._thread_detail_view,
         )
         dialog.setObjectName("serviceLinkProgressDialog")
-        dialog.setWindowModality(Qt.NonModal)
+        dialog.setWindowModality(Qt.WindowModality.NonModal)
         dialog.setMinimumDuration(0)
         dialog.setCancelButton(None)
         self._service_link_progress_dialog = dialog
@@ -479,7 +702,7 @@ class ChatWorkspace(QObject):
         self._open_service_link(uri)
 
     def _request_harness_stop(self) -> None:
-        disposition = self._conversation.stop_disposition()
+        disposition = self._lane.controller.stop_disposition()
         if disposition is StopDisposition.PREPARING:
             self._thread_detail_view.show_operation_error(
                 QCoreApplication.translate(
@@ -497,7 +720,10 @@ class ChatWorkspace(QObject):
                 report_exception(exc)
             self._thread_detail_view.show_operation_error(str(exc))
             return
-        self._conversation.mark_paused(thread_id)
+        self._lane.controller.mark_paused(thread_id)
+        self._lane.paused = True
+        self._update_steering(self._lane)
+        self._render_queue()
         self._thread_detail_view.hide_thinking_indicator()
         self._thread_detail_view.set_running(False)
         self._thread_detail_view.show_operation_status(QCoreApplication.translate("MainWindow", "Stopped."))
@@ -518,18 +744,30 @@ class ChatWorkspace(QObject):
         self._select_conversation_thread(thread_id)
         self._sync_thread_model_picker(snapshot)
         self._thread_detail_view.render_events(self._agent_harness_service.project_chatbot_events(snapshot))
+        self._drain_queue(self._lane)
 
     conversation_changed = Signal(object)
 
     def _select_conversation_thread(self, thread_id: int | None) -> None:
-        self._conversation.select_thread(thread_id)
+        previous = self._lane
+        lane = self._by_thread.get(thread_id) if thread_id is not None else None
+        if lane is None:
+            lane = _ThreadInput()
+            if thread_id is not None:
+                lane.controller.select_thread(thread_id)
+                self._by_thread[thread_id] = lane
+        if previous is not lane and previous.active is not None:
+            previous.active.holding_draft = False
+        self._lane = lane
         self.conversation_changed.emit(thread_id)
-        self._submission_attachment_paths = ()
         self._thread_detail_view.clear_operation_notification()
-        self._thread_detail_view.abort_composer_submission()
-        self._thread_detail_view.set_running(False)
+        if lane.active is None or not lane.active.holding_draft:
+            self._thread_detail_view.abort_composer_submission()
+            self._thread_detail_view.set_running(lane.active is not None and not lane.paused)
+        self._render_queue()
 
     def _on_history_thread_deleted(self, thread_id: int) -> None:
+        self._by_thread.pop(thread_id, None)
         if self.conversation_thread_id != thread_id:
             self.refresh_history(selected_thread_id=self.conversation_thread_id)
             return

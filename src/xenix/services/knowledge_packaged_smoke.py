@@ -146,6 +146,7 @@ def run_knowledge_packaged_smoke(paths: AppPaths) -> None:
         try:
             imported_by_format = {}
             for source_format, source in (
+                ("pdf", pdf_path),
                 ("docx", worker_docx),
                 ("pptx", worker_pptx),
             ):
@@ -164,6 +165,20 @@ def run_knowledge_packaged_smoke(paths: AppPaths) -> None:
                         f"Spawned {source_format.upper()} import worker result is invalid."
                     )
                 imported_by_format[source_format] = imported
+            pdf_import = imported_by_format["pdf"]
+            pdf_derivation = _wait_for_derivation_handoff(
+                derivation,
+                pdf_import.import_id,
+                failure_message="Spawned PDF derivation was not queued.",
+            )
+            if (
+                not derivation.derive_now(pdf_derivation.job_id).retrieval_ready
+                or not any(
+                    hit.document_id == pdf_import.document_id and hit.locator.get("page") == 1
+                    for hit in knowledge.lookup("Knowledge packaged smoke", top_k=5)
+                )
+            ):
+                raise RuntimeError("Spawned PDF import did not reach Knowledge lookup.")
             presentation_import = imported_by_format["pptx"]
             derivation_view = _wait_for_derivation_handoff(
                 derivation,
@@ -174,13 +189,19 @@ def run_knowledge_packaged_smoke(paths: AppPaths) -> None:
             matches = knowledge.lookup("presentation worker smoke", top_k=5)
             if (
                 not derived.retrieval_ready
-                or not matches
-                or "presentation worker smoke" not in matches[0].quote.casefold()
+                or not any(
+                    hit.document_id == presentation_import.document_id
+                    and "presentation worker smoke" in hit.quote.casefold()
+                    for hit in matches
+                )
             ):
                 raise RuntimeError("Spawned PPTX import did not reach Knowledge lookup.")
             source_bytes = worker_pptx.read_bytes()
             lifecycle.remove_document(presentation_import.document_id)
-            if knowledge.lookup("presentation worker smoke", top_k=5):
+            if any(
+                hit.document_id == presentation_import.document_id
+                for hit in knowledge.lookup("presentation worker smoke", top_k=5)
+            ):
                 raise RuntimeError(
                     "Removed Knowledge document remained reachable through lookup."
                 )
@@ -321,6 +342,7 @@ def run_knowledge_packaged_smoke(paths: AppPaths) -> None:
                 "canonical_zstd": True,
                 "import_worker_spawn": True,
                 "spawned_docx_import": True,
+                "spawned_pdf_import": True,
                 "spawned_pptx_import": True,
                 "document_removal": True,
                 "same_sha_reimport": True,

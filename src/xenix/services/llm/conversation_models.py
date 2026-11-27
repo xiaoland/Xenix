@@ -42,10 +42,17 @@ class CreateConversationThreadInput(SQLModel):
     selected_fq_model_key: str | None = None
 
 
+class UserMessageReplacement(SQLModel):
+    message_id: int
+    confirmed_following_ids: tuple[int, ...] = ()
+    retained_dataset_ids: tuple[int, ...] | None = None
+
+
 class AppendUserMessageInput(SQLModel):
     thread_id: int
     client_submission_id: str
     content_blocks: list[CanonicalMessageBlock] = Field(default_factory=list)
+    replacement: UserMessageReplacement | None = None
 
     @field_validator("content_blocks", mode="before")
     @classmethod

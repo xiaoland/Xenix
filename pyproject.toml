@@ -1,6 +1,6 @@
 [project]
 name = "xenix-native"
-version = "1.6.2"
+version = "1.6.3"
 description = "Xenix native"
 authors = [{ name = "Lan_zhijiang", email = "lanzhijiang@foxmail.com" }]
 readme = "README.md"
@@ -32,7 +32,10 @@ dependencies = [
     "polars[calamine,rtcompat]==1.42.1",
     "xlsxwriter>=3.2.0",
     "velopack==1.2.0",
-    "docling<3,>=2.114.0",
+    "docling-core<3,>=2.87.1",
+    "pypdfium2<6,>=5.12.1",
+    "python-docx<2,>=1.2",
+    "python-pptx<2,>=1.0.2",
     "firecrawl-anydoc==0.2.4",
     "zstandard<1,>=0.23",
     "charset-normalizer<4,>=3.4",
