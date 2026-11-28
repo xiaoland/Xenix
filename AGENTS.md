@@ -27,6 +27,7 @@ Read the relevant owner and applicable subtree `AGENTS.md`; load further guidanc
 - Focused verification: `pdm run pytest --direct <selectors>`; broad verification: `pdm run test` and `pdm run check`. Startup/runtime changes also use `pdm run smoke --isolated`. Packaging gates and verification selection are in CONTRIBUTING.
 - After completing a change, restart the development app from the changed worktree and leave it open for manual acceptance. Follow [Run the development app](CONTRIBUTING.md#run-the-development-app) to use that worktree's persistent `.runtime/dev`.
 - Diagnostics: `pdm run diagnostic-bundle`. Use [Runtime State](docs/40-deployment/runtime-state.md#locate-and-inspect) to identify the app home before inspecting its database, logs, or config within the authorized task.
+- When the user requests a release, follow the [Windows release procedure](docs/40-deployment/windows-distribution.md#one-tag-release-procedure). The Coding Agent owns the regression review before publication and the closeout after verification in that release task.
 
 ## Collaboration
 

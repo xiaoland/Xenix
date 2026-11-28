@@ -11,12 +11,24 @@
 - `develop` is the mutable integration line. An ordinary push to `develop` does not run Native CI.
 - Promote accepted work through one same-repository GitHub PR whose head is `develop` and base is `main`. Native CI is scoped to PRs targeting `main`; its single stable `Native CI` check is required before merge.
 - Do not locally merge `develop` into `main` and push the result. Do not open feature-branch PRs directly to `main`.
-- A merged promotion makes its resulting `main` state release-eligible but does not release it. Release starts only when an immutable `v<project-version>` tag is pushed on an eligible promotion result.
+- A merged promotion makes its resulting `main` state release-eligible. When the user requests a release, the Coding Agent follows the [Windows release procedure](docs/40-deployment/windows-distribution.md#one-tag-release-procedure).
 - A release tag may select the current or an older eligible promotion result. After creating the local tag and before pushing it, run `pdm run release-identity --require-tag --require-promotion --repository xiaoland/Xenix`. The remote release workflow repeats this check.
 - A historical target must already contain the supported release workflow and protocol. Because GitHub resolves a push workflow from the tagged ref, the local preflight is the rejection boundary for older pre-protocol commits.
 - Never move or delete a pushed release tag. Product corrections use a new version; transient infrastructure failures rerun the unchanged tag.
 
 When monitoring asynchronous workflows such as GitHub Actions, prefer a completion or failure notification when the environment supports one. Otherwise, wait at least 60 seconds between status checks, including checks through different commands or tools; use a longer interval for slow builds and uploads. Batch checks for independent active runs. Notify the user only when a phase changes, an actionable failure or approval requirement appears, or the workflow completes; an unchanged queued/running state is not a progress update. Workflow monitoring is separate from a build or transfer process's own diagnostic heartbeat.
+
+## Regression Postmortems
+
+Use these cases during the [release review](docs/40-deployment/windows-distribution.md#one-tag-release-procedure). Each entry should tell the Coding Agent when to revisit a failure and where to verify the affected behavior.
+
+| Historical failure | When to revisit | Verification |
+| --- | --- | --- |
+| A merge dropped Knowledge and Job Center wiring (`185e56d`, `5e858a9`). | Desktop composition, scheduler registration, or main-window navigation changes. | The [desktop acceptance](tests/runtime/test_application_composition.py) imports and retrieves a document through production wiring and opens the Job Center from the main window. |
+| Stopping or failing sampling left an idle conversation unable to accept a new message (`503fff6`, `2b599e6`). | Submission admission, cancellation, or model switching changes. | The [Harness acceptance](tests/agent/test_agent_harness_first_slice.py) covers a new submission after Stop and continuation after a terminal failure with a switched model. |
+| Offline PDF text import was broken while packaged smoke only exercised PDF rendering (`f3c6249`). | PDF routing, bundled document dependencies, or worker packaging changes. | The [packaged smoke](src/xenix/services/knowledge_packaged_smoke.py) requires an embedded-text PDF to reach lookup with its page locator through the spawned import worker. |
+
+Group related commits by failure. For a newly relevant failure, preserve its source references, user impact, triggering change, missed check, and verification result when known. Update the existing entry when the same failure recurs. Keep entries here while they guide future reviews, and maintain current guarantees in their owning specs, tests, or smoke checks.
 
 ## Run the Development App
 

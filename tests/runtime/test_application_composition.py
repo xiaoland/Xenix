@@ -1,6 +1,4 @@
 """Exercise desktop wiring in a separate Qt process with real local services."""
-import pytest
-
 
 import os
 from pathlib import Path
@@ -8,21 +6,30 @@ import subprocess
 import sys
 import textwrap
 
+import pytest
+
 from tests.support.paths import PROJECT_ROOT
 
 pytestmark = pytest.mark.slow
 
 
-def test_desktop_import_reaches_keyword_retrieval_through_all_job_kinds(app_paths, tmp_path: Path):
+def test_desktop_composition_connects_knowledge_jobs_and_job_center(app_paths, tmp_path: Path):
     source = tmp_path / "inventory-rules.txt"
     source.write_text("Umbrella inventory uses three weeks of average sales.", encoding="utf-8")
     driver = textwrap.dedent("""
         import sys
         from pathlib import Path
+
+        from PySide6.QtCore import Qt
+        from PySide6.QtTest import QTest
+        from PySide6.QtWidgets import QPushButton
+
+        from tests.support.ui_queries import find_control
         from xenix.app import build_main_window
+        from xenix.ui.job_center import JobCenterDialog
 
         handles = []
-        app, window = build_main_window(show=False, show_splash=False, on_services_ready=handles.append)
+        app, window = build_main_window(show_splash=False, on_services_ready=handles.append)
         # Report driver assertions to pytest rather than the application's modal exception UI.
         sys.excepthook = sys.__excepthook__
         try:
@@ -33,7 +40,15 @@ def test_desktop_import_reaches_keyword_retrieval_through_all_job_kinds(app_path
             assert not any(task.status in {"queued", "running", "failed", "needs_attention"} for task in tasks), tasks
             matches = services.agent.knowledge.lookup("umbrella inventory")
             assert any("three weeks" in match.quote for match in matches), matches
-            print("DESKTOP_KNOWLEDGE_CHAIN_OK")
+
+            jobs_button = find_control(window, "main.header.jobs", QPushButton)
+            assert jobs_button.isVisible(), "The main window's Jobs button is hidden"
+            QTest.mouseClick(jobs_button, Qt.MouseButton.LeftButton)
+            app.processEvents()
+            assert any(dialog.isVisible() for dialog in window.findChildren(JobCenterDialog)), (
+                "The main window's Jobs button did not open the Job Center"
+            )
+            print("DESKTOP_KNOWLEDGE_AND_JOBS_OK")
         finally:
             window.close()
             app.processEvents()
@@ -41,7 +56,11 @@ def test_desktop_import_reaches_keyword_retrieval_through_all_job_kinds(app_path
     result = subprocess.run(
         [sys.executable, "-c", driver, str(source)],
         cwd=tmp_path,
-        env={**os.environ, "PYTHONPATH": str(PROJECT_ROOT / "src"), "QT_QPA_PLATFORM": "offscreen"},
+        env={
+            **os.environ,
+            "PYTHONPATH": os.pathsep.join((str(PROJECT_ROOT / "src"), str(PROJECT_ROOT))),
+            "QT_QPA_PLATFORM": "offscreen",
+        },
         capture_output=True,
         text=True,
         encoding="utf-8",
@@ -49,4 +68,4 @@ def test_desktop_import_reaches_keyword_retrieval_through_all_job_kinds(app_path
         timeout=70,
     )
     assert result.returncode == 0, result.stdout + result.stderr
-    assert "DESKTOP_KNOWLEDGE_CHAIN_OK" in result.stdout
+    assert "DESKTOP_KNOWLEDGE_AND_JOBS_OK" in result.stdout

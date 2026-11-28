@@ -16,10 +16,7 @@ Setup.
 `develop -> main` pull request. Native CI is scoped to PRs targeting `main`; its
 single stable `Native CI` check is required. Do not locally merge and push `main`, and do not open feature-branch PRs directly to `main`.
 
-Merging the promotion PR creates a release-eligible `main` result but publishes
-nothing. The only release authorization is a pushed immutable
-`v<project-version>` tag on the current or any historical eligible promotion
-result. The selected commit must:
+The human requests a release and the Coding Agent carries it out. Merging the promotion PR makes its `main` result eligible. The Coding Agent starts `Native Release` by pushing an immutable `v<project-version>` tag on the selected eligible promotion result. The selected commit must meet these conditions.
 
 - occur in `origin/main` first-parent history;
 - contain the supported release protocol;
@@ -43,15 +40,28 @@ remote rejection.
 
 ## One-Tag Release Procedure
 
-Start from a clean checkout with current refs and the GitHub CLI authenticated:
+### Select and review the release
+
+Start from a clean checkout with current refs and the GitHub CLI authenticated. Read the currently visible version from the canonical Windows feed, resolve its `v<version>` tag to a commit with `git rev-parse '<published-tag>^{commit}'`, and record that baseline in the release task. Select the exact eligible promotion commit for the requested version.
 
 ```powershell
 git fetch origin main:refs/remotes/origin/main --tags
 git switch --detach <eligible-promotion-sha>
+```
+
+Use `git diff --name-status <published-tag> <candidate-sha>` to find which [historical failures](../../CONTRIBUTING.md#regression-postmortems) apply. For each relevant case, reuse evidence from the promotion PR if it covers the selected candidate and behavior, or run a focused check. Record any remaining coverage gaps and resolve confirmed regressions through `develop` before pushing the release tag. Recheck the affected behavior if the candidate changes.
+
+### Publish and close out
+
+After the regression review, tag the selected commit locally, verify its identity, and push the tag.
+
+```powershell
 git tag v<version>
 pdm run release-identity --require-tag --require-promotion --repository xiaoland/Xenix
 git push origin refs/tags/v<version>
 ```
+
+In the same release task, wait for `Native Release` to succeed and confirm the canonical Windows feed shows the intended version. Review fixes since the recorded baseline with `git log --oneline <published-tag>..<release-tag>` and the relevant PRs. Also review failures encountered during this release. Add or update a [postmortem](../../CONTRIBUTING.md#regression-postmortems) on the development line when it changes what future releases should check. Report the published tag and commit, release evidence, checks performed, and any follow-up from the review.
 
 If the local preflight fails, correct the source/version through `develop`; an
 unpushed local tag may be removed and recreated. Never move or delete a pushed
